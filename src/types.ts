@@ -24,6 +24,15 @@ export interface CreateConnectionRequest {
   tags: string[];
 }
 
+export interface CreateConnectionFolderRequest {
+  name: string;
+}
+
+export interface RenameConnectionFolderRequest {
+  id: string;
+  name: string;
+}
+
 export interface RenameConnectionRequest {
   id: string;
   name: string;

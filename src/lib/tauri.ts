@@ -3,9 +3,11 @@ import type {
   AppBootstrap,
   Connection,
   ConnectionGroup,
+  CreateConnectionFolderRequest,
   CreateConnectionRequest,
   DuplicateConnectionRequest,
   KeychainStatus,
+  RenameConnectionFolderRequest,
   RenameConnectionRequest,
   SecretPresence,
   SecretReferenceRequest,
@@ -47,6 +49,18 @@ type CommandMap = {
   create_connection: {
     args: { request: CreateConnectionRequest };
     result: Connection;
+  };
+  create_connection_folder: {
+    args: { request: CreateConnectionFolderRequest };
+    result: ConnectionGroup;
+  };
+  rename_connection_folder: {
+    args: { request: RenameConnectionFolderRequest };
+    result: ConnectionGroup;
+  };
+  delete_connection_folder: {
+    args: { folderId: string };
+    result: null;
   };
   rename_connection: {
     args: { request: RenameConnectionRequest };

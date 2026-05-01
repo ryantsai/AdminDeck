@@ -10,6 +10,7 @@ import {
   Download,
   FileCode2,
   Folder,
+  FolderPlus,
   HardDrive,
   KeyRound,
   Laptop,
@@ -170,6 +171,67 @@ function ConnectionSidebar() {
     });
   }
 
+  async function handleCreateFolder() {
+    const name = window.prompt("New folder name")?.trim();
+    if (!name) {
+      return;
+    }
+
+    try {
+      setTreeError("");
+      await invokeCommand("create_connection_folder", {
+        request: { name },
+      });
+      await reloadConnectionGroups();
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleRenameFolder(group: ConnectionGroup) {
+    const name = window.prompt("Rename folder", group.name)?.trim();
+    if (!name || name === group.name) {
+      return;
+    }
+
+    try {
+      setTreeError("");
+      await invokeCommand("rename_connection_folder", {
+        request: { id: group.id, name },
+      });
+      await reloadConnectionGroups();
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleDeleteFolder(group: ConnectionGroup) {
+    if (group.id === "local") {
+      setTreeError("The local workspace folder cannot be deleted.");
+      return;
+    }
+
+    const detail =
+      group.connections.length === 0
+        ? `Delete folder ${group.name}?`
+        : `Delete folder ${group.name} and ${group.connections.length} connection${
+            group.connections.length === 1 ? "" : "s"
+          }?`;
+    if (!window.confirm(detail)) {
+      return;
+    }
+
+    try {
+      setTreeError("");
+      await invokeCommand("delete_connection_folder", {
+        folderId: group.id,
+      });
+      await reloadConnectionGroups();
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async function handleRenameConnection(connection: Connection) {
     const name = window.prompt("Rename connection", connection.name)?.trim();
     if (!name || name === connection.name) {
@@ -222,22 +284,32 @@ function ConnectionSidebar() {
     }
 
     return groups
-      .map((group) => ({
-        ...group,
-        connections: group.connections.filter((connection) =>
-          [
-            connection.name,
-            connection.host,
-            connection.user,
-            connection.type,
-            ...connection.tags,
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(normalizedQuery),
-        ),
-      }))
-      .filter((group) => group.connections.length > 0);
+      .map((group) => {
+        if (group.name.toLowerCase().includes(normalizedQuery)) {
+          return group;
+        }
+
+        return {
+          ...group,
+          connections: group.connections.filter((connection) =>
+            [
+              connection.name,
+              connection.host,
+              connection.user,
+              connection.type,
+              ...connection.tags,
+            ]
+              .join(" ")
+              .toLowerCase()
+              .includes(normalizedQuery),
+          ),
+        };
+      })
+      .filter(
+        (group) =>
+          group.connections.length > 0 ||
+          group.name.toLowerCase().includes(normalizedQuery),
+      );
   }, [groups, query]);
 
   return (
@@ -247,13 +319,24 @@ function ConnectionSidebar() {
           <p className="panel-label">AdminDeck</p>
           <h1>Connections</h1>
         </div>
-        <button
-          className="icon-button"
-          aria-label="Add connection"
-          onClick={() => setFormMode("save")}
-        >
-          <Plus size={16} />
-        </button>
+        <div className="sidebar-actions">
+          <button
+            className="icon-button"
+            aria-label="New folder"
+            title="New folder"
+            onClick={() => void handleCreateFolder()}
+          >
+            <FolderPlus size={16} />
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Add connection"
+            title="Add connection"
+            onClick={() => setFormMode("save")}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
       </div>
 
       <label className="search-box">
@@ -274,12 +357,30 @@ function ConnectionSidebar() {
       <div className="tree-list" aria-label="Connection tree">
         {filteredGroups.map((group) => (
           <section className="tree-group" key={group.id}>
-            <button className="tree-folder">
-              <ChevronDown size={14} />
-              <Folder size={15} />
-              <span>{group.name}</span>
-              <small>{group.connections.length}</small>
-            </button>
+            <div className="tree-folder-row">
+              <button className="tree-folder">
+                <ChevronDown size={14} />
+                <Folder size={15} />
+                <span>{group.name}</span>
+                <small>{group.connections.length}</small>
+              </button>
+              <span className="folder-actions">
+                <button
+                  className="row-action"
+                  aria-label={`Rename folder ${group.name}`}
+                  onClick={() => void handleRenameFolder(group)}
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  className="row-action danger"
+                  aria-label={`Delete folder ${group.name}`}
+                  onClick={() => void handleDeleteFolder(group)}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </span>
+            </div>
             {group.connections.map((connection) => (
               <ConnectionRow
                 connection={connection}
@@ -297,6 +398,7 @@ function ConnectionSidebar() {
       {formMode ? (
         <ConnectionDialog
           error={formError}
+          groups={groups}
           mode={formMode}
           onCancel={() => {
             setFormMode(null);
@@ -311,16 +413,22 @@ function ConnectionSidebar() {
 
 function ConnectionDialog({
   error,
+  groups,
   mode,
   onCancel,
   onSubmit,
 }: {
   error: string;
+  groups: ConnectionGroup[];
   mode: "save" | "quick";
   onCancel: () => void;
   onSubmit: (request: CreateConnectionRequest) => void | Promise<void>;
 }) {
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
+  const folderOptions = useMemo(
+    () => groups.filter((group) => !["local", "manual"].includes(group.id)),
+    [groups],
+  );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -339,7 +447,10 @@ function ConnectionDialog({
       host,
       user: String(form.get("user") ?? "").trim(),
       type: connectionType,
-      folderId: connectionType === "local" ? "local" : "manual",
+      folderId:
+        connectionType === "local"
+          ? "local"
+          : String(form.get("folderId") ?? "").trim() || "manual",
       port: portValue ? Number(portValue) : undefined,
       keyPath: keyPath || undefined,
       tags,
@@ -367,8 +478,23 @@ function ConnectionDialog({
           >
             <option value="ssh">SSH terminal</option>
             <option value="local">Local terminal</option>
+            <option value="sftp">SFTP browser</option>
           </select>
         </label>
+
+        {mode === "save" && connectionType !== "local" ? (
+          <label>
+            <span>Folder</span>
+            <select name="folderId" defaultValue="manual">
+              <option value="manual">Manual</option>
+              {folderOptions.map((group) => (
+                <option value={group.id} key={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label>
           <span>Name</span>

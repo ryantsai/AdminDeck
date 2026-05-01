@@ -46,6 +46,30 @@ fn create_connection(
 }
 
 #[tauri::command]
+fn create_connection_folder(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::CreateConnectionFolderRequest,
+) -> Result<storage::ConnectionGroup, String> {
+    storage.create_connection_folder(request)
+}
+
+#[tauri::command]
+fn rename_connection_folder(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::RenameConnectionFolderRequest,
+) -> Result<storage::ConnectionGroup, String> {
+    storage.rename_connection_folder(request)
+}
+
+#[tauri::command]
+fn delete_connection_folder(
+    storage: tauri::State<'_, storage::Storage>,
+    folder_id: String,
+) -> Result<(), String> {
+    storage.delete_connection_folder(folder_id)
+}
+
+#[tauri::command]
 fn rename_connection(
     storage: tauri::State<'_, storage::Storage>,
     request: storage::RenameConnectionRequest,
@@ -170,6 +194,9 @@ pub fn run() {
             app_bootstrap,
             list_connection_groups,
             create_connection,
+            create_connection_folder,
+            rename_connection_folder,
+            delete_connection_folder,
             rename_connection,
             delete_connection,
             duplicate_connection,

@@ -99,6 +99,19 @@ pub struct CreateConnectionRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateConnectionFolderRequest {
+    name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameConnectionFolderRequest {
+    id: String,
+    name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RenameConnectionRequest {
     id: String,
     name: String,
@@ -298,6 +311,81 @@ impl Storage {
             tags,
             status: "idle".to_string(),
         })
+    }
+
+    pub fn create_connection_folder(
+        &self,
+        request: CreateConnectionFolderRequest,
+    ) -> Result<ConnectionGroup, String> {
+        let name = required_field("folder name", request.name)?;
+        let id = make_folder_id(&name);
+        let connection = self.lock()?;
+        let next_sort_order: i64 = connection
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connection_folders",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(to_storage_error)?;
+
+        connection
+            .execute(
+                "INSERT INTO connection_folders (id, name, sort_order) VALUES (?1, ?2, ?3)",
+                params![id, name, next_sort_order],
+            )
+            .map_err(to_storage_error)?;
+
+        Ok(ConnectionGroup {
+            id,
+            name,
+            connections: Vec::new(),
+        })
+    }
+
+    pub fn rename_connection_folder(
+        &self,
+        request: RenameConnectionFolderRequest,
+    ) -> Result<ConnectionGroup, String> {
+        let id = required_field("folder id", request.id)?;
+        let name = required_field("folder name", request.name)?;
+        let connection = self.lock()?;
+        let affected = connection
+            .execute(
+                "UPDATE connection_folders SET name = ?1 WHERE id = ?2",
+                params![name, id],
+            )
+            .map_err(to_storage_error)?;
+
+        if affected == 0 {
+            return Err("connection folder was not found".to_string());
+        }
+
+        Ok(ConnectionGroup {
+            connections: list_connections_for_folder(&connection, &id)?,
+            id,
+            name,
+        })
+    }
+
+    pub fn delete_connection_folder(&self, folder_id: String) -> Result<(), String> {
+        let folder_id = required_field("folder id", folder_id)?;
+        if folder_id == "local" {
+            return Err("the local workspace folder cannot be deleted".to_string());
+        }
+
+        let connection = self.lock()?;
+        let affected = connection
+            .execute(
+                "DELETE FROM connection_folders WHERE id = ?1",
+                params![folder_id],
+            )
+            .map_err(to_storage_error)?;
+
+        if affected == 0 {
+            return Err("connection folder was not found".to_string());
+        }
+
+        Ok(())
     }
 
     pub fn rename_connection(
@@ -796,6 +884,14 @@ fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<Terminal
 }
 
 fn make_connection_id(name: &str) -> String {
+    make_unique_id("connection", name)
+}
+
+fn make_folder_id(name: &str) -> String {
+    make_unique_id("folder", name)
+}
+
+fn make_unique_id(fallback: &str, name: &str) -> String {
     let slug = name
         .chars()
         .map(|character| {
@@ -816,7 +912,7 @@ fn make_connection_id(name: &str) -> String {
         .unwrap_or_default();
     format!(
         "{}-{unique}",
-        if slug.is_empty() { "connection" } else { &slug }
+        if slug.is_empty() { fallback } else { &slug }
     )
 }
 
@@ -968,6 +1064,86 @@ mod tests {
 
         assert_eq!(production.connections.len(), 3);
         assert_eq!(production.connections[2].id, duplicated.id);
+    }
+
+    #[test]
+    fn create_rename_and_delete_connection_folder() {
+        let storage = Storage::open(temp_db_path("folder-crud")).expect("storage opens");
+
+        let created = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Customer A".to_string(),
+            })
+            .expect("folder is created");
+        assert_eq!(created.name, "Customer A");
+        assert!(created.connections.is_empty());
+
+        let renamed = storage
+            .rename_connection_folder(RenameConnectionFolderRequest {
+                id: created.id.clone(),
+                name: "Customer A Production".to_string(),
+            })
+            .expect("folder is renamed");
+        assert_eq!(renamed.name, "Customer A Production");
+
+        storage
+            .delete_connection_folder(created.id)
+            .expect("folder is deleted");
+
+        let groups = storage
+            .list_connection_groups()
+            .expect("connection groups load");
+        assert!(!groups
+            .iter()
+            .any(|group| group.name == "Customer A Production"));
+    }
+
+    #[test]
+    fn deleting_folder_removes_connections_in_that_folder() {
+        let storage = Storage::open(temp_db_path("folder-delete-cascade")).expect("storage opens");
+        let folder = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Ephemeral".to_string(),
+            })
+            .expect("folder is created");
+
+        storage
+            .create_connection(CreateConnectionRequest {
+                name: "Throwaway SSH".to_string(),
+                host: "throwaway.internal".to_string(),
+                user: "admin".to_string(),
+                connection_type: "ssh".to_string(),
+                folder_id: Some(folder.id.clone()),
+                port: None,
+                key_path: None,
+                tags: vec!["temp".to_string()],
+            })
+            .expect("connection is created in folder");
+
+        storage
+            .delete_connection_folder(folder.id)
+            .expect("folder is deleted");
+
+        let groups = storage
+            .list_connection_groups()
+            .expect("connection groups load");
+        assert!(!groups.iter().any(|group| {
+            group
+                .connections
+                .iter()
+                .any(|connection| connection.host == "throwaway.internal")
+        }));
+    }
+
+    #[test]
+    fn local_workspace_folder_cannot_be_deleted() {
+        let storage = Storage::open(temp_db_path("folder-delete-local")).expect("storage opens");
+
+        let error = storage
+            .delete_connection_folder("local".to_string())
+            .expect_err("local workspace delete is rejected");
+
+        assert_eq!(error, "the local workspace folder cannot be deleted");
     }
 
     #[test]
