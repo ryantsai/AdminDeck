@@ -259,6 +259,22 @@ fn list_local_directory(
 }
 
 #[tauri::command]
+fn upload_sftp_path(
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    request: sftp::UploadSftpPathRequest,
+) -> Result<sftp::SftpTransferResult, String> {
+    sftp_sessions.upload_path(request)
+}
+
+#[tauri::command]
+fn download_sftp_path(
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    request: sftp::DownloadSftpPathRequest,
+) -> Result<sftp::SftpTransferResult, String> {
+    sftp_sessions.download_path(request)
+}
+
+#[tauri::command]
 fn close_sftp_session(
     sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     session_id: String,
@@ -318,6 +334,8 @@ pub fn run() {
             start_sftp_session,
             list_sftp_directory,
             list_local_directory,
+            upload_sftp_path,
+            download_sftp_path,
             close_sftp_session
         ])
         .run(tauri::generate_context!())

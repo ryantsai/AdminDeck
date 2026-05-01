@@ -44,11 +44,12 @@ import {
   isTauriRuntime,
   type LocalDirectoryEntry,
   type SftpDirectoryEntry,
+  type SftpTransferResult,
   type SshConfigImportPreview,
   type SshHostKeyPreview,
   type TerminalOutput,
 } from "./lib/tauri";
-import { aiSuggestions, connectionGroups, transferQueue } from "./sample-data";
+import { aiSuggestions, connectionGroups } from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import type {
   Connection,
@@ -69,6 +70,15 @@ type DraggedTreeItem =
 
 type ConnectionDialogRequest = CreateConnectionRequest & {
   password?: string;
+};
+
+type TransferRecord = {
+  id: string;
+  direction: "upload" | "download";
+  name: string;
+  state: "active" | "done" | "failed";
+  progress: number;
+  detail: string;
 };
 
 function App() {
@@ -1432,6 +1442,9 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   const [localStatus, setLocalStatus] = useState("");
   const [isLocalLoading, setIsLocalLoading] = useState(false);
   const [isRemoteLoading, setIsRemoteLoading] = useState(false);
+  const [selectedLocalName, setSelectedLocalName] = useState<string | null>(null);
+  const [selectedRemoteName, setSelectedRemoteName] = useState<string | null>(null);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
   const sessionIdRef = useRef<string | null>(null);
   const markConnectionSessionStarted = useWorkspaceStore(
     (state) => state.markConnectionSessionStarted,
@@ -1459,6 +1472,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
       });
       setLocalPath(result.path);
       setLocalFiles(result.entries.map(localEntryToFileEntry));
+      setSelectedLocalName(null);
       setLocalStatus("");
     } catch (error) {
       setLocalStatus(String(error));
@@ -1524,6 +1538,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
         markConnectionSessionStarted(connection.id);
         setRemotePath(result.path);
         setRemoteFiles(result.entries.map(remoteEntryToFileEntry));
+        setSelectedRemoteName(null);
         setStatus("Connected");
       } catch (error) {
         if (!disposed) {
@@ -1568,6 +1583,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
       });
       setRemotePath(result.path);
       setRemoteFiles(result.entries.map(remoteEntryToFileEntry));
+      setSelectedRemoteName(null);
       setStatus("Connected");
     } catch (error) {
       setStatus(String(error));
@@ -1596,6 +1612,102 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
     await loadLocalDirectory(joinLocalPath(localPath, ".."));
   };
 
+  const setTransferState = (id: string, patch: Partial<TransferRecord>) => {
+    setTransfers((current) =>
+      current.map((transfer) => (transfer.id === id ? { ...transfer, ...patch } : transfer)),
+    );
+  };
+
+  const handleUpload = async () => {
+    const sessionId = sessionIdRef.current;
+    const selected = localFiles.find((file) => file.name === selectedLocalName);
+    if (!sessionId || !selected || !localPath || !isTauriRuntime()) {
+      return;
+    }
+
+    const transferId = `upload-${Date.now()}`;
+    setTransfers((current) => [
+      {
+        id: transferId,
+        direction: "upload",
+        name: selected.name,
+        state: "active",
+        progress: 0,
+        detail: "Uploading",
+      },
+      ...current,
+    ]);
+
+    try {
+      const result = await invokeCommand("upload_sftp_path", {
+        request: {
+          sessionId,
+          localPath: joinLocalPath(localPath, selected.name),
+          remoteDirectory: remotePath,
+        },
+      });
+      setTransferState(transferId, {
+        state: "done",
+        progress: 100,
+        detail: formatTransferResult(result),
+      });
+      await refreshRemoteDirectory();
+    } catch (error) {
+      setTransferState(transferId, {
+        state: "failed",
+        progress: 100,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const handleDownload = async () => {
+    const sessionId = sessionIdRef.current;
+    const selected = remoteFiles.find((file) => file.name === selectedRemoteName);
+    if (!sessionId || !selected || !localPath || !isTauriRuntime()) {
+      return;
+    }
+
+    const transferId = `download-${Date.now()}`;
+    setTransfers((current) => [
+      {
+        id: transferId,
+        direction: "download",
+        name: selected.name,
+        state: "active",
+        progress: 0,
+        detail: "Downloading",
+      },
+      ...current,
+    ]);
+
+    try {
+      const result = await invokeCommand("download_sftp_path", {
+        request: {
+          sessionId,
+          remotePath: joinRemotePath(remotePath, selected.name),
+          localDirectory: localPath,
+        },
+      });
+      setTransferState(transferId, {
+        state: "done",
+        progress: 100,
+        detail: formatTransferResult(result),
+      });
+      await refreshLocalDirectory();
+    } catch (error) {
+      setTransferState(transferId, {
+        state: "failed",
+        progress: 100,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const isConnected = status === "Connected" && Boolean(sessionIdRef.current);
+  const isTransferring = transfers.some((transfer) => transfer.state === "active");
+  const activeTransferCount = transfers.filter((transfer) => transfer.state === "active").length;
+
   return (
     <section className="sftp-workspace">
       <div className="workspace-toolbar">
@@ -1604,11 +1716,21 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
           <span>{status === "Connected" ? tab.subtitle : status}</span>
         </div>
         <div className="toolbar-cluster">
-          <button className="toolbar-button">
+          <button
+            className="toolbar-button"
+            disabled={!isConnected || !selectedLocalName || isTransferring}
+            onClick={handleUpload}
+            type="button"
+          >
             <Upload size={15} />
             Upload
           </button>
-          <button className="toolbar-button">
+          <button
+            className="toolbar-button"
+            disabled={!isConnected || !selectedRemoteName || !localPath || isTransferring}
+            onClick={handleDownload}
+            type="button"
+          >
             <Download size={15} />
             Download
           </button>
@@ -1622,9 +1744,11 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
           files={localFiles}
           isLoading={isLocalLoading}
           status={localStatus}
+          selectedName={selectedLocalName}
           onRefresh={refreshLocalDirectory}
           onGoUp={openLocalParent}
           onOpenFolder={openLocalFolder}
+          onSelectFile={setSelectedLocalName}
         />
         <FilePane
           title="Remote"
@@ -1632,22 +1756,32 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
           files={remoteFiles}
           isLoading={isRemoteLoading}
           status={status === "Connected" ? "" : status}
+          selectedName={selectedRemoteName}
           onRefresh={refreshRemoteDirectory}
           onGoUp={openRemoteParent}
           onOpenFolder={openRemoteFolder}
+          onSelectFile={setSelectedRemoteName}
         />
       </div>
 
       <div className="transfer-queue">
         <header>
-          <strong>Transfer queue</strong>
-          <span>{transferQueue.length} active</span>
+          <strong>Transfer activity</strong>
+          <span>{activeTransferCount} active</span>
         </header>
-        {transferQueue.map((transfer) => (
+        {transfers.length === 0 ? (
+          <div className="transfer-row transfer-row-muted">No transfers yet</div>
+        ) : null}
+        {transfers.map((transfer) => (
           <div className="transfer-row" key={transfer.id}>
-            <span>{transfer.name}</span>
+            <span>
+              {transfer.direction === "upload" ? "Upload" : "Download"} {transfer.name}
+            </span>
             <progress value={transfer.progress} max="100" />
-            <small>{transfer.progress}%</small>
+            <small className={`transfer-state transfer-state-${transfer.state}`}>
+              {transfer.state}
+            </small>
+            <small>{transfer.detail}</small>
           </div>
         ))}
       </div>
@@ -1671,6 +1805,15 @@ function remoteEntryToFileEntry(entry: SftpDirectoryEntry): FileEntry {
     size: entry.kind === "folder" ? "-" : formatFileSize(entry.size),
     modified: formatRemoteTime(entry.modified),
   };
+}
+
+function formatTransferResult(result: SftpTransferResult) {
+  const parts = [`${result.files} files`];
+  if (result.folders > 0) {
+    parts.push(`${result.folders} folders`);
+  }
+  parts.push(formatFileSize(result.bytes));
+  return parts.join(" | ");
 }
 
 function joinRemotePath(basePath: string, childName: string) {
@@ -1731,18 +1874,22 @@ function FilePane({
   files,
   isLoading = false,
   status = "",
+  selectedName,
   onRefresh,
   onGoUp,
   onOpenFolder,
+  onSelectFile,
 }: {
   title: string;
   path: string;
   files: FileEntry[];
   isLoading?: boolean;
   status?: string;
+  selectedName?: string | null;
   onRefresh?: () => void;
   onGoUp?: () => void;
   onOpenFolder?: (folderName: string) => void;
+  onSelectFile?: (fileName: string) => void;
 }) {
   return (
     <article className="file-pane">
@@ -1780,11 +1927,16 @@ function FilePane({
         )}
         {files.map((file) => (
           <button
-            className="file-row"
-            disabled={file.kind !== "folder" || !onOpenFolder || isLoading}
+            className={`file-row${selectedName === file.name ? " selected" : ""}`}
+            disabled={isLoading}
             key={file.name}
-            onClick={() => onOpenFolder?.(file.name)}
-            title={file.kind === "folder" ? `Open ${file.name}` : file.name}
+            onClick={() => onSelectFile?.(file.name)}
+            onDoubleClick={() => {
+              if (file.kind === "folder") {
+                onOpenFolder?.(file.name);
+              }
+            }}
+            title={file.kind === "folder" ? `Double-click to open ${file.name}` : file.name}
             type="button"
           >
             {file.kind === "folder" ? <Folder size={15} /> : <FileCode2 size={15} />}

@@ -83,6 +83,13 @@ export interface LocalDirectoryListing {
   entries: LocalDirectoryEntry[];
 }
 
+export interface SftpTransferResult {
+  name: string;
+  files: number;
+  folders: number;
+  bytes: number;
+}
+
 export interface SshTransportPlan {
   primaryLibrary: string;
   sftpCandidate: string;
@@ -233,6 +240,14 @@ type CommandMap = {
   list_local_directory: {
     args: { request: { path?: string } };
     result: LocalDirectoryListing;
+  };
+  upload_sftp_path: {
+    args: { request: { sessionId: string; localPath: string; remoteDirectory: string } };
+    result: SftpTransferResult;
+  };
+  download_sftp_path: {
+    args: { request: { sessionId: string; remotePath: string; localDirectory: string } };
+    result: SftpTransferResult;
   };
   close_sftp_session: {
     args: { sessionId: string };

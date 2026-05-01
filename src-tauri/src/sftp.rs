@@ -1,14 +1,20 @@
 use crate::{secrets, ssh};
 use russh::{client, Disconnect};
-use russh_sftp::{client::SftpSession, protocol::FileType};
+use russh_sftp::{
+    client::SftpSession,
+    protocol::{FileType, OpenFlags},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
+    future::Future,
     path::{Path, PathBuf},
+    pin::Pin,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::AppHandle;
+use tokio::io::AsyncWriteExt;
 use tokio::runtime::Runtime;
 
 pub struct SftpSessionManager {
@@ -47,6 +53,22 @@ pub struct ListSftpDirectoryRequest {
 #[serde(rename_all = "camelCase")]
 pub struct ListLocalDirectoryRequest {
     path: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadSftpPathRequest {
+    session_id: String,
+    local_path: String,
+    remote_directory: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadSftpPathRequest {
+    session_id: String,
+    remote_path: String,
+    local_directory: String,
 }
 
 #[derive(Serialize)]
@@ -88,6 +110,15 @@ pub struct LocalDirectoryEntry {
     kind: String,
     size: Option<u64>,
     modified: Option<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SftpTransferResult {
+    name: String,
+    files: u64,
+    folders: u64,
+    bytes: u64,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -202,6 +233,42 @@ impl SftpSessionManager {
         ))
     }
 
+    pub fn upload_path(
+        &self,
+        request: UploadSftpPathRequest,
+    ) -> Result<SftpTransferResult, String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "SFTP session lock is poisoned".to_string())?;
+        let session = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| "SFTP session was not found".to_string())?;
+        session.runtime.block_on(upload_path(
+            &session.sftp,
+            &request.local_path,
+            &request.remote_directory,
+        ))
+    }
+
+    pub fn download_path(
+        &self,
+        request: DownloadSftpPathRequest,
+    ) -> Result<SftpTransferResult, String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "SFTP session lock is poisoned".to_string())?;
+        let session = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| "SFTP session was not found".to_string())?;
+        session.runtime.block_on(download_path(
+            &session.sftp,
+            &request.remote_path,
+            &request.local_directory,
+        ))
+    }
+
     pub fn close_sftp_session(&self, session_id: String) -> Result<(), String> {
         let session = self
             .sessions
@@ -219,6 +286,145 @@ impl SftpSessionManager {
         }
         Ok(())
     }
+}
+
+async fn upload_path(
+    sftp: &SftpSession,
+    local_path: &str,
+    remote_directory: &str,
+) -> Result<SftpTransferResult, String> {
+    let source = fs::canonicalize(local_path)
+        .map_err(|error| format!("failed to resolve local source: {error}"))?;
+    let name = local_path_name(&source)?;
+    let remote_target = join_remote_path(remote_directory, &name);
+    ensure_remote_missing(sftp, &remote_target).await?;
+
+    let mut summary = TransferSummary {
+        name,
+        ..TransferSummary::default()
+    };
+    upload_local_entry(sftp, &source, &remote_target, &mut summary).await?;
+    Ok(summary.into_result())
+}
+
+async fn download_path(
+    sftp: &SftpSession,
+    remote_path: &str,
+    local_directory: &str,
+) -> Result<SftpTransferResult, String> {
+    let local_directory = resolve_local_directory(Some(local_directory))?;
+    let remote_path = normalize_path(remote_path);
+    let name = remote_path_name(&remote_path)?;
+    let local_target = local_directory.join(&name);
+    ensure_local_missing(&local_target)?;
+
+    let mut summary = TransferSummary {
+        name,
+        ..TransferSummary::default()
+    };
+    download_remote_entry(sftp, &remote_path, &local_target, &mut summary).await?;
+    Ok(summary.into_result())
+}
+
+fn upload_local_entry<'a>(
+    sftp: &'a SftpSession,
+    local_path: &'a Path,
+    remote_path: &'a str,
+    summary: &'a mut TransferSummary,
+) -> Pin<Box<dyn Future<Output = Result<(), String>> + 'a>> {
+    Box::pin(async move {
+        let metadata = fs::metadata(local_path)
+            .map_err(|error| format!("failed to inspect local source: {error}"))?;
+        if metadata.is_dir() {
+            create_remote_dir_if_missing(sftp, remote_path).await?;
+            summary.folders += 1;
+            let mut children = fs::read_dir(local_path)
+                .map_err(|error| format!("failed to read local folder: {error}"))?
+                .filter_map(|entry| entry.ok())
+                .collect::<Vec<_>>();
+            children.sort_by_key(|entry| entry.file_name().to_string_lossy().to_lowercase());
+            for child in children {
+                let child_name = child.file_name().to_string_lossy().to_string();
+                let child_path = child.path();
+                let child_remote_path = join_remote_path(remote_path, &child_name);
+                upload_local_entry(sftp, &child_path, &child_remote_path, summary).await?;
+            }
+            return Ok(());
+        }
+
+        if !metadata.is_file() {
+            return Err("only local files and folders can be uploaded".to_string());
+        }
+
+        ensure_remote_missing(sftp, remote_path).await?;
+        let data =
+            fs::read(local_path).map_err(|error| format!("failed to read local file: {error}"))?;
+        let mut file = sftp
+            .open_with_flags(
+                remote_path.to_string(),
+                OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE,
+            )
+            .await
+            .map_err(|error| format!("failed to create remote file: {error}"))?;
+        file.write_all(&data)
+            .await
+            .map_err(|error| format!("failed to upload remote file: {error}"))?;
+        file.shutdown()
+            .await
+            .map_err(|error| format!("failed to finish remote upload: {error}"))?;
+        summary.files += 1;
+        summary.bytes += data.len() as u64;
+        Ok(())
+    })
+}
+
+fn download_remote_entry<'a>(
+    sftp: &'a SftpSession,
+    remote_path: &'a str,
+    local_path: &'a Path,
+    summary: &'a mut TransferSummary,
+) -> Pin<Box<dyn Future<Output = Result<(), String>> + 'a>> {
+    Box::pin(async move {
+        let metadata = sftp
+            .metadata(remote_path.to_string())
+            .await
+            .map_err(|error| format!("failed to inspect remote source: {error}"))?;
+        match metadata.file_type() {
+            FileType::Dir => {
+                ensure_local_missing(local_path)?;
+                fs::create_dir(local_path)
+                    .map_err(|error| format!("failed to create local folder: {error}"))?;
+                summary.folders += 1;
+                let mut entries = sftp
+                    .read_dir(remote_path.to_string())
+                    .await
+                    .map_err(|error| format!("failed to read remote folder: {error}"))?
+                    .map(|entry| entry.file_name())
+                    .collect::<Vec<_>>();
+                entries.sort_by_key(|name| name.to_lowercase());
+                for child_name in entries {
+                    let child_remote_path = join_remote_path(remote_path, &child_name);
+                    let child_local_path = local_path.join(&child_name);
+                    download_remote_entry(sftp, &child_remote_path, &child_local_path, summary)
+                        .await?;
+                }
+                Ok(())
+            }
+            FileType::File => {
+                ensure_local_missing(local_path)?;
+                let data = sftp
+                    .read(remote_path.to_string())
+                    .await
+                    .map_err(|error| format!("failed to download remote file: {error}"))?;
+                fs::write(local_path, &data)
+                    .map_err(|error| format!("failed to write local file: {error}"))?;
+                summary.files += 1;
+                summary.bytes += data.len() as u64;
+                Ok(())
+            }
+            _ => Err("only remote files and folders can be downloaded".to_string()),
+        }
+    })
 }
 
 pub fn list_local_directory(
@@ -239,7 +445,10 @@ pub fn list_local_directory(
                 } else {
                     None
                 },
-                modified: metadata.modified().ok().and_then(|time| unix_timestamp(time).ok()),
+                modified: metadata
+                    .modified()
+                    .ok()
+                    .and_then(|time| unix_timestamp(time).ok()),
             })
         })
         .collect::<Vec<_>>();
@@ -382,6 +591,69 @@ fn normalize_path(path: &str) -> String {
     }
 }
 
+fn join_remote_path(base_path: &str, child_name: &str) -> String {
+    let base_path = normalize_path(base_path);
+    if base_path == "." {
+        child_name.to_string()
+    } else if base_path.ends_with('/') {
+        format!("{base_path}{child_name}")
+    } else {
+        format!("{base_path}/{child_name}")
+    }
+}
+
+fn local_path_name(path: &Path) -> Result<String, String> {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| "local source must have a file or folder name".to_string())
+}
+
+fn remote_path_name(path: &str) -> Result<String, String> {
+    normalize_path(path)
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .map(str::trim)
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .map(ToString::to_string)
+        .ok_or_else(|| "remote source must have a file or folder name".to_string())
+}
+
+fn ensure_local_missing(path: &Path) -> Result<(), String> {
+    if path.exists() {
+        return Err(format!(
+            "local destination already exists: {}",
+            display_local_path(path)
+        ));
+    }
+    Ok(())
+}
+
+async fn ensure_remote_missing(sftp: &SftpSession, path: &str) -> Result<(), String> {
+    let exists = sftp
+        .try_exists(path.to_string())
+        .await
+        .map_err(|error| format!("failed to inspect remote destination: {error}"))?;
+    if exists {
+        return Err(format!("remote destination already exists: {path}"));
+    }
+    Ok(())
+}
+
+async fn create_remote_dir_if_missing(sftp: &SftpSession, path: &str) -> Result<(), String> {
+    if sftp
+        .try_exists(path.to_string())
+        .await
+        .map_err(|error| format!("failed to inspect remote folder: {error}"))?
+    {
+        return Err(format!("remote destination already exists: {path}"));
+    }
+    sftp.create_dir(path.to_string())
+        .await
+        .map_err(|error| format!("failed to create remote folder: {error}"))
+}
+
 fn resolve_local_directory(path: Option<&str>) -> Result<PathBuf, String> {
     let path = path
         .map(str::trim)
@@ -448,6 +720,25 @@ fn make_session_id(title: &str) -> String {
     format!("{}-{unique}", if slug.is_empty() { "sftp" } else { &slug })
 }
 
+#[derive(Default)]
+struct TransferSummary {
+    name: String,
+    files: u64,
+    folders: u64,
+    bytes: u64,
+}
+
+impl TransferSummary {
+    fn into_result(self) -> SftpTransferResult {
+        SftpTransferResult {
+            name: self.name,
+            files: self.files,
+            folders: self.folders,
+            bytes: self.bytes,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -498,6 +789,29 @@ mod tests {
             display_local_path(Path::new(r"\\?\UNC\server\share")),
             r"\\server\share"
         );
+    }
+
+    #[test]
+    fn remote_paths_join_with_single_separator() {
+        assert_eq!(join_remote_path(".", "release.zip"), "release.zip");
+        assert_eq!(
+            join_remote_path("/srv/releases", "release.zip"),
+            "/srv/releases/release.zip"
+        );
+        assert_eq!(
+            join_remote_path("/srv/releases/", "release.zip"),
+            "/srv/releases/release.zip"
+        );
+    }
+
+    #[test]
+    fn remote_path_names_reject_directory_only_values() {
+        assert_eq!(
+            remote_path_name("/srv/releases/app.zip"),
+            Ok("app.zip".to_string())
+        );
+        assert!(remote_path_name(".").is_err());
+        assert!(remote_path_name("..").is_err());
     }
 
     fn sftp_request() -> StartSftpSessionRequest {

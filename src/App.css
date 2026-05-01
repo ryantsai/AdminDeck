@@ -225,6 +225,13 @@ h2 {
   border: 1px solid var(--border);
 }
 
+.toolbar-button:disabled {
+  color: var(--text-faint);
+  background: var(--surface-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .approve-button {
   color: #ffffff;
   background: var(--green);
@@ -706,6 +713,11 @@ button.file-row:hover:not(:disabled) {
   background: var(--surface-muted);
 }
 
+button.file-row.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 button.file-row:disabled {
   cursor: default;
 }
@@ -731,12 +743,42 @@ button.file-row:disabled {
 
 .transfer-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 170px 42px;
+  grid-template-columns: minmax(120px, 1fr) 150px 56px minmax(180px, 0.85fr);
   gap: 10px;
   align-items: center;
   height: 34px;
   padding: 0 12px;
   font-size: 12px;
+}
+
+.transfer-row span,
+.transfer-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-row-muted {
+  grid-template-columns: minmax(0, 1fr);
+  color: var(--text-muted);
+}
+
+.transfer-state {
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.transfer-state-done {
+  color: var(--green);
+}
+
+.transfer-state-failed {
+  color: var(--red);
+}
+
+.transfer-state-active {
+  color: var(--accent);
 }
 
 progress {

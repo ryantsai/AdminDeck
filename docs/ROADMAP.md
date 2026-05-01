@@ -6,7 +6,7 @@ As of May 1, 2026, Milestone A has a usable session spine in place: typed fronte
 
 Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH/SFTP Connections.
 
-Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP Connection credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SFTP tabs now open a backend session, list the remote home directory, close the session with the tab view, and present a real dual-pane local/remote file manager with refresh, parent navigation, and folder opening on both sides.
+Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP Connection credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SFTP tabs now open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, and folder opening on both sides, and support conservative upload/download of selected files or folders without overwriting existing destinations.
 
 ## Milestone 0: Project Foundation
 
@@ -50,7 +50,7 @@ Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP
 
 - [x] Implement SFTP session reuse from connection credentials where possible.
 - [x] Add dual-pane local/remote file manager.
-- Add upload and download for files and folders.
+- [x] Add upload and download for files and folders.
 - Add create folder, rename, delete, and refresh.
 - Add transfer queue with progress and cancellation.
 - Add overwrite behavior setting.
