@@ -10,12 +10,13 @@ interface WorkspaceState {
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
+  openLocalTerminal: () => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   query: "",
   tabs: initialTabs,
-  activeTabId: initialTabs[0].id,
+  activeTabId: initialTabs[0]?.id ?? "",
   setQuery: (query) => set({ query }),
   activateTab: (tabId) => set({ activeTabId: tabId }),
   closeTab: (tabId) => {
@@ -57,10 +58,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 id: `pane-${connection.id}`,
                 title: connection.type === "local" ? "local shell" : "ssh",
                 cwd: connection.type === "local" ? "C:\\Users\\ryan" : "~",
-                buffer:
-                  connection.type === "local"
-                    ? "Starting local terminal adapter...\nPTY lifecycle lands in Milestone A.\n"
-                    : `Connecting to ${connection.user}@${connection.host}...\nSSH transport lands in Milestone B.\n`,
+                buffer: "",
+                connection,
               },
             ],
           };
@@ -69,5 +68,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tabs: [...state.tabs, tab],
       activeTabId: tab.id,
     }));
+  },
+  openLocalTerminal: () => {
+    const id = `local-${Date.now()}`;
+    get().openConnection({
+      id,
+      name: "PowerShell",
+      host: "localhost",
+      user: "local",
+      type: "local",
+      tags: ["local", "shell"],
+      status: "idle",
+    });
   },
 }));

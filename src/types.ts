@@ -6,9 +6,22 @@ export interface Connection {
   name: string;
   host: string;
   user: string;
+  port?: number;
+  keyPath?: string;
   type: ConnectionType;
   tags: string[];
   status: ConnectionStatus;
+}
+
+export interface CreateConnectionRequest {
+  name: string;
+  host: string;
+  user: string;
+  type: ConnectionType;
+  folderId?: string;
+  port?: number;
+  keyPath?: string;
+  tags: string[];
 }
 
 export interface ConnectionGroup {
@@ -22,6 +35,7 @@ export interface TerminalPane {
   title: string;
   cwd: string;
   buffer: string;
+  connection?: Connection;
 }
 
 export interface WorkspaceTab {

@@ -66,52 +66,7 @@ export const connectionGroups: ConnectionGroup[] = [
   },
 ];
 
-export const initialTabs: WorkspaceTab[] = [
-  {
-    id: "tab-local",
-    title: "PowerShell",
-    subtitle: "Local terminal session",
-    kind: "terminal",
-    panes: [
-      {
-        id: "pane-local-1",
-        title: "pwsh",
-        cwd: "C:\\Users\\ryan\\Desktop\\mytty",
-        buffer:
-          "PS C:\\Users\\ryan\\Desktop\\mytty> npm run tauri dev\nAdminDeck shell initialized\nSQLite repository layer: pending Milestone A\nPTY adapter: pending Milestone A\n",
-      },
-      {
-        id: "pane-local-2",
-        title: "diagnostics",
-        cwd: "logs",
-        buffer:
-          "Local logs enabled\nTelemetry: disabled\nCrash upload: disabled\nDiagnostics bundle: planned with redaction rules\n",
-      },
-    ],
-  },
-  {
-    id: "tab-ssh",
-    title: "Bastion East",
-    subtitle: "admin@bastion-east.internal",
-    kind: "terminal",
-    panes: [
-      {
-        id: "pane-ssh-1",
-        title: "ssh",
-        cwd: "~",
-        buffer:
-          "admin@bastion-east:~$ systemctl status admindeck-agent\n● admindeck-agent.service - AdminDeck test service\n   Loaded: loaded\n   Active: active (running)\n",
-      },
-    ],
-  },
-  {
-    id: "tab-sftp",
-    title: "Release Files",
-    subtitle: "deploy@files01.internal:/srv/admin-deck",
-    kind: "sftp",
-    panes: [],
-  },
-];
+export const initialTabs: WorkspaceTab[] = [];
 
 export const localFiles: FileEntry[] = [
   { name: "admin-deck-0.1.0.zip", kind: "file", size: "18.4 MB", modified: "10:38" },

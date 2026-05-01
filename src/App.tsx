@@ -28,9 +28,14 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { FitAddon } from "@xterm/addon-fit";
+import { Terminal as TerminalEmulator } from "@xterm/xterm";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
+import "@xterm/xterm/css/xterm.css";
 import "./App.css";
-import { invokeCommand } from "./lib/tauri";
+import { invokeCommand, type TerminalOutput } from "./lib/tauri";
 import {
   aiSuggestions,
   connectionGroups,
@@ -39,7 +44,15 @@ import {
   transferQueue,
 } from "./sample-data";
 import { useWorkspaceStore } from "./store";
-import type { Connection, ConnectionGroup, FileEntry, WorkspaceTab } from "./types";
+import type {
+  Connection,
+  ConnectionGroup,
+  ConnectionType,
+  CreateConnectionRequest,
+  FileEntry,
+  TerminalPane,
+  WorkspaceTab,
+} from "./types";
 
 function App() {
   const [bootstrap, setBootstrap] = useState("Starting local runtime");
@@ -92,12 +105,44 @@ function ConnectionSidebar() {
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
   const [groups, setGroups] = useState<ConnectionGroup[]>(connectionGroups);
+  const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    invokeCommand("list_connection_groups")
-      .then(setGroups)
-      .catch(() => setGroups(connectionGroups));
+    loadConnectionGroups(setGroups);
   }, []);
+
+  function handleConnectionReady(connection: Connection) {
+    setGroups((currentGroups) => upsertConnectionGroup(currentGroups, connection));
+    openConnection(connection);
+    setFormMode(null);
+    setFormError("");
+  }
+
+  async function handleConnectionSubmit(request: CreateConnectionRequest) {
+    setFormError("");
+    if (formMode === "save") {
+      try {
+        const connection = await invokeCommand("create_connection", { request });
+        handleConnectionReady(connection);
+      } catch (error) {
+        setFormError(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
+
+    handleConnectionReady({
+      id: `quick-${Date.now()}`,
+      name: request.name || request.host,
+      host: request.host,
+      user: request.user,
+      port: request.port,
+      keyPath: request.keyPath,
+      type: request.type,
+      tags: request.tags,
+      status: "idle",
+    });
+  }
 
   const filteredGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -131,7 +176,11 @@ function ConnectionSidebar() {
           <p className="panel-label">AdminDeck</p>
           <h1>Connections</h1>
         </div>
-        <button className="icon-button" aria-label="Add connection">
+        <button
+          className="icon-button"
+          aria-label="Add connection"
+          onClick={() => setFormMode("save")}
+        >
           <Plus size={16} />
         </button>
       </div>
@@ -145,7 +194,7 @@ function ConnectionSidebar() {
         />
       </label>
 
-      <button className="quick-connect">
+      <button className="quick-connect" onClick={() => setFormMode("quick")}>
         <Play size={15} />
         Quick connect
       </button>
@@ -169,7 +218,127 @@ function ConnectionSidebar() {
           </section>
         ))}
       </div>
+
+      {formMode ? (
+        <ConnectionDialog
+          error={formError}
+          mode={formMode}
+          onCancel={() => {
+            setFormMode(null);
+            setFormError("");
+          }}
+          onSubmit={handleConnectionSubmit}
+        />
+      ) : null}
     </aside>
+  );
+}
+
+function ConnectionDialog({
+  error,
+  mode,
+  onCancel,
+  onSubmit,
+}: {
+  error: string;
+  mode: "save" | "quick";
+  onCancel: () => void;
+  onSubmit: (request: CreateConnectionRequest) => void | Promise<void>;
+}) {
+  const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const host = String(form.get("host") ?? "").trim();
+    const name = String(form.get("name") ?? "").trim() || host;
+    const portValue = String(form.get("port") ?? "").trim();
+    const keyPath = String(form.get("keyPath") ?? "").trim();
+    const tags = String(form.get("tags") ?? "")
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    void onSubmit({
+      name,
+      host,
+      user: String(form.get("user") ?? "").trim(),
+      type: connectionType,
+      folderId: connectionType === "local" ? "local" : "manual",
+      port: portValue ? Number(portValue) : undefined,
+      keyPath: keyPath || undefined,
+      tags,
+    });
+  }
+
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <form className="connection-dialog" onSubmit={handleSubmit}>
+        <header>
+          <div>
+            <p className="panel-label">{mode === "save" ? "New connection" : "Quick connect"}</p>
+            <h2>{mode === "save" ? "Save and open" : "Open one-off session"}</h2>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close" onClick={onCancel}>
+            <X size={15} />
+          </button>
+        </header>
+
+        <label>
+          <span>Type</span>
+          <select
+            value={connectionType}
+            onChange={(event) => setConnectionType(event.currentTarget.value as ConnectionType)}
+          >
+            <option value="ssh">SSH terminal</option>
+            <option value="local">Local terminal</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Name</span>
+          <input name="name" placeholder="Bastion East" />
+        </label>
+
+        <label>
+          <span>Host</span>
+          <input name="host" placeholder="example.internal" required />
+        </label>
+
+        <div className="form-grid">
+          <label>
+            <span>User</span>
+            <input name="user" placeholder="admin" required />
+          </label>
+          <label>
+            <span>Port</span>
+            <input name="port" inputMode="numeric" min="1" max="65535" type="number" placeholder="22" />
+          </label>
+        </div>
+
+        <label>
+          <span>Key path</span>
+          <input name="keyPath" placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519" />
+        </label>
+
+        <label>
+          <span>Tags</span>
+          <input name="tags" placeholder="prod, jump" />
+        </label>
+
+        {error ? <p className="form-error">{error}</p> : null}
+
+        <div className="dialog-actions">
+          <button className="toolbar-button" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="approve-button" type="submit">
+            <Play size={15} />
+            {mode === "save" ? "Save and open" : "Connect"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -192,6 +361,39 @@ function ConnectionRow({
       <span className={`status-dot ${connection.status}`} />
     </button>
   );
+}
+
+function loadConnectionGroups(setGroups: (groups: ConnectionGroup[]) => void) {
+  invokeCommand("list_connection_groups")
+    .then(setGroups)
+    .catch(() => setGroups(connectionGroups));
+}
+
+function upsertConnectionGroup(groups: ConnectionGroup[], connection: Connection) {
+  const groupId = connection.type === "local" ? "local" : "manual";
+  const groupName = connection.type === "local" ? "Local workspace" : "Manual";
+  const withoutConnection = groups.map((group) => ({
+    ...group,
+    connections: group.connections.filter((item) => item.id !== connection.id),
+  }));
+  const targetGroup = withoutConnection.find((group) => group.id === groupId);
+
+  if (targetGroup) {
+    return withoutConnection.map((group) =>
+      group.id === groupId
+        ? { ...group, connections: [connection, ...group.connections] }
+        : group,
+    );
+  }
+
+  return [
+    ...withoutConnection,
+    {
+      id: groupId,
+      name: groupName,
+      connections: [connection],
+    },
+  ];
 }
 
 function TopBar({ runtimeStatus }: { runtimeStatus: string }) {
@@ -224,6 +426,7 @@ function TabStrip() {
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
   const activateTab = useWorkspaceStore((state) => state.activateTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
+  const openLocalTerminal = useWorkspaceStore((state) => state.openLocalTerminal);
 
   return (
     <div className="tab-strip" role="tablist" aria-label="Workspace tabs">
@@ -247,7 +450,7 @@ function TabStrip() {
           />
         </button>
       ))}
-      <button className="new-tab" aria-label="New local terminal">
+      <button className="new-tab" aria-label="New local terminal" onClick={openLocalTerminal}>
         <Plus size={15} />
       </button>
     </div>
@@ -299,21 +502,139 @@ function TerminalWorkspace({ tab }: { tab: WorkspaceTab }) {
 
       <div className="terminal-grid">
         {tab.panes.map((pane) => (
-          <article className="terminal-pane" key={pane.id}>
-            <header>
-              <span>
-                <Circle size={9} fill="currentColor" />
-                {pane.title}
-              </span>
-              <small>{pane.cwd}</small>
-            </header>
-            <pre>
-              <code>{pane.buffer}</code>
-            </pre>
-          </article>
+          <TerminalPaneView pane={pane} key={pane.id} />
         ))}
       </div>
     </section>
+  );
+}
+
+function TerminalPaneView({ pane }: { pane: TerminalPane }) {
+  const terminalElementRef = useRef<HTMLDivElement | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    const element = terminalElementRef.current;
+    const connection = pane.connection;
+    if (!element || !connection || startedRef.current) {
+      return;
+    }
+
+    startedRef.current = true;
+    const terminal = new TerminalEmulator({
+      cursorBlink: true,
+      fontFamily: '"Cascadia Mono", "JetBrains Mono", Consolas, monospace',
+      fontSize: 12,
+      lineHeight: 1.25,
+      theme: {
+        background: "#0c1219",
+        foreground: "#d9e2ef",
+        cursor: "#d9e2ef",
+        selectionBackground: "#305f95",
+      },
+    });
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.open(element);
+    fitAddon.fit();
+    terminal.focus();
+    terminal.writeln(`Starting ${connection.type} session for ${connection.name}...`);
+    const requestedSessionId = `${connection.id}-${Date.now()}`;
+    sessionIdRef.current = requestedSessionId;
+
+    let disposed = false;
+    let removeOutputListener: (() => void) | undefined;
+    const dataDisposable = terminal.onData((data) => {
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) {
+        return;
+      }
+      void invokeCommand("write_terminal_input", {
+        request: { sessionId, data },
+      });
+    });
+
+    const resizeObserver = new ResizeObserver(() => {
+      fitAddon.fit();
+      const sessionId = sessionIdRef.current;
+      if (sessionId) {
+        void invokeCommand("resize_terminal", {
+          request: { sessionId, cols: terminal.cols, rows: terminal.rows },
+        });
+      }
+    });
+    resizeObserver.observe(element);
+
+    void (async () => {
+      const unlisten = await listen<TerminalOutput>("terminal-output", (event) => {
+        if (event.payload.sessionId === sessionIdRef.current) {
+          terminal.write(event.payload.data);
+        }
+      });
+      if (disposed) {
+        unlisten();
+        return;
+      }
+      removeOutputListener = unlisten;
+
+      try {
+        const result = await invokeCommand("start_terminal_session", {
+          request: {
+            sessionId: requestedSessionId,
+            title: connection.name,
+            type: connection.type === "local" ? "local" : "ssh",
+            host: connection.host,
+            user: connection.user,
+            port: connection.port,
+            keyPath: connection.keyPath,
+            cols: terminal.cols,
+            rows: terminal.rows,
+          },
+        });
+        if (disposed) {
+          void invokeCommand("close_terminal_session", { sessionId: result.sessionId });
+          return;
+        }
+        sessionIdRef.current = result.sessionId;
+      } catch (error) {
+        terminal.writeln("");
+        terminal.writeln(`[failed to start session: ${String(error)}]`);
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      startedRef.current = false;
+      dataDisposable.dispose();
+      resizeObserver.disconnect();
+      removeOutputListener?.();
+      const sessionId = sessionIdRef.current;
+      if (sessionId) {
+        void invokeCommand("close_terminal_session", { sessionId });
+      }
+      sessionIdRef.current = null;
+      terminal.dispose();
+    };
+  }, [pane.connection]);
+
+  return (
+    <article className="terminal-pane">
+      <header>
+        <span>
+          <Circle size={9} fill="currentColor" />
+          {pane.title}
+        </span>
+        <small>{pane.cwd}</small>
+      </header>
+      {pane.connection ? (
+        <div className="xterm-host" ref={terminalElementRef} />
+      ) : (
+        <pre>
+          <code>{pane.buffer}</code>
+        </pre>
+      )}
+    </article>
   );
 }
 

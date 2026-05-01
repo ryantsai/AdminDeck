@@ -48,7 +48,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -466,7 +467,7 @@ kbd + kbd {
 
 .terminal-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 10px;
   min-height: 0;
 }
@@ -525,6 +526,16 @@ kbd + kbd {
 
 .terminal-pane code {
   color: #d9e2ef;
+}
+
+.xterm-host {
+  min-width: 0;
+  min-height: 0;
+  padding: 8px;
+}
+
+.xterm-host .xterm {
+  height: 100%;
 }
 
 .sftp-workspace {
@@ -739,4 +750,79 @@ progress {
   color: var(--text-muted);
   background: var(--surface-muted);
   border-top: 1px solid var(--border);
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.connection-dialog {
+  display: grid;
+  gap: 11px;
+  width: min(420px, calc(100vw - 40px));
+  padding: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.connection-dialog header,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.connection-dialog label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.connection-dialog label span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.connection-dialog input,
+.connection-dialog select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 9px;
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: 0;
+  font-size: 13px;
+}
+
+.connection-dialog input:focus,
+.connection-dialog select:focus {
+  border-color: #8db5ff;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 12px;
+  line-height: 1.4;
 }

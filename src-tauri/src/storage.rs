@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection as SqliteConnection};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
 const MIGRATION_001: &str = r#"
@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS connections (
     name TEXT NOT NULL,
     host TEXT NOT NULL,
     username TEXT NOT NULL,
+    port INTEGER,
+    key_path TEXT,
     connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'sftp')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
@@ -60,10 +62,26 @@ pub struct SavedConnection {
     name: String,
     host: String,
     user: String,
+    port: Option<u16>,
+    key_path: Option<String>,
     #[serde(rename = "type")]
     connection_type: String,
     tags: Vec<String>,
     status: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateConnectionRequest {
+    name: String,
+    host: String,
+    user: String,
+    #[serde(rename = "type")]
+    connection_type: String,
+    folder_id: Option<String>,
+    port: Option<u16>,
+    key_path: Option<String>,
+    tags: Vec<String>,
 }
 
 impl Storage {
@@ -130,7 +148,89 @@ impl Storage {
         let connection = self.lock()?;
         connection
             .execute_batch(MIGRATION_001)
-            .map_err(to_storage_error)
+            .map_err(to_storage_error)?;
+        add_optional_column(
+            &connection,
+            "ALTER TABLE connections ADD COLUMN port INTEGER",
+        )?;
+        add_optional_column(
+            &connection,
+            "ALTER TABLE connections ADD COLUMN key_path TEXT",
+        )?;
+        Ok(())
+    }
+
+    pub fn create_connection(
+        &self,
+        request: CreateConnectionRequest,
+    ) -> Result<SavedConnection, String> {
+        let connection_type = normalize_connection_type(&request.connection_type)?;
+        let name = required_field("name", request.name)?;
+        let host = required_field("host", request.host)?;
+        let user = required_field("user", request.user)?;
+        let folder_id = request
+            .folder_id
+            .unwrap_or_else(|| default_folder_for(&connection_type));
+        let key_path = request.key_path.and_then(|value| {
+            let trimmed = value.trim().to_string();
+            (!trimmed.is_empty()).then_some(trimmed)
+        });
+        let id = make_connection_id(&name);
+        let tags = normalize_tags(request.tags);
+
+        let mut connection = self.lock()?;
+        let transaction = connection.transaction().map_err(to_storage_error)?;
+        ensure_folder_exists(&transaction, &folder_id, folder_name_for(&folder_id))?;
+        let next_sort_order: i64 = transaction
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections WHERE folder_id = ?1",
+                params![folder_id],
+                |row| row.get(0),
+            )
+            .map_err(to_storage_error)?;
+
+        transaction
+            .execute(
+                "INSERT INTO connections (
+                    id, folder_id, name, host, username, port, key_path, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'idle', ?9)",
+                params![
+                    id,
+                    folder_id,
+                    name,
+                    host,
+                    user,
+                    request.port,
+                    key_path,
+                    connection_type,
+                    next_sort_order
+                ],
+            )
+            .map_err(to_storage_error)?;
+
+        for (index, tag) in tags.iter().enumerate() {
+            transaction
+                .execute(
+                    "INSERT INTO connection_tags (connection_id, tag, sort_order)
+                     VALUES (?1, ?2, ?3)",
+                    params![id, tag, index as i64],
+                )
+                .map_err(to_storage_error)?;
+        }
+
+        transaction.commit().map_err(to_storage_error)?;
+
+        Ok(SavedConnection {
+            id,
+            name,
+            host,
+            user,
+            port: request.port,
+            key_path,
+            connection_type,
+            tags,
+            status: "idle".to_string(),
+        })
     }
 
     fn seed_starter_connections(&self) -> Result<(), String> {
@@ -238,7 +338,7 @@ fn list_connections_for_folder(
 ) -> Result<Vec<SavedConnection>, String> {
     let mut statement = connection
         .prepare(
-            "SELECT id, name, host, username, connection_type, status
+            "SELECT id, name, host, username, port, key_path, connection_type, status
              FROM connections
              WHERE folder_id = ?1
              ORDER BY sort_order, name",
@@ -252,8 +352,10 @@ fn list_connections_for_folder(
                 name: row.get(1)?,
                 host: row.get(2)?,
                 user: row.get(3)?,
-                connection_type: row.get(4)?,
-                status: row.get(5)?,
+                port: optional_port(row.get::<_, Option<i64>>(4)?)?,
+                key_path: row.get(5)?,
+                connection_type: row.get(6)?,
+                status: row.get(7)?,
                 tags: Vec::new(),
             })
         })
@@ -353,6 +455,122 @@ fn to_storage_error(error: rusqlite::Error) -> String {
     format!("SQLite storage error: {error}")
 }
 
+fn add_optional_column(connection: &SqliteConnection, sql: &str) -> Result<(), String> {
+    match connection.execute(sql, []) {
+        Ok(_) => Ok(()),
+        Err(rusqlite::Error::SqliteFailure(_, Some(message)))
+            if message.contains("duplicate column name") =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(to_storage_error(error)),
+    }
+}
+
+fn ensure_folder_exists(
+    connection: &SqliteConnection,
+    id: &str,
+    fallback_name: &str,
+) -> Result<(), String> {
+    let exists: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM connection_folders WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .map_err(to_storage_error)?;
+
+    if exists > 0 {
+        return Ok(());
+    }
+
+    let next_sort_order: i64 = connection
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connection_folders",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(to_storage_error)?;
+    seed_folder(connection, id, fallback_name, next_sort_order)
+}
+
+fn normalize_connection_type(value: &str) -> Result<String, String> {
+    match value.trim().to_lowercase().as_str() {
+        "local" | "ssh" | "sftp" => Ok(value.trim().to_lowercase()),
+        _ => Err("connection type must be local, ssh, or sftp".to_string()),
+    }
+}
+
+fn default_folder_for(connection_type: &str) -> String {
+    if connection_type == "local" {
+        "local".to_string()
+    } else {
+        "manual".to_string()
+    }
+}
+
+fn folder_name_for(folder_id: &str) -> &str {
+    match folder_id {
+        "local" => "Local workspace",
+        "manual" => "Manual",
+        other => other,
+    }
+}
+
+fn required_field(field: &str, value: String) -> Result<String, String> {
+    let trimmed = value.trim().to_string();
+    if trimmed.is_empty() {
+        Err(format!("{field} is required"))
+    } else {
+        Ok(trimmed)
+    }
+}
+
+fn normalize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for tag in tags {
+        let trimmed = tag.trim().to_lowercase();
+        if !trimmed.is_empty() && !normalized.contains(&trimmed) {
+            normalized.push(trimmed);
+        }
+    }
+    normalized
+}
+
+fn make_connection_id(name: &str) -> String {
+    let slug = name
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    format!(
+        "{}-{unique}",
+        if slug.is_empty() { "connection" } else { &slug }
+    )
+}
+
+fn optional_port(value: Option<i64>) -> rusqlite::Result<Option<u16>> {
+    match value {
+        Some(port) => u16::try_from(port)
+            .map(Some)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error))),
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -384,6 +602,39 @@ mod tests {
         let connection_count: usize = groups.iter().map(|group| group.connections.len()).sum();
 
         assert_eq!(connection_count, 5);
+    }
+
+    #[test]
+    fn create_connection_persists_manual_ssh_connection() {
+        let storage = Storage::open(temp_db_path("create")).expect("storage opens");
+
+        let created = storage
+            .create_connection(CreateConnectionRequest {
+                name: "Lab Host".to_string(),
+                host: "lab.internal".to_string(),
+                user: "admin".to_string(),
+                connection_type: "ssh".to_string(),
+                folder_id: Some("manual".to_string()),
+                port: Some(2222),
+                key_path: Some("C:\\Users\\ryan\\.ssh\\id_ed25519".to_string()),
+                tags: vec!["Lab".to_string(), " ssh ".to_string()],
+            })
+            .expect("connection is created");
+
+        assert_eq!(created.name, "Lab Host");
+        assert_eq!(created.port, Some(2222));
+
+        let groups = storage
+            .list_connection_groups()
+            .expect("connection groups load");
+        let manual = groups
+            .iter()
+            .find(|group| group.id == "manual")
+            .expect("manual folder exists");
+
+        assert_eq!(manual.name, "Manual");
+        assert_eq!(manual.connections[0].host, "lab.internal");
+        assert_eq!(manual.connections[0].tags, ["lab", "ssh"]);
     }
 
     fn temp_db_path(name: &str) -> PathBuf {
