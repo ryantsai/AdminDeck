@@ -4,7 +4,7 @@
 
 As of May 1, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
 
-Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file Connections without `ProxyJump`, system `ssh` debug/fallback support for keyless and `ProxyJump` sessions, and an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections.
+Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file Connections without `ProxyJump`, system `ssh` debug/fallback support for keyless and `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH/SFTP Connections.
 
 ## Milestone 0: Project Foundation
 
@@ -41,7 +41,7 @@ Milestone B has started with the accepted Rust SSH direction, durable SSH `proxy
 - [x] Implement terminal channel allocation.
 - [x] Implement resize events.
 - [x] Add optional system ssh fallback/debug path.
-- [ ] Add SSH defaults in settings.
+- [x] Add SSH defaults in settings.
 - [x] Add SSH config import with unsupported directive reporting.
 
 ## Milestone C: SFTP Core

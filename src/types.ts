@@ -83,6 +83,13 @@ export interface TerminalSettings {
   defaultShell: string;
 }
 
+export interface SshSettings {
+  defaultUser: string;
+  defaultPort: number;
+  defaultKeyPath?: string;
+  defaultProxyJump?: string;
+}
+
 export interface WorkspaceTab {
   id: string;
   title: string;

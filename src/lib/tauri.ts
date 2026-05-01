@@ -13,6 +13,7 @@ import type {
   RenameConnectionRequest,
   SecretPresence,
   SecretReferenceRequest,
+  SshSettings,
   StoreSecretRequest,
   TerminalSettings,
 } from "../types";
@@ -113,6 +114,14 @@ type CommandMap = {
   update_terminal_settings: {
     args: { request: TerminalSettings };
     result: TerminalSettings;
+  };
+  get_ssh_settings: {
+    args: undefined;
+    result: SshSettings;
+  };
+  update_ssh_settings: {
+    args: { request: SshSettings };
+    result: SshSettings;
   };
   keychain_status: {
     args: undefined;

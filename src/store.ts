@@ -1,15 +1,17 @@
 import { create } from "zustand";
-import { defaultTerminalSettings, initialTabs } from "./sample-data";
-import type { Connection, TerminalSettings, WorkspaceTab } from "./types";
+import { defaultSshSettings, defaultTerminalSettings, initialTabs } from "./sample-data";
+import type { Connection, SshSettings, TerminalSettings, WorkspaceTab } from "./types";
 
 interface WorkspaceState {
   query: string;
   tabs: WorkspaceTab[];
   activeTabId: string;
   terminalSettings: TerminalSettings;
+  sshSettings: SshSettings;
   activeSessionCounts: Record<string, number>;
   setQuery: (query: string) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
+  setSshSettings: (settings: SshSettings) => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -24,9 +26,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   tabs: initialTabs,
   activeTabId: initialTabs[0]?.id ?? "",
   terminalSettings: defaultTerminalSettings,
+  sshSettings: defaultSshSettings,
   activeSessionCounts: {},
   setQuery: (query) => set({ query }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
+  setSshSettings: (sshSettings) => set({ sshSettings }),
   activateTab: (tabId) => set({ activeTabId: tabId }),
   closeTab: (tabId) => {
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);

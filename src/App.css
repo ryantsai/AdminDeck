@@ -870,7 +870,7 @@ progress {
 }
 
 .settings-dialog {
-  width: min(560px, calc(100vw - 40px));
+  width: min(620px, calc(100vw - 40px));
 }
 
 .import-dialog {
@@ -928,6 +928,12 @@ progress {
 .settings-section {
   display: grid;
   gap: 11px;
+}
+
+.settings-section-heading {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .settings-toggles {

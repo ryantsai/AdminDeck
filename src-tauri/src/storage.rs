@@ -61,6 +61,15 @@ pub struct TerminalSettings {
     default_shell: String,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshSettings {
+    default_user: String,
+    default_port: u16,
+    default_key_path: Option<String>,
+    default_proxy_jump: Option<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionGroup {
@@ -233,6 +242,41 @@ impl Storage {
             .execute(
                 "INSERT INTO settings (key, value, updated_at)
                  VALUES ('terminal', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
+    }
+
+    pub fn ssh_settings(&self) -> Result<SshSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row("SELECT value FROM settings WHERE key = 'ssh'", [], |row| {
+                row.get::<_, String>(0)
+            })
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_ssh_settings)
+                .map_err(|error| format!("SSH settings are invalid: {error}"))?,
+            None => Ok(default_ssh_settings()),
+        }
+    }
+
+    pub fn update_ssh_settings(&self, request: SshSettings) -> Result<SshSettings, String> {
+        let settings = validate_ssh_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize SSH settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('ssh', ?1, CURRENT_TIMESTAMP)
                  ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value,
                     updated_at = CURRENT_TIMESTAMP",
@@ -1050,6 +1094,15 @@ fn default_terminal_settings() -> TerminalSettings {
     }
 }
 
+fn default_ssh_settings() -> SshSettings {
+    SshSettings {
+        default_user: default_ssh_user(),
+        default_port: 22,
+        default_key_path: default_ssh_key_path(),
+        default_proxy_jump: None,
+    }
+}
+
 fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<TerminalSettings, String> {
     settings.font_family = required_field("font family", settings.font_family)?;
     settings.default_shell = required_field("default shell", settings.default_shell)?;
@@ -1072,6 +1125,38 @@ fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<Terminal
     }
 
     Ok(settings)
+}
+
+fn validate_ssh_settings(mut settings: SshSettings) -> Result<SshSettings, String> {
+    settings.default_user = required_field("default SSH user", settings.default_user)?;
+
+    if settings.default_port == 0 {
+        return Err("default SSH port must be between 1 and 65535".to_string());
+    }
+
+    settings.default_key_path = trim_optional(settings.default_key_path);
+    settings.default_proxy_jump = trim_optional(settings.default_proxy_jump);
+    Ok(settings)
+}
+
+fn trim_optional(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn default_ssh_user() -> String {
+    std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "admin".to_string())
+}
+
+fn default_ssh_key_path() -> Option<String> {
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()?;
+    let path = PathBuf::from(home).join(".ssh").join("id_ed25519");
+    Some(path.to_string_lossy().to_string())
 }
 
 fn make_connection_id(name: &str) -> String {
@@ -1442,6 +1527,37 @@ mod tests {
             .expect("terminal settings reload");
         assert_eq!(reloaded.font_family, "Cascadia Mono");
         assert_eq!(reloaded.default_shell, "pwsh.exe");
+    }
+
+    #[test]
+    fn ssh_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("ssh-settings")).expect("storage opens");
+
+        let defaults = storage.ssh_settings().expect("default SSH settings load");
+        assert_eq!(defaults.default_port, 22);
+        assert!(defaults.default_key_path.is_some());
+
+        let updated = storage
+            .update_ssh_settings(SshSettings {
+                default_user: "deploy".to_string(),
+                default_port: 2200,
+                default_key_path: Some("  C:\\Users\\ryan\\.ssh\\deploy_ed25519  ".to_string()),
+                default_proxy_jump: Some("  bastion.internal  ".to_string()),
+            })
+            .expect("SSH settings update");
+
+        assert_eq!(updated.default_user, "deploy");
+        assert_eq!(
+            updated.default_key_path.as_deref(),
+            Some("C:\\Users\\ryan\\.ssh\\deploy_ed25519")
+        );
+
+        let reloaded = storage.ssh_settings().expect("SSH settings reload");
+        assert_eq!(reloaded.default_port, 2200);
+        assert_eq!(
+            reloaded.default_proxy_jump.as_deref(),
+            Some("bastion.internal")
+        );
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

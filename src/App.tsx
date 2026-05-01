@@ -59,6 +59,7 @@ import type {
   ConnectionType,
   CreateConnectionRequest,
   FileEntry,
+  SshSettings,
   TerminalPane,
   TerminalSettings,
   WorkspaceTab,
@@ -73,6 +74,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [connectionRefreshToken, setConnectionRefreshToken] = useState(0);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
+  const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
 
   useEffect(() => {
     invokeCommand("app_bootstrap")
@@ -89,6 +91,12 @@ function App() {
       .then(setTerminalSettings)
       .catch(() => undefined);
   }, [setTerminalSettings]);
+
+  useEffect(() => {
+    invokeCommand("get_ssh_settings")
+      .then(setSshSettings)
+      .catch(() => undefined);
+  }, [setSshSettings]);
 
   return (
     <div className="app-shell">
@@ -136,6 +144,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
+  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const [groups, setGroups] = useState<ConnectionGroup[]>(connectionGroups);
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
@@ -542,6 +551,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
           error={formError}
           groups={groups}
           mode={formMode}
+          sshSettings={sshSettings}
           onCancel={() => {
             setFormMode(null);
             setFormError("");
@@ -557,16 +567,19 @@ function ConnectionDialog({
   error,
   groups,
   mode,
+  sshSettings,
   onCancel,
   onSubmit,
 }: {
   error: string;
   groups: ConnectionGroup[];
   mode: "save" | "quick";
+  sshSettings: SshSettings;
   onCancel: () => void;
   onSubmit: (request: CreateConnectionRequest) => void | Promise<void>;
 }) {
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
+  const usesSshDefaults = connectionType !== "local";
   const folderOptions = useMemo(
     () => groups.filter((group) => !["local", "manual"].includes(group.id)),
     [groups],
@@ -653,23 +666,50 @@ function ConnectionDialog({
         <div className="form-grid">
           <label>
             <span>User</span>
-            <input name="user" placeholder="admin" required />
+            <input
+              key={`user-${connectionType}`}
+              name="user"
+              defaultValue={usesSshDefaults ? sshSettings.defaultUser : "local"}
+              placeholder={usesSshDefaults ? "admin" : "local"}
+              required
+            />
           </label>
           <label>
             <span>Port</span>
-            <input name="port" inputMode="numeric" min="1" max="65535" type="number" placeholder="22" />
+            <input
+              key={`port-${connectionType}`}
+              name="port"
+              defaultValue={usesSshDefaults ? sshSettings.defaultPort : undefined}
+              inputMode="numeric"
+              min="1"
+              max="65535"
+              type="number"
+              placeholder={usesSshDefaults ? "22" : ""}
+            />
           </label>
         </div>
 
-        <label>
-          <span>Key path</span>
-          <input name="keyPath" placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519" />
-        </label>
+        {usesSshDefaults ? (
+          <>
+            <label>
+              <span>Key path</span>
+              <input
+                name="keyPath"
+                defaultValue={sshSettings.defaultKeyPath ?? ""}
+                placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
+              />
+            </label>
 
-        <label>
-          <span>Proxy jump</span>
-          <input name="proxyJump" placeholder="jump.internal" />
-        </label>
+            <label>
+              <span>Proxy jump</span>
+              <input
+                name="proxyJump"
+                defaultValue={sshSettings.defaultProxyJump ?? ""}
+                placeholder="jump.internal"
+              />
+            </label>
+          </>
+        ) : null}
 
         <label>
           <span>Tags</span>
@@ -1341,6 +1381,8 @@ function FilePane({
 function SettingsDialog({ onClose }: { onClose: () => void }) {
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
+  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
+  const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const [error, setError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1356,16 +1398,28 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
       confirmMultilinePaste: form.get("confirmMultilinePaste") === "on",
       defaultShell: String(form.get("defaultShell") ?? "").trim(),
     };
+    const sshRequest: SshSettings = {
+      defaultUser: String(form.get("defaultUser") ?? "").trim(),
+      defaultPort: Number(form.get("defaultPort")),
+      defaultKeyPath: String(form.get("defaultKeyPath") ?? "").trim() || undefined,
+      defaultProxyJump: String(form.get("defaultProxyJump") ?? "").trim() || undefined,
+    };
 
     try {
       setError("");
       if (!isTauriRuntime()) {
         setTerminalSettings(request);
+        setSshSettings(sshRequest);
         onClose();
         return;
       }
 
-      setTerminalSettings(await invokeCommand("update_terminal_settings", { request }));
+      const [updatedTerminalSettings, updatedSshSettings] = await Promise.all([
+        invokeCommand("update_terminal_settings", { request }),
+        invokeCommand("update_ssh_settings", { request: sshRequest }),
+      ]);
+      setTerminalSettings(updatedTerminalSettings);
+      setSshSettings(updatedSshSettings);
       onClose();
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
@@ -1378,7 +1432,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         <header>
           <div>
             <p className="panel-label">Settings</p>
-            <h2>Terminal defaults</h2>
+            <h2>Terminal and SSH defaults</h2>
           </div>
           <button className="icon-button" type="button" aria-label="Close" onClick={onClose}>
             <X size={15} />
@@ -1456,6 +1510,45 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
               defaultChecked={terminalSettings.confirmMultilinePaste}
             />
             <span>Confirm multiline paste before sending input</span>
+          </label>
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <span>SSH defaults</span>
+          </div>
+          <div className="form-grid">
+            <label>
+              <span>Default user</span>
+              <input name="defaultUser" defaultValue={sshSettings.defaultUser} required />
+            </label>
+            <label>
+              <span>Default port</span>
+              <input
+                name="defaultPort"
+                defaultValue={sshSettings.defaultPort}
+                inputMode="numeric"
+                min="1"
+                max="65535"
+                type="number"
+              />
+            </label>
+          </div>
+          <label>
+            <span>Default key path</span>
+            <input
+              name="defaultKeyPath"
+              defaultValue={sshSettings.defaultKeyPath ?? ""}
+              placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
+            />
+          </label>
+          <label>
+            <span>Default proxy jump</span>
+            <input
+              name="defaultProxyJump"
+              defaultValue={sshSettings.defaultProxyJump ?? ""}
+              placeholder="jump.internal"
+            />
           </label>
         </section>
 

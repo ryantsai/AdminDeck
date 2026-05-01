@@ -1,4 +1,10 @@
-import type { ConnectionGroup, FileEntry, TerminalSettings, WorkspaceTab } from "./types";
+import type {
+  ConnectionGroup,
+  FileEntry,
+  SshSettings,
+  TerminalSettings,
+  WorkspaceTab,
+} from "./types";
 
 export const connectionGroups: ConnectionGroup[] = [
   {
@@ -77,6 +83,13 @@ export const defaultTerminalSettings: TerminalSettings = {
   copyOnSelect: false,
   confirmMultilinePaste: true,
   defaultShell: "powershell.exe",
+};
+
+export const defaultSshSettings: SshSettings = {
+  defaultUser: "admin",
+  defaultPort: 22,
+  defaultKeyPath: "C:\\Users\\ryan\\.ssh\\id_ed25519",
+  defaultProxyJump: "",
 };
 
 export const localFiles: FileEntry[] = [
