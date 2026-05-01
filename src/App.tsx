@@ -42,6 +42,7 @@ import {
   invokeCommand,
   isTauriRuntime,
   type SshConfigImportPreview,
+  type SshHostKeyPreview,
   type TerminalOutput,
 } from "./lib/tauri";
 import {
@@ -1226,6 +1227,17 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
       removeOutputListener = unlisten;
 
       try {
+        if (usesNativeSshHostKeyVerification(connection)) {
+          terminal.writeln("Verifying SSH host key...");
+          const preview = await invokeCommand("inspect_ssh_host_key", {
+            request: {
+              host: connection.host,
+              port: connection.port,
+            },
+          });
+          await confirmTrustedSshHostKey(preview);
+        }
+
         const result = await invokeCommand("start_terminal_session", {
           request: {
             sessionId: requestedSessionId,
@@ -1300,6 +1312,45 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
 
 function isMultilinePaste(data: string) {
   return data.split(/\r\n|\r|\n/).filter((line) => line.length > 0).length > 1;
+}
+
+function usesNativeSshHostKeyVerification(connection: Connection) {
+  return (
+    connection.type === "ssh" &&
+    Boolean(connection.keyPath?.trim()) &&
+    !connection.proxyJump?.trim()
+  );
+}
+
+async function confirmTrustedSshHostKey(preview: SshHostKeyPreview) {
+  if (preview.status === "trusted") {
+    return;
+  }
+
+  if (preview.status === "changed") {
+    throw new Error(
+      `SSH host key for ${preview.host}:${preview.port} changed. Presented ${preview.algorithm} ${preview.fingerprint}.`,
+    );
+  }
+
+  const shouldTrust = window.confirm(
+    [
+      `Trust SSH host key for ${preview.host}:${preview.port}?`,
+      "",
+      `${preview.algorithm} ${preview.fingerprint}`,
+    ].join("\n"),
+  );
+  if (!shouldTrust) {
+    throw new Error("SSH host key was not trusted");
+  }
+
+  await invokeCommand("trust_ssh_host_key", {
+    request: {
+      host: preview.host,
+      port: preview.port,
+      publicKey: preview.publicKey,
+    },
+  });
 }
 
 function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {

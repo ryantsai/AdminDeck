@@ -4,7 +4,7 @@
 
 As of May 1, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
 
-Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file Connections without `ProxyJump`, system `ssh` debug/fallback support for keyless and `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH/SFTP Connections.
+Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for keyless and `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH/SFTP Connections.
 
 ## Milestone 0: Project Foundation
 
@@ -34,7 +34,7 @@ Milestone B has started with the accepted Rust SSH direction, durable SSH `proxy
 
 - [x] Evaluate and choose Rust SSH library. See `docs/ADR/0004-ssh-transport-library.md`.
 - [x] Implement in-process SSH connection lifecycle.
-- [ ] Implement host key verification.
+- [x] Implement host key verification.
 - [ ] Implement password auth.
 - [x] Implement key-file auth by path.
 - [ ] Implement SSH agent support where practical.

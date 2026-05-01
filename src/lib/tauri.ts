@@ -62,6 +62,15 @@ export interface SshConfigImportPreview {
   unsupportedDirectives: UnsupportedSshDirective[];
 }
 
+export interface SshHostKeyPreview {
+  host: string;
+  port: number;
+  algorithm: string;
+  fingerprint: string;
+  publicKey: string;
+  status: "trusted" | "unknown" | "changed";
+}
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -134,6 +143,14 @@ type CommandMap = {
   import_ssh_config: {
     args: { request: { content: string; folderId?: string; tags?: string[] } };
     result: SshConfigImportPreview;
+  };
+  inspect_ssh_host_key: {
+    args: { request: { host: string; port?: number } };
+    result: SshHostKeyPreview;
+  };
+  trust_ssh_host_key: {
+    args: { request: { host: string; port?: number; publicKey: string } };
+    result: SshHostKeyPreview;
   };
   store_secret: {
     args: { request: StoreSecretRequest };

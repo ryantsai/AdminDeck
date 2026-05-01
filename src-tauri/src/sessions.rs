@@ -89,6 +89,7 @@ impl SessionManager {
             .clone()
             .unwrap_or_else(|| make_session_id(&request.title));
         if uses_native_ssh(&request) {
+            let known_hosts_path = ssh::app_known_hosts_path(&app)?;
             let session = ssh::start_native_terminal(
                 app,
                 ssh::NativeSshTerminalRequest {
@@ -97,6 +98,7 @@ impl SessionManager {
                     user: request.user.clone(),
                     port: request.port.unwrap_or(22),
                     key_path: request.key_path.clone().unwrap_or_default(),
+                    known_hosts_path,
                     cols: request.cols.unwrap_or(80),
                     rows: request.rows.unwrap_or(24),
                 },
@@ -245,7 +247,10 @@ impl SessionManager {
 
 fn uses_native_ssh(request: &StartTerminalSessionRequest) -> bool {
     request.connection_type.trim().eq_ignore_ascii_case("ssh")
-        && ssh::can_start_native_terminal(request.key_path.as_deref(), request.proxy_jump.as_deref())
+        && ssh::can_start_native_terminal(
+            request.key_path.as_deref(),
+            request.proxy_jump.as_deref(),
+        )
 }
 
 fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, String> {

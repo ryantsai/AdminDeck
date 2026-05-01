@@ -159,6 +159,22 @@ fn import_ssh_config(
 }
 
 #[tauri::command]
+fn inspect_ssh_host_key(
+    app: tauri::AppHandle,
+    request: ssh::InspectSshHostKeyRequest,
+) -> Result<ssh::SshHostKeyPreview, String> {
+    ssh::inspect_host_key(ssh::app_known_hosts_path(&app)?, request)
+}
+
+#[tauri::command]
+fn trust_ssh_host_key(
+    app: tauri::AppHandle,
+    request: ssh::TrustSshHostKeyRequest,
+) -> Result<ssh::SshHostKeyPreview, String> {
+    ssh::trust_host_key(ssh::app_known_hosts_path(&app)?, request)
+}
+
+#[tauri::command]
 fn store_secret(
     secrets: tauri::State<'_, secrets::Secrets>,
     request: secrets::StoreSecretRequest,
@@ -254,6 +270,8 @@ pub fn run() {
             keychain_status,
             ssh_transport_plan,
             import_ssh_config,
+            inspect_ssh_host_key,
+            trust_ssh_host_key,
             store_secret,
             secret_exists,
             delete_secret,
