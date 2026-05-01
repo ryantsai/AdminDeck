@@ -48,6 +48,19 @@ export interface TerminalPane {
   connection?: Connection;
 }
 
+export type TerminalCursorStyle = "block" | "bar" | "underline";
+
+export interface TerminalSettings {
+  fontFamily: string;
+  fontSize: number;
+  lineHeight: number;
+  cursorStyle: TerminalCursorStyle;
+  scrollbackLines: number;
+  copyOnSelect: boolean;
+  confirmMultilinePaste: boolean;
+  defaultShell: string;
+}
+
 export interface WorkspaceTab {
   id: string;
   title: string;

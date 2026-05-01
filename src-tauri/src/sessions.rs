@@ -30,6 +30,7 @@ pub struct StartTerminalSessionRequest {
     pub user: String,
     pub port: Option<u16>,
     pub key_path: Option<String>,
+    pub shell: Option<String>,
     pub cols: Option<u16>,
     pub rows: Option<u16>,
 }
@@ -198,11 +199,19 @@ impl SessionManager {
 fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, String> {
     match request.connection_type.trim().to_lowercase().as_str() {
         "local" => {
-            let program = if cfg!(target_os = "windows") {
-                "powershell.exe".to_string()
-            } else {
-                std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
-            };
+            let program = request
+                .shell
+                .as_ref()
+                .map(|shell| shell.trim())
+                .filter(|shell| !shell.is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(|| {
+                    if cfg!(target_os = "windows") {
+                        "powershell.exe".to_string()
+                    } else {
+                        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+                    }
+                });
             Ok(CommandBuilder::new(program))
         }
         "ssh" => {

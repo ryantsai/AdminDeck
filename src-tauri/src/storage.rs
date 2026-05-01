@@ -47,6 +47,19 @@ pub struct Storage {
     connection: Mutex<SqliteConnection>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalSettings {
+    font_family: String,
+    font_size: u16,
+    line_height: f32,
+    cursor_style: String,
+    scrollback_lines: u32,
+    copy_on_select: bool,
+    confirm_multiline_paste: bool,
+    default_shell: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionGroup {
@@ -156,6 +169,46 @@ impl Storage {
         }
 
         Ok(groups)
+    }
+
+    pub fn terminal_settings(&self) -> Result<TerminalSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'terminal'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_terminal_settings)
+                .map_err(|error| format!("terminal settings are invalid: {error}"))?,
+            None => Ok(default_terminal_settings()),
+        }
+    }
+
+    pub fn update_terminal_settings(
+        &self,
+        request: TerminalSettings,
+    ) -> Result<TerminalSettings, String> {
+        let settings = validate_terminal_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize terminal settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('terminal', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
     }
 
     fn migrate(&self) -> Result<(), String> {
@@ -701,6 +754,47 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
     normalized
 }
 
+fn default_terminal_settings() -> TerminalSettings {
+    TerminalSettings {
+        font_family: "\"Cascadia Mono\", \"JetBrains Mono\", Consolas, monospace".to_string(),
+        font_size: 12,
+        line_height: 1.25,
+        cursor_style: "block".to_string(),
+        scrollback_lines: 5000,
+        copy_on_select: false,
+        confirm_multiline_paste: true,
+        default_shell: if cfg!(target_os = "windows") {
+            "powershell.exe".to_string()
+        } else {
+            std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+        },
+    }
+}
+
+fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<TerminalSettings, String> {
+    settings.font_family = required_field("font family", settings.font_family)?;
+    settings.default_shell = required_field("default shell", settings.default_shell)?;
+
+    if !(8..=32).contains(&settings.font_size) {
+        return Err("terminal font size must be between 8 and 32".to_string());
+    }
+
+    if !(1.0..=2.0).contains(&settings.line_height) {
+        return Err("terminal line height must be between 1.0 and 2.0".to_string());
+    }
+
+    settings.cursor_style = match settings.cursor_style.trim().to_lowercase().as_str() {
+        "block" | "bar" | "underline" => settings.cursor_style.trim().to_lowercase(),
+        _ => return Err("terminal cursor style must be block, bar, or underline".to_string()),
+    };
+
+    if !(100..=100_000).contains(&settings.scrollback_lines) {
+        return Err("terminal scrollback must be between 100 and 100000 lines".to_string());
+    }
+
+    Ok(settings)
+}
+
 fn make_connection_id(name: &str) -> String {
     let slug = name
         .chars()
@@ -874,6 +968,39 @@ mod tests {
 
         assert_eq!(production.connections.len(), 3);
         assert_eq!(production.connections[2].id, duplicated.id);
+    }
+
+    #[test]
+    fn terminal_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("terminal-settings")).expect("storage opens");
+
+        let defaults = storage
+            .terminal_settings()
+            .expect("default terminal settings load");
+        assert_eq!(defaults.font_size, 12);
+        assert!(defaults.confirm_multiline_paste);
+
+        let updated = storage
+            .update_terminal_settings(TerminalSettings {
+                font_family: "Cascadia Mono".to_string(),
+                font_size: 14,
+                line_height: 1.35,
+                cursor_style: "bar".to_string(),
+                scrollback_lines: 10_000,
+                copy_on_select: true,
+                confirm_multiline_paste: false,
+                default_shell: "pwsh.exe".to_string(),
+            })
+            .expect("terminal settings update");
+
+        assert_eq!(updated.cursor_style, "bar");
+        assert!(updated.copy_on_select);
+
+        let reloaded = storage
+            .terminal_settings()
+            .expect("terminal settings reload");
+        assert_eq!(reloaded.font_family, "Cascadia Mono");
+        assert_eq!(reloaded.default_shell, "pwsh.exe");
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

@@ -70,6 +70,21 @@ fn duplicate_connection(
 }
 
 #[tauri::command]
+fn get_terminal_settings(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::TerminalSettings, String> {
+    storage.terminal_settings()
+}
+
+#[tauri::command]
+fn update_terminal_settings(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::TerminalSettings,
+) -> Result<storage::TerminalSettings, String> {
+    storage.update_terminal_settings(request)
+}
+
+#[tauri::command]
 fn keychain_status(secrets: tauri::State<'_, secrets::Secrets>) -> secrets::KeychainStatus {
     secrets.status()
 }
@@ -158,6 +173,8 @@ pub fn run() {
             rename_connection,
             delete_connection,
             duplicate_connection,
+            get_terminal_settings,
+            update_terminal_settings,
             keychain_status,
             store_secret,
             secret_exists,

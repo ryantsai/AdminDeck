@@ -10,6 +10,7 @@ import type {
   SecretPresence,
   SecretReferenceRequest,
   StoreSecretRequest,
+  TerminalSettings,
 } from "../types";
 
 export interface StartTerminalSessionRequest {
@@ -20,6 +21,7 @@ export interface StartTerminalSessionRequest {
   user: string;
   port?: number;
   keyPath?: string;
+  shell?: string;
   cols?: number;
   rows?: number;
 }
@@ -57,6 +59,14 @@ type CommandMap = {
   duplicate_connection: {
     args: { request: DuplicateConnectionRequest };
     result: Connection;
+  };
+  get_terminal_settings: {
+    args: undefined;
+    result: TerminalSettings;
+  };
+  update_terminal_settings: {
+    args: { request: TerminalSettings };
+    result: TerminalSettings;
   };
   keychain_status: {
     args: undefined;

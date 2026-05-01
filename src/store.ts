@@ -1,12 +1,14 @@
 import { create } from "zustand";
-import { initialTabs } from "./sample-data";
-import type { Connection, WorkspaceTab } from "./types";
+import { defaultTerminalSettings, initialTabs } from "./sample-data";
+import type { Connection, TerminalSettings, WorkspaceTab } from "./types";
 
 interface WorkspaceState {
   query: string;
   tabs: WorkspaceTab[];
   activeTabId: string;
+  terminalSettings: TerminalSettings;
   setQuery: (query: string) => void;
+  setTerminalSettings: (settings: TerminalSettings) => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -18,7 +20,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   query: "",
   tabs: initialTabs,
   activeTabId: initialTabs[0]?.id ?? "",
+  terminalSettings: defaultTerminalSettings,
   setQuery: (query) => set({ query }),
+  setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
   activateTab: (tabId) => set({ activeTabId: tabId }),
   closeTab: (tabId) => {
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);
@@ -72,9 +76,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   openLocalTerminal: () => {
     const id = `local-${Date.now()}`;
+    const shell = get().terminalSettings.defaultShell;
     get().openConnection({
       id,
-      name: "PowerShell",
+      name: shell,
       host: "localhost",
       user: "local",
       type: "local",

@@ -815,10 +815,10 @@ progress {
   background: rgba(15, 23, 42, 0.28);
 }
 
-.connection-dialog {
+.connection-dialog,
+.settings-dialog {
   display: grid;
   gap: 11px;
-  width: min(420px, calc(100vw - 40px));
   padding: 16px;
   color: var(--text);
   background: var(--surface);
@@ -827,7 +827,16 @@ progress {
   box-shadow: var(--shadow);
 }
 
+.connection-dialog {
+  width: min(420px, calc(100vw - 40px));
+}
+
+.settings-dialog {
+  width: min(560px, calc(100vw - 40px));
+}
+
 .connection-dialog header,
+.settings-dialog header,
 .dialog-actions {
   display: flex;
   align-items: center;
@@ -835,20 +844,24 @@ progress {
   gap: 10px;
 }
 
-.connection-dialog label {
+.connection-dialog label,
+.settings-section label {
   display: grid;
   gap: 5px;
   min-width: 0;
 }
 
-.connection-dialog label span {
+.connection-dialog label span,
+.settings-section label span {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
 }
 
 .connection-dialog input,
-.connection-dialog select {
+.connection-dialog select,
+.settings-dialog input,
+.settings-dialog select {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -862,15 +875,50 @@ progress {
 }
 
 .connection-dialog input:focus,
-.connection-dialog select:focus {
+.connection-dialog select:focus,
+.settings-dialog input:focus,
+.settings-dialog select:focus {
   border-color: #8db5ff;
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.settings-section {
+  display: grid;
+  gap: 11px;
+}
+
+.settings-toggles {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.settings-toggles label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settings-toggles input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 96px;
   gap: 10px;
+}
+
+.form-grid.three-columns {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 128px;
 }
 
 .form-error {

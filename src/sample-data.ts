@@ -1,4 +1,4 @@
-import type { ConnectionGroup, FileEntry, WorkspaceTab } from "./types";
+import type { ConnectionGroup, FileEntry, TerminalSettings, WorkspaceTab } from "./types";
 
 export const connectionGroups: ConnectionGroup[] = [
   {
@@ -67,6 +67,17 @@ export const connectionGroups: ConnectionGroup[] = [
 ];
 
 export const initialTabs: WorkspaceTab[] = [];
+
+export const defaultTerminalSettings: TerminalSettings = {
+  fontFamily: '"Cascadia Mono", "JetBrains Mono", Consolas, monospace',
+  fontSize: 12,
+  lineHeight: 1.25,
+  cursorStyle: "block",
+  scrollbackLines: 5000,
+  copyOnSelect: false,
+  confirmMultilinePaste: true,
+  defaultShell: "powershell.exe",
+};
 
 export const localFiles: FileEntry[] = [
   { name: "admin-deck-0.1.0.zip", kind: "file", size: "18.4 MB", modified: "10:38" },
