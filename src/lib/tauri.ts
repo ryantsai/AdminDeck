@@ -43,6 +43,34 @@ export interface TerminalOutput {
   data: string;
 }
 
+export interface StartSftpSessionRequest {
+  sessionId?: string;
+  title: string;
+  host: string;
+  user: string;
+  port?: number;
+  keyPath?: string;
+  proxyJump?: string;
+  authMethod?: "keyFile" | "password" | "agent";
+  secretOwnerId?: string;
+  path?: string;
+}
+
+export interface SftpDirectoryEntry {
+  name: string;
+  kind: "file" | "folder" | "symlink" | "other";
+  size?: number;
+  modified?: number;
+}
+
+export interface SftpDirectoryListing {
+  sessionId: string;
+  path: string;
+  entries: SftpDirectoryEntry[];
+}
+
+export interface SftpSessionStarted extends SftpDirectoryListing {}
+
 export interface SshTransportPlan {
   primaryLibrary: string;
   sftpCandidate: string;
@@ -179,6 +207,18 @@ type CommandMap = {
     result: null;
   };
   close_terminal_session: {
+    args: { sessionId: string };
+    result: null;
+  };
+  start_sftp_session: {
+    args: { request: StartSftpSessionRequest };
+    result: SftpSessionStarted;
+  };
+  list_sftp_directory: {
+    args: { request: { sessionId: string; path: string } };
+    result: SftpDirectoryListing;
+  };
+  close_sftp_session: {
     args: { sessionId: string };
     result: null;
   };

@@ -20,6 +20,7 @@ import {
   Pencil,
   Play,
   Plus,
+  RefreshCw,
   Search,
   Server,
   Settings,
@@ -41,17 +42,12 @@ import "./App.css";
 import {
   invokeCommand,
   isTauriRuntime,
+  type SftpDirectoryEntry,
   type SshConfigImportPreview,
   type SshHostKeyPreview,
   type TerminalOutput,
 } from "./lib/tauri";
-import {
-  aiSuggestions,
-  connectionGroups,
-  localFiles,
-  remoteFiles,
-  transferQueue,
-} from "./sample-data";
+import { aiSuggestions, connectionGroups, localFiles, transferQueue } from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import type {
   Connection,
@@ -1385,7 +1381,7 @@ function isMultilinePaste(data: string) {
 
 function usesNativeSshHostKeyVerification(connection: Connection) {
   return (
-    connection.type === "ssh" &&
+    (connection.type === "ssh" || connection.type === "sftp") &&
     (Boolean(connection.keyPath?.trim()) ||
       Boolean(connection.hasPassword) ||
       connection.authMethod === "password" ||
@@ -1426,12 +1422,129 @@ async function confirmTrustedSshHostKey(preview: SshHostKeyPreview) {
 }
 
 function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
+  const connection = tab.connection;
+  const [remotePath, setRemotePath] = useState(".");
+  const [remoteFiles, setRemoteFiles] = useState<FileEntry[]>([]);
+  const [status, setStatus] = useState("Connecting");
+  const [isRemoteLoading, setIsRemoteLoading] = useState(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const markConnectionSessionStarted = useWorkspaceStore(
+    (state) => state.markConnectionSessionStarted,
+  );
+  const markConnectionSessionEnded = useWorkspaceStore(
+    (state) => state.markConnectionSessionEnded,
+  );
+
+  useEffect(() => {
+    if (!connection) {
+      setStatus("No SFTP connection selected");
+      return;
+    }
+
+    if (!isTauriRuntime()) {
+      setStatus("Tauri runtime unavailable");
+      return;
+    }
+
+    let disposed = false;
+    let sessionStarted = false;
+    const requestedSessionId = `${connection.id}-sftp-${Date.now()}`;
+    sessionIdRef.current = requestedSessionId;
+    setIsRemoteLoading(true);
+    setStatus("Verifying host");
+
+    (async () => {
+      try {
+        if (usesNativeSshHostKeyVerification(connection)) {
+          const preview = await invokeCommand("inspect_ssh_host_key", {
+            request: {
+              host: connection.host,
+              port: connection.port,
+            },
+          });
+          await confirmTrustedSshHostKey(preview);
+        }
+
+        setStatus("Opening SFTP");
+        const result = await invokeCommand("start_sftp_session", {
+          request: {
+            sessionId: requestedSessionId,
+            title: connection.name,
+            host: connection.host,
+            user: connection.user,
+            port: connection.port,
+            keyPath: connection.keyPath,
+            proxyJump: connection.proxyJump,
+            authMethod: connection.authMethod,
+            secretOwnerId: connection.id,
+            path: ".",
+          },
+        });
+
+        if (disposed) {
+          void invokeCommand("close_sftp_session", { sessionId: result.sessionId });
+          return;
+        }
+
+        sessionIdRef.current = result.sessionId;
+        sessionStarted = true;
+        markConnectionSessionStarted(connection.id);
+        setRemotePath(result.path);
+        setRemoteFiles(result.entries.map(remoteEntryToFileEntry));
+        setStatus("Connected");
+      } catch (error) {
+        if (!disposed) {
+          setStatus(String(error));
+          setRemoteFiles([]);
+        }
+      } finally {
+        if (!disposed) {
+          setIsRemoteLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      const sessionId = sessionIdRef.current;
+      if (sessionId) {
+        void invokeCommand("close_sftp_session", { sessionId });
+      }
+      if (sessionStarted) {
+        markConnectionSessionEnded(connection.id);
+      }
+      sessionIdRef.current = null;
+    };
+  }, [connection, markConnectionSessionEnded, markConnectionSessionStarted]);
+
+  const refreshRemoteDirectory = async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !isTauriRuntime()) {
+      return;
+    }
+
+    setIsRemoteLoading(true);
+    setStatus("Refreshing");
+    try {
+      const result = await invokeCommand("list_sftp_directory", {
+        request: { sessionId, path: remotePath },
+      });
+      setRemotePath(result.path);
+      setRemoteFiles(result.entries.map(remoteEntryToFileEntry));
+      setStatus("Connected");
+    } catch (error) {
+      setStatus(String(error));
+    } finally {
+      setIsRemoteLoading(false);
+    }
+  };
+
   return (
     <section className="sftp-workspace">
       <div className="workspace-toolbar">
         <div>
           <strong>{tab.title}</strong>
-          <span>{tab.subtitle}</span>
+          <span>{status === "Connected" ? tab.subtitle : status}</span>
         </div>
         <div className="toolbar-cluster">
           <button className="toolbar-button">
@@ -1447,7 +1560,13 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
 
       <div className="file-manager">
         <FilePane title="Local" path="C:\\Users\\ryan\\deployments" files={localFiles} />
-        <FilePane title="Remote" path="/srv/admin-deck/releases" files={remoteFiles} />
+        <FilePane
+          title="Remote"
+          path={remotePath}
+          files={remoteFiles}
+          isLoading={isRemoteLoading}
+          onRefresh={refreshRemoteDirectory}
+        />
       </div>
 
       <div className="transfer-queue">
@@ -1467,14 +1586,59 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   );
 }
 
+function remoteEntryToFileEntry(entry: SftpDirectoryEntry): FileEntry {
+  return {
+    name: entry.name,
+    kind: entry.kind,
+    size: entry.kind === "folder" ? "-" : formatFileSize(entry.size),
+    modified: formatRemoteTime(entry.modified),
+  };
+}
+
+function formatFileSize(size?: number) {
+  if (size === undefined) {
+    return "-";
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = size / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function formatRemoteTime(timestamp?: number) {
+  if (!timestamp) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp * 1000));
+}
+
 function FilePane({
   title,
   path,
   files,
+  isLoading = false,
+  onRefresh,
 }: {
   title: string;
   path: string;
   files: FileEntry[];
+  isLoading?: boolean;
+  onRefresh?: () => void;
 }) {
   return (
     <article className="file-pane">
@@ -1483,11 +1647,21 @@ function FilePane({
           <strong>{title}</strong>
           <span>{path}</span>
         </div>
-        <button className="icon-button" aria-label={`Refresh ${title.toLowerCase()} files`}>
-          <MoreHorizontal size={15} />
+        <button
+          className="icon-button"
+          aria-label={`Refresh ${title.toLowerCase()} files`}
+          disabled={!onRefresh || isLoading}
+          onClick={onRefresh}
+          title={`Refresh ${title.toLowerCase()} files`}
+        >
+          <RefreshCw size={15} />
         </button>
       </header>
       <div className="file-table">
+        {isLoading && <div className="file-row file-row-muted">Loading...</div>}
+        {!isLoading && files.length === 0 && (
+          <div className="file-row file-row-muted">No files</div>
+        )}
         {files.map((file) => (
           <div className="file-row" key={file.name}>
             {file.kind === "folder" ? <Folder size={15} /> : <FileCode2 size={15} />}

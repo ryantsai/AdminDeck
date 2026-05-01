@@ -687,6 +687,11 @@ kbd + kbd {
   color: var(--text-muted);
 }
 
+.file-row-muted {
+  grid-template-columns: minmax(0, 1fr);
+  color: var(--text-muted);
+}
+
 .transfer-queue {
   overflow: hidden;
 }

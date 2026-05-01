@@ -1,6 +1,7 @@
 mod logging;
 mod secrets;
 mod sessions;
+mod sftp;
 mod ssh;
 mod ssh_config;
 mod storage;
@@ -232,6 +233,32 @@ fn close_terminal_session(
     sessions.close_terminal_session(session_id)
 }
 
+#[tauri::command]
+fn start_sftp_session(
+    app: tauri::AppHandle,
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: sftp::StartSftpSessionRequest,
+) -> Result<sftp::SftpSessionStarted, String> {
+    sftp_sessions.start_sftp_session(app, &secrets, request)
+}
+
+#[tauri::command]
+fn list_sftp_directory(
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    request: sftp::ListSftpDirectoryRequest,
+) -> Result<sftp::SftpDirectoryListing, String> {
+    sftp_sessions.list_directory(request)
+}
+
+#[tauri::command]
+fn close_sftp_session(
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    session_id: String,
+) -> Result<(), String> {
+    sftp_sessions.close_sftp_session(session_id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     logging::init();
@@ -250,6 +277,7 @@ pub fn run() {
             app.manage(storage);
             app.manage(secrets::Secrets::new());
             app.manage(sessions::SessionManager::new());
+            app.manage(sftp::SftpSessionManager::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -279,7 +307,10 @@ pub fn run() {
             start_terminal_session,
             write_terminal_input,
             resize_terminal,
-            close_terminal_session
+            close_terminal_session,
+            start_sftp_session,
+            list_sftp_directory,
+            close_sftp_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running AdminDeck");

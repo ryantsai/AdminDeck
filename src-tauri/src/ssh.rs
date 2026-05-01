@@ -52,6 +52,15 @@ pub struct NativeSshTerminalRequest {
 }
 
 #[derive(Clone)]
+pub(crate) struct NativeSshConnectionRequest {
+    pub host: String,
+    pub user: String,
+    pub port: u16,
+    pub auth: NativeSshAuth,
+    pub known_hosts_path: PathBuf,
+}
+
+#[derive(Clone)]
 pub enum NativeSshAuth {
     KeyFile { key_path: String },
     Password { password: String },
@@ -97,7 +106,7 @@ struct TerminalOutput {
     data: String,
 }
 
-struct VerifyingClient {
+pub(crate) struct VerifyingClient {
     host: String,
     port: u16,
     known_hosts_path: PathBuf,
@@ -378,28 +387,14 @@ async fn run_native_terminal(
     mut control_rx: mpsc::UnboundedReceiver<SshTerminalControl>,
     ready_tx: std_mpsc::SyncSender<Result<(), String>>,
 ) -> Result<(), String> {
-    let config = Arc::new(client::Config {
-        inactivity_timeout: Some(Duration::from_secs(30)),
-        ..Default::default()
-    });
-    let host_key_rejection = Arc::new(std::sync::Mutex::new(None));
-    let mut session = client::connect(
-        config,
-        (request.host.as_str(), request.port),
-        VerifyingClient {
-            host: request.host.clone(),
-            port: request.port,
-            known_hosts_path: request.known_hosts_path.clone(),
-            rejection: Arc::clone(&host_key_rejection),
-        },
-    )
-    .await
-    .map_err(|error| {
-        remembered_rejection(&host_key_rejection)
-            .unwrap_or_else(|| format!("failed to connect to SSH server: {error}"))
-    })?;
-
-    authenticate_native_ssh(&mut session, &request.user, &request.auth).await?;
+    let session = connect_verified_client(NativeSshConnectionRequest {
+        host: request.host.clone(),
+        user: request.user.clone(),
+        port: request.port,
+        auth: request.auth.clone(),
+        known_hosts_path: request.known_hosts_path.clone(),
+    })
+    .await?;
 
     let mut channel = session
         .channel_open_session()
@@ -556,7 +551,46 @@ fn normalize_native_ssh_auth(auth: NativeSshAuth) -> Result<NativeSshAuth, Strin
     }
 }
 
-async fn authenticate_native_ssh(
+pub(crate) async fn connect_verified_client(
+    request: NativeSshConnectionRequest,
+) -> Result<client::Handle<VerifyingClient>, String> {
+    let host = request.host.trim();
+    if host.is_empty() {
+        return Err("host is required for native SSH sessions".to_string());
+    }
+
+    let user = request.user.trim();
+    if user.is_empty() {
+        return Err("user is required for native SSH sessions".to_string());
+    }
+
+    let auth = normalize_native_ssh_auth(request.auth)?;
+    let config = Arc::new(client::Config {
+        inactivity_timeout: Some(Duration::from_secs(30)),
+        ..Default::default()
+    });
+    let host_key_rejection = Arc::new(std::sync::Mutex::new(None));
+    let mut session = client::connect(
+        config,
+        (host, request.port),
+        VerifyingClient {
+            host: host.to_string(),
+            port: request.port,
+            known_hosts_path: request.known_hosts_path,
+            rejection: Arc::clone(&host_key_rejection),
+        },
+    )
+    .await
+    .map_err(|error| {
+        remembered_rejection(&host_key_rejection)
+            .unwrap_or_else(|| format!("failed to connect to SSH server: {error}"))
+    })?;
+
+    authenticate_native_ssh(&mut session, user, &auth).await?;
+    Ok(session)
+}
+
+pub(crate) async fn authenticate_native_ssh(
     session: &mut client::Handle<VerifyingClient>,
     user: &str,
     auth: &NativeSshAuth,

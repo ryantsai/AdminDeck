@@ -6,6 +6,8 @@ As of May 1, 2026, Milestone A has a usable session spine in place: typed fronte
 
 Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH/SFTP Connections.
 
+Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP Connection credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SFTP tabs now open a backend session, list the remote home directory, refresh the listing, and close the session with the tab view.
+
 ## Milestone 0: Project Foundation
 
 - [x] Confirm working product name: AdminDeck.
@@ -46,7 +48,7 @@ Milestone B has started with the accepted Rust SSH direction, durable SSH `proxy
 
 ## Milestone C: SFTP Core
 
-- Implement SFTP session reuse from connection credentials where possible.
+- [x] Implement SFTP session reuse from connection credentials where possible.
 - Add dual-pane local/remote file manager.
 - Add upload and download for files and folders.
 - Add create folder, rename, delete, and refresh.

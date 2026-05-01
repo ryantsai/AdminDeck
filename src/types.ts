@@ -100,11 +100,12 @@ export interface WorkspaceTab {
   subtitle: string;
   kind: "terminal" | "sftp";
   panes: TerminalPane[];
+  connection?: Connection;
 }
 
 export interface FileEntry {
   name: string;
-  kind: "file" | "folder";
+  kind: "file" | "folder" | "symlink" | "other";
   size: string;
   modified: string;
 }

@@ -57,6 +57,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             subtitle: `${connection.user}@${connection.host}`,
             kind: "sftp",
             panes: [],
+            connection,
           }
         : {
             id: `tab-${connection.id}`,
