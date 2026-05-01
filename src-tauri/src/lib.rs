@@ -94,6 +94,22 @@ fn duplicate_connection(
 }
 
 #[tauri::command]
+fn move_connection_folder(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::MoveConnectionFolderRequest,
+) -> Result<Vec<storage::ConnectionGroup>, String> {
+    storage.move_connection_folder(request)
+}
+
+#[tauri::command]
+fn move_connection(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::MoveConnectionRequest,
+) -> Result<Vec<storage::ConnectionGroup>, String> {
+    storage.move_connection(request)
+}
+
+#[tauri::command]
 fn get_terminal_settings(
     storage: tauri::State<'_, storage::Storage>,
 ) -> Result<storage::TerminalSettings, String> {
@@ -200,6 +216,8 @@ pub fn run() {
             rename_connection,
             delete_connection,
             duplicate_connection,
+            move_connection_folder,
+            move_connection,
             get_terminal_settings,
             update_terminal_settings,
             keychain_status,

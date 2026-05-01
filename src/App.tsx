@@ -35,7 +35,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as TerminalEmulator } from "@xterm/xterm";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { DragEvent, FormEvent } from "react";
 import "@xterm/xterm/css/xterm.css";
 import "./App.css";
 import { invokeCommand, isTauriRuntime, type TerminalOutput } from "./lib/tauri";
@@ -57,6 +57,10 @@ import type {
   TerminalSettings,
   WorkspaceTab,
 } from "./types";
+
+type DraggedTreeItem =
+  | { kind: "folder"; folderId: string }
+  | { kind: "connection"; connectionId: string };
 
 function App() {
   const [bootstrap, setBootstrap] = useState("Starting local runtime");
@@ -125,6 +129,8 @@ function ConnectionSidebar() {
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
   const [treeError, setTreeError] = useState("");
+  const [draggedItem, setDraggedItem] = useState<DraggedTreeItem | null>(null);
+  const [dropTarget, setDropTarget] = useState("");
 
   useEffect(() => {
     void reloadConnectionGroups();
@@ -261,6 +267,32 @@ function ConnectionSidebar() {
     }
   }
 
+  async function handleMoveFolder(folderId: string, targetIndex: number) {
+    try {
+      setTreeError("");
+      setGroups(
+        await invokeCommand("move_connection_folder", {
+          request: { id: folderId, targetIndex },
+        }),
+      );
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleMoveConnection(connectionId: string, folderId: string, targetIndex: number) {
+    try {
+      setTreeError("");
+      setGroups(
+        await invokeCommand("move_connection", {
+          request: { id: connectionId, folderId, targetIndex },
+        }),
+      );
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async function handleDeleteConnection(connection: Connection) {
     if (!window.confirm(`Delete ${connection.name}?`)) {
       return;
@@ -311,6 +343,63 @@ function ConnectionSidebar() {
           group.name.toLowerCase().includes(normalizedQuery),
       );
   }, [groups, query]);
+  const isTreeFiltered = query.trim().length > 0;
+
+  function handleDragStart(event: DragEvent, item: DraggedTreeItem) {
+    if (isTreeFiltered) {
+      event.preventDefault();
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-admindeck-tree-item", JSON.stringify(item));
+    setDraggedItem(item);
+  }
+
+  function handleDragOver(event: DragEvent, targetId: string) {
+    if (isTreeFiltered || !draggedItem) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTarget(targetId);
+  }
+
+  function handleDragEnd() {
+    setDraggedItem(null);
+    setDropTarget("");
+  }
+
+  function dropDraggedItem(
+    event: DragEvent,
+    target: { kind: "folder"; folderId: string; targetIndex: number } | {
+      kind: "connection";
+      folderId: string;
+      connectionId: string;
+      targetIndex: number;
+    },
+  ) {
+    event.preventDefault();
+    const item = draggedItem;
+    handleDragEnd();
+    if (!item) {
+      return;
+    }
+
+    if (item.kind === "folder" && target.kind === "folder" && item.folderId !== target.folderId) {
+      void handleMoveFolder(item.folderId, target.targetIndex);
+      return;
+    }
+
+    if (item.kind === "connection") {
+      if (target.kind === "connection" && item.connectionId === target.connectionId) {
+        return;
+      }
+
+      void handleMoveConnection(item.connectionId, target.folderId, target.targetIndex);
+    }
+  }
 
   return (
     <aside className="connection-sidebar">
@@ -355,9 +444,27 @@ function ConnectionSidebar() {
       {treeError ? <p className="form-error tree-error">{treeError}</p> : null}
 
       <div className="tree-list" aria-label="Connection tree">
-        {filteredGroups.map((group) => (
+        {filteredGroups.map((group, groupIndex) => (
           <section className="tree-group" key={group.id}>
-            <div className="tree-folder-row">
+            <div
+              className={`tree-folder-row ${dropTarget === `folder-${group.id}` ? "drop-target" : ""}`}
+              draggable={!isTreeFiltered}
+              onDragEnd={handleDragEnd}
+              onDragOver={(event) => handleDragOver(event, `folder-${group.id}`)}
+              onDragStart={(event) =>
+                handleDragStart(event, { kind: "folder", folderId: group.id })
+              }
+              onDrop={(event) =>
+                dropDraggedItem(event, {
+                  kind: "folder",
+                  folderId: group.id,
+                  targetIndex:
+                    draggedItem?.kind === "connection"
+                      ? group.connections.length
+                      : groupIndex,
+                })
+              }
+            >
               <button className="tree-folder">
                 <ChevronDown size={14} />
                 <Folder size={15} />
@@ -381,12 +488,30 @@ function ConnectionSidebar() {
                 </button>
               </span>
             </div>
-            {group.connections.map((connection) => (
+            {group.connections.map((connection, connectionIndex) => (
               <ConnectionRow
                 connection={connection}
                 key={connection.id}
+                dragDisabled={isTreeFiltered}
+                isDropTarget={dropTarget === `connection-${connection.id}`}
                 onDelete={() => void handleDeleteConnection(connection)}
                 onDuplicate={() => void handleDuplicateConnection(connection)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(event) => handleDragOver(event, `connection-${connection.id}`)}
+                onDragStart={(event) =>
+                  handleDragStart(event, {
+                    kind: "connection",
+                    connectionId: connection.id,
+                  })
+                }
+                onDrop={(event) =>
+                  dropDraggedItem(event, {
+                    kind: "connection",
+                    folderId: group.id,
+                    connectionId: connection.id,
+                    targetIndex: connectionIndex,
+                  })
+                }
                 onOpen={() => openConnection(connection)}
                 onRename={() => void handleRenameConnection(connection)}
               />
@@ -545,21 +670,40 @@ function ConnectionDialog({
 
 function ConnectionRow({
   connection,
+  dragDisabled,
+  isDropTarget,
   onDelete,
   onDuplicate,
+  onDragEnd,
+  onDragOver,
+  onDragStart,
+  onDrop,
   onOpen,
   onRename,
 }: {
   connection: Connection;
+  dragDisabled: boolean;
+  isDropTarget: boolean;
   onDelete: () => void;
   onDuplicate: () => void;
+  onDragEnd: () => void;
+  onDragOver: (event: DragEvent) => void;
+  onDragStart: (event: DragEvent) => void;
+  onDrop: (event: DragEvent) => void;
   onOpen: () => void;
   onRename: () => void;
 }) {
   const Icon = connection.type === "local" ? Laptop : connection.type === "sftp" ? Columns2 : Server;
 
   return (
-    <div className="connection-row">
+    <div
+      className={isDropTarget ? "connection-row drop-target" : "connection-row"}
+      draggable={!dragDisabled}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragStart={onDragStart}
+      onDrop={onDrop}
+    >
       <button className="connection-open" onClick={onOpen}>
         <Icon size={15} />
         <span className="connection-main">

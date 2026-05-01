@@ -7,6 +7,8 @@ import type {
   CreateConnectionRequest,
   DuplicateConnectionRequest,
   KeychainStatus,
+  MoveConnectionFolderRequest,
+  MoveConnectionRequest,
   RenameConnectionFolderRequest,
   RenameConnectionRequest,
   SecretPresence,
@@ -73,6 +75,14 @@ type CommandMap = {
   duplicate_connection: {
     args: { request: DuplicateConnectionRequest };
     result: Connection;
+  };
+  move_connection_folder: {
+    args: { request: MoveConnectionFolderRequest };
+    result: ConnectionGroup[];
+  };
+  move_connection: {
+    args: { request: MoveConnectionRequest };
+    result: ConnectionGroup[];
   };
   get_terminal_settings: {
     args: undefined;

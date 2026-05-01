@@ -124,6 +124,21 @@ pub struct DuplicateConnectionRequest {
     name: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveConnectionFolderRequest {
+    id: String,
+    target_index: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveConnectionRequest {
+    id: String,
+    folder_id: String,
+    target_index: usize,
+}
+
 impl Storage {
     pub fn open(db_path: PathBuf) -> Result<Self, String> {
         if let Some(parent) = db_path.parent() {
@@ -504,6 +519,86 @@ impl Storage {
         get_connection_by_id(&connection, &duplicate_id)
     }
 
+    pub fn move_connection_folder(
+        &self,
+        request: MoveConnectionFolderRequest,
+    ) -> Result<Vec<ConnectionGroup>, String> {
+        let id = required_field("folder id", request.id)?;
+        let mut connection = self.lock()?;
+        let transaction = connection.transaction().map_err(to_storage_error)?;
+        let mut folder_ids = list_folder_ids(&transaction)?;
+        let current_index = folder_ids
+            .iter()
+            .position(|folder_id| folder_id == &id)
+            .ok_or_else(|| "connection folder was not found".to_string())?;
+        let folder_id = folder_ids.remove(current_index);
+        let target_index = if current_index < request.target_index {
+            request.target_index.saturating_sub(1)
+        } else {
+            request.target_index
+        }
+        .min(folder_ids.len());
+        folder_ids.insert(target_index, folder_id);
+        update_folder_sort_order(&transaction, &folder_ids)?;
+        transaction.commit().map_err(to_storage_error)?;
+        drop(connection);
+        self.list_connection_groups()
+    }
+
+    pub fn move_connection(
+        &self,
+        request: MoveConnectionRequest,
+    ) -> Result<Vec<ConnectionGroup>, String> {
+        let id = required_field("connection id", request.id)?;
+        let target_folder_id = required_field("folder id", request.folder_id)?;
+        let mut connection = self.lock()?;
+        let transaction = connection.transaction().map_err(to_storage_error)?;
+
+        let source_folder_id = transaction
+            .query_row(
+                "SELECT folder_id FROM connections WHERE id = ?1",
+                params![id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?
+            .ok_or_else(|| "connection was not found".to_string())?;
+
+        let target_index = if source_folder_id == target_folder_id {
+            let connection_ids = list_connection_ids_for_folder(&transaction, &source_folder_id)?;
+            match connection_ids
+                .iter()
+                .position(|connection_id| connection_id == &id)
+            {
+                Some(current_index) if current_index < request.target_index => {
+                    request.target_index.saturating_sub(1)
+                }
+                _ => request.target_index,
+            }
+        } else {
+            request.target_index
+        };
+
+        ensure_folder_exists(
+            &transaction,
+            &target_folder_id,
+            folder_name_for(&target_folder_id),
+        )?;
+
+        transaction
+            .execute(
+                "UPDATE connections SET folder_id = ?1 WHERE id = ?2",
+                params![target_folder_id, id],
+            )
+            .map_err(to_storage_error)?;
+
+        reorder_connection_ids(&transaction, &source_folder_id, None)?;
+        reorder_connection_ids(&transaction, &target_folder_id, Some((&id, target_index)))?;
+        transaction.commit().map_err(to_storage_error)?;
+        drop(connection);
+        self.list_connection_groups()
+    }
+
     fn seed_starter_connections(&self) -> Result<(), String> {
         let mut connection = self.lock()?;
         let existing_count: i64 = connection
@@ -640,6 +735,84 @@ fn list_connections_for_folder(
     }
 
     Ok(connections)
+}
+
+fn list_folder_ids(connection: &SqliteConnection) -> Result<Vec<String>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT id
+             FROM connection_folders
+             ORDER BY sort_order, name",
+        )
+        .map_err(to_storage_error)?;
+
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(to_storage_error)?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(to_storage_error)
+}
+
+fn update_folder_sort_order(
+    connection: &SqliteConnection,
+    folder_ids: &[String],
+) -> Result<(), String> {
+    for (index, folder_id) in folder_ids.iter().enumerate() {
+        connection
+            .execute(
+                "UPDATE connection_folders SET sort_order = ?1 WHERE id = ?2",
+                params![index as i64, folder_id],
+            )
+            .map_err(to_storage_error)?;
+    }
+
+    Ok(())
+}
+
+fn reorder_connection_ids(
+    connection: &SqliteConnection,
+    folder_id: &str,
+    moved_connection: Option<(&str, usize)>,
+) -> Result<(), String> {
+    let mut connection_ids = list_connection_ids_for_folder(connection, folder_id)?;
+    if let Some((connection_id, target_index)) = moved_connection {
+        connection_ids.retain(|id| id != connection_id);
+        let target_index = target_index.min(connection_ids.len());
+        connection_ids.insert(target_index, connection_id.to_string());
+    }
+
+    for (index, connection_id) in connection_ids.iter().enumerate() {
+        connection
+            .execute(
+                "UPDATE connections SET sort_order = ?1 WHERE id = ?2",
+                params![index as i64, connection_id],
+            )
+            .map_err(to_storage_error)?;
+    }
+
+    Ok(())
+}
+
+fn list_connection_ids_for_folder(
+    connection: &SqliteConnection,
+    folder_id: &str,
+) -> Result<Vec<String>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT id
+             FROM connections
+             WHERE folder_id = ?1
+             ORDER BY sort_order, name",
+        )
+        .map_err(to_storage_error)?;
+
+    let rows = statement
+        .query_map(params![folder_id], |row| row.get::<_, String>(0))
+        .map_err(to_storage_error)?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(to_storage_error)
 }
 
 fn get_connection_by_id(
@@ -1144,6 +1317,73 @@ mod tests {
             .expect_err("local workspace delete is rejected");
 
         assert_eq!(error, "the local workspace folder cannot be deleted");
+    }
+
+    #[test]
+    fn move_connection_folder_updates_durable_folder_order() {
+        let storage = Storage::open(temp_db_path("folder-move")).expect("storage opens");
+
+        let groups = storage
+            .move_connection_folder(MoveConnectionFolderRequest {
+                id: "staging".to_string(),
+                target_index: 0,
+            })
+            .expect("folder is moved");
+
+        assert_eq!(groups[0].id, "staging");
+        assert_eq!(groups[1].id, "local");
+
+        let reloaded = storage
+            .list_connection_groups()
+            .expect("connection groups reload");
+        assert_eq!(reloaded[0].id, "staging");
+    }
+
+    #[test]
+    fn move_connection_reorders_within_target_folder() {
+        let storage = Storage::open(temp_db_path("connection-move")).expect("storage opens");
+
+        let groups = storage
+            .move_connection(MoveConnectionRequest {
+                id: "api-stage".to_string(),
+                folder_id: "production".to_string(),
+                target_index: 1,
+            })
+            .expect("connection is moved");
+
+        let production = groups
+            .iter()
+            .find(|group| group.id == "production")
+            .expect("production folder exists");
+        assert_eq!(production.connections[1].id, "api-stage");
+        assert_eq!(production.connections.len(), 3);
+
+        let staging = groups
+            .iter()
+            .find(|group| group.id == "staging")
+            .expect("staging folder exists");
+        assert!(staging.connections.is_empty());
+    }
+
+    #[test]
+    fn move_connection_before_later_connection_in_same_folder() {
+        let storage =
+            Storage::open(temp_db_path("connection-move-same-folder")).expect("storage opens");
+
+        let groups = storage
+            .move_connection(MoveConnectionRequest {
+                id: "bastion-east".to_string(),
+                folder_id: "production".to_string(),
+                target_index: 1,
+            })
+            .expect("connection order is normalized");
+
+        let production = groups
+            .iter()
+            .find(|group| group.id == "production")
+            .expect("production folder exists");
+        assert_eq!(production.connections[0].id, "bastion-east");
+        assert_eq!(production.connections[1].id, "files-prod");
     }
 
     #[test]

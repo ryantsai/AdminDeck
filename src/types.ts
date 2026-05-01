@@ -43,6 +43,17 @@ export interface DuplicateConnectionRequest {
   name?: string;
 }
 
+export interface MoveConnectionFolderRequest {
+  id: string;
+  targetIndex: number;
+}
+
+export interface MoveConnectionRequest {
+  id: string;
+  folderId: string;
+  targetIndex: number;
+}
+
 export interface ConnectionGroup {
   id: string;
   name: string;

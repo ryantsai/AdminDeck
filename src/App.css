@@ -257,6 +257,18 @@ h2 {
   gap: 4px;
 }
 
+.tree-folder-row[draggable="true"],
+.connection-row[draggable="true"] {
+  cursor: grab;
+}
+
+.tree-folder-row.drop-target,
+.connection-row.drop-target {
+  background: var(--accent-soft);
+  outline: 1px solid #8db5ff;
+  outline-offset: -1px;
+}
+
 .tree-folder,
 .connection-open,
 .row-action {
