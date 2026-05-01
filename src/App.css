@@ -161,6 +161,13 @@ h2 {
   background: var(--surface);
 }
 
+.icon-button:disabled {
+  color: var(--text-faint);
+  background: var(--surface-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .search-box {
   display: flex;
   gap: 8px;

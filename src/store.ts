@@ -11,6 +11,7 @@ interface WorkspaceState {
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
   openLocalTerminal: () => void;
+  splitTerminalPane: (tabId: string) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -80,5 +81,35 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tags: ["local", "shell"],
       status: "idle",
     });
+  },
+  splitTerminalPane: (tabId) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.id !== tabId || tab.kind !== "terminal") {
+          return tab;
+        }
+
+        const sourcePane = tab.panes[0];
+        const connection = sourcePane?.connection;
+        if (!sourcePane || !connection) {
+          return tab;
+        }
+
+        const paneCount = tab.panes.length + 1;
+        return {
+          ...tab,
+          panes: [
+            ...tab.panes,
+            {
+              id: `pane-${connection.id}-${Date.now()}`,
+              title: `${sourcePane.title} ${paneCount}`,
+              cwd: sourcePane.cwd,
+              buffer: "",
+              connection,
+            },
+          ],
+        };
+      }),
+    }));
   },
 }));

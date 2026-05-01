@@ -96,5 +96,16 @@ export function invokeCommand<Name extends keyof CommandMap>(
   name: Name,
   args?: CommandMap[Name]["args"],
 ): Promise<CommandMap[Name]["result"]> {
+  if (!isTauriRuntime()) {
+    return Promise.reject(new Error("Tauri runtime unavailable"));
+  }
+
   return invoke<CommandMap[Name]["result"]>(name, args);
+}
+
+export function isTauriRuntime() {
+  return (
+    typeof window !== "undefined" &&
+    "__TAURI_INTERNALS__" in (window as Window & { __TAURI_INTERNALS__?: unknown })
+  );
 }

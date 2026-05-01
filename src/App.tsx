@@ -37,7 +37,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import "@xterm/xterm/css/xterm.css";
 import "./App.css";
-import { invokeCommand, type TerminalOutput } from "./lib/tauri";
+import { invokeCommand, isTauriRuntime, type TerminalOutput } from "./lib/tauri";
 import {
   aiSuggestions,
   connectionGroups,
@@ -558,6 +558,9 @@ function WorkspaceCanvas() {
 }
 
 function TerminalWorkspace({ tab }: { tab: WorkspaceTab }) {
+  const splitTerminalPane = useWorkspaceStore((state) => state.splitTerminalPane);
+  const canSplit = tab.panes.some((pane) => pane.connection);
+
   return (
     <section className="terminal-workspace">
       <div className="workspace-toolbar">
@@ -566,7 +569,13 @@ function TerminalWorkspace({ tab }: { tab: WorkspaceTab }) {
           <span>{tab.subtitle}</span>
         </div>
         <div className="toolbar-cluster">
-          <button className="icon-button" aria-label="Split terminal">
+          <button
+            className="icon-button"
+            aria-label="Split terminal"
+            disabled={!canSplit}
+            onClick={() => splitTerminalPane(tab.id)}
+            title="Split terminal"
+          >
             <SplitSquareHorizontal size={15} />
           </button>
           <button className="icon-button" aria-label="Copy terminal selection">
@@ -618,6 +627,14 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     fitAddon.fit();
     terminal.focus();
     terminal.writeln(`Starting ${connection.type} session for ${connection.name}...`);
+
+    if (!isTauriRuntime()) {
+      terminal.writeln("Terminal sessions require the Tauri desktop runtime.");
+      return () => {
+        terminal.dispose();
+      };
+    }
+
     const requestedSessionId = `${connection.id}-${Date.now()}`;
     sessionIdRef.current = requestedSessionId;
 
