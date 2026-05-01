@@ -16,6 +16,7 @@ import {
   LayoutPanelLeft,
   MoreHorizontal,
   PanelRight,
+  Pencil,
   Play,
   Plus,
   Search,
@@ -25,6 +26,7 @@ import {
   SplitSquareHorizontal,
   Tags,
   Terminal,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -59,7 +61,11 @@ function App() {
 
   useEffect(() => {
     invokeCommand("app_bootstrap")
-      .then((result) => setBootstrap(`${result.logStatus} | ${result.storageStatus}`))
+      .then((result) =>
+        setBootstrap(
+          `${result.logStatus} | ${result.storageStatus} | Keychain: ${result.keychainStatus.backend}`,
+        ),
+      )
       .catch(() => setBootstrap("Frontend preview mode"));
   }, []);
 
@@ -107,16 +113,26 @@ function ConnectionSidebar() {
   const [groups, setGroups] = useState<ConnectionGroup[]>(connectionGroups);
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
+  const [treeError, setTreeError] = useState("");
 
   useEffect(() => {
-    loadConnectionGroups(setGroups);
+    void reloadConnectionGroups();
   }, []);
+
+  async function reloadConnectionGroups() {
+    try {
+      setGroups(await invokeCommand("list_connection_groups"));
+    } catch {
+      setGroups(connectionGroups);
+    }
+  }
 
   function handleConnectionReady(connection: Connection) {
     setGroups((currentGroups) => upsertConnectionGroup(currentGroups, connection));
     openConnection(connection);
     setFormMode(null);
     setFormError("");
+    setTreeError("");
   }
 
   async function handleConnectionSubmit(request: CreateConnectionRequest) {
@@ -142,6 +158,51 @@ function ConnectionSidebar() {
       tags: request.tags,
       status: "idle",
     });
+  }
+
+  async function handleRenameConnection(connection: Connection) {
+    const name = window.prompt("Rename connection", connection.name)?.trim();
+    if (!name || name === connection.name) {
+      return;
+    }
+
+    try {
+      setTreeError("");
+      await invokeCommand("rename_connection", {
+        request: { id: connection.id, name },
+      });
+      await reloadConnectionGroups();
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleDuplicateConnection(connection: Connection) {
+    try {
+      setTreeError("");
+      await invokeCommand("duplicate_connection", {
+        request: { id: connection.id },
+      });
+      await reloadConnectionGroups();
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleDeleteConnection(connection: Connection) {
+    if (!window.confirm(`Delete ${connection.name}?`)) {
+      return;
+    }
+
+    try {
+      setTreeError("");
+      await invokeCommand("delete_connection", {
+        connectionId: connection.id,
+      });
+      await reloadConnectionGroups();
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   const filteredGroups = useMemo(() => {
@@ -198,6 +259,7 @@ function ConnectionSidebar() {
         <Play size={15} />
         Quick connect
       </button>
+      {treeError ? <p className="form-error tree-error">{treeError}</p> : null}
 
       <div className="tree-list" aria-label="Connection tree">
         {filteredGroups.map((group) => (
@@ -212,7 +274,10 @@ function ConnectionSidebar() {
               <ConnectionRow
                 connection={connection}
                 key={connection.id}
+                onDelete={() => void handleDeleteConnection(connection)}
+                onDuplicate={() => void handleDuplicateConnection(connection)}
                 onOpen={() => openConnection(connection)}
+                onRename={() => void handleRenameConnection(connection)}
               />
             ))}
           </section>
@@ -344,29 +409,42 @@ function ConnectionDialog({
 
 function ConnectionRow({
   connection,
+  onDelete,
+  onDuplicate,
   onOpen,
+  onRename,
 }: {
   connection: Connection;
+  onDelete: () => void;
+  onDuplicate: () => void;
   onOpen: () => void;
+  onRename: () => void;
 }) {
   const Icon = connection.type === "local" ? Laptop : connection.type === "sftp" ? Columns2 : Server;
 
   return (
-    <button className="connection-row" onClick={onOpen}>
-      <Icon size={15} />
-      <span className="connection-main">
-        <strong>{connection.name}</strong>
-        <small>{connection.host}</small>
-      </span>
+    <div className="connection-row">
+      <button className="connection-open" onClick={onOpen}>
+        <Icon size={15} />
+        <span className="connection-main">
+          <strong>{connection.name}</strong>
+          <small>{connection.host}</small>
+        </span>
+      </button>
       <span className={`status-dot ${connection.status}`} />
-    </button>
+      <span className="connection-actions">
+        <button className="row-action" aria-label={`Rename ${connection.name}`} onClick={onRename}>
+          <Pencil size={13} />
+        </button>
+        <button className="row-action" aria-label={`Duplicate ${connection.name}`} onClick={onDuplicate}>
+          <Copy size={13} />
+        </button>
+        <button className="row-action danger" aria-label={`Delete ${connection.name}`} onClick={onDelete}>
+          <Trash2 size={13} />
+        </button>
+      </span>
+    </div>
   );
-}
-
-function loadConnectionGroups(setGroups: (groups: ConnectionGroup[]) => void) {
-  invokeCommand("list_connection_groups")
-    .then(setGroups)
-    .catch(() => setGroups(connectionGroups));
 }
 
 function upsertConnectionGroup(groups: ConnectionGroup[], connection: Connection) {
@@ -770,7 +848,7 @@ function AssistantPanel() {
       <section className="settings-stack">
         <div>
           <Database size={15} />
-          <span>SQLite profiles</span>
+          <span>SQLite connections</span>
           <strong>Planned</strong>
         </div>
         <div>

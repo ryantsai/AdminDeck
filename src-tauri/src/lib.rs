@@ -1,4 +1,5 @@
 mod logging;
+mod secrets;
 mod sessions;
 mod storage;
 
@@ -12,15 +13,20 @@ struct AppBootstrap {
     version: &'static str,
     log_status: String,
     storage_status: String,
+    keychain_status: secrets::KeychainStatus,
 }
 
 #[tauri::command]
-fn app_bootstrap(storage: tauri::State<'_, storage::Storage>) -> AppBootstrap {
+fn app_bootstrap(
+    storage: tauri::State<'_, storage::Storage>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+) -> AppBootstrap {
     AppBootstrap {
         product_name: "AdminDeck",
         version: env!("CARGO_PKG_VERSION"),
         log_status: logging::status(),
         storage_status: storage.status(),
+        keychain_status: secrets.status(),
     }
 }
 
@@ -37,6 +43,59 @@ fn create_connection(
     request: storage::CreateConnectionRequest,
 ) -> Result<storage::SavedConnection, String> {
     storage.create_connection(request)
+}
+
+#[tauri::command]
+fn rename_connection(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::RenameConnectionRequest,
+) -> Result<storage::SavedConnection, String> {
+    storage.rename_connection(request)
+}
+
+#[tauri::command]
+fn delete_connection(
+    storage: tauri::State<'_, storage::Storage>,
+    connection_id: String,
+) -> Result<(), String> {
+    storage.delete_connection(connection_id)
+}
+
+#[tauri::command]
+fn duplicate_connection(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::DuplicateConnectionRequest,
+) -> Result<storage::SavedConnection, String> {
+    storage.duplicate_connection(request)
+}
+
+#[tauri::command]
+fn keychain_status(secrets: tauri::State<'_, secrets::Secrets>) -> secrets::KeychainStatus {
+    secrets.status()
+}
+
+#[tauri::command]
+fn store_secret(
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: secrets::StoreSecretRequest,
+) -> Result<(), String> {
+    secrets.store_secret(request)
+}
+
+#[tauri::command]
+fn secret_exists(
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: secrets::SecretReferenceRequest,
+) -> Result<secrets::SecretPresence, String> {
+    secrets.secret_exists(request)
+}
+
+#[tauri::command]
+fn delete_secret(
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: secrets::SecretReferenceRequest,
+) -> Result<(), String> {
+    secrets.delete_secret(request)
 }
 
 #[tauri::command]
@@ -88,6 +147,7 @@ pub fn run() {
                 .join("admin-deck.sqlite3");
             let storage = storage::Storage::open(db_path).map_err(setup_error)?;
             app.manage(storage);
+            app.manage(secrets::Secrets::new());
             app.manage(sessions::SessionManager::new());
             Ok(())
         })
@@ -95,6 +155,13 @@ pub fn run() {
             app_bootstrap,
             list_connection_groups,
             create_connection,
+            rename_connection,
+            delete_connection,
+            duplicate_connection,
+            keychain_status,
+            store_secret,
+            secret_exists,
+            delete_secret,
             start_terminal_session,
             write_terminal_input,
             resize_terminal,

@@ -24,6 +24,16 @@ export interface CreateConnectionRequest {
   tags: string[];
 }
 
+export interface RenameConnectionRequest {
+  id: string;
+  name: string;
+}
+
+export interface DuplicateConnectionRequest {
+  id: string;
+  name?: string;
+}
+
 export interface ConnectionGroup {
   id: string;
   name: string;
@@ -58,4 +68,26 @@ export interface AppBootstrap {
   version: string;
   logStatus: string;
   storageStatus: string;
+  keychainStatus: KeychainStatus;
+}
+
+export type SecretKind = "connectionPassword" | "connectionPassphrase" | "aiApiKey";
+
+export interface KeychainStatus {
+  available: boolean;
+  service: string;
+  backend: string;
+}
+
+export interface SecretReferenceRequest {
+  kind: SecretKind;
+  ownerId: string;
+}
+
+export interface StoreSecretRequest extends SecretReferenceRequest {
+  secret: string;
+}
+
+export interface SecretPresence {
+  exists: boolean;
 }

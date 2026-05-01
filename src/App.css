@@ -228,7 +228,8 @@ h2 {
 }
 
 .tree-folder,
-.connection-row {
+.connection-row,
+.connection-open {
   display: flex;
   align-items: center;
   width: 100%;
@@ -236,6 +237,11 @@ h2 {
   color: var(--text);
   background: transparent;
   border-radius: 6px;
+}
+
+.tree-folder,
+.connection-open,
+.row-action {
   cursor: pointer;
 }
 
@@ -255,11 +261,19 @@ h2 {
 .connection-row {
   gap: 9px;
   min-height: 42px;
-  padding: 6px 8px 6px 26px;
+  padding: 6px 6px 6px 26px;
 }
 
 .connection-row:hover {
   background: var(--surface);
+}
+
+.connection-open {
+  flex: 1 1 auto;
+  gap: 9px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
 }
 
 .connection-main {
@@ -294,9 +308,9 @@ h2 {
 }
 
 .status-dot {
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
-  margin-left: auto;
   border-radius: 999px;
 }
 
@@ -310,6 +324,38 @@ h2 {
 
 .status-dot.offline {
   background: var(--border-strong);
+}
+
+.connection-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  opacity: 0;
+}
+
+.connection-row:hover .connection-actions,
+.connection-row:focus-within .connection-actions {
+  opacity: 1;
+}
+
+.row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-faint);
+  background: transparent;
+  border-radius: 5px;
+}
+
+.row-action:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.row-action.danger:hover {
+  color: var(--red);
 }
 
 .workspace {
@@ -825,4 +871,8 @@ progress {
   color: var(--red);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.tree-error {
+  margin: -4px 0 10px;
 }

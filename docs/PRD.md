@@ -8,7 +8,7 @@ AdminDeck is intended to be a fast, professional desktop workspace for personal/
 
 ## Solution
 
-AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions, SFTP dual-pane file management, SSH config import, local SQLite profile storage, OS keychain secret storage, and approval-based AI command assistance.
+AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions, SFTP dual-pane file management, SSH config import, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
 
 The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. Mobile, RDP, VNC, team vaults, and sync are explicitly later-stage work.
 
@@ -21,10 +21,10 @@ The product will be light chrome with dark terminal panes by default, optimized 
 5. As an operator, I want tags on connections, so that I can find related hosts across folder boundaries.
 6. As an operator, I want search and filtering in the connection tree, so that large host lists remain usable.
 7. As an operator, I want drag/drop reorder in the tree, so that I can keep my workspace arranged naturally.
-8. As an operator, I want rename, delete, and duplicate actions for folders and connections, so that profile maintenance is fast.
-9. As an operator, I want quick connect, so that I can connect to a host without saving a full profile first.
+8. As an operator, I want rename, delete, and duplicate actions for folders and connections, so that connection maintenance is fast.
+9. As an operator, I want quick connect, so that I can connect to a host without saving a full connection first.
 10. As an SSH user, I want to import entries from my SSH config, so that AdminDeck can bootstrap my existing workflow.
-11. As an SSH user, I want imported SSH config entries to preserve host, user, port, identity file, and proxy jump when possible, so that imported profiles behave as expected.
+11. As an SSH user, I want imported SSH config entries to preserve host, user, port, identity file, and proxy jump when possible, so that imported connections behave as expected.
 12. As an SSH user, I want unsupported SSH config directives to be visible, so that I understand what may need manual adjustment.
 13. As a terminal user, I want local terminal tabs, so that AdminDeck can replace my daily terminal for common work.
 14. As a terminal user, I want SSH terminal tabs, so that remote shell work happens in the same workspace as local work.
@@ -50,7 +50,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 34. As a user, I want the command palette to open connections, create terminals, split panes, search scrollback, open settings, and import SSH config, so that common workflows are keyboard-first.
 35. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
 36. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
-37. As a user, I want local SQLite storage for non-secret settings and profiles, so that the app remains local-first and reliable.
+37. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
 38. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
 39. As a user, I want no telemetry by default, so that my terminal and host data remain private.
 40. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
@@ -89,7 +89,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - SSH/SFTP implementation: in-process Rust implementation as primary path.
 - SSH library candidates: evaluate russh first, ssh2/libssh2 as fallback candidate.
 - System ssh: optional fallback/debug path only.
-- Storage: local SQLite for profiles, tree, tags, settings, layout, recent sessions, and non-secret AI provider metadata.
+- Storage: local SQLite for connections, tree, tags, settings, layout, recent sessions, and non-secret AI provider metadata.
 - Secrets: OS keychain for passwords, SSH passphrases, and AI API keys.
 - SSH keys: reference existing key files by path; do not manage/generate keypairs in v0.1.
 - AI model: approval-based command assist only.
@@ -139,6 +139,6 @@ The product will be light chrome with dark terminal panes by default, optimized 
 
 ## Further Notes
 
-AdminDeck is open-source under Apache-2.0. The codebase should prefer deep modules with small, testable interfaces for storage, connection profiles, terminal sessions, SSH/SFTP transport, renderer abstraction, AI provider adapters, command approval, and importers.
+AdminDeck is open-source under Apache-2.0. The codebase should prefer deep modules with small, testable interfaces for storage, connections, terminal sessions, SSH/SFTP transport, renderer abstraction, AI provider adapters, command approval, and importers.
 
 The product should feel like a quiet, dense, professional desktop tool. Avoid marketing-style layouts, decorative gradients, oversized cards, or generic admin-dashboard styling.

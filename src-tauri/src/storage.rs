@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection as SqliteConnection};
+use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
@@ -82,6 +82,20 @@ pub struct CreateConnectionRequest {
     port: Option<u16>,
     key_path: Option<String>,
     tags: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameConnectionRequest {
+    id: String,
+    name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateConnectionRequest {
+    id: String,
+    name: Option<String>,
 }
 
 impl Storage {
@@ -233,6 +247,122 @@ impl Storage {
         })
     }
 
+    pub fn rename_connection(
+        &self,
+        request: RenameConnectionRequest,
+    ) -> Result<SavedConnection, String> {
+        let id = required_field("connection id", request.id)?;
+        let name = required_field("name", request.name)?;
+        let connection = self.lock()?;
+        let affected = connection
+            .execute(
+                "UPDATE connections SET name = ?1 WHERE id = ?2",
+                params![name, id],
+            )
+            .map_err(to_storage_error)?;
+
+        if affected == 0 {
+            return Err("connection was not found".to_string());
+        }
+
+        get_connection_by_id(&connection, &id)
+    }
+
+    pub fn delete_connection(&self, connection_id: String) -> Result<(), String> {
+        let connection_id = required_field("connection id", connection_id)?;
+        let connection = self.lock()?;
+        let affected = connection
+            .execute(
+                "DELETE FROM connections WHERE id = ?1",
+                params![connection_id],
+            )
+            .map_err(to_storage_error)?;
+
+        if affected == 0 {
+            return Err("connection was not found".to_string());
+        }
+
+        Ok(())
+    }
+
+    pub fn duplicate_connection(
+        &self,
+        request: DuplicateConnectionRequest,
+    ) -> Result<SavedConnection, String> {
+        let source_id = required_field("connection id", request.id)?;
+        let mut connection = self.lock()?;
+        let transaction = connection.transaction().map_err(to_storage_error)?;
+
+        let source = transaction
+            .query_row(
+                "SELECT folder_id, name, host, username, port, key_path, connection_type
+                 FROM connections
+                 WHERE id = ?1",
+                params![source_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        optional_port(row.get::<_, Option<i64>>(4)?)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, String>(6)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(to_storage_error)?
+            .ok_or_else(|| "connection was not found".to_string())?;
+        let (folder_id, source_name, host, user, port, key_path, connection_type) = source;
+        let duplicate_name = request
+            .name
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| format!("Copy of {source_name}"));
+        let duplicate_id = make_connection_id(&duplicate_name);
+        let next_sort_order: i64 = transaction
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections WHERE folder_id = ?1",
+                params![folder_id],
+                |row| row.get(0),
+            )
+            .map_err(to_storage_error)?;
+
+        transaction
+            .execute(
+                "INSERT INTO connections (
+                    id, folder_id, name, host, username, port, key_path, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'idle', ?9)",
+                params![
+                    duplicate_id,
+                    folder_id,
+                    duplicate_name,
+                    host,
+                    user,
+                    port,
+                    key_path,
+                    connection_type,
+                    next_sort_order
+                ],
+            )
+            .map_err(to_storage_error)?;
+
+        let tags = list_tags(&transaction, &source_id)?;
+        for (index, tag) in tags.iter().enumerate() {
+            transaction
+                .execute(
+                    "INSERT INTO connection_tags (connection_id, tag, sort_order)
+                     VALUES (?1, ?2, ?3)",
+                    params![duplicate_id, tag, index as i64],
+                )
+                .map_err(to_storage_error)?;
+        }
+
+        transaction.commit().map_err(to_storage_error)?;
+        get_connection_by_id(&connection, &duplicate_id)
+    }
+
     fn seed_starter_connections(&self) -> Result<(), String> {
         let mut connection = self.lock()?;
         let existing_count: i64 = connection
@@ -369,6 +499,40 @@ fn list_connections_for_folder(
     }
 
     Ok(connections)
+}
+
+fn get_connection_by_id(
+    connection: &SqliteConnection,
+    connection_id: &str,
+) -> Result<SavedConnection, String> {
+    let saved_connection = connection
+        .query_row(
+            "SELECT id, name, host, username, port, key_path, connection_type, status
+             FROM connections
+             WHERE id = ?1",
+            params![connection_id],
+            |row| {
+                Ok(SavedConnection {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    host: row.get(2)?,
+                    user: row.get(3)?,
+                    port: optional_port(row.get::<_, Option<i64>>(4)?)?,
+                    key_path: row.get(5)?,
+                    connection_type: row.get(6)?,
+                    status: row.get(7)?,
+                    tags: Vec::new(),
+                })
+            },
+        )
+        .optional()
+        .map_err(to_storage_error)?
+        .ok_or_else(|| "connection was not found".to_string())?;
+
+    Ok(SavedConnection {
+        tags: list_tags(connection, &saved_connection.id)?,
+        ..saved_connection
+    })
 }
 
 fn list_tags(connection: &SqliteConnection, connection_id: &str) -> Result<Vec<String>, String> {
@@ -635,6 +799,81 @@ mod tests {
         assert_eq!(manual.name, "Manual");
         assert_eq!(manual.connections[0].host, "lab.internal");
         assert_eq!(manual.connections[0].tags, ["lab", "ssh"]);
+    }
+
+    #[test]
+    fn rename_connection_updates_durable_connection_name() {
+        let storage = Storage::open(temp_db_path("rename")).expect("storage opens");
+
+        let renamed = storage
+            .rename_connection(RenameConnectionRequest {
+                id: "api-stage".to_string(),
+                name: "API Stage Blue".to_string(),
+            })
+            .expect("connection is renamed");
+
+        assert_eq!(renamed.id, "api-stage");
+        assert_eq!(renamed.name, "API Stage Blue");
+
+        let groups = storage
+            .list_connection_groups()
+            .expect("connection groups load");
+        let staging = groups
+            .iter()
+            .find(|group| group.id == "staging")
+            .expect("staging folder exists");
+
+        assert_eq!(staging.connections[0].name, "API Stage Blue");
+    }
+
+    #[test]
+    fn delete_connection_removes_connection_and_tags() {
+        let storage = Storage::open(temp_db_path("delete")).expect("storage opens");
+
+        storage
+            .delete_connection("bastion-east".to_string())
+            .expect("connection is deleted");
+
+        let groups = storage
+            .list_connection_groups()
+            .expect("connection groups load");
+        let production = groups
+            .iter()
+            .find(|group| group.id == "production")
+            .expect("production folder exists");
+
+        assert_eq!(production.connections.len(), 1);
+        assert_eq!(production.connections[0].id, "files-prod");
+    }
+
+    #[test]
+    fn duplicate_connection_copies_non_secret_connection_data_and_tags() {
+        let storage = Storage::open(temp_db_path("duplicate")).expect("storage opens");
+
+        let duplicated = storage
+            .duplicate_connection(DuplicateConnectionRequest {
+                id: "bastion-east".to_string(),
+                name: Some("Bastion East Copy".to_string()),
+            })
+            .expect("connection is duplicated");
+
+        assert_ne!(duplicated.id, "bastion-east");
+        assert_eq!(duplicated.name, "Bastion East Copy");
+        assert_eq!(duplicated.host, "bastion-east.internal");
+        assert_eq!(duplicated.user, "admin");
+        assert_eq!(duplicated.tags, ["prod", "ssh", "jump"]);
+        assert_eq!(duplicated.status, "idle");
+
+        let groups = storage
+            .list_connection_groups()
+            .expect("connection groups load");
+        let production = groups
+            .iter()
+            .find(|group| group.id == "production")
+            .expect("production folder exists");
+
+        assert_eq!(production.connections.len(), 3);
+        assert_eq!(production.connections[2].id, duplicated.id);
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

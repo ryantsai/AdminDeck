@@ -21,7 +21,7 @@ v0.1 includes:
 - SFTP dual-pane file manager
 - left-side connection tree
 - SSH config import
-- SQLite profile/settings storage
+- SQLite connection/settings storage
 - OS keychain secret storage
 - approval-based AI command assistance
 - OpenAI-compatible BYO API key

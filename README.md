@@ -1,7 +1,7 @@
 # AdminDeck
 
 AdminDeck is a Windows-first, local-first desktop workspace for terminal sessions,
-SSH, SFTP, saved connection profiles, and approval-based command assistance.
+SSH, SFTP, saved connections, and approval-based command assistance.
 
 This repository currently contains the v0.1 foundation:
 

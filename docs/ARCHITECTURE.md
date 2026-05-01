@@ -103,7 +103,7 @@ Owns SFTP sessions, local/remote listing, upload/download, create folder, rename
 
 ### SSH Config Importer
 
-Parses SSH config and creates draft connection profiles. It should preserve supported directives and visibly report unsupported directives.
+Parses SSH config and creates draft connections. It should preserve supported directives and visibly report unsupported directives.
 
 ### AI Assist
 

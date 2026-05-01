@@ -1,5 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppBootstrap, Connection, ConnectionGroup, CreateConnectionRequest } from "../types";
+import type {
+  AppBootstrap,
+  Connection,
+  ConnectionGroup,
+  CreateConnectionRequest,
+  DuplicateConnectionRequest,
+  KeychainStatus,
+  RenameConnectionRequest,
+  SecretPresence,
+  SecretReferenceRequest,
+  StoreSecretRequest,
+} from "../types";
 
 export interface StartTerminalSessionRequest {
   sessionId?: string;
@@ -34,6 +45,34 @@ type CommandMap = {
   create_connection: {
     args: { request: CreateConnectionRequest };
     result: Connection;
+  };
+  rename_connection: {
+    args: { request: RenameConnectionRequest };
+    result: Connection;
+  };
+  delete_connection: {
+    args: { connectionId: string };
+    result: null;
+  };
+  duplicate_connection: {
+    args: { request: DuplicateConnectionRequest };
+    result: Connection;
+  };
+  keychain_status: {
+    args: undefined;
+    result: KeychainStatus;
+  };
+  store_secret: {
+    args: { request: StoreSecretRequest };
+    result: null;
+  };
+  secret_exists: {
+    args: { request: SecretReferenceRequest };
+    result: SecretPresence;
+  };
+  delete_secret: {
+    args: { request: SecretReferenceRequest };
+    result: null;
   };
   start_terminal_session: {
     args: { request: StartTerminalSessionRequest };
