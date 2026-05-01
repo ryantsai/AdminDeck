@@ -1,0 +1,43 @@
+# AdminDeck
+
+AdminDeck is a Windows-first, local-first desktop workspace for terminal sessions,
+SSH, SFTP, saved connection profiles, and approval-based command assistance.
+
+This repository currently contains the v0.1 foundation:
+
+- Tauri v2 desktop shell
+- React, TypeScript, and Vite frontend
+- Tailwind design-token setup
+- Zustand workspace state
+- Dense first-pass AdminDeck app shell
+- Rust command boundary with a typed frontend wrapper
+- Local logging bootstrap
+- Windows-first CI skeleton
+
+## Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the frontend preview:
+
+```bash
+npm run dev
+```
+
+Run the Tauri desktop app:
+
+```bash
+npm run tauri dev
+```
+
+Run checks:
+
+```bash
+npm run check
+npm run build
+cargo check --manifest-path src-tauri/Cargo.toml
+```

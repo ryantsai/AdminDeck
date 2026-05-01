@@ -1,0 +1,742 @@
+@import "tailwindcss";
+
+:root {
+  color: var(--text);
+  background: var(--app-bg);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --app-bg: #eef1f5;
+  --chrome: #f8fafc;
+  --chrome-strong: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #f3f6fa;
+  --terminal: #111820;
+  --terminal-2: #0c1219;
+  --terminal-border: #243344;
+  --text: #17202b;
+  --text-muted: #687386;
+  --text-faint: #8a95a6;
+  --border: #d7dde7;
+  --border-strong: #c3ccd9;
+  --accent: #2563eb;
+  --accent-soft: #dbe8ff;
+  --green: #15915f;
+  --amber: #b7791f;
+  --red: #c2413b;
+  --shadow: 0 18px 50px rgba(31, 42, 58, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 48px 292px minmax(0, 1fr) 334px;
+  height: 100vh;
+  min-width: 1120px;
+  color: var(--text);
+  background: var(--app-bg);
+}
+
+.activity-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  padding: 10px 7px;
+  background: #202936;
+  color: #d8e1ef;
+}
+
+.rail-button,
+.icon-button,
+.new-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: inherit;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rail-button:hover,
+.rail-button.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.rail-button.bottom {
+  margin-top: auto;
+}
+
+.connection-sidebar,
+.assistant-panel {
+  min-width: 0;
+  background: var(--chrome);
+  border-right: 1px solid var(--border);
+}
+
+.connection-sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+}
+
+.sidebar-header,
+.assistant-header,
+.workspace-toolbar,
+.file-pane header,
+.transfer-queue header,
+.approval-card header,
+.top-bar,
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-label {
+  margin: 0 0 3px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.icon-button {
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+
+.icon-button:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.search-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 34px;
+  margin: 18px 0 10px;
+  padding: 0 10px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.search-box input {
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 13px;
+}
+
+.quick-connect,
+.toolbar-button,
+.approve-button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-connect {
+  width: 100%;
+  margin-bottom: 14px;
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.toolbar-button {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.approve-button {
+  color: #ffffff;
+  background: var(--green);
+}
+
+.tree-list {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.tree-group {
+  margin-bottom: 12px;
+}
+
+.tree-folder,
+.connection-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tree-folder {
+  gap: 7px;
+  height: 28px;
+  padding: 0 7px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tree-folder small {
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+.connection-row {
+  gap: 9px;
+  min-height: 42px;
+  padding: 6px 8px 6px 26px;
+}
+
+.connection-row:hover {
+  background: var(--surface);
+}
+
+.connection-main {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+}
+
+.connection-main strong,
+.connection-main small,
+.tab span,
+.file-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-main strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.connection-main small,
+.workspace-toolbar span,
+.file-pane header span,
+.transfer-queue span,
+.approval-card p,
+.status-bar,
+.settings-stack strong {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 999px;
+}
+
+.status-dot.connected {
+  background: var(--green);
+}
+
+.status-dot.idle {
+  background: var(--amber);
+}
+
+.status-dot.offline {
+  background: var(--border-strong);
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: 48px 38px minmax(0, 1fr) 28px;
+  min-width: 0;
+  background: var(--chrome-strong);
+}
+
+.top-bar {
+  gap: 14px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.command-search {
+  display: flex;
+  flex: 1 1 180px;
+  gap: 8px;
+  align-items: center;
+  width: auto;
+  min-width: 150px;
+  height: 30px;
+  padding: 0 9px;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.command-search span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  margin-left: auto;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+kbd + kbd {
+  margin-left: -4px;
+}
+
+.top-actions,
+.toolbar-cluster,
+.approval-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.runtime-status,
+.status-bar span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.top-actions {
+  flex: 0 0 auto;
+}
+
+.runtime-status {
+  max-width: 170px;
+}
+
+.runtime-status,
+.terminal-pane header small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-strip {
+  display: flex;
+  align-items: end;
+  min-width: 0;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab,
+.new-tab {
+  height: 37px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tab {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  max-width: 210px;
+  min-width: 132px;
+  padding: 0 9px;
+  border-right: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.tab.active {
+  color: var(--text);
+  background: var(--chrome-strong);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab-close {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+.terminal-workspace,
+.sftp-workspace {
+  display: grid;
+  min-height: 0;
+  padding: 14px;
+  background: var(--chrome-strong);
+}
+
+.terminal-workspace {
+  grid-template-rows: 42px minmax(0, 1fr);
+}
+
+.workspace-toolbar {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.workspace-toolbar > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workspace-toolbar strong {
+  font-size: 14px;
+}
+
+.terminal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 0;
+}
+
+.terminal-pane {
+  display: grid;
+  grid-template-rows: 34px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: #c9d4e2;
+  background: linear-gradient(180deg, var(--terminal), var(--terminal-2));
+  border: 1px solid var(--terminal-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.terminal-pane header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  color: #95a7bb;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--terminal-border);
+}
+
+.terminal-pane header span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.terminal-pane header small {
+  max-width: 55%;
+  margin-left: 8px;
+  color: #69798b;
+  font-size: 11px;
+}
+
+.terminal-pane pre,
+.approval-card pre {
+  margin: 0;
+  overflow: auto;
+  font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.58;
+}
+
+.terminal-pane pre {
+  padding: 14px;
+}
+
+.terminal-pane code {
+  color: #d9e2ef;
+}
+
+.sftp-workspace {
+  grid-template-rows: 42px minmax(0, 1fr) 112px;
+  gap: 10px;
+}
+
+.file-manager {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 0;
+}
+
+.file-pane,
+.transfer-queue,
+.approval-card,
+.settings-stack {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.file-pane {
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.file-pane header {
+  padding: 0 10px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-pane header div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.file-table {
+  overflow: auto;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: 18px minmax(140px, 1fr) 70px 86px;
+  gap: 8px;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.file-row small {
+  color: var(--text-muted);
+}
+
+.transfer-queue {
+  overflow: hidden;
+}
+
+.transfer-queue header {
+  height: 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.transfer-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 170px 42px;
+  gap: 10px;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  accent-color: var(--accent);
+}
+
+.assistant-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 18px 14px;
+  border-right: 0;
+  border-left: 1px solid var(--border);
+}
+
+.assistant-context {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 10px;
+  color: var(--text-muted);
+  background: var(--accent-soft);
+  border: 1px solid #c5d9ff;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.suggestion-list {
+  display: grid;
+  gap: 7px;
+}
+
+.suggestion {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.suggestion.active {
+  border-color: #8db5ff;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.suggestion span {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.suggestion small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.approval-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.approval-card header span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.approval-card header strong {
+  color: var(--amber);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.approval-card pre {
+  padding: 10px;
+  color: #dce7f5;
+  background: var(--terminal);
+  border-radius: 6px;
+}
+
+.approval-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.settings-stack {
+  display: grid;
+  margin-top: auto;
+  overflow: hidden;
+}
+
+.settings-stack div {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.settings-stack div:last-child {
+  border-bottom: 0;
+}
+
+.empty-workspace {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-workspace p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.status-bar {
+  justify-content: flex-start;
+  gap: 18px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border-top: 1px solid var(--border);
+}

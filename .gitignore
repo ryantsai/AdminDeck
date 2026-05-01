@@ -1,3 +1,31 @@
 /.agents
 /.claude
 /skills-lock.json
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Frontend build outputs
+node_modules
+dist
+dist-ssr
+*.local
+
+# Rust build outputs
+/src-tauri/target
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+/node_modules
