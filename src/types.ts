@@ -8,6 +8,7 @@ export interface Connection {
   user: string;
   port?: number;
   keyPath?: string;
+  proxyJump?: string;
   type: ConnectionType;
   tags: string[];
   status: ConnectionStatus;
@@ -21,6 +22,7 @@ export interface CreateConnectionRequest {
   folderId?: string;
   port?: number;
   keyPath?: string;
+  proxyJump?: string;
   tags: string[];
 }
 

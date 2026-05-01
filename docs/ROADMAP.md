@@ -1,42 +1,48 @@
 # AdminDeck Roadmap
 
+## Current Progress
+
+As of May 1, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
+
+Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, system `ssh` debug/fallback support for `ProxyJump`, and an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections.
+
 ## Milestone 0: Project Foundation
 
-- Confirm working product name: AdminDeck.
-- Initialize repository structure.
-- Add Apache-2.0 license.
-- Add Rust/Tauri/React/Vite scaffold.
-- Add Tailwind design tokens.
-- Add basic app shell with light chrome and dark terminal surface placeholder.
-- Add local logging foundation.
-- Add CI skeleton for Windows-first builds.
+- [x] Confirm working product name: AdminDeck.
+- [x] Initialize repository structure.
+- [x] Add Apache-2.0 license.
+- [x] Add Rust/Tauri/React/Vite scaffold.
+- [x] Add Tailwind design tokens.
+- [x] Add basic app shell with light chrome and dark terminal surface placeholder.
+- [x] Add local logging foundation.
+- [x] Add CI skeleton for Windows-first builds.
 
 ## Milestone A: Usable Session Spine
 
-- Implement typed Tauri command wrapper.
-- Add SQLite migrations and repository layer.
-- Add OS keychain abstraction.
-- Add connection model for local terminal, SSH terminal, and SFTP.
-- Add connection tree with folders, saved connections, tags, search/filter, drag/drop reorder, rename/delete/duplicate, quick connect, and status badges.
-- Add tab workspace.
-- Add split panes inside terminal tabs.
-- Add local terminal session lifecycle.
-- Add initial terminal view using the fastest reliable implementation.
-- Add settings shell for terminal font, line height, cursor, scrollback, copy-on-select, multiline paste confirmation, and default shell.
+- [x] Implement typed Tauri command wrapper.
+- [x] Add SQLite migrations and repository layer.
+- [x] Add OS keychain abstraction.
+- [x] Add connection model for local terminal, SSH terminal, and SFTP.
+- [x] Add connection tree with folders, saved connections, tags, search/filter, drag/drop reorder, rename/delete/duplicate, quick connect, and live status badges.
+- [x] Add tab workspace.
+- [x] Add split panes inside terminal tabs.
+- [x] Add local terminal session lifecycle.
+- [x] Add initial terminal view using the fastest reliable implementation.
+- [x] Add settings shell for terminal font, line height, cursor, scrollback, copy-on-select, multiline paste confirmation, and default shell.
 
 ## Milestone B: SSH Core
 
-- Evaluate and choose Rust SSH library. See `docs/ADR/0004-ssh-transport-library.md`.
-- Implement in-process SSH connection lifecycle.
-- Implement host key verification.
-- Implement password auth.
-- Implement key-file auth by path.
-- Implement SSH agent support where practical.
-- Implement terminal channel allocation.
-- Implement resize events.
-- Add optional system ssh fallback/debug path.
-- Add SSH defaults in settings.
-- Add SSH config import with unsupported directive reporting.
+- [x] Evaluate and choose Rust SSH library. See `docs/ADR/0004-ssh-transport-library.md`.
+- [ ] Implement in-process SSH connection lifecycle.
+- [ ] Implement host key verification.
+- [ ] Implement password auth.
+- [ ] Implement key-file auth by path.
+- [ ] Implement SSH agent support where practical.
+- [ ] Implement terminal channel allocation.
+- [ ] Implement resize events.
+- [x] Add optional system ssh fallback/debug path.
+- [ ] Add SSH defaults in settings.
+- [x] Add SSH config import with unsupported directive reporting.
 
 ## Milestone C: SFTP Core
 

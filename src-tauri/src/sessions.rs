@@ -30,6 +30,7 @@ pub struct StartTerminalSessionRequest {
     pub user: String,
     pub port: Option<u16>,
     pub key_path: Option<String>,
+    pub proxy_jump: Option<String>,
     pub shell: Option<String>,
     pub cols: Option<u16>,
     pub rows: Option<u16>,
@@ -230,6 +231,12 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
                 if !key_path.is_empty() {
                     command.arg("-i");
                     command.arg(key_path);
+                }
+            }
+            if let Some(proxy_jump) = request.proxy_jump.as_ref().map(|value| value.trim()) {
+                if !proxy_jump.is_empty() {
+                    command.arg("-J");
+                    command.arg(proxy_jump);
                 }
             }
 

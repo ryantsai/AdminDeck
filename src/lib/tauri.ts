@@ -25,6 +25,7 @@ export interface StartTerminalSessionRequest {
   user: string;
   port?: number;
   keyPath?: string;
+  proxyJump?: string;
   shell?: string;
   cols?: number;
   rows?: number;
@@ -44,6 +45,20 @@ export interface SshTransportPlan {
   sftpCandidate: string;
   fallbackLibrary: string;
   systemSshRole: string;
+}
+
+export interface SshConfigConnectionDraft extends CreateConnectionRequest {}
+
+export interface UnsupportedSshDirective {
+  line: number;
+  hostPattern?: string;
+  directive: string;
+  value: string;
+}
+
+export interface SshConfigImportPreview {
+  drafts: SshConfigConnectionDraft[];
+  unsupportedDirectives: UnsupportedSshDirective[];
 }
 
 type CommandMap = {
@@ -106,6 +121,10 @@ type CommandMap = {
   ssh_transport_plan: {
     args: undefined;
     result: SshTransportPlan;
+  };
+  import_ssh_config: {
+    args: { request: { content: string; folderId?: string; tags?: string[] } };
+    result: SshConfigImportPreview;
   };
   store_secret: {
     args: { request: StoreSecretRequest };

@@ -70,6 +70,8 @@ Later connection types:
 
 Owns folders, saved connections, tags, search/filter, drag/drop ordering, rename/delete/duplicate, quick connect, SSH config import display, and open-session status badges.
 
+Current implementation note: status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
+
 ### Terminal Session
 
 Owns local PTY lifecycle, SSH terminal channel lifecycle, input/output streams, resize events, tab integration, split pane integration, and terminal compatibility behavior.
@@ -104,6 +106,8 @@ Owns SFTP sessions, local/remote listing, upload/download, create folder, rename
 ### SSH Config Importer
 
 Parses SSH config and creates draft connections. It should preserve supported directives and visibly report unsupported directives.
+
+Current implementation note: the importer supports `Host`, `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump`. It skips wildcard-only host patterns, reports unsupported global or host-scoped directives with line numbers, previews draft Connections in the UI, and only persists them after explicit user confirmation.
 
 ### AI Assist
 

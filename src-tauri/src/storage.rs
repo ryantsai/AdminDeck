@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS connections (
     username TEXT NOT NULL,
     port INTEGER,
     key_path TEXT,
+    proxy_jump TEXT,
     connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'sftp')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
@@ -77,6 +78,7 @@ pub struct SavedConnection {
     user: String,
     port: Option<u16>,
     key_path: Option<String>,
+    proxy_jump: Option<String>,
     #[serde(rename = "type")]
     connection_type: String,
     tags: Vec<String>,
@@ -94,6 +96,7 @@ pub struct CreateConnectionRequest {
     folder_id: Option<String>,
     port: Option<u16>,
     key_path: Option<String>,
+    proxy_jump: Option<String>,
     tags: Vec<String>,
 }
 
@@ -252,6 +255,10 @@ impl Storage {
             &connection,
             "ALTER TABLE connections ADD COLUMN key_path TEXT",
         )?;
+        add_optional_column(
+            &connection,
+            "ALTER TABLE connections ADD COLUMN proxy_jump TEXT",
+        )?;
         Ok(())
     }
 
@@ -267,6 +274,10 @@ impl Storage {
             .folder_id
             .unwrap_or_else(|| default_folder_for(&connection_type));
         let key_path = request.key_path.and_then(|value| {
+            let trimmed = value.trim().to_string();
+            (!trimmed.is_empty()).then_some(trimmed)
+        });
+        let proxy_jump = request.proxy_jump.and_then(|value| {
             let trimmed = value.trim().to_string();
             (!trimmed.is_empty()).then_some(trimmed)
         });
@@ -287,8 +298,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'idle', ?9)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'idle', ?10)",
                 params![
                     id,
                     folder_id,
@@ -297,6 +308,7 @@ impl Storage {
                     user,
                     request.port,
                     key_path,
+                    proxy_jump,
                     connection_type,
                     next_sort_order
                 ],
@@ -322,6 +334,7 @@ impl Storage {
             user,
             port: request.port,
             key_path,
+            proxy_jump,
             connection_type,
             tags,
             status: "idle".to_string(),
@@ -451,7 +464,7 @@ impl Storage {
 
         let source = transaction
             .query_row(
-                "SELECT folder_id, name, host, username, port, key_path, connection_type
+                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, connection_type
                  FROM connections
                  WHERE id = ?1",
                 params![source_id],
@@ -463,14 +476,16 @@ impl Storage {
                         row.get::<_, String>(3)?,
                         optional_port(row.get::<_, Option<i64>>(4)?)?,
                         row.get::<_, Option<String>>(5)?,
-                        row.get::<_, String>(6)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, String>(7)?,
                     ))
                 },
             )
             .optional()
             .map_err(to_storage_error)?
             .ok_or_else(|| "connection was not found".to_string())?;
-        let (folder_id, source_name, host, user, port, key_path, connection_type) = source;
+        let (folder_id, source_name, host, user, port, key_path, proxy_jump, connection_type) =
+            source;
         let duplicate_name = request
             .name
             .map(|name| name.trim().to_string())
@@ -488,8 +503,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'idle', ?9)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'idle', ?10)",
                 params![
                     duplicate_id,
                     folder_id,
@@ -498,6 +513,7 @@ impl Storage {
                     user,
                     port,
                     key_path,
+                    proxy_jump,
                     connection_type,
                     next_sort_order
                 ],
@@ -704,7 +720,7 @@ fn list_connections_for_folder(
 ) -> Result<Vec<SavedConnection>, String> {
     let mut statement = connection
         .prepare(
-            "SELECT id, name, host, username, port, key_path, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, connection_type
              FROM connections
              WHERE folder_id = ?1
              ORDER BY sort_order, name",
@@ -720,7 +736,8 @@ fn list_connections_for_folder(
                 user: row.get(3)?,
                 port: optional_port(row.get::<_, Option<i64>>(4)?)?,
                 key_path: row.get(5)?,
-                connection_type: row.get(6)?,
+                proxy_jump: row.get(6)?,
+                connection_type: row.get(7)?,
                 status: "idle".to_string(),
                 tags: Vec::new(),
             })
@@ -821,7 +838,7 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT id, name, host, username, port, key_path, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, connection_type
              FROM connections
              WHERE id = ?1",
             params![connection_id],
@@ -833,7 +850,8 @@ fn get_connection_by_id(
                     user: row.get(3)?,
                     port: optional_port(row.get::<_, Option<i64>>(4)?)?,
                     key_path: row.get(5)?,
-                    connection_type: row.get(6)?,
+                    proxy_jump: row.get(6)?,
+                    connection_type: row.get(7)?,
                     status: "idle".to_string(),
                     tags: Vec::new(),
                 })
@@ -1148,12 +1166,14 @@ mod tests {
                 folder_id: Some("manual".to_string()),
                 port: Some(2222),
                 key_path: Some("C:\\Users\\ryan\\.ssh\\id_ed25519".to_string()),
+                proxy_jump: Some("jump.internal".to_string()),
                 tags: vec!["Lab".to_string(), " ssh ".to_string()],
             })
             .expect("connection is created");
 
         assert_eq!(created.name, "Lab Host");
         assert_eq!(created.port, Some(2222));
+        assert_eq!(created.proxy_jump.as_deref(), Some("jump.internal"));
 
         let groups = storage
             .list_connection_groups()
@@ -1293,6 +1313,7 @@ mod tests {
                 folder_id: Some(folder.id.clone()),
                 port: None,
                 key_path: None,
+                proxy_jump: None,
                 tags: vec!["temp".to_string()],
             })
             .expect("connection is created in folder");

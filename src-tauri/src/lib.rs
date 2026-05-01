@@ -2,6 +2,7 @@ mod logging;
 mod secrets;
 mod sessions;
 mod ssh;
+mod ssh_config;
 mod storage;
 
 use serde::Serialize;
@@ -136,6 +137,13 @@ fn ssh_transport_plan() -> ssh::SshTransportPlan {
 }
 
 #[tauri::command]
+fn import_ssh_config(
+    request: ssh_config::ImportSshConfigRequest,
+) -> Result<ssh_config::SshConfigImportPreview, String> {
+    ssh_config::import_ssh_config(request)
+}
+
+#[tauri::command]
 fn store_secret(
     secrets: tauri::State<'_, secrets::Secrets>,
     request: secrets::StoreSecretRequest,
@@ -228,6 +236,7 @@ pub fn run() {
             update_terminal_settings,
             keychain_status,
             ssh_transport_plan,
+            import_ssh_config,
             store_secret,
             secret_exists,
             delete_secret,
