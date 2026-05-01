@@ -42,12 +42,13 @@ import "./App.css";
 import {
   invokeCommand,
   isTauriRuntime,
+  type LocalDirectoryEntry,
   type SftpDirectoryEntry,
   type SshConfigImportPreview,
   type SshHostKeyPreview,
   type TerminalOutput,
 } from "./lib/tauri";
-import { aiSuggestions, connectionGroups, localFiles, transferQueue } from "./sample-data";
+import { aiSuggestions, connectionGroups, transferQueue } from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import type {
   Connection,
@@ -1423,9 +1424,13 @@ async function confirmTrustedSshHostKey(preview: SshHostKeyPreview) {
 
 function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   const connection = tab.connection;
+  const [localPath, setLocalPath] = useState("");
+  const [localFiles, setLocalFiles] = useState<FileEntry[]>([]);
   const [remotePath, setRemotePath] = useState(".");
   const [remoteFiles, setRemoteFiles] = useState<FileEntry[]>([]);
   const [status, setStatus] = useState("Connecting");
+  const [localStatus, setLocalStatus] = useState("");
+  const [isLocalLoading, setIsLocalLoading] = useState(false);
   const [isRemoteLoading, setIsRemoteLoading] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
   const markConnectionSessionStarted = useWorkspaceStore(
@@ -1434,6 +1439,34 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   const markConnectionSessionEnded = useWorkspaceStore(
     (state) => state.markConnectionSessionEnded,
   );
+
+  useEffect(() => {
+    void loadLocalDirectory();
+  }, []);
+
+  const loadLocalDirectory = async (path?: string) => {
+    if (!isTauriRuntime()) {
+      setLocalStatus("Tauri runtime unavailable");
+      setLocalFiles([]);
+      return;
+    }
+
+    setIsLocalLoading(true);
+    setLocalStatus(path ? "Opening folder" : "Loading local files");
+    try {
+      const result = await invokeCommand("list_local_directory", {
+        request: { path },
+      });
+      setLocalPath(result.path);
+      setLocalFiles(result.entries.map(localEntryToFileEntry));
+      setLocalStatus("");
+    } catch (error) {
+      setLocalStatus(String(error));
+      setLocalFiles([]);
+    } finally {
+      setIsLocalLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!connection) {
@@ -1518,16 +1551,20 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   }, [connection, markConnectionSessionEnded, markConnectionSessionStarted]);
 
   const refreshRemoteDirectory = async () => {
+    await loadRemoteDirectory(remotePath, "Refreshing");
+  };
+
+  const loadRemoteDirectory = async (path: string, loadingStatus = "Opening folder") => {
     const sessionId = sessionIdRef.current;
     if (!sessionId || !isTauriRuntime()) {
       return;
     }
 
     setIsRemoteLoading(true);
-    setStatus("Refreshing");
+    setStatus(loadingStatus);
     try {
       const result = await invokeCommand("list_sftp_directory", {
-        request: { sessionId, path: remotePath },
+        request: { sessionId, path },
       });
       setRemotePath(result.path);
       setRemoteFiles(result.entries.map(remoteEntryToFileEntry));
@@ -1537,6 +1574,26 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
     } finally {
       setIsRemoteLoading(false);
     }
+  };
+
+  const openRemoteFolder = async (folderName: string) => {
+    await loadRemoteDirectory(joinRemotePath(remotePath, folderName));
+  };
+
+  const openRemoteParent = async () => {
+    await loadRemoteDirectory(joinRemotePath(remotePath, ".."));
+  };
+
+  const refreshLocalDirectory = async () => {
+    await loadLocalDirectory(localPath || undefined);
+  };
+
+  const openLocalFolder = async (folderName: string) => {
+    await loadLocalDirectory(joinLocalPath(localPath, folderName));
+  };
+
+  const openLocalParent = async () => {
+    await loadLocalDirectory(joinLocalPath(localPath, ".."));
   };
 
   return (
@@ -1559,13 +1616,25 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
       </div>
 
       <div className="file-manager">
-        <FilePane title="Local" path="C:\\Users\\ryan\\deployments" files={localFiles} />
+        <FilePane
+          title="Local"
+          path={localPath || localStatus || "Local files"}
+          files={localFiles}
+          isLoading={isLocalLoading}
+          status={localStatus}
+          onRefresh={refreshLocalDirectory}
+          onGoUp={openLocalParent}
+          onOpenFolder={openLocalFolder}
+        />
         <FilePane
           title="Remote"
           path={remotePath}
           files={remoteFiles}
           isLoading={isRemoteLoading}
+          status={status === "Connected" ? "" : status}
           onRefresh={refreshRemoteDirectory}
+          onGoUp={openRemoteParent}
+          onOpenFolder={openRemoteFolder}
         />
       </div>
 
@@ -1586,6 +1655,15 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   );
 }
 
+function localEntryToFileEntry(entry: LocalDirectoryEntry): FileEntry {
+  return {
+    name: entry.name,
+    kind: entry.kind,
+    size: entry.kind === "folder" ? "-" : formatFileSize(entry.size),
+    modified: formatRemoteTime(entry.modified),
+  };
+}
+
 function remoteEntryToFileEntry(entry: SftpDirectoryEntry): FileEntry {
   return {
     name: entry.name,
@@ -1593,6 +1671,26 @@ function remoteEntryToFileEntry(entry: SftpDirectoryEntry): FileEntry {
     size: entry.kind === "folder" ? "-" : formatFileSize(entry.size),
     modified: formatRemoteTime(entry.modified),
   };
+}
+
+function joinRemotePath(basePath: string, childName: string) {
+  if (!basePath || basePath === ".") {
+    return childName;
+  }
+  if (basePath.endsWith("/")) {
+    return `${basePath}${childName}`;
+  }
+  return `${basePath}/${childName}`;
+}
+
+function joinLocalPath(basePath: string, childName: string) {
+  if (!basePath) {
+    return childName;
+  }
+  if (basePath.endsWith("\\") || basePath.endsWith("/")) {
+    return `${basePath}${childName}`;
+  }
+  return `${basePath}\\${childName}`;
 }
 
 function formatFileSize(size?: number) {
@@ -1632,13 +1730,19 @@ function FilePane({
   path,
   files,
   isLoading = false,
+  status = "",
   onRefresh,
+  onGoUp,
+  onOpenFolder,
 }: {
   title: string;
   path: string;
   files: FileEntry[];
   isLoading?: boolean;
+  status?: string;
   onRefresh?: () => void;
+  onGoUp?: () => void;
+  onOpenFolder?: (folderName: string) => void;
 }) {
   return (
     <article className="file-pane">
@@ -1647,28 +1751,47 @@ function FilePane({
           <strong>{title}</strong>
           <span>{path}</span>
         </div>
-        <button
-          className="icon-button"
-          aria-label={`Refresh ${title.toLowerCase()} files`}
-          disabled={!onRefresh || isLoading}
-          onClick={onRefresh}
-          title={`Refresh ${title.toLowerCase()} files`}
-        >
-          <RefreshCw size={15} />
-        </button>
+        <div className="file-pane-actions">
+          <button
+            className="icon-button"
+            aria-label={`Open parent ${title.toLowerCase()} folder`}
+            disabled={!onGoUp || isLoading}
+            onClick={onGoUp}
+            title={`Open parent ${title.toLowerCase()} folder`}
+          >
+            <ChevronDown className="up-icon" size={15} />
+          </button>
+          <button
+            className="icon-button"
+            aria-label={`Refresh ${title.toLowerCase()} files`}
+            disabled={!onRefresh || isLoading}
+            onClick={onRefresh}
+            title={`Refresh ${title.toLowerCase()} files`}
+          >
+            <RefreshCw size={15} />
+          </button>
+        </div>
       </header>
       <div className="file-table">
         {isLoading && <div className="file-row file-row-muted">Loading...</div>}
-        {!isLoading && files.length === 0 && (
+        {!isLoading && status && <div className="file-row file-row-muted">{status}</div>}
+        {!isLoading && !status && files.length === 0 && (
           <div className="file-row file-row-muted">No files</div>
         )}
         {files.map((file) => (
-          <div className="file-row" key={file.name}>
+          <button
+            className="file-row"
+            disabled={file.kind !== "folder" || !onOpenFolder || isLoading}
+            key={file.name}
+            onClick={() => onOpenFolder?.(file.name)}
+            title={file.kind === "folder" ? `Open ${file.name}` : file.name}
+            type="button"
+          >
             {file.kind === "folder" ? <Folder size={15} /> : <FileCode2 size={15} />}
             <span>{file.name}</span>
             <small>{file.size}</small>
             <small>{file.modified}</small>
-          </div>
+          </button>
         ))}
       </div>
     </article>

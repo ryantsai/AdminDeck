@@ -662,10 +662,21 @@ kbd + kbd {
   border-bottom: 1px solid var(--border);
 }
 
-.file-pane header div {
+.file-pane header > div:first-child {
   display: grid;
   gap: 3px;
   min-width: 0;
+}
+
+.file-pane-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.up-icon {
+  transform: rotate(180deg);
 }
 
 .file-table {
@@ -677,10 +688,26 @@ kbd + kbd {
   grid-template-columns: 18px minmax(140px, 1fr) 70px 86px;
   gap: 8px;
   align-items: center;
+  width: 100%;
   height: 34px;
   padding: 0 12px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
+}
+
+button.file-row {
+  cursor: pointer;
+}
+
+button.file-row:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+button.file-row:disabled {
+  cursor: default;
 }
 
 .file-row small {

@@ -252,6 +252,13 @@ fn list_sftp_directory(
 }
 
 #[tauri::command]
+fn list_local_directory(
+    request: sftp::ListLocalDirectoryRequest,
+) -> Result<sftp::LocalDirectoryListing, String> {
+    sftp::list_local_directory(request)
+}
+
+#[tauri::command]
 fn close_sftp_session(
     sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     session_id: String,
@@ -310,6 +317,7 @@ pub fn run() {
             close_terminal_session,
             start_sftp_session,
             list_sftp_directory,
+            list_local_directory,
             close_sftp_session
         ])
         .run(tauri::generate_context!())

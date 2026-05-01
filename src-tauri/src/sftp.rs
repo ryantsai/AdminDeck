@@ -4,6 +4,8 @@ use russh_sftp::{client::SftpSession, protocol::FileType};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::AppHandle;
@@ -41,6 +43,12 @@ pub struct ListSftpDirectoryRequest {
     path: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListLocalDirectoryRequest {
+    path: Option<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SftpSessionStarted {
@@ -59,7 +67,23 @@ pub struct SftpDirectoryListing {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LocalDirectoryListing {
+    path: String,
+    entries: Vec<LocalDirectoryEntry>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SftpDirectoryEntry {
+    name: String,
+    kind: String,
+    size: Option<u64>,
+    modified: Option<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalDirectoryEntry {
     name: String,
     kind: String,
     size: Option<u64>,
@@ -197,6 +221,41 @@ impl SftpSessionManager {
     }
 }
 
+pub fn list_local_directory(
+    request: ListLocalDirectoryRequest,
+) -> Result<LocalDirectoryListing, String> {
+    let directory = resolve_local_directory(request.path.as_deref())?;
+    let mut entries = fs::read_dir(&directory)
+        .map_err(|error| format!("failed to list local directory: {error}"))?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let metadata = entry.metadata().ok()?;
+            let file_type = entry.file_type().ok()?;
+            Some(LocalDirectoryEntry {
+                name: entry.file_name().to_string_lossy().to_string(),
+                kind: local_file_kind(&file_type).to_string(),
+                size: if metadata.is_file() {
+                    Some(metadata.len())
+                } else {
+                    None
+                },
+                modified: metadata.modified().ok().and_then(|time| unix_timestamp(time).ok()),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    entries.sort_by(|left, right| {
+        file_kind_rank(&left.kind)
+            .cmp(&file_kind_rank(&right.kind))
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+    });
+
+    Ok(LocalDirectoryListing {
+        path: display_local_path(&directory),
+        entries,
+    })
+}
+
 async fn read_directory(
     sftp: &SftpSession,
     session_id: &str,
@@ -302,12 +361,63 @@ fn file_kind_rank(kind: &str) -> u8 {
     }
 }
 
+fn local_file_kind(file_type: &fs::FileType) -> &'static str {
+    if file_type.is_dir() {
+        "folder"
+    } else if file_type.is_file() {
+        "file"
+    } else if file_type.is_symlink() {
+        "symlink"
+    } else {
+        "other"
+    }
+}
+
 fn normalize_path(path: &str) -> String {
     let path = path.trim();
     if path.is_empty() {
         ".".to_string()
     } else {
         path.to_string()
+    }
+}
+
+fn resolve_local_directory(path: Option<&str>) -> Result<PathBuf, String> {
+    let path = path
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(default_local_directory);
+    let path = if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("failed to resolve current directory: {error}"))?
+            .join(path)
+    };
+    let directory = fs::canonicalize(&path)
+        .map_err(|error| format!("failed to resolve local directory: {error}"))?;
+    if !directory.is_dir() {
+        return Err("local path is not a directory".to_string());
+    }
+    Ok(directory)
+}
+
+fn default_local_directory() -> PathBuf {
+    std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn display_local_path(path: &Path) -> String {
+    let value = path.to_string_lossy();
+    if let Some(stripped) = value.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{stripped}")
+    } else if let Some(stripped) = value.strip_prefix(r"\\?\") {
+        stripped.to_string()
+    } else {
+        value.to_string()
     }
 }
 
@@ -376,6 +486,18 @@ mod tests {
         assert_eq!(normalize_path(""), ".");
         assert_eq!(normalize_path("  "), ".");
         assert_eq!(normalize_path("/srv/releases"), "/srv/releases");
+    }
+
+    #[test]
+    fn display_local_path_strips_windows_verbatim_prefixes() {
+        assert_eq!(
+            display_local_path(Path::new(r"\\?\C:\Users\Ryan")),
+            r"C:\Users\Ryan"
+        );
+        assert_eq!(
+            display_local_path(Path::new(r"\\?\UNC\server\share")),
+            r"\\server\share"
+        );
     }
 
     fn sftp_request() -> StartSftpSessionRequest {

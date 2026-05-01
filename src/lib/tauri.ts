@@ -71,6 +71,18 @@ export interface SftpDirectoryListing {
 
 export interface SftpSessionStarted extends SftpDirectoryListing {}
 
+export interface LocalDirectoryEntry {
+  name: string;
+  kind: "file" | "folder" | "symlink" | "other";
+  size?: number;
+  modified?: number;
+}
+
+export interface LocalDirectoryListing {
+  path: string;
+  entries: LocalDirectoryEntry[];
+}
+
 export interface SshTransportPlan {
   primaryLibrary: string;
   sftpCandidate: string;
@@ -217,6 +229,10 @@ type CommandMap = {
   list_sftp_directory: {
     args: { request: { sessionId: string; path: string } };
     result: SftpDirectoryListing;
+  };
+  list_local_directory: {
+    args: { request: { path?: string } };
+    result: LocalDirectoryListing;
   };
   close_sftp_session: {
     args: { sessionId: string };
