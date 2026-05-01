@@ -217,6 +217,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       port: connectionRequest.port,
       keyPath: connectionRequest.keyPath,
       proxyJump: connectionRequest.proxyJump,
+      authMethod: connectionRequest.authMethod,
       hasPassword: Boolean(password),
       type: connectionRequest.type,
       tags: connectionRequest.tags,
@@ -614,7 +615,7 @@ function ConnectionDialog({
   onSubmit: (request: ConnectionDialogRequest) => void | Promise<void>;
 }) {
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
-  const [authMethod, setAuthMethod] = useState<"key" | "password">("key");
+  const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
   const usesSshDefaults = connectionType !== "local";
   const folderOptions = useMemo(
     () => groups.filter((group) => !["local", "manual"].includes(group.id)),
@@ -645,8 +646,9 @@ function ConnectionDialog({
           ? "local"
           : String(form.get("folderId") ?? "").trim() || "manual",
       port: portValue ? Number(portValue) : undefined,
-      keyPath: usesSshDefaults && authMethod === "key" ? keyPath || undefined : undefined,
+      keyPath: usesSshDefaults && authMethod === "keyFile" ? keyPath || undefined : undefined,
       proxyJump: proxyJump || undefined,
+      authMethod: usesSshDefaults ? authMethod : undefined,
       password: usesSshDefaults && authMethod === "password" ? password : undefined,
       tags,
     });
@@ -736,11 +738,12 @@ function ConnectionDialog({
                   name="authMethod"
                   value={authMethod}
                   onChange={(event) =>
-                    setAuthMethod(event.currentTarget.value as "key" | "password")
+                    setAuthMethod(event.currentTarget.value as "keyFile" | "password" | "agent")
                   }
                 >
-                  <option value="key">Key file</option>
+                  <option value="keyFile">Key file</option>
                   <option value="password">Password</option>
+                  <option value="agent">SSH agent</option>
                 </select>
               </label>
               <label>
@@ -763,16 +766,16 @@ function ConnectionDialog({
                   type="password"
                 />
               </label>
-            ) : (
-            <label>
-              <span>Key path</span>
-              <input
-                name="keyPath"
-                defaultValue={sshSettings.defaultKeyPath ?? ""}
-                placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
-              />
-            </label>
-            )}
+            ) : authMethod === "keyFile" ? (
+              <label>
+                <span>Key path</span>
+                <input
+                  name="keyPath"
+                  defaultValue={sshSettings.defaultKeyPath ?? ""}
+                  placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
+                />
+              </label>
+            ) : null}
           </>
         ) : null}
 
@@ -1312,6 +1315,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
             port: connection.port,
             keyPath: connection.keyPath,
             proxyJump: connection.proxyJump,
+            authMethod: connection.authMethod,
             secretOwnerId: connection.id,
             shell: connection.type === "local" ? terminalSettings.defaultShell : undefined,
             cols: terminal.cols,
@@ -1382,7 +1386,10 @@ function isMultilinePaste(data: string) {
 function usesNativeSshHostKeyVerification(connection: Connection) {
   return (
     connection.type === "ssh" &&
-    (Boolean(connection.keyPath?.trim()) || Boolean(connection.hasPassword)) &&
+    (Boolean(connection.keyPath?.trim()) ||
+      Boolean(connection.hasPassword) ||
+      connection.authMethod === "password" ||
+      connection.authMethod === "agent") &&
     !connection.proxyJump?.trim()
   );
 }

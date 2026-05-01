@@ -39,6 +39,7 @@ pub struct StartTerminalSessionRequest {
     pub port: Option<u16>,
     pub key_path: Option<String>,
     pub proxy_jump: Option<String>,
+    pub auth_method: Option<String>,
     pub secret_owner_id: Option<String>,
     pub shell: Option<String>,
     pub cols: Option<u16>,
@@ -91,18 +92,10 @@ impl SessionManager {
             .clone()
             .unwrap_or_else(|| make_session_id(&request.title));
         let password = connection_password_for(secrets, &request);
-        if uses_native_ssh(&request, password.as_deref()) {
+        let auth_method = ssh_auth_method_for(&request, password.as_deref())?;
+        if uses_native_ssh(&request, password.as_deref(), &auth_method) {
             let known_hosts_path = ssh::app_known_hosts_path(&app)?;
-            let auth = match request.key_path.as_deref().map(str::trim) {
-                Some(key_path) if !key_path.is_empty() => ssh::NativeSshAuth::KeyFile {
-                    key_path: key_path.to_string(),
-                },
-                _ => ssh::NativeSshAuth::Password {
-                    password: password.ok_or_else(|| {
-                        "password is required for native SSH sessions".to_string()
-                    })?,
-                },
-            };
+            let auth = native_ssh_auth_for(&request, password, &auth_method)?;
             let session = ssh::start_native_terminal(
                 app,
                 ssh::NativeSshTerminalRequest {
@@ -258,13 +251,69 @@ impl SessionManager {
     }
 }
 
-fn uses_native_ssh(request: &StartTerminalSessionRequest, password: Option<&str>) -> bool {
+fn uses_native_ssh(
+    request: &StartTerminalSessionRequest,
+    password: Option<&str>,
+    auth_method: &SshAuthMethod,
+) -> bool {
     request.connection_type.trim().eq_ignore_ascii_case("ssh")
         && ssh::can_start_native_terminal(
             request.key_path.as_deref(),
             password,
+            matches!(auth_method, SshAuthMethod::Agent),
             request.proxy_jump.as_deref(),
         )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SshAuthMethod {
+    KeyFile,
+    Password,
+    Agent,
+}
+
+fn ssh_auth_method_for(
+    request: &StartTerminalSessionRequest,
+    password: Option<&str>,
+) -> Result<SshAuthMethod, String> {
+    match request
+        .auth_method
+        .as_deref()
+        .map(str::trim)
+        .filter(|method| !method.is_empty())
+    {
+        Some("keyFile") | Some("key-file") | Some("key") => Ok(SshAuthMethod::KeyFile),
+        Some("password") => Ok(SshAuthMethod::Password),
+        Some("agent") | Some("sshAgent") | Some("ssh-agent") => Ok(SshAuthMethod::Agent),
+        Some(_) => Err("SSH auth method must be keyFile, password, or agent".to_string()),
+        None if request
+            .key_path
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|value| !value.is_empty()) =>
+        {
+            Ok(SshAuthMethod::KeyFile)
+        }
+        None if password.is_some() => Ok(SshAuthMethod::Password),
+        None => Ok(SshAuthMethod::Agent),
+    }
+}
+
+fn native_ssh_auth_for(
+    request: &StartTerminalSessionRequest,
+    password: Option<String>,
+    auth_method: &SshAuthMethod,
+) -> Result<ssh::NativeSshAuth, String> {
+    match auth_method {
+        SshAuthMethod::KeyFile => Ok(ssh::NativeSshAuth::KeyFile {
+            key_path: request.key_path.clone().unwrap_or_default(),
+        }),
+        SshAuthMethod::Password => Ok(ssh::NativeSshAuth::Password {
+            password: password
+                .ok_or_else(|| "password is required for native SSH sessions".to_string())?,
+        }),
+        SshAuthMethod::Agent => Ok(ssh::NativeSshAuth::Agent),
+    }
 }
 
 fn connection_password_for(
@@ -272,6 +321,12 @@ fn connection_password_for(
     request: &StartTerminalSessionRequest,
 ) -> Option<String> {
     if !request.connection_type.trim().eq_ignore_ascii_case("ssh") {
+        return None;
+    }
+    if !matches!(
+        ssh_auth_method_for(request, None),
+        Ok(SshAuthMethod::Password)
+    ) {
         return None;
     }
     if request
@@ -378,4 +433,58 @@ fn make_session_id(title: &str) -> String {
         "{}-{unique}",
         if slug.is_empty() { "session" } else { &slug }
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ssh_auth_method_prefers_explicit_agent_and_key_file() {
+        let mut request = ssh_request();
+
+        request.auth_method = Some("agent".to_string());
+        assert!(matches!(
+            ssh_auth_method_for(&request, None),
+            Ok(SshAuthMethod::Agent)
+        ));
+
+        request.auth_method = Some("keyFile".to_string());
+        request.key_path = Some("C:\\Users\\ryan\\.ssh\\id_ed25519".to_string());
+        assert!(matches!(
+            ssh_auth_method_for(&request, None),
+            Ok(SshAuthMethod::KeyFile)
+        ));
+    }
+
+    #[test]
+    fn password_auth_requires_explicit_password_method_before_reading_keychain() {
+        let mut request = ssh_request();
+        request.auth_method = Some("password".to_string());
+        assert!(matches!(
+            ssh_auth_method_for(&request, Some("not-for-sqlite")),
+            Ok(SshAuthMethod::Password)
+        ));
+
+        request.auth_method = Some("keyboardInteractive".to_string());
+        assert!(ssh_auth_method_for(&request, None).is_err());
+    }
+
+    fn ssh_request() -> StartTerminalSessionRequest {
+        StartTerminalSessionRequest {
+            session_id: None,
+            title: "Test SSH".to_string(),
+            connection_type: "ssh".to_string(),
+            host: "example.internal".to_string(),
+            user: "admin".to_string(),
+            port: Some(22),
+            key_path: None,
+            proxy_jump: None,
+            auth_method: None,
+            secret_owner_id: None,
+            shell: None,
+            cols: None,
+            rows: None,
+        }
+    }
 }

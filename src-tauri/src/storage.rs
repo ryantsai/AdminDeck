@@ -88,6 +88,7 @@ pub struct SavedConnection {
     port: Option<u16>,
     key_path: Option<String>,
     proxy_jump: Option<String>,
+    auth_method: String,
     #[serde(rename = "type")]
     connection_type: String,
     tags: Vec<String>,
@@ -106,6 +107,7 @@ pub struct CreateConnectionRequest {
     port: Option<u16>,
     key_path: Option<String>,
     proxy_jump: Option<String>,
+    auth_method: Option<String>,
     tags: Vec<String>,
 }
 
@@ -303,6 +305,20 @@ impl Storage {
             &connection,
             "ALTER TABLE connections ADD COLUMN proxy_jump TEXT",
         )?;
+        add_optional_column(
+            &connection,
+            "ALTER TABLE connections ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'keyFile'",
+        )?;
+        connection
+            .execute(
+                "UPDATE connections
+                 SET auth_method = 'agent'
+                 WHERE connection_type IN ('ssh', 'sftp')
+                   AND auth_method = 'keyFile'
+                   AND (key_path IS NULL OR TRIM(key_path) = '')",
+                [],
+            )
+            .map_err(to_storage_error)?;
         Ok(())
     }
 
@@ -325,6 +341,7 @@ impl Storage {
             let trimmed = value.trim().to_string();
             (!trimmed.is_empty()).then_some(trimmed)
         });
+        let auth_method = normalize_auth_method(request.auth_method, &connection_type, &key_path)?;
         let id = make_connection_id(&name);
         let tags = normalize_tags(request.tags);
 
@@ -342,8 +359,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'idle', ?10)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'idle', ?11)",
                 params![
                     id,
                     folder_id,
@@ -353,6 +370,7 @@ impl Storage {
                     request.port,
                     key_path,
                     proxy_jump,
+                    auth_method,
                     connection_type,
                     next_sort_order
                 ],
@@ -379,6 +397,7 @@ impl Storage {
             port: request.port,
             key_path,
             proxy_jump,
+            auth_method,
             connection_type,
             tags,
             status: "idle".to_string(),
@@ -508,7 +527,7 @@ impl Storage {
 
         let source = transaction
             .query_row(
-                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, connection_type
+                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type
                  FROM connections
                  WHERE id = ?1",
                 params![source_id],
@@ -522,14 +541,24 @@ impl Storage {
                         row.get::<_, Option<String>>(5)?,
                         row.get::<_, Option<String>>(6)?,
                         row.get::<_, String>(7)?,
+                        row.get::<_, String>(8)?,
                     ))
                 },
             )
             .optional()
             .map_err(to_storage_error)?
             .ok_or_else(|| "connection was not found".to_string())?;
-        let (folder_id, source_name, host, user, port, key_path, proxy_jump, connection_type) =
-            source;
+        let (
+            folder_id,
+            source_name,
+            host,
+            user,
+            port,
+            key_path,
+            proxy_jump,
+            auth_method,
+            connection_type,
+        ) = source;
         let duplicate_name = request
             .name
             .map(|name| name.trim().to_string())
@@ -547,8 +576,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'idle', ?10)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'idle', ?11)",
                 params![
                     duplicate_id,
                     folder_id,
@@ -558,6 +587,7 @@ impl Storage {
                     port,
                     key_path,
                     proxy_jump,
+                    auth_method,
                     connection_type,
                     next_sort_order
                 ],
@@ -686,6 +716,7 @@ impl Storage {
                 host: "localhost",
                 username: "ryan",
                 connection_type: "local",
+                auth_method: "keyFile",
                 status: "idle",
                 sort_order: 0,
                 tags: &["local", "shell"],
@@ -700,6 +731,7 @@ impl Storage {
                 host: "wsl.local",
                 username: "ryan",
                 connection_type: "local",
+                auth_method: "keyFile",
                 status: "idle",
                 sort_order: 1,
                 tags: &["local", "linux"],
@@ -714,6 +746,7 @@ impl Storage {
                 host: "bastion-east.internal",
                 username: "admin",
                 connection_type: "ssh",
+                auth_method: "agent",
                 status: "idle",
                 sort_order: 0,
                 tags: &["prod", "ssh", "jump"],
@@ -728,6 +761,7 @@ impl Storage {
                 host: "files01.internal",
                 username: "deploy",
                 connection_type: "sftp",
+                auth_method: "agent",
                 status: "idle",
                 sort_order: 1,
                 tags: &["prod", "sftp"],
@@ -742,6 +776,7 @@ impl Storage {
                 host: "api-stage.internal",
                 username: "ops",
                 connection_type: "ssh",
+                auth_method: "agent",
                 status: "idle",
                 sort_order: 0,
                 tags: &["stage", "api"],
@@ -764,7 +799,7 @@ fn list_connections_for_folder(
 ) -> Result<Vec<SavedConnection>, String> {
     let mut statement = connection
         .prepare(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type
              FROM connections
              WHERE folder_id = ?1
              ORDER BY sort_order, name",
@@ -781,7 +816,8 @@ fn list_connections_for_folder(
                 port: optional_port(row.get::<_, Option<i64>>(4)?)?,
                 key_path: row.get(5)?,
                 proxy_jump: row.get(6)?,
-                connection_type: row.get(7)?,
+                auth_method: row.get(7)?,
+                connection_type: row.get(8)?,
                 status: "idle".to_string(),
                 tags: Vec::new(),
             })
@@ -882,7 +918,7 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type
              FROM connections
              WHERE id = ?1",
             params![connection_id],
@@ -895,7 +931,8 @@ fn get_connection_by_id(
                     port: optional_port(row.get::<_, Option<i64>>(4)?)?,
                     key_path: row.get(5)?,
                     proxy_jump: row.get(6)?,
-                    connection_type: row.get(7)?,
+                    auth_method: row.get(7)?,
+                    connection_type: row.get(8)?,
                     status: "idle".to_string(),
                     tags: Vec::new(),
                 })
@@ -951,6 +988,7 @@ struct NewConnection<'a> {
     host: &'a str,
     username: &'a str,
     connection_type: &'a str,
+    auth_method: &'a str,
     status: &'a str,
     sort_order: i64,
     tags: &'a [&'a str],
@@ -963,14 +1001,15 @@ fn seed_connection(
     connection
         .execute(
             "INSERT INTO connections (
-                id, folder_id, name, host, username, connection_type, status, sort_order
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                id, folder_id, name, host, username, auth_method, connection_type, status, sort_order
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 new_connection.id,
                 new_connection.folder_id,
                 new_connection.name,
                 new_connection.host,
                 new_connection.username,
+                new_connection.auth_method,
                 new_connection.connection_type,
                 new_connection.status,
                 new_connection.sort_order
@@ -1038,6 +1077,29 @@ fn normalize_connection_type(value: &str) -> Result<String, String> {
     match value.trim().to_lowercase().as_str() {
         "local" | "ssh" | "sftp" => Ok(value.trim().to_lowercase()),
         _ => Err("connection type must be local, ssh, or sftp".to_string()),
+    }
+}
+
+fn normalize_auth_method(
+    value: Option<String>,
+    connection_type: &str,
+    key_path: &Option<String>,
+) -> Result<String, String> {
+    if connection_type == "local" {
+        return Ok("keyFile".to_string());
+    }
+
+    match value
+        .as_deref()
+        .map(str::trim)
+        .filter(|method| !method.is_empty())
+    {
+        Some("keyFile") | Some("key-file") | Some("key") => Ok("keyFile".to_string()),
+        Some("password") => Ok("password".to_string()),
+        Some("agent") | Some("sshAgent") | Some("ssh-agent") => Ok("agent".to_string()),
+        Some(_) => Err("SSH auth method must be keyFile, password, or agent".to_string()),
+        None if key_path.is_some() => Ok("keyFile".to_string()),
+        None => Ok("agent".to_string()),
     }
 }
 
@@ -1252,6 +1314,7 @@ mod tests {
                 port: Some(2222),
                 key_path: Some("C:\\Users\\ryan\\.ssh\\id_ed25519".to_string()),
                 proxy_jump: Some("jump.internal".to_string()),
+                auth_method: Some("keyFile".to_string()),
                 tags: vec!["Lab".to_string(), " ssh ".to_string()],
             })
             .expect("connection is created");
@@ -1399,6 +1462,7 @@ mod tests {
                 port: None,
                 key_path: None,
                 proxy_jump: None,
+                auth_method: Some("agent".to_string()),
                 tags: vec!["temp".to_string()],
             })
             .expect("connection is created in folder");

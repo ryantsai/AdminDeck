@@ -27,6 +27,7 @@ export interface StartTerminalSessionRequest {
   port?: number;
   keyPath?: string;
   proxyJump?: string;
+  authMethod?: "keyFile" | "password" | "agent";
   secretOwnerId?: string;
   shell?: string;
   cols?: number;

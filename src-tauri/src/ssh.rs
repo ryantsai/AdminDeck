@@ -1,6 +1,9 @@
 use russh::{
     client,
-    keys::{load_secret_key, PrivateKeyWithHashAlg},
+    keys::{
+        agent::{client::AgentClient, AgentIdentity},
+        load_secret_key, PrivateKeyWithHashAlg,
+    },
     ChannelMsg, Disconnect,
 };
 use serde::{Deserialize, Serialize};
@@ -52,6 +55,7 @@ pub struct NativeSshTerminalRequest {
 pub enum NativeSshAuth {
     KeyFile { key_path: String },
     Password { password: String },
+    Agent,
 }
 
 #[derive(Deserialize)]
@@ -168,6 +172,7 @@ impl client::Handler for InspectingClient {
 pub fn can_start_native_terminal(
     key_path: Option<&str>,
     password: Option<&str>,
+    use_agent: bool,
     proxy_jump: Option<&str>,
 ) -> bool {
     let has_key_path = key_path
@@ -180,7 +185,7 @@ pub fn can_start_native_terminal(
         .map(str::trim)
         .is_some_and(|value| !value.is_empty());
 
-    (has_key_path || has_password) && !has_proxy_jump
+    (has_key_path || has_password || use_agent) && !has_proxy_jump
 }
 
 pub fn start_native_terminal(
@@ -547,6 +552,7 @@ fn normalize_native_ssh_auth(auth: NativeSshAuth) -> Result<NativeSshAuth, Strin
                 Ok(NativeSshAuth::Password { password })
             }
         }
+        NativeSshAuth::Agent => Ok(NativeSshAuth::Agent),
     }
 }
 
@@ -580,17 +586,98 @@ async fn authenticate_native_ssh(
             .authenticate_password(user.to_string(), password.clone())
             .await
             .map_err(|error| format!("SSH password authentication failed: {error}"))?,
+        NativeSshAuth::Agent => {
+            authenticate_with_agent(session, user).await?;
+            return Ok(());
+        }
     };
 
     if !auth_result.success() {
         let method = match auth {
             NativeSshAuth::KeyFile { .. } => "key-file",
             NativeSshAuth::Password { .. } => "password",
+            NativeSshAuth::Agent => "agent",
         };
         return Err(format!("SSH {method} authentication was rejected"));
     }
 
     Ok(())
+}
+
+async fn authenticate_with_agent(
+    session: &mut client::Handle<VerifyingClient>,
+    user: &str,
+) -> Result<(), String> {
+    let mut agent = connect_ssh_agent().await?;
+    let identities = agent
+        .request_identities()
+        .await
+        .map_err(|error| format!("failed to list SSH agent identities: {error}"))?;
+    if identities.is_empty() {
+        return Err("SSH agent has no identities loaded".to_string());
+    }
+
+    let rsa_hash = session
+        .best_supported_rsa_hash()
+        .await
+        .map_err(|error| format!("failed to negotiate SSH agent key algorithm: {error}"))?
+        .flatten();
+    let mut last_rejection = None;
+    for identity in identities {
+        let auth_result = match identity {
+            AgentIdentity::PublicKey { key, comment } => session
+                .authenticate_publickey_with(user.to_string(), key, rsa_hash, &mut agent)
+                .await
+                .map_err(|error| {
+                    format!("SSH agent authentication failed for {comment}: {error}")
+                })?,
+            AgentIdentity::Certificate {
+                certificate,
+                comment,
+            } => session
+                .authenticate_certificate_with(user.to_string(), certificate, rsa_hash, &mut agent)
+                .await
+                .map_err(|error| {
+                    format!("SSH agent certificate authentication failed for {comment}: {error}")
+                })?,
+        };
+
+        if auth_result.success() {
+            return Ok(());
+        }
+        last_rejection = Some("SSH agent identity was rejected".to_string());
+    }
+
+    Err(last_rejection.unwrap_or_else(|| "SSH agent authentication was rejected".to_string()))
+}
+
+type DynamicAgentClient =
+    AgentClient<Box<dyn russh::keys::agent::client::AgentStream + Send + Unpin + 'static>>;
+
+#[cfg(unix)]
+async fn connect_ssh_agent() -> Result<DynamicAgentClient, String> {
+    AgentClient::connect_env()
+        .await
+        .map(AgentClient::dynamic)
+        .map_err(|error| format!("failed to connect to SSH agent from SSH_AUTH_SOCK: {error}"))
+}
+
+#[cfg(windows)]
+async fn connect_ssh_agent() -> Result<DynamicAgentClient, String> {
+    match AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await {
+        Ok(agent) => return Ok(agent.dynamic()),
+        Err(open_ssh_error) => match AgentClient::connect_pageant().await {
+            Ok(agent) => Ok(agent.dynamic()),
+            Err(pageant_error) => Err(format!(
+                "failed to connect to Windows SSH agents; OpenSSH agent: {open_ssh_error}; Pageant: {pageant_error}"
+            )),
+        },
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+async fn connect_ssh_agent() -> Result<DynamicAgentClient, String> {
+    Err("SSH agent authentication is not supported on this platform yet".to_string())
 }
 
 #[cfg(test)]
@@ -613,19 +700,23 @@ mod tests {
         assert!(can_start_native_terminal(
             Some("C:\\Users\\ryan\\.ssh\\id_ed25519"),
             None,
+            false,
             None
         ));
         assert!(can_start_native_terminal(
             None,
             Some("not-for-sqlite"),
+            false,
             None
         ));
-        assert!(!can_start_native_terminal(None, None, None));
-        assert!(!can_start_native_terminal(Some("  "), None, None));
-        assert!(!can_start_native_terminal(None, Some("  "), None));
+        assert!(can_start_native_terminal(None, None, true, None));
+        assert!(!can_start_native_terminal(None, None, false, None));
+        assert!(!can_start_native_terminal(Some("  "), None, false, None));
+        assert!(!can_start_native_terminal(None, Some("  "), false, None));
         assert!(!can_start_native_terminal(
             Some("C:\\Users\\ryan\\.ssh\\id_ed25519"),
             None,
+            false,
             Some("bastion")
         ));
     }

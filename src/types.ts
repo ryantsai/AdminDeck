@@ -1,5 +1,6 @@
 export type ConnectionType = "local" | "ssh" | "sftp";
 export type ConnectionStatus = "connected" | "idle" | "offline";
+export type SshAuthMethod = "keyFile" | "password" | "agent";
 
 export interface Connection {
   id: string;
@@ -9,6 +10,7 @@ export interface Connection {
   port?: number;
   keyPath?: string;
   proxyJump?: string;
+  authMethod?: SshAuthMethod;
   hasPassword?: boolean;
   type: ConnectionType;
   tags: string[];
@@ -24,6 +26,7 @@ export interface CreateConnectionRequest {
   port?: number;
   keyPath?: string;
   proxyJump?: string;
+  authMethod?: SshAuthMethod;
   tags: string[];
 }
 
