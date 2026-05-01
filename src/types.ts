@@ -43,4 +43,5 @@ export interface AppBootstrap {
   productName: string;
   version: string;
   logStatus: string;
+  storageStatus: string;
 }

@@ -1,10 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppBootstrap } from "../types";
+import type { AppBootstrap, ConnectionGroup } from "../types";
 
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
     result: AppBootstrap;
+  };
+  list_connection_groups: {
+    args: undefined;
+    result: ConnectionGroup[];
   };
 };
 

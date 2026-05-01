@@ -39,14 +39,14 @@ import {
   transferQueue,
 } from "./sample-data";
 import { useWorkspaceStore } from "./store";
-import type { Connection, FileEntry, WorkspaceTab } from "./types";
+import type { Connection, ConnectionGroup, FileEntry, WorkspaceTab } from "./types";
 
 function App() {
   const [bootstrap, setBootstrap] = useState("Starting local runtime");
 
   useEffect(() => {
     invokeCommand("app_bootstrap")
-      .then((result) => setBootstrap(result.logStatus))
+      .then((result) => setBootstrap(`${result.logStatus} | ${result.storageStatus}`))
       .catch(() => setBootstrap("Frontend preview mode"));
   }, []);
 
@@ -91,14 +91,21 @@ function ConnectionSidebar() {
   const query = useWorkspaceStore((state) => state.query);
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
+  const [groups, setGroups] = useState<ConnectionGroup[]>(connectionGroups);
+
+  useEffect(() => {
+    invokeCommand("list_connection_groups")
+      .then(setGroups)
+      .catch(() => setGroups(connectionGroups));
+  }, []);
 
   const filteredGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
-      return connectionGroups;
+      return groups;
     }
 
-    return connectionGroups
+    return groups
       .map((group) => ({
         ...group,
         connections: group.connections.filter((connection) =>
@@ -115,7 +122,7 @@ function ConnectionSidebar() {
         ),
       }))
       .filter((group) => group.connections.length > 0);
-  }, [query]);
+  }, [groups, query]);
 
   return (
     <aside className="connection-sidebar">
