@@ -1,6 +1,7 @@
 mod logging;
 mod secrets;
 mod sessions;
+mod ssh;
 mod storage;
 
 use serde::Serialize;
@@ -130,6 +131,11 @@ fn keychain_status(secrets: tauri::State<'_, secrets::Secrets>) -> secrets::Keyc
 }
 
 #[tauri::command]
+fn ssh_transport_plan() -> ssh::SshTransportPlan {
+    ssh::transport_plan()
+}
+
+#[tauri::command]
 fn store_secret(
     secrets: tauri::State<'_, secrets::Secrets>,
     request: secrets::StoreSecretRequest,
@@ -221,6 +227,7 @@ pub fn run() {
             get_terminal_settings,
             update_terminal_settings,
             keychain_status,
+            ssh_transport_plan,
             store_secret,
             secret_exists,
             delete_secret,

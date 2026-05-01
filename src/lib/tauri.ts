@@ -39,6 +39,13 @@ export interface TerminalOutput {
   data: string;
 }
 
+export interface SshTransportPlan {
+  primaryLibrary: string;
+  sftpCandidate: string;
+  fallbackLibrary: string;
+  systemSshRole: string;
+}
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -95,6 +102,10 @@ type CommandMap = {
   keychain_status: {
     args: undefined;
     result: KeychainStatus;
+  };
+  ssh_transport_plan: {
+    args: undefined;
+    result: SshTransportPlan;
   };
   store_secret: {
     args: { request: StoreSecretRequest };

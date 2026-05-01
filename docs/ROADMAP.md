@@ -26,7 +26,7 @@
 
 ## Milestone B: SSH Core
 
-- Evaluate and choose Rust SSH library.
+- Evaluate and choose Rust SSH library. See `docs/ADR/0004-ssh-transport-library.md`.
 - Implement in-process SSH connection lifecycle.
 - Implement host key verification.
 - Implement password auth.
