@@ -7,6 +7,7 @@ interface WorkspaceState {
   tabs: WorkspaceTab[];
   activeTabId: string;
   terminalSettings: TerminalSettings;
+  activeSessionCounts: Record<string, number>;
   setQuery: (query: string) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
   activateTab: (tabId: string) => void;
@@ -14,6 +15,8 @@ interface WorkspaceState {
   openConnection: (connection: Connection) => void;
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
+  markConnectionSessionStarted: (connectionId: string) => void;
+  markConnectionSessionEnded: (connectionId: string) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -21,6 +24,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   tabs: initialTabs,
   activeTabId: initialTabs[0]?.id ?? "",
   terminalSettings: defaultTerminalSettings,
+  activeSessionCounts: {},
   setQuery: (query) => set({ query }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
   activateTab: (tabId) => set({ activeTabId: tabId }),
@@ -116,5 +120,30 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         };
       }),
     }));
+  },
+  markConnectionSessionStarted: (connectionId) => {
+    set((state) => ({
+      activeSessionCounts: {
+        ...state.activeSessionCounts,
+        [connectionId]: (state.activeSessionCounts[connectionId] ?? 0) + 1,
+      },
+    }));
+  },
+  markConnectionSessionEnded: (connectionId) => {
+    set((state) => {
+      const currentCount = state.activeSessionCounts[connectionId] ?? 0;
+      if (currentCount <= 1) {
+        const remainingCounts = { ...state.activeSessionCounts };
+        delete remainingCounts[connectionId];
+        return { activeSessionCounts: remainingCounts };
+      }
+
+      return {
+        activeSessionCounts: {
+          ...state.activeSessionCounts,
+          [connectionId]: currentCount - 1,
+        },
+      };
+    });
   },
 }));

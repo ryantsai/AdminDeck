@@ -12,7 +12,7 @@ export const connectionGroups: ConnectionGroup[] = [
         user: "ryan",
         type: "local",
         tags: ["local", "shell"],
-        status: "connected",
+        status: "idle",
       },
       {
         id: "local-wsl",
@@ -36,7 +36,7 @@ export const connectionGroups: ConnectionGroup[] = [
         user: "admin",
         type: "ssh",
         tags: ["prod", "ssh", "jump"],
-        status: "connected",
+        status: "idle",
       },
       {
         id: "files-prod",
@@ -60,7 +60,7 @@ export const connectionGroups: ConnectionGroup[] = [
         user: "ops",
         type: "ssh",
         tags: ["stage", "api"],
-        status: "offline",
+        status: "idle",
       },
     ],
   },

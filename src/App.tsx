@@ -50,6 +50,7 @@ import { useWorkspaceStore } from "./store";
 import type {
   Connection,
   ConnectionGroup,
+  ConnectionStatus,
   ConnectionType,
   CreateConnectionRequest,
   FileEntry,
@@ -125,6 +126,7 @@ function ConnectionSidebar() {
   const query = useWorkspaceStore((state) => state.query);
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
+  const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const [groups, setGroups] = useState<ConnectionGroup[]>(connectionGroups);
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
@@ -309,13 +311,18 @@ function ConnectionSidebar() {
     }
   }
 
+  const groupsWithLiveStatuses = useMemo(
+    () => withLiveConnectionStatuses(groups, activeSessionCounts),
+    [activeSessionCounts, groups],
+  );
+
   const filteredGroups = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
-      return groups;
+      return groupsWithLiveStatuses;
     }
 
-    return groups
+    return groupsWithLiveStatuses
       .map((group) => {
         if (group.name.toLowerCase().includes(normalizedQuery)) {
           return group;
@@ -342,7 +349,7 @@ function ConnectionSidebar() {
           group.connections.length > 0 ||
           group.name.toLowerCase().includes(normalizedQuery),
       );
-  }, [groups, query]);
+  }, [groupsWithLiveStatuses, query]);
   const isTreeFiltered = query.trim().length > 0;
 
   function handleDragStart(event: DragEvent, item: DraggedTreeItem) {
@@ -754,6 +761,26 @@ function upsertConnectionGroup(groups: ConnectionGroup[], connection: Connection
   ];
 }
 
+function withLiveConnectionStatuses(
+  groups: ConnectionGroup[],
+  activeSessionCounts: Record<string, number>,
+) {
+  return groups.map((group) => ({
+    ...group,
+    connections: group.connections.map((connection) => ({
+      ...connection,
+      status: liveConnectionStatus(connection.id, activeSessionCounts),
+    })),
+  }));
+}
+
+function liveConnectionStatus(
+  connectionId: string,
+  activeSessionCounts: Record<string, number>,
+): ConnectionStatus {
+  return activeSessionCounts[connectionId] ? "connected" : "idle";
+}
+
 function TopBar({ runtimeStatus }: { runtimeStatus: string }) {
   return (
     <header className="top-bar">
@@ -881,6 +908,12 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
   const sessionIdRef = useRef<string | null>(null);
   const startedRef = useRef(false);
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
+  const markConnectionSessionStarted = useWorkspaceStore(
+    (state) => state.markConnectionSessionStarted,
+  );
+  const markConnectionSessionEnded = useWorkspaceStore(
+    (state) => state.markConnectionSessionEnded,
+  );
 
   useEffect(() => {
     const element = terminalElementRef.current;
@@ -922,6 +955,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     sessionIdRef.current = requestedSessionId;
 
     let disposed = false;
+    let sessionStarted = false;
     let removeOutputListener: (() => void) | undefined;
     const dataDisposable = terminal.onData((data) => {
       if (terminalSettings.confirmMultilinePaste && isMultilinePaste(data)) {
@@ -993,6 +1027,8 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
           return;
         }
         sessionIdRef.current = result.sessionId;
+        sessionStarted = true;
+        markConnectionSessionStarted(connection.id);
       } catch (error) {
         terminal.writeln("");
         terminal.writeln(`[failed to start session: ${String(error)}]`);
@@ -1010,10 +1046,18 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
       if (sessionId) {
         void invokeCommand("close_terminal_session", { sessionId });
       }
+      if (sessionStarted) {
+        markConnectionSessionEnded(connection.id);
+      }
       sessionIdRef.current = null;
       terminal.dispose();
     };
-  }, [pane.connection, terminalSettings]);
+  }, [
+    markConnectionSessionEnded,
+    markConnectionSessionStarted,
+    pane.connection,
+    terminalSettings,
+  ]);
 
   return (
     <article className="terminal-pane">

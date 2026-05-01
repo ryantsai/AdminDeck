@@ -626,7 +626,7 @@ impl Storage {
                 host: "localhost",
                 username: "ryan",
                 connection_type: "local",
-                status: "connected",
+                status: "idle",
                 sort_order: 0,
                 tags: &["local", "shell"],
             },
@@ -654,7 +654,7 @@ impl Storage {
                 host: "bastion-east.internal",
                 username: "admin",
                 connection_type: "ssh",
-                status: "connected",
+                status: "idle",
                 sort_order: 0,
                 tags: &["prod", "ssh", "jump"],
             },
@@ -682,7 +682,7 @@ impl Storage {
                 host: "api-stage.internal",
                 username: "ops",
                 connection_type: "ssh",
-                status: "offline",
+                status: "idle",
                 sort_order: 0,
                 tags: &["stage", "api"],
             },
@@ -704,7 +704,7 @@ fn list_connections_for_folder(
 ) -> Result<Vec<SavedConnection>, String> {
     let mut statement = connection
         .prepare(
-            "SELECT id, name, host, username, port, key_path, connection_type, status
+            "SELECT id, name, host, username, port, key_path, connection_type
              FROM connections
              WHERE folder_id = ?1
              ORDER BY sort_order, name",
@@ -721,7 +721,7 @@ fn list_connections_for_folder(
                 port: optional_port(row.get::<_, Option<i64>>(4)?)?,
                 key_path: row.get(5)?,
                 connection_type: row.get(6)?,
-                status: row.get(7)?,
+                status: "idle".to_string(),
                 tags: Vec::new(),
             })
         })
@@ -821,7 +821,7 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT id, name, host, username, port, key_path, connection_type, status
+            "SELECT id, name, host, username, port, key_path, connection_type
              FROM connections
              WHERE id = ?1",
             params![connection_id],
@@ -834,7 +834,7 @@ fn get_connection_by_id(
                     port: optional_port(row.get::<_, Option<i64>>(4)?)?,
                     key_path: row.get(5)?,
                     connection_type: row.get(6)?,
-                    status: row.get(7)?,
+                    status: "idle".to_string(),
                     tags: Vec::new(),
                 })
             },
@@ -1114,6 +1114,10 @@ mod tests {
         assert_eq!(groups[0].id, "local");
         assert_eq!(groups[0].connections[0].name, "PowerShell");
         assert_eq!(groups[1].connections[0].tags, ["prod", "ssh", "jump"]);
+        assert!(groups
+            .iter()
+            .flat_map(|group| group.connections.iter())
+            .all(|connection| connection.status == "idle"));
     }
 
     #[test]
