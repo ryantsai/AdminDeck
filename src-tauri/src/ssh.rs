@@ -42,10 +42,16 @@ pub struct NativeSshTerminalRequest {
     pub host: String,
     pub user: String,
     pub port: u16,
-    pub key_path: String,
+    pub auth: NativeSshAuth,
     pub known_hosts_path: PathBuf,
     pub cols: u16,
     pub rows: u16,
+}
+
+#[derive(Clone)]
+pub enum NativeSshAuth {
+    KeyFile { key_path: String },
+    Password { password: String },
 }
 
 #[derive(Deserialize)]
@@ -159,15 +165,22 @@ impl client::Handler for InspectingClient {
     }
 }
 
-pub fn can_start_native_terminal(key_path: Option<&str>, proxy_jump: Option<&str>) -> bool {
+pub fn can_start_native_terminal(
+    key_path: Option<&str>,
+    password: Option<&str>,
+    proxy_jump: Option<&str>,
+) -> bool {
     let has_key_path = key_path
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty());
+    let has_password = password
         .map(str::trim)
         .is_some_and(|value| !value.is_empty());
     let has_proxy_jump = proxy_jump
         .map(str::trim)
         .is_some_and(|value| !value.is_empty());
 
-    has_key_path && !has_proxy_jump
+    (has_key_path || has_password) && !has_proxy_jump
 }
 
 pub fn start_native_terminal(
@@ -184,17 +197,13 @@ pub fn start_native_terminal(
         return Err("user is required for native SSH sessions".to_string());
     }
 
-    let key_path = request.key_path.trim();
-    if key_path.is_empty() {
-        return Err("key path is required for native SSH sessions".to_string());
-    }
-
+    let auth = normalize_native_ssh_auth(request.auth)?;
     let request = NativeSshTerminalRequest {
         session_id: request.session_id,
         host: host.to_string(),
         user: user.to_string(),
         port: request.port,
-        key_path: key_path.to_string(),
+        auth,
         known_hosts_path: request.known_hosts_path,
         cols: request.cols,
         rows: request.rows,
@@ -364,8 +373,6 @@ async fn run_native_terminal(
     mut control_rx: mpsc::UnboundedReceiver<SshTerminalControl>,
     ready_tx: std_mpsc::SyncSender<Result<(), String>>,
 ) -> Result<(), String> {
-    let key_pair = load_secret_key(&request.key_path, None)
-        .map_err(|error| format!("failed to load SSH key: {error}"))?;
     let config = Arc::new(client::Config {
         inactivity_timeout: Some(Duration::from_secs(30)),
         ..Default::default()
@@ -387,24 +394,7 @@ async fn run_native_terminal(
             .unwrap_or_else(|| format!("failed to connect to SSH server: {error}"))
     })?;
 
-    let auth_result = session
-        .authenticate_publickey(
-            request.user.clone(),
-            PrivateKeyWithHashAlg::new(
-                Arc::new(key_pair),
-                session
-                    .best_supported_rsa_hash()
-                    .await
-                    .map_err(|error| format!("failed to negotiate SSH key algorithm: {error}"))?
-                    .flatten(),
-            ),
-        )
-        .await
-        .map_err(|error| format!("SSH key-file authentication failed: {error}"))?;
-
-    if !auth_result.success() {
-        return Err("SSH key-file authentication was rejected".to_string());
-    }
+    authenticate_native_ssh(&mut session, &request.user, &request.auth).await?;
 
     let mut channel = session
         .channel_open_session()
@@ -540,6 +530,69 @@ fn remembered_rejection(rejection: &Arc<std::sync::Mutex<Option<String>>>) -> Op
     rejection.lock().ok().and_then(|message| message.clone())
 }
 
+fn normalize_native_ssh_auth(auth: NativeSshAuth) -> Result<NativeSshAuth, String> {
+    match auth {
+        NativeSshAuth::KeyFile { key_path } => {
+            let key_path = key_path.trim().to_string();
+            if key_path.is_empty() {
+                Err("key path is required for SSH key-file authentication".to_string())
+            } else {
+                Ok(NativeSshAuth::KeyFile { key_path })
+            }
+        }
+        NativeSshAuth::Password { password } => {
+            if password.is_empty() {
+                Err("password is required for SSH password authentication".to_string())
+            } else {
+                Ok(NativeSshAuth::Password { password })
+            }
+        }
+    }
+}
+
+async fn authenticate_native_ssh(
+    session: &mut client::Handle<VerifyingClient>,
+    user: &str,
+    auth: &NativeSshAuth,
+) -> Result<(), String> {
+    let auth_result = match auth {
+        NativeSshAuth::KeyFile { key_path } => {
+            let key_pair = load_secret_key(key_path, None)
+                .map_err(|error| format!("failed to load SSH key: {error}"))?;
+            session
+                .authenticate_publickey(
+                    user.to_string(),
+                    PrivateKeyWithHashAlg::new(
+                        Arc::new(key_pair),
+                        session
+                            .best_supported_rsa_hash()
+                            .await
+                            .map_err(|error| {
+                                format!("failed to negotiate SSH key algorithm: {error}")
+                            })?
+                            .flatten(),
+                    ),
+                )
+                .await
+                .map_err(|error| format!("SSH key-file authentication failed: {error}"))?
+        }
+        NativeSshAuth::Password { password } => session
+            .authenticate_password(user.to_string(), password.clone())
+            .await
+            .map_err(|error| format!("SSH password authentication failed: {error}"))?,
+    };
+
+    if !auth_result.success() {
+        let method = match auth {
+            NativeSshAuth::KeyFile { .. } => "key-file",
+            NativeSshAuth::Password { .. } => "password",
+        };
+        return Err(format!("SSH {method} authentication was rejected"));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -556,15 +609,23 @@ mod tests {
     }
 
     #[test]
-    fn native_terminal_lifecycle_starts_only_for_key_path_without_proxy_jump() {
+    fn native_terminal_lifecycle_starts_for_credentials_without_proxy_jump() {
         assert!(can_start_native_terminal(
             Some("C:\\Users\\ryan\\.ssh\\id_ed25519"),
+            None,
             None
         ));
-        assert!(!can_start_native_terminal(None, None));
-        assert!(!can_start_native_terminal(Some("  "), None));
+        assert!(can_start_native_terminal(
+            None,
+            Some("not-for-sqlite"),
+            None
+        ));
+        assert!(!can_start_native_terminal(None, None, None));
+        assert!(!can_start_native_terminal(Some("  "), None, None));
+        assert!(!can_start_native_terminal(None, Some("  "), None));
         assert!(!can_start_native_terminal(
             Some("C:\\Users\\ryan\\.ssh\\id_ed25519"),
+            None,
             Some("bastion")
         ));
     }

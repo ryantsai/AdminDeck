@@ -70,6 +70,10 @@ type DraggedTreeItem =
   | { kind: "folder"; folderId: string }
   | { kind: "connection"; connectionId: string };
 
+type ConnectionDialogRequest = CreateConnectionRequest & {
+  password?: string;
+};
+
 function App() {
   const [bootstrap, setBootstrap] = useState("Starting local runtime");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -173,30 +177,60 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     setTreeError("");
   }
 
-  async function handleConnectionSubmit(request: CreateConnectionRequest) {
+  async function storeConnectionPassword(connectionId: string, password: string) {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    await invokeCommand("store_secret", {
+      request: {
+        kind: "connectionPassword",
+        ownerId: connectionId,
+        secret: password,
+      },
+    });
+  }
+
+  async function handleConnectionSubmit(request: ConnectionDialogRequest) {
     setFormError("");
+    const { password, ...connectionRequest } = request;
     if (formMode === "save") {
       try {
-        const connection = await invokeCommand("create_connection", { request });
-        handleConnectionReady(connection);
+        const connection = await invokeCommand("create_connection", {
+          request: connectionRequest,
+        });
+        if (password) {
+          await storeConnectionPassword(connection.id, password);
+        }
+        handleConnectionReady({ ...connection, hasPassword: Boolean(password) });
       } catch (error) {
         setFormError(error instanceof Error ? error.message : String(error));
       }
       return;
     }
 
-    handleConnectionReady({
+    const connection: Connection = {
       id: `quick-${Date.now()}`,
-      name: request.name || request.host,
-      host: request.host,
-      user: request.user,
-      port: request.port,
-      keyPath: request.keyPath,
-      proxyJump: request.proxyJump,
-      type: request.type,
-      tags: request.tags,
+      name: connectionRequest.name || connectionRequest.host,
+      host: connectionRequest.host,
+      user: connectionRequest.user,
+      port: connectionRequest.port,
+      keyPath: connectionRequest.keyPath,
+      proxyJump: connectionRequest.proxyJump,
+      hasPassword: Boolean(password),
+      type: connectionRequest.type,
+      tags: connectionRequest.tags,
       status: "idle",
-    });
+    };
+
+    try {
+      if (password) {
+        await storeConnectionPassword(connection.id, password);
+      }
+      handleConnectionReady(connection);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   async function handleCreateFolder() {
@@ -577,9 +611,10 @@ function ConnectionDialog({
   mode: "save" | "quick";
   sshSettings: SshSettings;
   onCancel: () => void;
-  onSubmit: (request: CreateConnectionRequest) => void | Promise<void>;
+  onSubmit: (request: ConnectionDialogRequest) => void | Promise<void>;
 }) {
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
+  const [authMethod, setAuthMethod] = useState<"key" | "password">("key");
   const usesSshDefaults = connectionType !== "local";
   const folderOptions = useMemo(
     () => groups.filter((group) => !["local", "manual"].includes(group.id)),
@@ -592,6 +627,7 @@ function ConnectionDialog({
     const host = String(form.get("host") ?? "").trim();
     const name = String(form.get("name") ?? "").trim() || host;
     const portValue = String(form.get("port") ?? "").trim();
+    const password = String(form.get("password") ?? "");
     const keyPath = String(form.get("keyPath") ?? "").trim();
     const proxyJump = String(form.get("proxyJump") ?? "").trim();
     const tags = String(form.get("tags") ?? "")
@@ -609,8 +645,9 @@ function ConnectionDialog({
           ? "local"
           : String(form.get("folderId") ?? "").trim() || "manual",
       port: portValue ? Number(portValue) : undefined,
-      keyPath: keyPath || undefined,
+      keyPath: usesSshDefaults && authMethod === "key" ? keyPath || undefined : undefined,
       proxyJump: proxyJump || undefined,
+      password: usesSshDefaults && authMethod === "password" ? password : undefined,
       tags,
     });
   }
@@ -692,6 +729,41 @@ function ConnectionDialog({
 
         {usesSshDefaults ? (
           <>
+            <div className="form-grid">
+              <label>
+                <span>Auth</span>
+                <select
+                  name="authMethod"
+                  value={authMethod}
+                  onChange={(event) =>
+                    setAuthMethod(event.currentTarget.value as "key" | "password")
+                  }
+                >
+                  <option value="key">Key file</option>
+                  <option value="password">Password</option>
+                </select>
+              </label>
+              <label>
+                <span>Proxy jump</span>
+                <input
+                  name="proxyJump"
+                  defaultValue={sshSettings.defaultProxyJump ?? ""}
+                  placeholder="jump.internal"
+                />
+              </label>
+            </div>
+
+            {authMethod === "password" ? (
+              <label>
+                <span>Password</span>
+                <input
+                  name="password"
+                  placeholder="Stored in OS keychain"
+                  required
+                  type="password"
+                />
+              </label>
+            ) : (
             <label>
               <span>Key path</span>
               <input
@@ -700,15 +772,7 @@ function ConnectionDialog({
                 placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
               />
             </label>
-
-            <label>
-              <span>Proxy jump</span>
-              <input
-                name="proxyJump"
-                defaultValue={sshSettings.defaultProxyJump ?? ""}
-                placeholder="jump.internal"
-              />
-            </label>
+            )}
           </>
         ) : null}
 
@@ -1248,6 +1312,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
             port: connection.port,
             keyPath: connection.keyPath,
             proxyJump: connection.proxyJump,
+            secretOwnerId: connection.id,
             shell: connection.type === "local" ? terminalSettings.defaultShell : undefined,
             cols: terminal.cols,
             rows: terminal.rows,
@@ -1317,7 +1382,7 @@ function isMultilinePaste(data: string) {
 function usesNativeSshHostKeyVerification(connection: Connection) {
   return (
     connection.type === "ssh" &&
-    Boolean(connection.keyPath?.trim()) &&
+    (Boolean(connection.keyPath?.trim()) || Boolean(connection.hasPassword)) &&
     !connection.proxyJump?.trim()
   );
 }

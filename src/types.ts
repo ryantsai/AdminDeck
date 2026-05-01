@@ -9,6 +9,7 @@ export interface Connection {
   port?: number;
   keyPath?: string;
   proxyJump?: string;
+  hasPassword?: boolean;
   type: ConnectionType;
   tags: string[];
   status: ConnectionStatus;

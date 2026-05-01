@@ -202,9 +202,10 @@ fn delete_secret(
 fn start_terminal_session(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::StartTerminalSessionRequest,
 ) -> Result<sessions::TerminalSessionStarted, String> {
-    sessions.start_terminal_session(app, request)
+    sessions.start_terminal_session(app, &secrets, request)
 }
 
 #[tauri::command]

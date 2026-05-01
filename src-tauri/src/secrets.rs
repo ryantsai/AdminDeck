@@ -124,6 +124,16 @@ impl Secrets {
         }
     }
 
+    pub(crate) fn read_connection_password(
+        &self,
+        owner_id: String,
+    ) -> Result<Option<String>, String> {
+        self.read_secret(SecretReferenceRequest {
+            kind: SecretKind::ConnectionPassword,
+            owner_id,
+        })
+    }
+
     fn entry(&self, reference: &SecretReference) -> Result<Entry, String> {
         if self.backend.is_none() {
             return Err(self

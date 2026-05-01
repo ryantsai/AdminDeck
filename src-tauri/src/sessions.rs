@@ -1,4 +1,4 @@
-use crate::ssh;
+use crate::{secrets, ssh};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -39,6 +39,7 @@ pub struct StartTerminalSessionRequest {
     pub port: Option<u16>,
     pub key_path: Option<String>,
     pub proxy_jump: Option<String>,
+    pub secret_owner_id: Option<String>,
     pub shell: Option<String>,
     pub cols: Option<u16>,
     pub rows: Option<u16>,
@@ -82,14 +83,26 @@ impl SessionManager {
     pub fn start_terminal_session(
         &self,
         app: AppHandle,
+        secrets: &secrets::Secrets,
         request: StartTerminalSessionRequest,
     ) -> Result<TerminalSessionStarted, String> {
         let session_id = request
             .session_id
             .clone()
             .unwrap_or_else(|| make_session_id(&request.title));
-        if uses_native_ssh(&request) {
+        let password = connection_password_for(secrets, &request);
+        if uses_native_ssh(&request, password.as_deref()) {
             let known_hosts_path = ssh::app_known_hosts_path(&app)?;
+            let auth = match request.key_path.as_deref().map(str::trim) {
+                Some(key_path) if !key_path.is_empty() => ssh::NativeSshAuth::KeyFile {
+                    key_path: key_path.to_string(),
+                },
+                _ => ssh::NativeSshAuth::Password {
+                    password: password.ok_or_else(|| {
+                        "password is required for native SSH sessions".to_string()
+                    })?,
+                },
+            };
             let session = ssh::start_native_terminal(
                 app,
                 ssh::NativeSshTerminalRequest {
@@ -97,7 +110,7 @@ impl SessionManager {
                     host: request.host.clone(),
                     user: request.user.clone(),
                     port: request.port.unwrap_or(22),
-                    key_path: request.key_path.clone().unwrap_or_default(),
+                    auth,
                     known_hosts_path,
                     cols: request.cols.unwrap_or(80),
                     rows: request.rows.unwrap_or(24),
@@ -245,12 +258,45 @@ impl SessionManager {
     }
 }
 
-fn uses_native_ssh(request: &StartTerminalSessionRequest) -> bool {
+fn uses_native_ssh(request: &StartTerminalSessionRequest, password: Option<&str>) -> bool {
     request.connection_type.trim().eq_ignore_ascii_case("ssh")
         && ssh::can_start_native_terminal(
             request.key_path.as_deref(),
+            password,
             request.proxy_jump.as_deref(),
         )
+}
+
+fn connection_password_for(
+    secrets: &secrets::Secrets,
+    request: &StartTerminalSessionRequest,
+) -> Option<String> {
+    if !request.connection_type.trim().eq_ignore_ascii_case("ssh") {
+        return None;
+    }
+    if request
+        .proxy_jump
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty())
+    {
+        return None;
+    }
+    if request
+        .key_path
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty())
+    {
+        return None;
+    }
+
+    request.secret_owner_id.as_ref().and_then(|owner_id| {
+        secrets
+            .read_connection_password(owner_id.clone())
+            .ok()
+            .flatten()
+    })
 }
 
 fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, String> {
