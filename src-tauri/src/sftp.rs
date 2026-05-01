@@ -71,6 +71,29 @@ pub struct DownloadSftpPathRequest {
     local_directory: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSftpFolderRequest {
+    session_id: String,
+    parent_path: String,
+    name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameSftpPathRequest {
+    session_id: String,
+    path: String,
+    new_name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteSftpPathRequest {
+    session_id: String,
+    path: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SftpSessionStarted {
@@ -269,6 +292,47 @@ impl SftpSessionManager {
         ))
     }
 
+    pub fn create_folder(&self, request: CreateSftpFolderRequest) -> Result<(), String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "SFTP session lock is poisoned".to_string())?;
+        let session = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| "SFTP session was not found".to_string())?;
+        session.runtime.block_on(create_folder(
+            &session.sftp,
+            &request.parent_path,
+            &request.name,
+        ))
+    }
+
+    pub fn rename_path(&self, request: RenameSftpPathRequest) -> Result<(), String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "SFTP session lock is poisoned".to_string())?;
+        let session = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| "SFTP session was not found".to_string())?;
+        session
+            .runtime
+            .block_on(rename_path(&session.sftp, &request.path, &request.new_name))
+    }
+
+    pub fn delete_path(&self, request: DeleteSftpPathRequest) -> Result<(), String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "SFTP session lock is poisoned".to_string())?;
+        let session = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| "SFTP session was not found".to_string())?;
+        session
+            .runtime
+            .block_on(delete_remote_entry(&session.sftp, &request.path))
+    }
+
     pub fn close_sftp_session(&self, session_id: String) -> Result<(), String> {
         let session = self
             .sessions
@@ -324,6 +388,59 @@ async fn download_path(
     };
     download_remote_entry(sftp, &remote_path, &local_target, &mut summary).await?;
     Ok(summary.into_result())
+}
+
+async fn create_folder(sftp: &SftpSession, parent_path: &str, name: &str) -> Result<(), String> {
+    let name = validate_remote_child_name(name)?;
+    let target = join_remote_path(parent_path, &name);
+    ensure_remote_missing(sftp, &target).await?;
+    sftp.create_dir(target)
+        .await
+        .map_err(|error| format!("failed to create remote folder: {error}"))
+}
+
+async fn rename_path(sftp: &SftpSession, path: &str, new_name: &str) -> Result<(), String> {
+    let source = normalize_mutable_remote_path(path)?;
+    let new_name = validate_remote_child_name(new_name)?;
+    let target = join_remote_path(&remote_parent_path(&source), &new_name);
+    ensure_remote_missing(sftp, &target).await?;
+    sftp.rename(source, target)
+        .await
+        .map_err(|error| format!("failed to rename remote path: {error}"))
+}
+
+fn delete_remote_entry<'a>(
+    sftp: &'a SftpSession,
+    path: &'a str,
+) -> Pin<Box<dyn Future<Output = Result<(), String>> + 'a>> {
+    Box::pin(async move {
+        let path = normalize_mutable_remote_path(path)?;
+        let metadata = sftp
+            .symlink_metadata(path.clone())
+            .await
+            .map_err(|error| format!("failed to inspect remote path: {error}"))?;
+        if metadata.file_type() == FileType::Dir {
+            let entries = sftp
+                .read_dir(path.clone())
+                .await
+                .map_err(|error| format!("failed to read remote folder: {error}"))?
+                .map(|entry| entry.file_name())
+                .filter(|name| name != "." && name != "..")
+                .collect::<Vec<_>>();
+            for child_name in entries {
+                let child_path = join_remote_path(&path, &child_name);
+                delete_remote_entry(sftp, &child_path).await?;
+            }
+            sftp.remove_dir(path)
+                .await
+                .map_err(|error| format!("failed to delete remote folder: {error}"))?;
+            return Ok(());
+        }
+
+        sftp.remove_file(path)
+            .await
+            .map_err(|error| format!("failed to delete remote file: {error}"))
+    })
 }
 
 fn upload_local_entry<'a>(
@@ -591,6 +708,14 @@ fn normalize_path(path: &str) -> String {
     }
 }
 
+fn normalize_mutable_remote_path(path: &str) -> Result<String, String> {
+    let path = normalize_path(path);
+    if path == "." || path == "/" || path == ".." {
+        return Err("select a remote file or folder first".to_string());
+    }
+    Ok(path)
+}
+
 fn join_remote_path(base_path: &str, child_name: &str) -> String {
     let base_path = normalize_path(base_path);
     if base_path == "." {
@@ -600,6 +725,29 @@ fn join_remote_path(base_path: &str, child_name: &str) -> String {
     } else {
         format!("{base_path}/{child_name}")
     }
+}
+
+fn remote_parent_path(path: &str) -> String {
+    let path = normalize_path(path).trim_end_matches('/').to_string();
+    match path.rsplit_once('/') {
+        Some(("", _)) => "/".to_string(),
+        Some((parent, _)) if !parent.is_empty() => parent.to_string(),
+        _ => ".".to_string(),
+    }
+}
+
+fn validate_remote_child_name(name: &str) -> Result<String, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("remote name cannot be blank".to_string());
+    }
+    if name == "." || name == ".." {
+        return Err("remote name cannot be . or ..".to_string());
+    }
+    if name.contains('/') || name.contains('\\') {
+        return Err("remote name cannot contain path separators".to_string());
+    }
+    Ok(name.to_string())
 }
 
 fn local_path_name(path: &Path) -> Result<String, String> {
@@ -802,6 +950,39 @@ mod tests {
             join_remote_path("/srv/releases/", "release.zip"),
             "/srv/releases/release.zip"
         );
+    }
+
+    #[test]
+    fn remote_parent_paths_keep_sibling_renames_in_place() {
+        assert_eq!(remote_parent_path("release.zip"), ".");
+        assert_eq!(
+            remote_parent_path("/srv/releases/release.zip"),
+            "/srv/releases"
+        );
+        assert_eq!(remote_parent_path("/release.zip"), "/");
+    }
+
+    #[test]
+    fn remote_child_names_reject_paths_and_parent_segments() {
+        assert_eq!(
+            validate_remote_child_name("release.zip"),
+            Ok("release.zip".to_string())
+        );
+        assert!(validate_remote_child_name("").is_err());
+        assert!(validate_remote_child_name("..").is_err());
+        assert!(validate_remote_child_name("folder/release.zip").is_err());
+        assert!(validate_remote_child_name(r"folder\release.zip").is_err());
+    }
+
+    #[test]
+    fn mutable_remote_paths_reject_directory_only_values() {
+        assert_eq!(
+            normalize_mutable_remote_path("/srv/releases/app.zip"),
+            Ok("/srv/releases/app.zip".to_string())
+        );
+        assert!(normalize_mutable_remote_path(".").is_err());
+        assert!(normalize_mutable_remote_path("/").is_err());
+        assert!(normalize_mutable_remote_path("..").is_err());
     }
 
     #[test]

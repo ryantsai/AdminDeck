@@ -1704,6 +1704,107 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
     }
   };
 
+  const handleCreateRemoteFolder = async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !isTauriRuntime()) {
+      return;
+    }
+
+    const name = window.prompt("New remote folder name");
+    if (name === null) {
+      return;
+    }
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setStatus("Remote folder name cannot be blank");
+      return;
+    }
+
+    setIsRemoteLoading(true);
+    setStatus("Creating folder");
+    try {
+      await invokeCommand("create_sftp_folder", {
+        request: {
+          sessionId,
+          parentPath: remotePath,
+          name: trimmedName,
+        },
+      });
+      await refreshRemoteDirectory();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsRemoteLoading(false);
+    }
+  };
+
+  const handleRenameRemotePath = async () => {
+    const sessionId = sessionIdRef.current;
+    const selected = remoteFiles.find((file) => file.name === selectedRemoteName);
+    if (!sessionId || !selected || !isTauriRuntime()) {
+      return;
+    }
+
+    const name = window.prompt("Rename remote item", selected.name);
+    if (name === null) {
+      return;
+    }
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setStatus("Remote name cannot be blank");
+      return;
+    }
+    if (trimmedName === selected.name) {
+      return;
+    }
+
+    setIsRemoteLoading(true);
+    setStatus("Renaming");
+    try {
+      await invokeCommand("rename_sftp_path", {
+        request: {
+          sessionId,
+          path: joinRemotePath(remotePath, selected.name),
+          newName: trimmedName,
+        },
+      });
+      await refreshRemoteDirectory();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsRemoteLoading(false);
+    }
+  };
+
+  const handleDeleteRemotePath = async () => {
+    const sessionId = sessionIdRef.current;
+    const selected = remoteFiles.find((file) => file.name === selectedRemoteName);
+    if (!sessionId || !selected || !isTauriRuntime()) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`Delete remote ${selected.kind} "${selected.name}"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsRemoteLoading(true);
+    setStatus("Deleting");
+    try {
+      await invokeCommand("delete_sftp_path", {
+        request: {
+          sessionId,
+          path: joinRemotePath(remotePath, selected.name),
+        },
+      });
+      await refreshRemoteDirectory();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsRemoteLoading(false);
+    }
+  };
+
   const isConnected = status === "Connected" && Boolean(sessionIdRef.current);
   const isTransferring = transfers.some((transfer) => transfer.state === "active");
   const activeTransferCount = transfers.filter((transfer) => transfer.state === "active").length;
@@ -1759,6 +1860,9 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
           selectedName={selectedRemoteName}
           onRefresh={refreshRemoteDirectory}
           onGoUp={openRemoteParent}
+          onCreateFolder={isConnected && !isTransferring ? handleCreateRemoteFolder : undefined}
+          onRenameSelected={isConnected && !isTransferring ? handleRenameRemotePath : undefined}
+          onDeleteSelected={isConnected && !isTransferring ? handleDeleteRemotePath : undefined}
           onOpenFolder={openRemoteFolder}
           onSelectFile={setSelectedRemoteName}
         />
@@ -1877,6 +1981,9 @@ function FilePane({
   selectedName,
   onRefresh,
   onGoUp,
+  onCreateFolder,
+  onRenameSelected,
+  onDeleteSelected,
   onOpenFolder,
   onSelectFile,
 }: {
@@ -1888,9 +1995,14 @@ function FilePane({
   selectedName?: string | null;
   onRefresh?: () => void;
   onGoUp?: () => void;
+  onCreateFolder?: () => void;
+  onRenameSelected?: () => void;
+  onDeleteSelected?: () => void;
   onOpenFolder?: (folderName: string) => void;
   onSelectFile?: (fileName: string) => void;
 }) {
+  const hasMutationActions = Boolean(onCreateFolder || onRenameSelected || onDeleteSelected);
+
   return (
     <article className="file-pane">
       <header>
@@ -1905,15 +2017,51 @@ function FilePane({
             disabled={!onGoUp || isLoading}
             onClick={onGoUp}
             title={`Open parent ${title.toLowerCase()} folder`}
+            type="button"
           >
             <ChevronDown className="up-icon" size={15} />
           </button>
+          {hasMutationActions && (
+            <>
+              <button
+                className="icon-button"
+                aria-label={`Create ${title.toLowerCase()} folder`}
+                disabled={!onCreateFolder || isLoading}
+                onClick={onCreateFolder}
+                title={`Create ${title.toLowerCase()} folder`}
+                type="button"
+              >
+                <FolderPlus size={15} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label={`Rename selected ${title.toLowerCase()} item`}
+                disabled={!onRenameSelected || !selectedName || isLoading}
+                onClick={onRenameSelected}
+                title={`Rename selected ${title.toLowerCase()} item`}
+                type="button"
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label={`Delete selected ${title.toLowerCase()} item`}
+                disabled={!onDeleteSelected || !selectedName || isLoading}
+                onClick={onDeleteSelected}
+                title={`Delete selected ${title.toLowerCase()} item`}
+                type="button"
+              >
+                <Trash2 size={15} />
+              </button>
+            </>
+          )}
           <button
             className="icon-button"
             aria-label={`Refresh ${title.toLowerCase()} files`}
             disabled={!onRefresh || isLoading}
             onClick={onRefresh}
             title={`Refresh ${title.toLowerCase()} files`}
+            type="button"
           >
             <RefreshCw size={15} />
           </button>

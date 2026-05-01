@@ -249,6 +249,18 @@ type CommandMap = {
     args: { request: { sessionId: string; remotePath: string; localDirectory: string } };
     result: SftpTransferResult;
   };
+  create_sftp_folder: {
+    args: { request: { sessionId: string; parentPath: string; name: string } };
+    result: null;
+  };
+  rename_sftp_path: {
+    args: { request: { sessionId: string; path: string; newName: string } };
+    result: null;
+  };
+  delete_sftp_path: {
+    args: { request: { sessionId: string; path: string } };
+    result: null;
+  };
   close_sftp_session: {
     args: { sessionId: string };
     result: null;
