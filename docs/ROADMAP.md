@@ -4,7 +4,7 @@
 
 As of May 1, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
 
-Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, system `ssh` debug/fallback support for `ProxyJump`, and an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections.
+Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file Connections without `ProxyJump`, system `ssh` debug/fallback support for keyless and `ProxyJump` sessions, and an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections.
 
 ## Milestone 0: Project Foundation
 
@@ -33,13 +33,13 @@ Milestone B has started with the accepted Rust SSH direction, durable SSH `proxy
 ## Milestone B: SSH Core
 
 - [x] Evaluate and choose Rust SSH library. See `docs/ADR/0004-ssh-transport-library.md`.
-- [ ] Implement in-process SSH connection lifecycle.
+- [x] Implement in-process SSH connection lifecycle.
 - [ ] Implement host key verification.
 - [ ] Implement password auth.
-- [ ] Implement key-file auth by path.
+- [x] Implement key-file auth by path.
 - [ ] Implement SSH agent support where practical.
-- [ ] Implement terminal channel allocation.
-- [ ] Implement resize events.
+- [x] Implement terminal channel allocation.
+- [x] Implement resize events.
 - [x] Add optional system ssh fallback/debug path.
 - [ ] Add SSH defaults in settings.
 - [x] Add SSH config import with unsupported directive reporting.

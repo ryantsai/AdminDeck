@@ -1,3 +1,4 @@
+use crate::ssh;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,9 +15,16 @@ pub struct SessionManager {
 }
 
 struct TerminalSession {
-    master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
-    child: Box<dyn Child + Send + Sync>,
+    transport: TerminalTransport,
+}
+
+enum TerminalTransport {
+    Pty {
+        master: Box<dyn MasterPty + Send>,
+        writer: Box<dyn Write + Send>,
+        child: Box<dyn Child + Send + Sync>,
+    },
+    NativeSsh(ssh::NativeSshTerminal),
 }
 
 #[derive(Deserialize)]
@@ -80,6 +88,31 @@ impl SessionManager {
             .session_id
             .clone()
             .unwrap_or_else(|| make_session_id(&request.title));
+        if uses_native_ssh(&request) {
+            let session = ssh::start_native_terminal(
+                app,
+                ssh::NativeSshTerminalRequest {
+                    session_id: session_id.clone(),
+                    host: request.host.clone(),
+                    user: request.user.clone(),
+                    port: request.port.unwrap_or(22),
+                    key_path: request.key_path.clone().unwrap_or_default(),
+                    cols: request.cols.unwrap_or(80),
+                    rows: request.rows.unwrap_or(24),
+                },
+            )?;
+            self.sessions
+                .lock()
+                .map_err(|_| "terminal session lock is poisoned".to_string())?
+                .insert(
+                    session_id.clone(),
+                    TerminalSession {
+                        transport: TerminalTransport::NativeSsh(session),
+                    },
+                );
+            return Ok(TerminalSessionStarted { session_id });
+        }
+
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -106,9 +139,11 @@ impl SessionManager {
         drop(pair.slave);
 
         let session = TerminalSession {
-            master: pair.master,
-            writer,
-            child,
+            transport: TerminalTransport::Pty {
+                master: pair.master,
+                writer,
+                child,
+            },
         };
         self.sessions
             .lock()
@@ -156,14 +191,17 @@ impl SessionManager {
         let session = sessions
             .get_mut(&request.session_id)
             .ok_or_else(|| "terminal session was not found".to_string())?;
-        session
-            .writer
-            .write_all(request.data.as_bytes())
-            .map_err(|error| format!("failed to write terminal input: {error}"))?;
-        session
-            .writer
-            .flush()
-            .map_err(|error| format!("failed to flush terminal input: {error}"))
+        match &mut session.transport {
+            TerminalTransport::Pty { writer, .. } => {
+                writer
+                    .write_all(request.data.as_bytes())
+                    .map_err(|error| format!("failed to write terminal input: {error}"))?;
+                writer
+                    .flush()
+                    .map_err(|error| format!("failed to flush terminal input: {error}"))
+            }
+            TerminalTransport::NativeSsh(session) => session.write_input(request.data),
+        }
     }
 
     pub fn resize_terminal(&self, request: ResizeTerminalRequest) -> Result<(), String> {
@@ -174,27 +212,40 @@ impl SessionManager {
         let session = sessions
             .get(&request.session_id)
             .ok_or_else(|| "terminal session was not found".to_string())?;
-        session
-            .master
-            .resize(PtySize {
-                rows: request.rows,
-                cols: request.cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|error| format!("failed to resize terminal: {error}"))
+        match &session.transport {
+            TerminalTransport::Pty { master, .. } => master
+                .resize(PtySize {
+                    rows: request.rows,
+                    cols: request.cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .map_err(|error| format!("failed to resize terminal: {error}")),
+            TerminalTransport::NativeSsh(session) => session.resize(request.cols, request.rows),
+        }
     }
 
     pub fn close_terminal_session(&self, session_id: String) -> Result<(), String> {
-        let mut sessions = self
+        let session = self
             .sessions
             .lock()
-            .map_err(|_| "terminal session lock is poisoned".to_string())?;
-        if let Some(mut session) = sessions.remove(&session_id) {
-            let _ = session.child.kill();
+            .map_err(|_| "terminal session lock is poisoned".to_string())?
+            .remove(&session_id);
+        if let Some(mut session) = session {
+            match session.transport {
+                TerminalTransport::Pty { ref mut child, .. } => {
+                    let _ = child.kill();
+                }
+                TerminalTransport::NativeSsh(session) => session.close(),
+            }
         }
         Ok(())
     }
+}
+
+fn uses_native_ssh(request: &StartTerminalSessionRequest) -> bool {
+    request.connection_type.trim().eq_ignore_ascii_case("ssh")
+        && ssh::can_start_native_terminal(request.key_path.as_deref(), request.proxy_jump.as_deref())
 }
 
 fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, String> {
