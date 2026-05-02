@@ -90,6 +90,13 @@ export interface SftpTransferResult {
   bytes: number;
 }
 
+export interface SftpTransferProgress {
+  transferId: string;
+  transferredBytes: number;
+  totalBytes: number;
+  progress: number;
+}
+
 export interface SshTransportPlan {
   primaryLibrary: string;
   sftpCandidate: string;
@@ -242,12 +249,20 @@ type CommandMap = {
     result: LocalDirectoryListing;
   };
   upload_sftp_path: {
-    args: { request: { sessionId: string; localPath: string; remoteDirectory: string } };
+    args: {
+      request: { sessionId: string; transferId: string; localPath: string; remoteDirectory: string };
+    };
     result: SftpTransferResult;
   };
   download_sftp_path: {
-    args: { request: { sessionId: string; remotePath: string; localDirectory: string } };
+    args: {
+      request: { sessionId: string; transferId: string; remotePath: string; localDirectory: string };
+    };
     result: SftpTransferResult;
+  };
+  cancel_sftp_transfer: {
+    args: { request: { transferId: string } };
+    result: null;
   };
   create_sftp_folder: {
     args: { request: { sessionId: string; parentPath: string; name: string } };

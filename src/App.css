@@ -743,7 +743,7 @@ button.file-row:disabled {
 
 .transfer-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 150px 56px minmax(180px, 0.85fr);
+  grid-template-columns: minmax(120px, 1fr) 150px 64px minmax(150px, 0.85fr) 24px;
   gap: 10px;
   align-items: center;
   height: 34px;
@@ -779,6 +779,20 @@ button.file-row:disabled {
 
 .transfer-state-active {
   color: var(--accent);
+}
+
+.transfer-state-queued {
+  color: var(--text-muted);
+}
+
+.transfer-state-canceled {
+  color: var(--amber);
+}
+
+.transfer-row .row-action:disabled {
+  color: var(--text-faint);
+  cursor: default;
+  opacity: 0.45;
 }
 
 progress {

@@ -44,6 +44,7 @@ import {
   isTauriRuntime,
   type LocalDirectoryEntry,
   type SftpDirectoryEntry,
+  type SftpTransferProgress,
   type SftpTransferResult,
   type SshConfigImportPreview,
   type SshHostKeyPreview,
@@ -76,9 +77,13 @@ type TransferRecord = {
   id: string;
   direction: "upload" | "download";
   name: string;
-  state: "active" | "done" | "failed";
+  state: "queued" | "active" | "done" | "failed" | "canceled";
   progress: number;
   detail: string;
+  localPath?: string;
+  remoteDirectory?: string;
+  remotePath?: string;
+  localDirectory?: string;
 };
 
 function App() {
@@ -1446,6 +1451,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   const [selectedRemoteName, setSelectedRemoteName] = useState<string | null>(null);
   const [transfers, setTransfers] = useState<TransferRecord[]>([]);
   const sessionIdRef = useRef<string | null>(null);
+  const activeTransferIdRef = useRef<string | null>(null);
   const markConnectionSessionStarted = useWorkspaceStore(
     (state) => state.markConnectionSessionStarted,
   );
@@ -1455,6 +1461,45 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
 
   useEffect(() => {
     void loadLocalDirectory();
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    let dispose: (() => void) | undefined;
+    let disposed = false;
+    void listen<SftpTransferProgress>("sftp-transfer-progress", (event) => {
+      const progress = event.payload;
+      setTransfers((current) =>
+        current.map((transfer) =>
+          transfer.id === progress.transferId
+            ? {
+                ...transfer,
+                progress: progress.progress,
+                detail:
+                  progress.totalBytes > 0
+                    ? `${formatFileSize(progress.transferredBytes)} / ${formatFileSize(
+                        progress.totalBytes,
+                      )}`
+                    : `${formatFileSize(progress.transferredBytes)} transferred`,
+              }
+            : transfer,
+        ),
+      );
+    }).then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
+      dispose = unlisten;
+    });
+
+    return () => {
+      disposed = true;
+      dispose?.();
+    };
   }, []);
 
   const loadLocalDirectory = async (path?: string) => {
@@ -1618,7 +1663,86 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
     );
   };
 
-  const handleUpload = async () => {
+  const runQueuedTransfer = async (transfer: TransferRecord) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !isTauriRuntime()) {
+      setTransferState(transfer.id, {
+        state: "failed",
+        progress: 100,
+        detail: "SFTP session unavailable",
+      });
+      activeTransferIdRef.current = null;
+      return;
+    }
+
+    setTransferState(transfer.id, {
+      state: "active",
+      detail: "Preparing",
+    });
+
+    try {
+      const result =
+        transfer.direction === "upload"
+          ? await invokeCommand("upload_sftp_path", {
+              request: {
+                sessionId,
+                transferId: transfer.id,
+                localPath: transfer.localPath ?? "",
+                remoteDirectory: transfer.remoteDirectory ?? remotePath,
+              },
+            })
+          : await invokeCommand("download_sftp_path", {
+              request: {
+                sessionId,
+                transferId: transfer.id,
+                remotePath: transfer.remotePath ?? "",
+                localDirectory: transfer.localDirectory ?? localPath,
+              },
+            });
+
+      setTransferState(transfer.id, {
+        state: "done",
+        progress: 100,
+        detail: formatTransferResult(result),
+      });
+
+      if (transfer.direction === "upload") {
+        await refreshRemoteDirectory();
+      } else {
+        await refreshLocalDirectory();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTransferState(transfer.id, {
+        state: message.includes("transfer canceled") ? "canceled" : "failed",
+        progress: 100,
+        detail: message.includes("transfer canceled") ? "Canceled" : message,
+      });
+    } finally {
+      activeTransferIdRef.current = null;
+      setTransfers((current) => [...current]);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTransferIdRef.current) {
+      return;
+    }
+
+    const nextTransfer = transfers.find((transfer) => transfer.state === "queued");
+    if (!nextTransfer) {
+      return;
+    }
+
+    activeTransferIdRef.current = nextTransfer.id;
+    void runQueuedTransfer(nextTransfer);
+  }, [transfers]);
+
+  const enqueueTransfer = (transfer: TransferRecord) => {
+    setTransfers((current) => [...current, transfer]);
+  };
+
+  const handleUpload = () => {
     const sessionId = sessionIdRef.current;
     const selected = localFiles.find((file) => file.name === selectedLocalName);
     if (!sessionId || !selected || !localPath || !isTauriRuntime()) {
@@ -1626,42 +1750,19 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
     }
 
     const transferId = `upload-${Date.now()}`;
-    setTransfers((current) => [
-      {
-        id: transferId,
-        direction: "upload",
-        name: selected.name,
-        state: "active",
-        progress: 0,
-        detail: "Uploading",
-      },
-      ...current,
-    ]);
-
-    try {
-      const result = await invokeCommand("upload_sftp_path", {
-        request: {
-          sessionId,
-          localPath: joinLocalPath(localPath, selected.name),
-          remoteDirectory: remotePath,
-        },
-      });
-      setTransferState(transferId, {
-        state: "done",
-        progress: 100,
-        detail: formatTransferResult(result),
-      });
-      await refreshRemoteDirectory();
-    } catch (error) {
-      setTransferState(transferId, {
-        state: "failed",
-        progress: 100,
-        detail: error instanceof Error ? error.message : String(error),
-      });
-    }
+    enqueueTransfer({
+      id: transferId,
+      direction: "upload",
+      name: selected.name,
+      state: "queued",
+      progress: 0,
+      detail: "Waiting",
+      localPath: joinLocalPath(localPath, selected.name),
+      remoteDirectory: remotePath,
+    });
   };
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     const sessionId = sessionIdRef.current;
     const selected = remoteFiles.find((file) => file.name === selectedRemoteName);
     if (!sessionId || !selected || !localPath || !isTauriRuntime()) {
@@ -1669,34 +1770,39 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
     }
 
     const transferId = `download-${Date.now()}`;
-    setTransfers((current) => [
-      {
-        id: transferId,
-        direction: "download",
-        name: selected.name,
-        state: "active",
-        progress: 0,
-        detail: "Downloading",
-      },
-      ...current,
-    ]);
+    enqueueTransfer({
+      id: transferId,
+      direction: "download",
+      name: selected.name,
+      state: "queued",
+      progress: 0,
+      detail: "Waiting",
+      remotePath: joinRemotePath(remotePath, selected.name),
+      localDirectory: localPath,
+    });
+  };
 
-    try {
-      const result = await invokeCommand("download_sftp_path", {
-        request: {
-          sessionId,
-          remotePath: joinRemotePath(remotePath, selected.name),
-          localDirectory: localPath,
-        },
-      });
-      setTransferState(transferId, {
-        state: "done",
+  const handleCancelTransfer = async (transfer: TransferRecord) => {
+    if (transfer.state === "queued") {
+      setTransferState(transfer.id, {
+        state: "canceled",
         progress: 100,
-        detail: formatTransferResult(result),
+        detail: "Canceled before start",
       });
-      await refreshLocalDirectory();
+      return;
+    }
+
+    if (transfer.state !== "active") {
+      return;
+    }
+
+    setTransferState(transfer.id, { detail: "Canceling" });
+    try {
+      await invokeCommand("cancel_sftp_transfer", {
+        request: { transferId: transfer.id },
+      });
     } catch (error) {
-      setTransferState(transferId, {
+      setTransferState(transfer.id, {
         state: "failed",
         progress: 100,
         detail: error instanceof Error ? error.message : String(error),
@@ -1819,7 +1925,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
         <div className="toolbar-cluster">
           <button
             className="toolbar-button"
-            disabled={!isConnected || !selectedLocalName || isTransferring}
+            disabled={!isConnected || !selectedLocalName}
             onClick={handleUpload}
             type="button"
           >
@@ -1828,7 +1934,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
           </button>
           <button
             className="toolbar-button"
-            disabled={!isConnected || !selectedRemoteName || !localPath || isTransferring}
+            disabled={!isConnected || !selectedRemoteName || !localPath}
             onClick={handleDownload}
             type="button"
           >
@@ -1886,6 +1992,16 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
               {transfer.state}
             </small>
             <small>{transfer.detail}</small>
+            <button
+              className="row-action"
+              aria-label={`Cancel ${transfer.name}`}
+              disabled={!["active", "queued"].includes(transfer.state)}
+              onClick={() => void handleCancelTransfer(transfer)}
+              title={`Cancel ${transfer.name}`}
+              type="button"
+            >
+              <X size={13} />
+            </button>
           </div>
         ))}
       </div>

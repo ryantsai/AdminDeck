@@ -260,18 +260,28 @@ fn list_local_directory(
 
 #[tauri::command]
 fn upload_sftp_path(
+    app: tauri::AppHandle,
     sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     request: sftp::UploadSftpPathRequest,
 ) -> Result<sftp::SftpTransferResult, String> {
-    sftp_sessions.upload_path(request)
+    sftp_sessions.upload_path(app, request)
 }
 
 #[tauri::command]
 fn download_sftp_path(
+    app: tauri::AppHandle,
     sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     request: sftp::DownloadSftpPathRequest,
 ) -> Result<sftp::SftpTransferResult, String> {
-    sftp_sessions.download_path(request)
+    sftp_sessions.download_path(app, request)
+}
+
+#[tauri::command]
+fn cancel_sftp_transfer(
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    request: sftp::CancelSftpTransferRequest,
+) -> Result<(), String> {
+    sftp_sessions.cancel_transfer(request)
 }
 
 #[tauri::command]
@@ -360,6 +370,7 @@ pub fn run() {
             list_local_directory,
             upload_sftp_path,
             download_sftp_path,
+            cancel_sftp_transfer,
             create_sftp_folder,
             rename_sftp_path,
             delete_sftp_path,
