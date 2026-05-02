@@ -8,9 +8,9 @@ Before changing product behavior or terminology, read `CONTEXT.md` and preserve 
 
 ## Domain Language
 
-- **Connection**: durable, stored in SQLite, can be local terminal, SSH terminal, or SFTP browser.
+- **Connection**: durable, stored in SQLite. Supported kinds are local terminal, SSH terminal, and URL (embedded WebView2). SFTP is opened from an SSH Connection.
 - **Quick Connect**: creates an unsaved one-off connection draft, then starts a session.
-- **Session**: live process/channel/SFTP browser state, not the saved profile itself.
+- **Session**: live process/channel/SFTP browser/webview state, not the saved profile itself.
 - **Tab**: frontend workspace container, not a backend domain object.
 
 Avoid using "profile" as the canonical name for stored openable resources. Use **Connection**.

@@ -557,9 +557,9 @@ function ConnectionSidebar() {
 
     const connection: Connection = {
       id: `quick-${Date.now()}`,
-      name: connectionRequest.name || connectionRequest.host,
-      host: connectionRequest.host,
-      user: connectionRequest.user,
+      name: connectionRequest.name || connectionRequest.host || connectionRequest.url || "Quick session",
+      host: connectionRequest.host ?? "",
+      user: connectionRequest.user ?? "",
       port: connectionRequest.port,
       keyPath: connectionRequest.keyPath,
       proxyJump: connectionRequest.proxyJump,
@@ -567,6 +567,8 @@ function ConnectionSidebar() {
       hasPassword: Boolean(password),
       type: connectionRequest.type,
       localShell: connectionRequest.localShell,
+      url: connectionRequest.url,
+      dataPartition: connectionRequest.dataPartition,
       status: "idle",
     };
 
@@ -1341,11 +1343,20 @@ function ConnectionDialog({
     const selectedLocalShellLabel =
       localShellOptions.find((option) => (option.value ?? "") === selectedLocalShell)?.label ??
       "Local terminal";
-    const host = connectionType === "local" ? "localhost" : String(form.get("host") ?? "").trim();
+    const url = String(form.get("url") ?? "").trim();
+    const dataPartition = String(form.get("dataPartition") ?? "").trim();
+    const host =
+      connectionType === "local"
+        ? "localhost"
+        : connectionType === "url"
+          ? ""
+          : String(form.get("host") ?? "").trim();
     const name =
       connectionType === "local"
         ? selectedLocalShellLabel
-        : String(form.get("name") ?? "").trim() || host;
+        : connectionType === "url"
+          ? String(form.get("name") ?? "").trim() || url
+          : String(form.get("name") ?? "").trim() || host;
     const portValue = String(form.get("port") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const keyPath = String(form.get("keyPath") ?? "").trim();
@@ -1354,7 +1365,12 @@ function ConnectionDialog({
     void onSubmit({
       name,
       host,
-      user: connectionType === "local" ? "local" : String(form.get("user") ?? "").trim(),
+      user:
+        connectionType === "local"
+          ? "local"
+          : connectionType === "url"
+            ? ""
+            : String(form.get("user") ?? "").trim(),
       type: connectionType,
       folderId:
         connectionType === "local"
@@ -1365,6 +1381,8 @@ function ConnectionDialog({
       proxyJump: proxyJump || undefined,
       authMethod: usesSshDefaults ? authMethod : undefined,
       localShell: connectionType === "local" ? selectedLocalShell || undefined : undefined,
+      url: connectionType === "url" ? url : undefined,
+      dataPartition: connectionType === "url" ? dataPartition || undefined : undefined,
       password: usesSshDefaults && authMethod === "password" ? password : undefined,
     });
   }
@@ -1390,6 +1408,7 @@ function ConnectionDialog({
           >
             <option value="ssh">SSH terminal</option>
             <option value="local">Local terminal</option>
+            <option value="url">URL (embedded browser)</option>
           </select>
         </label>
 
@@ -1419,6 +1438,29 @@ function ConnectionDialog({
               ))}
             </select>
           </label>
+        ) : connectionType === "url" ? (
+          <>
+            <label>
+              <span>Name</span>
+              <input name="name" placeholder="Friendly name" />
+            </label>
+            <label>
+              <span>URL</span>
+              <input
+                name="url"
+                placeholder="https://example.com"
+                required
+                type="url"
+              />
+            </label>
+            <label>
+              <span>Cookie partition</span>
+              <input
+                name="dataPartition"
+                placeholder="Leave blank for per-connection isolation"
+              />
+            </label>
+          </>
         ) : (
           <>
             <label>
@@ -1831,14 +1873,243 @@ function WorkspaceCanvas() {
 
   return (
     <div className="workspace-canvas">
-      {tabs.map((tab) =>
-        tab.kind === "sftp" ? (
-          <SftpWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />
-        ) : (
-          <TerminalWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />
-        ),
-      )}
+      {tabs.map((tab) => {
+        if (tab.kind === "sftp") {
+          return <SftpWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
+        }
+        if (tab.kind === "webview") {
+          return <WebViewWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
+        }
+        return <TerminalWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
+      })}
     </div>
+  );
+}
+
+function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
+  const placeholderRef = useRef<HTMLDivElement | null>(null);
+  const sessionStartedRef = useRef(false);
+  const sessionIdRef = useRef<string>(`webview-${tab.id}`);
+  const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const [navError, setNavError] = useState("");
+  const [addressInput, setAddressInput] = useState(tab.url ?? "");
+
+  const initialUrl = tab.url ?? "";
+
+  const computeBounds = () => {
+    const node = placeholderRef.current;
+    if (!node) {
+      return null;
+    }
+    const rect = node.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.round(rect.left)),
+      y: Math.max(0, Math.round(rect.top)),
+      width: Math.max(1, Math.round(rect.width)),
+      height: Math.max(1, Math.round(rect.height)),
+    };
+  };
+
+  const scheduleBoundsPush = () => {
+    if (!sessionStartedRef.current) {
+      return;
+    }
+    if (rafRef.current !== null) {
+      return;
+    }
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = null;
+      const bounds = computeBounds();
+      if (!bounds) {
+        return;
+      }
+      const previous = lastBoundsRef.current;
+      if (
+        previous &&
+        previous.x === bounds.x &&
+        previous.y === bounds.y &&
+        previous.width === bounds.width &&
+        previous.height === bounds.height
+      ) {
+        return;
+      }
+      lastBoundsRef.current = bounds;
+      void invokeCommand("update_webview_bounds", {
+        request: { sessionId: sessionIdRef.current, ...bounds },
+      }).catch((error) => {
+        setNavError(error instanceof Error ? error.message : String(error));
+      });
+    });
+  };
+
+  useEffect(() => {
+    if (!isTauriRuntime() || sessionStartedRef.current || !initialUrl) {
+      return;
+    }
+    const bounds = computeBounds();
+    if (!bounds) {
+      return;
+    }
+    sessionStartedRef.current = true;
+    lastBoundsRef.current = bounds;
+    invokeCommand("start_webview_session", {
+      request: {
+        sessionId: sessionIdRef.current,
+        url: initialUrl,
+        dataPartition: tab.dataPartition,
+        ...bounds,
+      },
+    }).catch((error) => {
+      sessionStartedRef.current = false;
+      setNavError(error instanceof Error ? error.message : String(error));
+    });
+
+    return () => {
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (sessionStartedRef.current) {
+        sessionStartedRef.current = false;
+        void invokeCommand("close_webview_session", {
+          request: { sessionId: sessionIdRef.current },
+        }).catch(() => undefined);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    const node = placeholderRef.current;
+    if (!node) {
+      return;
+    }
+    const observer = new ResizeObserver(() => scheduleBoundsPush());
+    observer.observe(node);
+    window.addEventListener("resize", scheduleBoundsPush);
+    window.addEventListener("scroll", scheduleBoundsPush, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleBoundsPush);
+      window.removeEventListener("scroll", scheduleBoundsPush, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime() || !sessionStartedRef.current) {
+      return;
+    }
+    const bounds = computeBounds();
+    if (!bounds) {
+      return;
+    }
+    void invokeCommand("set_webview_visibility", {
+      request: { sessionId: sessionIdRef.current, visible: isActive, ...bounds },
+    }).catch((error) => {
+      setNavError(error instanceof Error ? error.message : String(error));
+    });
+    if (isActive) {
+      lastBoundsRef.current = bounds;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+
+  function handleNavigate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isTauriRuntime() || !sessionStartedRef.current) {
+      return;
+    }
+    setNavError("");
+    void invokeCommand("webview_navigate", {
+      request: { sessionId: sessionIdRef.current, url: addressInput },
+    }).catch((error) => {
+      setNavError(error instanceof Error ? error.message : String(error));
+    });
+  }
+
+  function handleSimple(name: "webview_reload" | "webview_go_back" | "webview_go_forward") {
+    if (!isTauriRuntime() || !sessionStartedRef.current) {
+      return;
+    }
+    void invokeCommand(name, {
+      request: { sessionId: sessionIdRef.current },
+    }).catch((error) => {
+      setNavError(error instanceof Error ? error.message : String(error));
+    });
+  }
+
+  return (
+    <section className={isActive ? "terminal-workspace active" : "terminal-workspace"}>
+      <div className="workspace-toolbar">
+        <div>
+          <strong>{tab.title}</strong>
+          <span>{tab.subtitle}</span>
+        </div>
+        <div className="toolbar-cluster">
+          <button
+            className="icon-button"
+            aria-label="Go back"
+            onClick={() => handleSimple("webview_go_back")}
+            title="Back"
+            type="button"
+          >
+            <ArrowDown className="webview-nav-icon-back" size={15} />
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Go forward"
+            onClick={() => handleSimple("webview_go_forward")}
+            title="Forward"
+            type="button"
+          >
+            <ArrowDown className="webview-nav-icon-forward" size={15} />
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Reload"
+            onClick={() => handleSimple("webview_reload")}
+            title="Reload"
+            type="button"
+          >
+            <RefreshCw size={15} />
+          </button>
+          <form className="webview-toolbar-form" onSubmit={handleNavigate}>
+            <input
+              aria-label="Address"
+              className="webview-address-input"
+              onChange={(event) => setAddressInput(event.currentTarget.value)}
+              placeholder="https://example.com"
+              value={addressInput}
+            />
+          </form>
+          <button
+            className="toolbar-button"
+            disabled
+            title="Phase 2: fill saved credential"
+            type="button"
+          >
+            <KeyRound size={15} />
+            Fill
+          </button>
+        </div>
+      </div>
+
+      <div ref={placeholderRef} className="webview-placeholder">
+        {!initialUrl ? (
+          <p className="webview-placeholder-message">This URL connection has no URL configured.</p>
+        ) : !isTauriRuntime() ? (
+          <p className="webview-placeholder-message">
+            Embedded browser only available in the desktop runtime. Open <code>{initialUrl}</code> externally.
+          </p>
+        ) : null}
+        {navError ? <p className="form-error webview-placeholder-error">{navError}</p> : null}
+      </div>
+    </section>
   );
 }
 

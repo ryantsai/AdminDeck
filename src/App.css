@@ -1838,3 +1838,34 @@ progress {
 .tree-error {
   margin: -4px 0 10px;
 }
+
+.webview-toolbar-form {
+  display: flex;
+  flex: 1;
+}
+
+.webview-address-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.webview-placeholder {
+  flex: 1;
+  min-height: 0;
+}
+
+.webview-placeholder-message {
+  padding: 24px;
+}
+
+.webview-placeholder-error {
+  padding: 12px;
+}
+
+.webview-nav-icon-back {
+  transform: rotate(90deg);
+}
+
+.webview-nav-icon-forward {
+  transform: rotate(-90deg);
+}

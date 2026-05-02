@@ -8,6 +8,7 @@ mod sftp;
 mod ssh;
 mod ssh_config;
 mod storage;
+mod webview;
 
 use serde::Serialize;
 use tauri::Manager;
@@ -406,6 +407,71 @@ fn close_sftp_session(
     sftp_sessions.close_sftp_session(session_id)
 }
 
+#[tauri::command]
+fn start_webview_session(
+    app: tauri::AppHandle,
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::StartWebviewSessionRequest,
+) -> Result<webview::WebviewSessionStarted, String> {
+    webviews.start_session(&app, request)
+}
+
+#[tauri::command]
+fn update_webview_bounds(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::UpdateWebviewBoundsRequest,
+) -> Result<(), String> {
+    webviews.update_bounds(request)
+}
+
+#[tauri::command]
+fn set_webview_visibility(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::SetWebviewVisibilityRequest,
+) -> Result<(), String> {
+    webviews.set_visibility(request)
+}
+
+#[tauri::command]
+fn webview_navigate(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::WebviewNavigateRequest,
+) -> Result<(), String> {
+    webviews.navigate(request)
+}
+
+#[tauri::command]
+fn webview_reload(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::WebviewSimpleRequest,
+) -> Result<(), String> {
+    webviews.reload(request)
+}
+
+#[tauri::command]
+fn webview_go_back(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::WebviewSimpleRequest,
+) -> Result<(), String> {
+    webviews.go_back(request)
+}
+
+#[tauri::command]
+fn webview_go_forward(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::WebviewSimpleRequest,
+) -> Result<(), String> {
+    webviews.go_forward(request)
+}
+
+#[tauri::command]
+fn close_webview_session(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::WebviewSimpleRequest,
+) -> Result<(), String> {
+    webviews.close_session(request)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     logging::init();
@@ -426,6 +492,7 @@ pub fn run() {
             app.manage(secrets::Secrets::new());
             app.manage(sessions::SessionManager::new());
             app.manage(sftp::SftpSessionManager::new());
+            app.manage(webview::WebviewSessionManager::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -476,7 +543,15 @@ pub fn run() {
             delete_sftp_path,
             sftp_path_properties,
             update_sftp_path_properties,
-            close_sftp_session
+            close_sftp_session,
+            start_webview_session,
+            update_webview_bounds,
+            set_webview_visibility,
+            webview_navigate,
+            webview_reload,
+            webview_go_back,
+            webview_go_forward,
+            close_webview_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running AdminDeck");

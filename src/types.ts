@@ -1,4 +1,4 @@
-export type ConnectionType = "local" | "ssh";
+export type ConnectionType = "local" | "ssh" | "url";
 export type ConnectionStatus = "connected" | "idle" | "offline";
 export type SshAuthMethod = "keyFile" | "password" | "agent";
 
@@ -13,6 +13,8 @@ export interface Connection {
   authMethod?: SshAuthMethod;
   hasPassword?: boolean;
   localShell?: string;
+  url?: string;
+  dataPartition?: string;
   type: ConnectionType;
   status: ConnectionStatus;
 }
@@ -31,8 +33,8 @@ export interface ConnectionTree {
 
 export interface CreateConnectionRequest {
   name: string;
-  host: string;
-  user: string;
+  host?: string;
+  user?: string;
   type: ConnectionType;
   folderId?: string;
   port?: number;
@@ -40,6 +42,8 @@ export interface CreateConnectionRequest {
   proxyJump?: string;
   authMethod?: SshAuthMethod;
   localShell?: string;
+  url?: string;
+  dataPartition?: string;
 }
 
 export interface CreateConnectionFolderRequest {
@@ -121,9 +125,11 @@ export interface WorkspaceTab {
   id: string;
   title: string;
   subtitle: string;
-  kind: "terminal" | "sftp";
+  kind: "terminal" | "sftp" | "webview";
   panes: TerminalPane[];
   connection?: Connection;
+  url?: string;
+  dataPartition?: string;
 }
 
 export interface FileEntry {

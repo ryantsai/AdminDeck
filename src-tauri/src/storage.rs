@@ -2,6 +2,8 @@ use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
+const SCHEMA_USER_VERSION: i32 = 1;
+
 const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
     id TEXT PRIMARY KEY,
@@ -21,7 +23,9 @@ CREATE TABLE IF NOT EXISTS connections (
     proxy_jump TEXT,
     auth_method TEXT NOT NULL DEFAULT 'keyFile',
     local_shell TEXT,
-    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh')),
+    url TEXT,
+    data_partition TEXT,
+    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
 );
@@ -125,6 +129,8 @@ pub struct SavedConnection {
     proxy_jump: Option<String>,
     auth_method: String,
     local_shell: Option<String>,
+    url: Option<String>,
+    data_partition: Option<String>,
     #[serde(rename = "type")]
     connection_type: String,
     tags: Vec<String>,
@@ -135,7 +141,9 @@ pub struct SavedConnection {
 #[serde(rename_all = "camelCase")]
 pub struct CreateConnectionRequest {
     name: String,
+    #[serde(default)]
     host: String,
+    #[serde(default)]
     user: String,
     #[serde(rename = "type")]
     connection_type: String,
@@ -145,6 +153,8 @@ pub struct CreateConnectionRequest {
     proxy_jump: Option<String>,
     auth_method: Option<String>,
     local_shell: Option<String>,
+    url: Option<String>,
+    data_partition: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -383,10 +393,11 @@ impl Storage {
     }
 
     fn initialize_schema(&self) -> Result<(), String> {
-        let connection = self.lock()?;
+        let mut connection = self.lock()?;
         connection
             .execute_batch(CURRENT_SCHEMA)
             .map_err(to_storage_error)?;
+        run_migrations(&mut connection)?;
         Ok(())
     }
 
@@ -396,8 +407,19 @@ impl Storage {
     ) -> Result<SavedConnection, String> {
         let connection_type = normalize_connection_type(&request.connection_type)?;
         let name = required_field("name", request.name)?;
-        let host = required_field("host", request.host)?;
-        let user = required_field("user", request.user)?;
+        let url = normalize_url_field(request.url, &connection_type)?;
+        let host = if connection_type == "url" {
+            url.as_deref()
+                .and_then(|value| extract_url_host(value))
+                .unwrap_or_default()
+        } else {
+            required_field("host", request.host)?
+        };
+        let user = if connection_type == "url" {
+            String::new()
+        } else {
+            required_field("user", request.user)?
+        };
         let folder_id = normalize_optional_id(request.folder_id);
         let key_path = request.key_path.and_then(|value| {
             let trimmed = value.trim().to_string();
@@ -409,6 +431,7 @@ impl Storage {
         });
         let auth_method = normalize_auth_method(request.auth_method, &connection_type, &key_path)?;
         let local_shell = normalize_local_shell(request.local_shell, &connection_type)?;
+        let data_partition = normalize_data_partition(request.data_partition, &connection_type)?;
         let id = make_connection_id(&name);
         let tags = Vec::new();
 
@@ -422,8 +445,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'idle', ?12)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'idle', ?14)",
                 params![
                     id,
                     folder_id,
@@ -435,6 +458,8 @@ impl Storage {
                     proxy_jump,
                     auth_method,
                     local_shell,
+                    url,
+                    data_partition,
                     connection_type,
                     next_sort_order
                 ],
@@ -463,6 +488,8 @@ impl Storage {
             proxy_jump,
             auth_method,
             local_shell,
+            url,
+            data_partition,
             connection_type,
             tags,
             status: "idle".to_string(),
@@ -587,7 +614,7 @@ impl Storage {
 
         let source = transaction
             .query_row(
-                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type
+                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type
                  FROM connections
                  WHERE id = ?1",
                 params![source_id],
@@ -602,7 +629,9 @@ impl Storage {
                         row.get::<_, Option<String>>(6)?,
                         row.get::<_, String>(7)?,
                         row.get::<_, Option<String>>(8)?,
-                        row.get::<_, String>(9)?,
+                        row.get::<_, Option<String>>(9)?,
+                        row.get::<_, Option<String>>(10)?,
+                        row.get::<_, String>(11)?,
                     ))
                 },
             )
@@ -619,6 +648,8 @@ impl Storage {
             proxy_jump,
             auth_method,
             local_shell,
+            url,
+            data_partition,
             connection_type,
         ) = source;
         let duplicate_name = request
@@ -632,8 +663,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'idle', ?12)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'idle', ?14)",
                 params![
                     duplicate_id,
                     folder_id,
@@ -645,6 +676,8 @@ impl Storage {
                     proxy_jump,
                     auth_method,
                     local_shell,
+                    url,
+                    data_partition,
                     connection_type,
                     next_sort_order
                 ],
@@ -784,7 +817,7 @@ fn list_connections_for_folder(
     };
     let mut statement = connection
         .prepare(&format!(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type
              FROM connections
              WHERE {where_clause}
              ORDER BY sort_order, name",
@@ -1044,7 +1077,7 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type
              FROM connections
              WHERE id = ?1",
             params![connection_id],
@@ -1059,7 +1092,9 @@ fn get_connection_by_id(
                     proxy_jump: row.get(6)?,
                     auth_method: row.get(7)?,
                     local_shell: row.get(8)?,
-                    connection_type: row.get(9)?,
+                    url: row.get(9)?,
+                    data_partition: row.get(10)?,
+                    connection_type: row.get(11)?,
                     status: "idle".to_string(),
                     tags: Vec::new(),
                 })
@@ -1086,7 +1121,9 @@ fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedC
         proxy_jump: row.get(6)?,
         auth_method: row.get(7)?,
         local_shell: row.get(8)?,
-        connection_type: row.get(9)?,
+        url: row.get(9)?,
+        data_partition: row.get(10)?,
+        connection_type: row.get(11)?,
         status: "idle".to_string(),
         tags: Vec::new(),
     })
@@ -1130,6 +1167,96 @@ fn to_storage_error(error: rusqlite::Error) -> String {
     format!("SQLite storage error: {error}")
 }
 
+fn run_migrations(connection: &mut SqliteConnection) -> Result<(), String> {
+    let current: i32 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(to_storage_error)?;
+
+    if current >= SCHEMA_USER_VERSION {
+        return Ok(());
+    }
+
+    if current < 1 {
+        rebuild_connections_for_url_kind(connection)?;
+    }
+
+    connection
+        .execute_batch(&format!("PRAGMA user_version = {SCHEMA_USER_VERSION}"))
+        .map_err(to_storage_error)?;
+    Ok(())
+}
+
+// SQLite cannot ALTER a CHECK constraint in place. For pre-v1 databases the
+// connections table still rejects 'url' rows and lacks the url/data_partition
+// columns, so we copy rows into a fresh table that matches CURRENT_SCHEMA.
+fn rebuild_connections_for_url_kind(connection: &mut SqliteConnection) -> Result<(), String> {
+    let needs_rebuild = column_missing(connection, "connections", "url")?
+        || column_missing(connection, "connections", "data_partition")?;
+    if !needs_rebuild {
+        return Ok(());
+    }
+
+    let transaction = connection.transaction().map_err(to_storage_error)?;
+    transaction
+        .execute_batch(
+            r#"
+            CREATE TABLE connections_new (
+                id TEXT PRIMARY KEY,
+                folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                host TEXT NOT NULL,
+                username TEXT NOT NULL,
+                port INTEGER,
+                key_path TEXT,
+                proxy_jump TEXT,
+                auth_method TEXT NOT NULL DEFAULT 'keyFile',
+                local_shell TEXT,
+                url TEXT,
+                data_partition TEXT,
+                connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url')),
+                status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
+                sort_order INTEGER NOT NULL
+            );
+
+            INSERT INTO connections_new (
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, url, data_partition, connection_type, status, sort_order
+            )
+            SELECT
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, NULL, NULL, connection_type, status, sort_order
+            FROM connections;
+
+            DROP TABLE connections;
+            ALTER TABLE connections_new RENAME TO connections;
+
+            CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
+                ON connections(folder_id, sort_order);
+            "#,
+        )
+        .map_err(to_storage_error)?;
+    transaction.commit().map_err(to_storage_error)?;
+    Ok(())
+}
+
+fn column_missing(
+    connection: &SqliteConnection,
+    table: &str,
+    column: &str,
+) -> Result<bool, String> {
+    let mut statement = connection
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(to_storage_error)?;
+    let mut rows = statement.query([]).map_err(to_storage_error)?;
+    while let Some(row) = rows.next().map_err(to_storage_error)? {
+        let name: String = row.get(1).map_err(to_storage_error)?;
+        if name == column {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn ensure_folder_exists(
     connection: &SqliteConnection,
     id: &str,
@@ -1153,9 +1280,73 @@ fn ensure_folder_exists(
 
 fn normalize_connection_type(value: &str) -> Result<String, String> {
     match value.trim().to_lowercase().as_str() {
-        "local" | "ssh" => Ok(value.trim().to_lowercase()),
-        _ => Err("connection type must be local or ssh".to_string()),
+        "local" | "ssh" | "url" => Ok(value.trim().to_lowercase()),
+        _ => Err("connection type must be local, ssh, or url".to_string()),
     }
+}
+
+fn normalize_url_field(
+    value: Option<String>,
+    connection_type: &str,
+) -> Result<Option<String>, String> {
+    let trimmed = value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+    if connection_type != "url" {
+        return Ok(trimmed);
+    }
+
+    let raw = trimmed.ok_or_else(|| "URL is required for URL connections".to_string())?;
+    let candidate = if raw.contains("://") {
+        raw.clone()
+    } else {
+        format!("https://{raw}")
+    };
+    let parsed = url::Url::parse(&candidate)
+        .map_err(|error| format!("URL is not valid: {error}"))?;
+    match parsed.scheme() {
+        "http" | "https" => Ok(Some(parsed.to_string())),
+        other => Err(format!("URL scheme must be http or https, got {other}")),
+    }
+}
+
+fn extract_url_host(value: &str) -> Option<String> {
+    url::Url::parse(value)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(|host| host.to_string()))
+}
+
+fn normalize_data_partition(
+    value: Option<String>,
+    connection_type: &str,
+) -> Result<Option<String>, String> {
+    if connection_type != "url" {
+        return Ok(None);
+    }
+
+    let trimmed = value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+    if let Some(partition) = trimmed.as_deref() {
+        if partition == "shared" {
+            return Ok(Some("shared".to_string()));
+        }
+        if !partition
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+        {
+            return Err(
+                "data partition may only contain letters, digits, '-' or '_'".to_string(),
+            );
+        }
+        if partition.len() > 64 {
+            return Err("data partition must be 64 characters or fewer".to_string());
+        }
+    }
+
+    Ok(trimmed)
 }
 
 fn normalize_local_shell(
@@ -1184,7 +1375,7 @@ fn normalize_auth_method(
     connection_type: &str,
     key_path: &Option<String>,
 ) -> Result<String, String> {
-    if connection_type == "local" {
+    if connection_type == "local" || connection_type == "url" {
         return Ok("keyFile".to_string());
     }
 
@@ -1474,6 +1665,8 @@ mod tests {
                 proxy_jump: None,
                 auth_method: Some("agent".to_string()),
                 local_shell: None,
+                url: None,
+                data_partition: None,
             })
             .expect("SSH connection is created")
     }
@@ -1491,6 +1684,8 @@ mod tests {
                 proxy_jump: None,
                 auth_method: Some("keyFile".to_string()),
                 local_shell: Some(shell.to_string()),
+                url: None,
+                data_partition: None,
             })
             .expect("local connection is created")
     }
@@ -1539,6 +1734,8 @@ mod tests {
                 proxy_jump: Some("jump.internal".to_string()),
                 auth_method: Some("keyFile".to_string()),
                 local_shell: None,
+                url: None,
+                data_partition: None,
             })
             .expect("connection is created");
 
@@ -1740,6 +1937,8 @@ mod tests {
                 proxy_jump: None,
                 auth_method: Some("agent".to_string()),
                 local_shell: None,
+                url: None,
+                data_partition: None,
             })
             .expect("connection is created in folder");
 

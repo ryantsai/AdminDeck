@@ -5,8 +5,12 @@ AdminDeck is a local-first desktop administration workspace for terminal, SSH, S
 ## Language
 
 **Connection**:
-A durable openable resource stored in SQLite for a local terminal or SSH terminal. SFTP is opened from an SSH Connection and is not stored as a standalone Connection.
+A durable openable resource stored in SQLite. The supported kinds are local terminal, SSH terminal, and URL (an embedded WebView2 browser surface targeting a single http(s) origin). SFTP is opened from an SSH Connection and is not stored as a standalone Connection.
 _Avoid_: Profile, saved session, host entry
+
+**URL Connection**:
+A Connection of kind `url`. It stores an http(s) URL plus an optional `dataPartition` label. Each partition maps to its own on-disk WebView2 user-data directory under the app data folder, so two URL Connections with different partitions have independent cookies and storage. Leaving the partition blank uses a per-Connection partition; setting it to `shared` joins the shared default partition.
+_Avoid_: Web tab, browser bookmark, URL profile
 
 **Quick Connect**:
 An unsaved one-off connection draft used to start a session without creating a durable connection.
@@ -28,6 +32,7 @@ _Avoid_: Session, split
 
 - A **Connection** may start zero or more **Sessions** over time.
 - An SSH **Connection** may start terminal **Sessions** and related SFTP browser **Sessions**.
+- A **URL Connection** starts a webview **Session** that owns one child WebView2 surface positioned over its **Tab**.
 - A **Quick Connect** starts exactly one **Session** unless the user saves it as a **Connection**.
 - A **Session** may be presented by one **Tab**.
 - A terminal **Tab** may contain one or more **Panes**.

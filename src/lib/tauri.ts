@@ -173,6 +173,48 @@ export interface DiagnosticsBundle {
   warnings: string[];
 }
 
+export interface StartWebviewSessionRequest {
+  sessionId: string;
+  url: string;
+  dataPartition?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface WebviewSessionStarted {
+  sessionId: string;
+  label: string;
+  partition: string;
+}
+
+export interface UpdateWebviewBoundsRequest {
+  sessionId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SetWebviewVisibilityRequest {
+  sessionId: string;
+  visible: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface WebviewNavigateRequest {
+  sessionId: string;
+  url: string;
+}
+
+export interface WebviewSimpleRequest {
+  sessionId: string;
+}
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -404,6 +446,38 @@ type CommandMap = {
   };
   close_sftp_session: {
     args: { sessionId: string };
+    result: null;
+  };
+  start_webview_session: {
+    args: { request: StartWebviewSessionRequest };
+    result: WebviewSessionStarted;
+  };
+  update_webview_bounds: {
+    args: { request: UpdateWebviewBoundsRequest };
+    result: null;
+  };
+  set_webview_visibility: {
+    args: { request: SetWebviewVisibilityRequest };
+    result: null;
+  };
+  webview_navigate: {
+    args: { request: WebviewNavigateRequest };
+    result: null;
+  };
+  webview_reload: {
+    args: { request: WebviewSimpleRequest };
+    result: null;
+  };
+  webview_go_back: {
+    args: { request: WebviewSimpleRequest };
+    result: null;
+  };
+  webview_go_forward: {
+    args: { request: WebviewSimpleRequest };
+    result: null;
+  };
+  close_webview_session: {
+    args: { request: WebviewSimpleRequest };
     result: null;
   };
 };

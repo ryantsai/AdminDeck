@@ -46,6 +46,7 @@ interface WorkspaceState {
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
+  openUrlConnection: (connection: Connection) => void;
   openSftpBrowser: (connection: Connection) => void;
   openTerminalHere: (connection: Connection, remotePath: string) => void;
   openLocalTerminal: () => void;
@@ -133,6 +134,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
   },
   openConnection: (connection) => {
+    if (connection.type === "url") {
+      get().openUrlConnection(connection);
+      return;
+    }
+
     const existingTab = get().tabs.find((tab) => tab.id === `tab-${connection.id}`);
     if (existingTab) {
       set({ activeTabId: existingTab.id });
@@ -155,6 +161,40 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         },
       ],
       connection,
+    };
+
+    set((state) => ({
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
+    }));
+  },
+  openUrlConnection: (connection) => {
+    if (connection.type !== "url" || !connection.url) {
+      return;
+    }
+
+    const existingTab = get().tabs.find((tab) => tab.id === `tab-${connection.id}`);
+    if (existingTab) {
+      set({ activeTabId: existingTab.id });
+      return;
+    }
+
+    let subtitle = connection.url;
+    try {
+      subtitle = new URL(connection.url).host;
+    } catch {
+      subtitle = connection.url;
+    }
+
+    const tab: WorkspaceTab = {
+      id: `tab-${connection.id}`,
+      title: connection.name,
+      subtitle,
+      kind: "webview",
+      panes: [],
+      connection,
+      url: connection.url,
+      dataPartition: connection.dataPartition,
     };
 
     set((state) => ({
