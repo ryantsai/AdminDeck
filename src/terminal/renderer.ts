@@ -1,4 +1,9 @@
 import { FitAddon } from "@xterm/addon-fit";
+import {
+  SearchAddon,
+  type ISearchOptions,
+  type ISearchResultChangeEvent,
+} from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import {
   Terminal as XtermTerminal,
@@ -16,6 +21,7 @@ export type TerminalRendererCapability =
   | "hyperlinks"
   | "mouseTracking"
   | "resize"
+  | "search"
   | "scrollback";
 
 export interface TerminalDimensions {
@@ -27,11 +33,15 @@ export interface TerminalRenderer {
   readonly backend: TerminalRendererBackend;
   readonly capabilities: readonly TerminalRendererCapability[];
   readonly dimensions: TerminalDimensions;
+  clearSearch: () => void;
   dispose: () => void;
   fit: () => TerminalDimensions;
+  findNext: (term: string) => boolean;
+  findPrevious: (term: string) => boolean;
   focus: () => void;
   getSelection: () => string;
   onData: (handler: (data: string) => void) => IDisposable;
+  onSearchResultsChange: (handler: (result: ISearchResultChangeEvent) => void) => IDisposable;
   onSelectionChange: (handler: () => void) => IDisposable;
   open: (element: HTMLElement) => void;
   write: (data: string) => void;
@@ -45,8 +55,20 @@ const XTERM_CAPABILITIES = [
   "hyperlinks",
   "mouseTracking",
   "resize",
+  "search",
   "scrollback",
 ] satisfies TerminalRendererCapability[];
+
+const SEARCH_OPTIONS: ISearchOptions = {
+  decorations: {
+    matchBackground: "#24384f",
+    matchBorder: "#5aa0ff",
+    matchOverviewRuler: "#5aa0ff",
+    activeMatchBackground: "#f7c948",
+    activeMatchBorder: "#f7c948",
+    activeMatchColorOverviewRuler: "#f7c948",
+  },
+};
 
 export function createTerminalRenderer(settings: TerminalSettings): TerminalRenderer {
   return new XtermTerminalRenderer(settings);
@@ -56,11 +78,13 @@ class XtermTerminalRenderer implements TerminalRenderer {
   readonly backend = "xterm";
   readonly capabilities = XTERM_CAPABILITIES;
   private readonly fitAddon = new FitAddon();
+  private readonly searchAddon = new SearchAddon({ highlightLimit: 500 });
   private readonly terminal: XtermTerminal;
 
   constructor(settings: TerminalSettings) {
     this.terminal = new XtermTerminal(terminalOptionsFor(settings));
     this.terminal.loadAddon(this.fitAddon);
+    this.terminal.loadAddon(this.searchAddon);
     this.terminal.loadAddon(new WebLinksAddon());
   }
 
@@ -75,9 +99,37 @@ class XtermTerminalRenderer implements TerminalRenderer {
     this.terminal.dispose();
   }
 
+  clearSearch() {
+    this.searchAddon.clearDecorations();
+    this.terminal.clearSelection();
+  }
+
   fit() {
     this.fitAddon.fit();
     return this.dimensions;
+  }
+
+  findNext(term: string) {
+    const normalizedTerm = term.trim();
+    if (!normalizedTerm) {
+      this.clearSearch();
+      return false;
+    }
+
+    return this.searchAddon.findNext(normalizedTerm, {
+      ...SEARCH_OPTIONS,
+      incremental: true,
+    });
+  }
+
+  findPrevious(term: string) {
+    const normalizedTerm = term.trim();
+    if (!normalizedTerm) {
+      this.clearSearch();
+      return false;
+    }
+
+    return this.searchAddon.findPrevious(normalizedTerm, SEARCH_OPTIONS);
   }
 
   focus() {
@@ -90,6 +142,10 @@ class XtermTerminalRenderer implements TerminalRenderer {
 
   onData(handler: (data: string) => void) {
     return this.terminal.onData(handler);
+  }
+
+  onSearchResultsChange(handler: (result: ISearchResultChangeEvent) => void) {
+    return this.searchAddon.onDidChangeResults(handler);
   }
 
   onSelectionChange(handler: () => void) {

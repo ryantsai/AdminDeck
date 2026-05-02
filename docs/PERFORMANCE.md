@@ -67,6 +67,7 @@ Run this checklist in a local terminal and, where practical, in a native SSH ter
 | `tmux` starts, splits panes, switches panes, and exits | Mouse and resize behavior remain usable |
 | `htop` or `btop` runs | Full-screen redraws are stable and input remains responsive |
 | `git status`, `git log`, and pager navigation | Scroll, search, and quit behavior match normal terminal expectations |
+| Search terminal scrollback from a pane | Matches are highlighted, next/previous navigation wraps through scrollback, and closing search clears decorations |
 | `npm run check` or similar noisy command | Scrollback remains available and terminal stays responsive |
 | `cargo test` or similar long command | Output does not corrupt after resize |
 | Paste a multi-line command while confirmation is enabled | User confirmation appears before input is sent |

@@ -576,7 +576,7 @@ kbd + kbd {
 
 .terminal-pane {
   display: grid;
-  grid-template-rows: 34px minmax(0, 1fr);
+  grid-template-rows: 34px auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -643,6 +643,45 @@ kbd + kbd {
   color: #536174;
   cursor: default;
   opacity: 0.55;
+}
+
+.terminal-search-bar {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) minmax(54px, auto) repeat(3, 24px);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 8px;
+  background: rgba(9, 14, 21, 0.9);
+  border-bottom: 1px solid var(--terminal-border);
+}
+
+.terminal-search-bar input {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  color: #d9e2ef;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(128, 153, 184, 0.28);
+  border-radius: 5px;
+  outline: none;
+}
+
+.terminal-search-bar input:focus {
+  border-color: #5aa0ff;
+}
+
+.terminal-search-count {
+  min-width: 54px;
+  color: #95a7bb;
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.terminal-search-count.empty {
+  color: #f28b82;
 }
 
 .terminal-pane pre,

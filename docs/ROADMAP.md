@@ -10,7 +10,9 @@ Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP
 
 Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged.
 
-Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, separate local and SSH terminal Session start timing, Windows process working set, and budget status in the app chrome without adding telemetry or logging terminal contents. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink support, keeps terminal behavior configured through stored terminal settings, and has backend tests covering performance snapshot basics. Manual performance and terminal compatibility checks now live in `docs/PERFORMANCE.md`.
+Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, separate local and SSH terminal Session start timing, Windows process working set, and budget status in the app chrome without adding telemetry or logging terminal contents. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink and scrollback-search support, keeps terminal behavior configured through stored terminal settings, and has backend tests covering performance snapshot basics. Manual performance and terminal compatibility checks now live in `docs/PERFORMANCE.md`.
+
+Latest validation on May 2, 2026: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after the terminal scrollback-search batch. The frontend production build still reports Vite's existing chunk-size warning.
 
 ## Milestone 0: Project Foundation
 
@@ -80,22 +82,23 @@ Milestone E has started with local-only performance instrumentation that surface
 - [x] Add backend tests for local-only performance snapshots.
 - [x] Define terminal renderer interface in code so xterm can be swapped for a later WGPU renderer.
 - [x] Harden the current xterm path for configured scrollback, cursor style, selection/copy handling, multiline paste confirmation, resize propagation, and hyperlinks.
+- [x] Add renderer-level terminal scrollback search with pane controls.
 - [x] Surface budget-aware status for cold launch, local terminal readiness, SSH terminal readiness, and idle memory.
 - [x] Document repeatable performance measurement and terminal compatibility checklist.
 - [x] Measure cold launch time.
 - [x] Measure new local terminal tab time.
-- Measure SSH terminal readiness after auth.
+- [ ] Measure SSH terminal readiness after auth.
 - [x] Measure idle memory.
-- Run manual compatibility checklist: vim, tmux, htop/btop, git, npm, cargo.
-- Harden terminal bracketed paste, mouse support, and alternate screen behavior against the manual compatibility checklist.
-- Start WGPU renderer prototype if Milestone A terminal integration limits are clear.
+- [ ] Run manual compatibility checklist: vim, tmux, htop/btop, git, npm, cargo, and pane scrollback search.
+- [ ] Harden terminal bracketed paste, mouse support, and alternate screen behavior against the manual compatibility checklist.
+- [ ] Start WGPU renderer prototype if Milestone A terminal integration limits are clear.
 
 ## Milestone F: Packaging and v0.1 Release
 
-- Build Windows .msi or .exe installer.
-- Build Windows portable ZIP.
-- Smoke test installer.
-- Publish GitHub Release.
+- [ ] Build Windows .msi or .exe installer.
+- [ ] Build Windows portable ZIP.
+- [ ] Smoke test installer.
+- [ ] Publish GitHub Release.
 - [x] Document no-telemetry posture.
 - [x] Document diagnostics bundle flow.
 - [x] Document known limitations.
@@ -104,46 +107,46 @@ Milestone E has started with local-only performance instrumentation that surface
 
 ### Assistant Context and Automation
 
-- Add screenshot capture for the active connection window.
-- Add partial-area screenshot capture from a terminal pane, SFTP view, or other workspace surface.
-- Send captured screenshots to the AI assistant for analysis with explicit user action.
-- Support asking the AI assistant to create extensions.
-- Keep extension-generation flows approval-based before installing or running generated code.
+- [ ] Add screenshot capture for the active connection window.
+- [ ] Add partial-area screenshot capture from a terminal pane, SFTP view, or other workspace surface.
+- [ ] Send captured screenshots to the AI assistant for analysis with explicit user action.
+- [ ] Support asking the AI assistant to create extensions.
+- [ ] Keep extension-generation flows approval-based before installing or running generated code.
 
 ### UI Customization
 
-- Optimize the overall UI/UX for cleaner, more straightforward daily use.
-- Simplify common workflows and reduce unnecessary visual or interaction complexity.
-- Review navigation, workspace layout, settings, connection management, terminal panes, SFTP flows, and AI assistant entry points for clarity.
-- Add a more colorful default UI while preserving dense, professional workspace ergonomics.
-- Add theme support for app chrome and workspace surfaces.
-- Add editable keybindings.
+- [ ] Optimize the overall UI/UX for cleaner, more straightforward daily use.
+- [ ] Simplify common workflows and reduce unnecessary visual or interaction complexity.
+- [ ] Review navigation, workspace layout, settings, connection management, terminal panes, SFTP flows, and AI assistant entry points for clarity.
+- [ ] Add a more colorful default UI while preserving dense, professional workspace ergonomics.
+- [ ] Add theme support for app chrome and workspace surfaces.
+- [ ] Add editable keybindings.
 
 ### Extension Platform
 
-- Add extension support for user-installed features.
-- Define extension permissions, install/update lifecycle, storage access, and trust boundaries before enabling general extension execution.
+- [ ] Add extension support for user-installed features.
+- [ ] Define extension permissions, install/update lifecycle, storage access, and trust boundaries before enabling general extension execution.
 
 ### Connection and Workspace Expansion
 
-- Add macOS packaging with .dmg.
-- Add Linux packaging with AppImage/deb/rpm where reasonable.
-- Add WGPU terminal renderer replacement if not already complete.
-- Add lightweight webview tab.
-- Add RDP connection type.
-- Add VNC connection type.
-- Add MobaXterm/RDCMan import.
-- Add SFTP folder sync/diff/resume.
+- [ ] Add macOS packaging with .dmg.
+- [ ] Add Linux packaging with AppImage/deb/rpm where reasonable.
+- [ ] Add WGPU terminal renderer replacement if not already complete.
+- [ ] Add lightweight webview tab.
+- [ ] Add RDP connection type.
+- [ ] Add VNC connection type.
+- [ ] Add MobaXterm/RDCMan import.
+- [ ] Add SFTP folder sync/diff/resume.
 
 ### Distribution, Sync, and Trust
 
-- Add Windows installed-app auto-update mechanism for v0.2.
-- Use signed Tauri updater artifacts as a release gate for any user-facing update flow.
-- Use GitHub Releases static updater metadata for the stable update channel.
-- Enable update checks by default with clear local-first wording and no telemetry beyond the updater request.
-- Keep update installation user-mediated through Settings plus a lightweight app-chrome update notification.
-- Support normal forward updates only; defer rollback, downgrade, preview channels, managed update servers, silent installs, and portable ZIP self-update.
-- Add optional portable encrypted credential vault for users who need secrets to travel with a portable install.
-- Add optional crash reporting after explicit opt-in design.
-- Evaluate team sharing/sync as a major product-scope decision before implementation.
-- Evaluate mobile apps as a major platform-scope decision after desktop architecture proves itself.
+- [ ] Add Windows installed-app auto-update mechanism for v0.2.
+- [ ] Use signed Tauri updater artifacts as a release gate for any user-facing update flow.
+- [ ] Use GitHub Releases static updater metadata for the stable update channel.
+- [ ] Enable update checks by default with clear local-first wording and no telemetry beyond the updater request.
+- [ ] Keep update installation user-mediated through Settings plus a lightweight app-chrome update notification.
+- [ ] Support normal forward updates only; defer rollback, downgrade, preview channels, managed update servers, silent installs, and portable ZIP self-update.
+- [ ] Add optional portable encrypted credential vault for users who need secrets to travel with a portable install.
+- [ ] Add optional crash reporting after explicit opt-in design.
+- [ ] Evaluate team sharing/sync as a major product-scope decision before implementation.
+- [ ] Evaluate mobile apps as a major platform-scope decision after desktop architecture proves itself.

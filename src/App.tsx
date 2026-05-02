@@ -1,4 +1,6 @@
 import {
+  ArrowDown,
+  ArrowUp,
   Bot,
   Check,
   ChevronDown,
@@ -35,7 +37,7 @@ import {
 } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, DragEvent, FormEvent } from "react";
+import type { ChangeEvent, DragEvent, FormEvent, KeyboardEvent } from "react";
 import "@xterm/xterm/css/xterm.css";
 import "./App.css";
 import {
@@ -52,7 +54,7 @@ import {
 } from "./lib/tauri";
 import { aiSuggestions, connectionGroups } from "./sample-data";
 import { useWorkspaceStore } from "./store";
-import { createTerminalRenderer } from "./terminal/renderer";
+import { createTerminalRenderer, type TerminalRenderer } from "./terminal/renderer";
 import type {
   AiProviderSettings,
   Connection,
@@ -1283,8 +1285,17 @@ function TerminalWorkspace({ tab }: { tab: WorkspaceTab }) {
 
 function TerminalPaneView({ pane }: { pane: TerminalPane }) {
   const terminalElementRef = useRef<HTMLDivElement | null>(null);
+  const terminalRendererRef = useRef<TerminalRenderer | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const startedRef = useRef(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResult, setSearchResult] = useState<{
+    resultIndex: number;
+    resultCount: number;
+    found: boolean;
+  }>({ resultIndex: -1, resultCount: 0, found: true });
   const [selectedTerminalText, setSelectedTerminalText] = useState("");
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
   const setAssistantContextSnippet = useWorkspaceStore(
@@ -1309,6 +1320,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
 
     startedRef.current = true;
     const terminal = createTerminalRenderer(terminalSettings);
+    terminalRendererRef.current = terminal;
     terminal.open(element);
     terminal.fit();
     terminal.focus();
@@ -1350,6 +1362,13 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
       if (selection && terminalSettings.copyOnSelect) {
         void navigator.clipboard?.writeText(selection);
       }
+    });
+    const searchResultsDisposable = terminal.onSearchResultsChange((result) => {
+      setSearchResult({
+        resultIndex: result.resultIndex,
+        resultCount: result.resultCount,
+        found: result.resultCount > 0,
+      });
     });
 
     const resizeObserver = new ResizeObserver(() => {
@@ -1430,6 +1449,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
       startedRef.current = false;
       dataDisposable.dispose();
       selectionDisposable.dispose();
+      searchResultsDisposable.dispose();
       resizeObserver.disconnect();
       removeOutputListener?.();
       const sessionId = sessionIdRef.current;
@@ -1440,7 +1460,9 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
         markConnectionSessionEnded(connection.id);
       }
       sessionIdRef.current = null;
+      terminalRendererRef.current = null;
       setSelectedTerminalText("");
+      setSearchResult({ resultIndex: -1, resultCount: 0, found: true });
       terminal.dispose();
     };
   }, [
@@ -1450,6 +1472,34 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     recordTerminalStartMetric,
     terminalSettings,
   ]);
+
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }
+  }, [searchOpen]);
+
+  useEffect(() => {
+    const renderer = terminalRendererRef.current;
+    if (!renderer) {
+      return;
+    }
+
+    if (!searchOpen || !searchTerm.trim()) {
+      renderer.clearSearch();
+      setSearchResult({ resultIndex: -1, resultCount: 0, found: true });
+      return;
+    }
+
+    const found = renderer.findNext(searchTerm);
+    setSearchResult((result) => ({
+      ...result,
+      found,
+      resultCount: found ? result.resultCount : 0,
+      resultIndex: found ? result.resultIndex : -1,
+    }));
+  }, [searchOpen, searchTerm]);
 
   function handleCopyTerminalSelection() {
     if (selectedTerminalText) {
@@ -1474,6 +1524,59 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     });
   }
 
+  function handleSearchNext() {
+    const found = terminalRendererRef.current?.findNext(searchTerm) ?? false;
+    setSearchResult((result) => ({
+      ...result,
+      found,
+      resultCount: found ? result.resultCount : 0,
+      resultIndex: found ? result.resultIndex : -1,
+    }));
+  }
+
+  function handleSearchPrevious() {
+    const found = terminalRendererRef.current?.findPrevious(searchTerm) ?? false;
+    setSearchResult((result) => ({
+      ...result,
+      found,
+      resultCount: found ? result.resultCount : 0,
+      resultIndex: found ? result.resultIndex : -1,
+    }));
+  }
+
+  function handleCloseSearch() {
+    terminalRendererRef.current?.clearSearch();
+    setSearchOpen(false);
+    setSearchTerm("");
+    setSearchResult({ resultIndex: -1, resultCount: 0, found: true });
+    terminalRendererRef.current?.focus();
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        handleSearchPrevious();
+      } else {
+        handleSearchNext();
+      }
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleCloseSearch();
+    }
+  }
+
+  const searchStatusLabel = searchTerm.trim()
+    ? searchResult.resultCount > 0 && searchResult.resultIndex >= 0
+      ? `${searchResult.resultIndex + 1}/${searchResult.resultCount}`
+      : searchResult.found
+        ? "..."
+        : "No results"
+    : "";
+
   return (
     <article className="terminal-pane">
       <header>
@@ -1483,6 +1586,15 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
         </span>
         <div className="terminal-pane-actions">
           <small>{pane.cwd}</small>
+          <button
+            className="terminal-pane-action"
+            aria-label="Find in terminal scrollback"
+            onClick={() => setSearchOpen((open) => !open)}
+            title="Find in terminal scrollback"
+            type="button"
+          >
+            <Search size={13} />
+          </button>
           <button
             className="terminal-pane-action"
             aria-label="Copy terminal selection"
@@ -1505,6 +1617,51 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
           </button>
         </div>
       </header>
+      {searchOpen ? (
+        <div className="terminal-search-bar">
+          <Search size={13} />
+          <input
+            aria-label="Find in terminal scrollback"
+            onChange={(event) => setSearchTerm(event.currentTarget.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Find"
+            ref={searchInputRef}
+            value={searchTerm}
+          />
+          <span className={searchResult.found ? "terminal-search-count" : "terminal-search-count empty"}>
+            {searchStatusLabel}
+          </span>
+          <button
+            aria-label="Previous search result"
+            className="terminal-pane-action"
+            disabled={!searchTerm.trim()}
+            onClick={handleSearchPrevious}
+            title="Previous search result"
+            type="button"
+          >
+            <ArrowUp size={13} />
+          </button>
+          <button
+            aria-label="Next search result"
+            className="terminal-pane-action"
+            disabled={!searchTerm.trim()}
+            onClick={handleSearchNext}
+            title="Next search result"
+            type="button"
+          >
+            <ArrowDown size={13} />
+          </button>
+          <button
+            aria-label="Close terminal search"
+            className="terminal-pane-action"
+            onClick={handleCloseSearch}
+            title="Close terminal search"
+            type="button"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ) : null}
       {pane.connection ? (
         <div className="xterm-host" ref={terminalElementRef} />
       ) : (
