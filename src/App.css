@@ -1053,6 +1053,12 @@ progress {
   font-weight: 700;
 }
 
+.field-hint {
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .connection-dialog input,
 .connection-dialog select,
 .settings-dialog input,

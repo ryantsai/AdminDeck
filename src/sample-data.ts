@@ -1,4 +1,5 @@
 import type {
+  AiProviderSettings,
   ConnectionGroup,
   FileEntry,
   SftpSettings,
@@ -98,6 +99,11 @@ export const defaultSshSettings: SshSettings = {
 
 export const defaultSftpSettings: SftpSettings = {
   overwriteBehavior: "fail",
+};
+
+export const defaultAiProviderSettings: AiProviderSettings = {
+  enabled: false,
+  baseUrl: "https://api.openai.com/v1",
 };
 
 export const localFiles: FileEntry[] = [

@@ -52,6 +52,8 @@ Owns OS keychain integration:
 
 Secrets include passwords, SSH passphrases, and AI API keys.
 
+Optional future direction: a portable vault mode may add encrypted SQLite credential storage for users who need secrets to travel with a portable install. That mode must be explicit opt-in, derive its encryption key from a user-provided master password or OS-protected material, define lock/unlock and password-change behavior, and remain separate from the default OS keychain path.
+
 ### Connection Model
 
 Represents all openable resources as saved connections. v0.1 connection types:
@@ -127,7 +129,7 @@ Owns structured local logs, diagnostics bundle creation, and redaction rules. No
 
 ## Data Boundaries
 
-SQLite contains local, non-secret data only. OS keychain contains secrets. Terminal contents should not be logged by default. Diagnostics bundles must avoid secrets and terminal output unless the user explicitly includes selected content.
+SQLite contains local, non-secret data only. OS keychain contains secrets. Terminal contents should not be logged by default. Diagnostics bundles must avoid secrets and terminal output unless the user explicitly includes selected content. Any future encrypted SQLite vault must be treated as a separate secret backend, not as ordinary settings storage.
 
 ## Frontend Layout
 
@@ -168,3 +170,4 @@ Deferred:
 - macOS .dmg
 - Linux AppImage/deb/rpm
 - auto-update
+- optional portable encrypted credential vault

@@ -100,6 +100,11 @@ export interface SftpSettings {
   overwriteBehavior: SftpOverwriteBehavior;
 }
 
+export interface AiProviderSettings {
+  enabled: boolean;
+  baseUrl: string;
+}
+
 export interface WorkspaceTab {
   id: string;
   title: string;

@@ -134,6 +134,14 @@ impl Secrets {
         })
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn read_ai_api_key(&self, owner_id: String) -> Result<Option<String>, String> {
+        self.read_secret(SecretReferenceRequest {
+            kind: SecretKind::AiApiKey,
+            owner_id,
+        })
+    }
+
     fn entry(&self, reference: &SecretReference) -> Result<Entry, String> {
         if self.backend.is_none() {
             return Err(self
@@ -254,5 +262,32 @@ mod tests {
                 owner_id,
             })
             .expect("secret is deleted");
+    }
+
+    #[test]
+    fn stores_ai_api_keys_under_their_own_secret_kind() {
+        let secrets = Secrets::new_for_test();
+        let owner_id = "openai-compatible-provider".to_string();
+
+        secrets
+            .store_secret(StoreSecretRequest {
+                kind: SecretKind::AiApiKey,
+                owner_id: owner_id.clone(),
+                secret: "sk-test-key".to_string(),
+            })
+            .expect("AI API key is stored");
+
+        let presence = secrets
+            .secret_exists(SecretReferenceRequest {
+                kind: SecretKind::AiApiKey,
+                owner_id: owner_id.clone(),
+            })
+            .expect("presence check succeeds");
+        assert!(presence.exists);
+
+        let secret = secrets
+            .read_ai_api_key(owner_id)
+            .expect("AI API key can be read by backend");
+        assert_eq!(secret.as_deref(), Some("sk-test-key"));
     }
 }

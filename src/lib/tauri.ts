@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AiProviderSettings,
   AppBootstrap,
   Connection,
   ConnectionGroup,
@@ -197,6 +198,14 @@ type CommandMap = {
   update_sftp_settings: {
     args: { request: SftpSettings };
     result: SftpSettings;
+  };
+  get_ai_provider_settings: {
+    args: undefined;
+    result: AiProviderSettings;
+  };
+  update_ai_provider_settings: {
+    args: { request: AiProviderSettings };
+    result: AiProviderSettings;
   };
   keychain_status: {
     args: undefined;

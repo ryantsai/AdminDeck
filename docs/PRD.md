@@ -91,6 +91,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - System ssh: optional fallback/debug path only.
 - Storage: local SQLite for connections, tree, tags, settings, layout, recent sessions, and non-secret AI provider metadata.
 - Secrets: OS keychain for passwords, SSH passphrases, and AI API keys.
+- Optional later idea: portable vault mode could store credentials encrypted in SQLite for portable installs, but only with explicit opt-in, a user-supplied master password, clear lock/unlock behavior, and no plaintext or disk-stored encryption key.
 - SSH keys: reference existing key files by path; do not manage/generate keypairs in v0.1.
 - AI model: approval-based command assist only.
 - AI providers: OpenAI-compatible BYO API key plus Claude Code CLI and Codex CLI adapters.
@@ -136,6 +137,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - Fully autonomous AI agent execution.
 - Editable keybinding UI.
 - Built-in SSH key generation/import/export.
+- Optional encrypted SQLite credential vault for portable mode.
 
 ## Further Notes
 

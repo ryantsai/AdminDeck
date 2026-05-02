@@ -8,7 +8,7 @@ Milestone B has started with the accepted Rust SSH direction, durable SSH `proxy
 
 Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP Connection credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SFTP tabs now open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, and folder opening on both sides, support upload/download of selected files or folders with configurable overwrite behavior, provide remote create folder, rename, and delete actions, include a visible transfer queue with byte progress and cancellation for queued or active transfers, and can open an SSH terminal at the current remote directory.
 
-Milestone D has started with a right-side AI assistant panel that scopes requests to the active workspace Tab, stages command proposals, and keeps approval or rejection explicit without executing commands.
+Milestone D has started with a right-side AI assistant panel that scopes requests to the active workspace Tab, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings, and stores AI API keys in the OS keychain.
 
 ## Milestone 0: Project Foundation
 
@@ -61,8 +61,8 @@ Milestone D has started with a right-side AI assistant panel that scopes request
 ## Milestone D: AI Command Assist
 
 - [x] Add AI assistant panel.
-- Add OpenAI-compatible provider settings.
-- Store API keys in OS keychain.
+- [x] Add OpenAI-compatible provider settings.
+- [x] Store API keys in OS keychain.
 - Add model selector.
 - Add command proposal flow.
 - Add explicit approval before execution.
@@ -106,5 +106,6 @@ Milestone D has started with a right-side AI assistant panel that scopes request
 - SFTP folder sync/diff/resume.
 - Team sharing/sync.
 - Managed update channel and auto-update.
+- Optional portable encrypted credential vault for users who need secrets to travel with a portable install.
 - Optional crash reporting after explicit opt-in design.
 - Mobile apps after desktop architecture proves itself.

@@ -54,6 +54,7 @@ import {
 import { aiSuggestions, connectionGroups } from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import type {
+  AiProviderSettings,
   Connection,
   ConnectionGroup,
   ConnectionStatus,
@@ -74,6 +75,8 @@ type DraggedTreeItem =
 type ConnectionDialogRequest = CreateConnectionRequest & {
   password?: string;
 };
+
+const AI_PROVIDER_SECRET_OWNER_ID = "openai-compatible-provider";
 
 type TransferRecord = {
   id: string;
@@ -106,6 +109,8 @@ function App() {
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
+  const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
+  const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
 
   useEffect(() => {
     invokeCommand("app_bootstrap")
@@ -134,6 +139,23 @@ function App() {
       .then(setSftpSettings)
       .catch(() => undefined);
   }, [setSftpSettings]);
+
+  useEffect(() => {
+    invokeCommand("get_ai_provider_settings")
+      .then(setAiProviderSettings)
+      .catch(() => undefined);
+  }, [setAiProviderSettings]);
+
+  useEffect(() => {
+    invokeCommand("secret_exists", {
+      request: {
+        kind: "aiApiKey",
+        ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+      },
+    })
+      .then((presence) => setAiProviderHasApiKey(presence.exists))
+      .catch(() => undefined);
+  }, [setAiProviderHasApiKey]);
 
   return (
     <div className="app-shell">
@@ -2266,6 +2288,10 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
+  const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
+  const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
+  const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
+  const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
   const [error, setError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -2292,6 +2318,16 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         form.get("overwriteBehavior") ?? "fail",
       ) as SftpSettings["overwriteBehavior"],
     };
+    const aiProviderRequest: AiProviderSettings = {
+      enabled: form.get("aiProviderEnabled") === "on",
+      baseUrl: String(form.get("aiProviderBaseUrl") ?? "").trim(),
+    };
+    const aiProviderApiKey = String(form.get("aiProviderApiKey") ?? "").trim();
+
+    if (aiProviderRequest.enabled && !aiProviderApiKey && !aiProviderHasApiKey) {
+      setError("Enter an API key before enabling the command assist provider.");
+      return;
+    }
 
     try {
       setError("");
@@ -2299,18 +2335,39 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         setTerminalSettings(request);
         setSshSettings(sshRequest);
         setSftpSettings(sftpRequest);
+        setAiProviderSettings(aiProviderRequest);
+        if (aiProviderApiKey) {
+          setAiProviderHasApiKey(true);
+        }
         onClose();
         return;
       }
 
-      const [updatedTerminalSettings, updatedSshSettings, updatedSftpSettings] = await Promise.all([
+      const [
+        updatedTerminalSettings,
+        updatedSshSettings,
+        updatedSftpSettings,
+        updatedAiProviderSettings,
+      ] = await Promise.all([
         invokeCommand("update_terminal_settings", { request }),
         invokeCommand("update_ssh_settings", { request: sshRequest }),
         invokeCommand("update_sftp_settings", { request: sftpRequest }),
+        invokeCommand("update_ai_provider_settings", { request: aiProviderRequest }),
       ]);
+      if (aiProviderApiKey) {
+        await invokeCommand("store_secret", {
+          request: {
+            kind: "aiApiKey",
+            ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+            secret: aiProviderApiKey,
+          },
+        });
+        setAiProviderHasApiKey(true);
+      }
       setTerminalSettings(updatedTerminalSettings);
       setSshSettings(updatedSshSettings);
       setSftpSettings(updatedSftpSettings);
+      setAiProviderSettings(updatedAiProviderSettings);
       onClose();
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
@@ -2323,7 +2380,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         <header>
           <div>
             <p className="panel-label">Settings</p>
-            <h2>Terminal, SSH, and SFTP defaults</h2>
+            <h2>Workspace defaults</h2>
           </div>
           <button className="icon-button" type="button" aria-label="Close" onClick={onClose}>
             <X size={15} />
@@ -2456,6 +2513,48 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
           </label>
         </section>
 
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <span>AI provider</span>
+          </div>
+          <label>
+            <span>OpenAI-compatible endpoint</span>
+            <input
+              name="aiProviderBaseUrl"
+              defaultValue={aiProviderSettings.baseUrl}
+              placeholder="https://api.openai.com/v1"
+              required
+              type="url"
+            />
+          </label>
+          <label>
+            <span>API key</span>
+            <input
+              autoComplete="off"
+              name="aiProviderApiKey"
+              placeholder={
+                aiProviderHasApiKey ? "Stored in OS keychain" : "Paste API key to store"
+              }
+              type="password"
+            />
+            <small className="field-hint">
+              {aiProviderHasApiKey
+                ? "Leave blank to keep the existing keychain entry."
+                : "Saved only to the OS keychain."}
+            </small>
+          </label>
+          <div className="settings-toggles compact">
+            <label>
+              <input
+                name="aiProviderEnabled"
+                type="checkbox"
+                defaultChecked={aiProviderSettings.enabled}
+              />
+              <span>Enable command assist provider</span>
+            </label>
+          </div>
+        </section>
+
         {error ? <p className="form-error">{error}</p> : null}
 
         <div className="dialog-actions">
@@ -2476,6 +2575,8 @@ function AssistantPanel() {
   const activeTab = useWorkspaceStore((state) =>
     state.tabs.find((tab) => tab.id === state.activeTabId),
   );
+  const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
+  const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const [selectedSuggestion, setSelectedSuggestion] = useState(aiSuggestions[0].id);
   const [prompt, setPrompt] = useState("");
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
@@ -2486,6 +2587,7 @@ function AssistantPanel() {
   const connectionLabel = activeTab?.connection
     ? `${activeTab.connection.user}@${activeTab.connection.host}`
     : "Workspace";
+  const providerHost = formatProviderHost(aiProviderSettings.baseUrl);
 
   function handleSuggestionSelect(suggestionId: string) {
     const nextSuggestion = aiSuggestions.find((item) => item.id === suggestionId);
@@ -2618,16 +2720,24 @@ function AssistantPanel() {
         <div>
           <KeyRound size={15} />
           <span>OS keychain</span>
-          <strong>Planned</strong>
+          <strong>{aiProviderHasApiKey ? "Ready" : "No API key"}</strong>
         </div>
         <div>
           <Tags size={15} />
-          <span>OpenAI-compatible endpoint</span>
-          <strong>BYO key</strong>
+          <span>{providerHost}</span>
+          <strong>{aiProviderSettings.enabled ? "Enabled" : "Disabled"}</strong>
         </div>
       </section>
     </aside>
   );
+}
+
+function formatProviderHost(baseUrl: string) {
+  try {
+    return new URL(baseUrl).host || "OpenAI-compatible endpoint";
+  } catch {
+    return "OpenAI-compatible endpoint";
+  }
 }
 
 function StatusBar() {

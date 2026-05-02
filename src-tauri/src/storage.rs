@@ -76,6 +76,13 @@ pub struct SftpSettings {
     overwrite_behavior: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiProviderSettings {
+    enabled: bool,
+    base_url: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionGroup {
@@ -320,6 +327,46 @@ impl Storage {
             .execute(
                 "INSERT INTO settings (key, value, updated_at)
                  VALUES ('sftp', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
+    }
+
+    pub fn ai_provider_settings(&self) -> Result<AiProviderSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'ai_provider'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_ai_provider_settings)
+                .map_err(|error| format!("AI provider settings are invalid: {error}"))?,
+            None => Ok(default_ai_provider_settings()),
+        }
+    }
+
+    pub fn update_ai_provider_settings(
+        &self,
+        request: AiProviderSettings,
+    ) -> Result<AiProviderSettings, String> {
+        let settings = validate_ai_provider_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize AI provider settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('ai_provider', ?1, CURRENT_TIMESTAMP)
                  ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value,
                     updated_at = CURRENT_TIMESTAMP",
@@ -1212,6 +1259,13 @@ fn default_sftp_settings() -> SftpSettings {
     }
 }
 
+fn default_ai_provider_settings() -> AiProviderSettings {
+    AiProviderSettings {
+        enabled: false,
+        base_url: "https://api.openai.com/v1".to_string(),
+    }
+}
+
 fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<TerminalSettings, String> {
     settings.font_family = required_field("font family", settings.font_family)?;
     settings.default_shell = required_field("default shell", settings.default_shell)?;
@@ -1254,6 +1308,29 @@ fn validate_sftp_settings(mut settings: SftpSettings) -> Result<SftpSettings, St
         "overwrite" | "replace" => "overwrite".to_string(),
         _ => return Err("SFTP overwrite behavior must be fail or overwrite".to_string()),
     };
+    Ok(settings)
+}
+
+fn validate_ai_provider_settings(
+    mut settings: AiProviderSettings,
+) -> Result<AiProviderSettings, String> {
+    settings.base_url = required_field("OpenAI-compatible endpoint", settings.base_url)?;
+    settings.base_url = settings.base_url.trim_end_matches('/').to_string();
+
+    if !(settings.base_url.starts_with("https://") || settings.base_url.starts_with("http://")) {
+        return Err("OpenAI-compatible endpoint must start with https:// or http://".to_string());
+    }
+
+    if settings.base_url.chars().any(char::is_whitespace) {
+        return Err("OpenAI-compatible endpoint cannot contain whitespace".to_string());
+    }
+
+    if settings.base_url.contains('?') || settings.base_url.contains('#') {
+        return Err(
+            "OpenAI-compatible endpoint must be a base URL without query or fragment".to_string(),
+        );
+    }
+
     Ok(settings)
 }
 
@@ -1697,6 +1774,49 @@ mod tests {
 
         let reloaded = storage.sftp_settings().expect("SFTP settings reload");
         assert_eq!(reloaded.overwrite_behavior, "overwrite");
+    }
+
+    #[test]
+    fn ai_provider_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("ai-provider-settings")).expect("storage opens");
+
+        let defaults = storage
+            .ai_provider_settings()
+            .expect("default AI provider settings load");
+        assert!(!defaults.enabled);
+        assert_eq!(defaults.base_url, "https://api.openai.com/v1");
+
+        let updated = storage
+            .update_ai_provider_settings(AiProviderSettings {
+                enabled: true,
+                base_url: "  https://llm-gateway.internal/v1/  ".to_string(),
+            })
+            .expect("AI provider settings update");
+
+        assert!(updated.enabled);
+        assert_eq!(updated.base_url, "https://llm-gateway.internal/v1");
+
+        let reloaded = storage
+            .ai_provider_settings()
+            .expect("AI provider settings reload");
+        assert_eq!(reloaded.base_url, "https://llm-gateway.internal/v1");
+    }
+
+    #[test]
+    fn ai_provider_settings_reject_invalid_base_url() {
+        let storage = Storage::open(temp_db_path("ai-provider-invalid")).expect("storage opens");
+
+        let error = storage
+            .update_ai_provider_settings(AiProviderSettings {
+                enabled: true,
+                base_url: "api.openai.com/v1".to_string(),
+            })
+            .expect_err("scheme-less endpoint is rejected");
+
+        assert_eq!(
+            error,
+            "OpenAI-compatible endpoint must start with https:// or http://"
+        );
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

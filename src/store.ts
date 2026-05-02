@@ -1,11 +1,19 @@
 import { create } from "zustand";
 import {
+  defaultAiProviderSettings,
   defaultSftpSettings,
   defaultSshSettings,
   defaultTerminalSettings,
   initialTabs,
 } from "./sample-data";
-import type { Connection, SftpSettings, SshSettings, TerminalSettings, WorkspaceTab } from "./types";
+import type {
+  AiProviderSettings,
+  Connection,
+  SftpSettings,
+  SshSettings,
+  TerminalSettings,
+  WorkspaceTab,
+} from "./types";
 
 interface WorkspaceState {
   query: string;
@@ -14,11 +22,15 @@ interface WorkspaceState {
   terminalSettings: TerminalSettings;
   sshSettings: SshSettings;
   sftpSettings: SftpSettings;
+  aiProviderSettings: AiProviderSettings;
+  aiProviderHasApiKey: boolean;
   activeSessionCounts: Record<string, number>;
   setQuery: (query: string) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
   setSshSettings: (settings: SshSettings) => void;
   setSftpSettings: (settings: SftpSettings) => void;
+  setAiProviderSettings: (settings: AiProviderSettings) => void;
+  setAiProviderHasApiKey: (hasApiKey: boolean) => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -36,11 +48,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   terminalSettings: defaultTerminalSettings,
   sshSettings: defaultSshSettings,
   sftpSettings: defaultSftpSettings,
+  aiProviderSettings: defaultAiProviderSettings,
+  aiProviderHasApiKey: false,
   activeSessionCounts: {},
   setQuery: (query) => set({ query }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
   setSshSettings: (sshSettings) => set({ sshSettings }),
   setSftpSettings: (sftpSettings) => set({ sftpSettings }),
+  setAiProviderSettings: (aiProviderSettings) => set({ aiProviderSettings }),
+  setAiProviderHasApiKey: (aiProviderHasApiKey) => set({ aiProviderHasApiKey }),
   activateTab: (tabId) => set({ activeTabId: tabId }),
   closeTab: (tabId) => {
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);
