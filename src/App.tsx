@@ -29,7 +29,6 @@ import {
   SendHorizontal,
   Server,
   Settings,
-  ShieldCheck,
   SplitSquareHorizontal,
   Tags,
   Terminal,
@@ -40,7 +39,6 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
-  ChangeEvent,
   CSSProperties,
   DragEvent as ReactDragEvent,
   FormEvent,
@@ -58,7 +56,6 @@ import {
   type SftpPathProperties,
   type SftpTransferProgress,
   type SftpTransferResult,
-  type SshConfigImportPreview,
   type SshHostKeyPreview,
   type CommandProposalPlan,
   type TerminalOutput,
@@ -244,9 +241,7 @@ type AssistantDraft = {
 };
 
 function App() {
-  const [bootstrap, setBootstrap] = useState("Starting local runtime");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [connectionRefreshToken, setConnectionRefreshToken] = useState(0);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
@@ -254,16 +249,6 @@ function App() {
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
   const setFrontendLaunchMs = useWorkspaceStore((state) => state.setFrontendLaunchMs);
   const setPerformanceSnapshot = useWorkspaceStore((state) => state.setPerformanceSnapshot);
-
-  useEffect(() => {
-    invokeCommand("app_bootstrap")
-      .then((result) =>
-        setBootstrap(
-          `${result.logStatus} | ${result.storageStatus} | Keychain: ${result.keychainStatus.backend}`,
-        ),
-      )
-      .catch(() => setBootstrap("Frontend preview mode"));
-  }, []);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -335,12 +320,8 @@ function App() {
   return (
     <div className="app-shell">
       <ActivityRail onOpenSettings={() => setSettingsOpen(true)} />
-      <ConnectionSidebar refreshToken={connectionRefreshToken} />
+      <ConnectionSidebar />
       <main className="workspace">
-        <TopBar
-          onConnectionsChanged={() => setConnectionRefreshToken((token) => token + 1)}
-          runtimeStatus={bootstrap}
-        />
         <TabStrip />
         <WorkspaceCanvas />
         <StatusBar />
@@ -370,7 +351,7 @@ function ActivityRail({ onOpenSettings }: { onOpenSettings: () => void }) {
   );
 }
 
-function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
+function ConnectionSidebar() {
   const query = useWorkspaceStore((state) => state.query);
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
@@ -396,7 +377,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
 
   useEffect(() => {
     void reloadConnectionGroups();
-  }, [refreshToken]);
+  }, []);
 
   useEffect(() => {
     if (!quickConnectMenuOpen) {
@@ -1740,187 +1721,6 @@ function liveConnectionStatus(
   activeSessionCounts: Record<string, number>,
 ): ConnectionStatus {
   return activeSessionCounts[connectionId] ? "connected" : "idle";
-}
-
-function TopBar({
-  onConnectionsChanged,
-  runtimeStatus,
-}: {
-  onConnectionsChanged: () => void;
-  runtimeStatus: string;
-}) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [importPreview, setImportPreview] = useState<SshConfigImportPreview | null>(null);
-  const [importError, setImportError] = useState("");
-  const [savingImport, setSavingImport] = useState(false);
-
-  async function handleImportFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file) {
-      return;
-    }
-
-    try {
-      setImportError("");
-      const content = await file.text();
-      setImportPreview(
-        await invokeCommand("import_ssh_config", {
-          request: { content },
-        }),
-      );
-    } catch (error) {
-      setImportError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleSaveImportedConnections() {
-    if (!importPreview || importPreview.drafts.length === 0) {
-      return;
-    }
-
-    try {
-      setSavingImport(true);
-      setImportError("");
-      for (const draft of importPreview.drafts) {
-        await invokeCommand("create_connection", { request: draft });
-      }
-      setImportPreview(null);
-      onConnectionsChanged();
-    } catch (error) {
-      setImportError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSavingImport(false);
-    }
-  }
-
-  return (
-    <header className="top-bar">
-      <div className="top-actions">
-        <span className="runtime-status">
-          <ShieldCheck size={14} />
-          {runtimeStatus}
-        </span>
-        <input
-          aria-label="Import SSH config file"
-          accept=".conf,.config,.txt"
-          className="hidden-file-input"
-          onChange={(event) => void handleImportFileChange(event)}
-          ref={fileInputRef}
-          type="file"
-        />
-        <button
-          className="icon-button"
-          aria-label="Import SSH config"
-          onClick={() => fileInputRef.current?.click()}
-          title="Import SSH config"
-        >
-          <FileCode2 size={15} />
-        </button>
-        <button className="icon-button" aria-label="Secrets" title="Secrets">
-          <KeyRound size={15} />
-        </button>
-      </div>
-      {importPreview || importError ? (
-        <SshConfigImportDialog
-          error={importError}
-          onCancel={() => {
-            setImportPreview(null);
-            setImportError("");
-          }}
-          onSave={() => void handleSaveImportedConnections()}
-          preview={importPreview}
-          saving={savingImport}
-        />
-      ) : null}
-    </header>
-  );
-}
-
-function SshConfigImportDialog({
-  error,
-  onCancel,
-  onSave,
-  preview,
-  saving,
-}: {
-  error: string;
-  onCancel: () => void;
-  onSave: () => void;
-  preview: SshConfigImportPreview | null;
-  saving: boolean;
-}) {
-  const drafts = preview?.drafts ?? [];
-  const unsupportedDirectives = preview?.unsupportedDirectives ?? [];
-
-  return (
-    <div className="dialog-backdrop" role="presentation">
-      <section className="import-dialog" role="dialog" aria-modal="true" aria-label="Import SSH config">
-        <header>
-          <div>
-            <p className="panel-label">SSH config import</p>
-            <h2>{drafts.length} connection drafts</h2>
-          </div>
-          <button className="icon-button" type="button" aria-label="Close" onClick={onCancel}>
-            <X size={15} />
-          </button>
-        </header>
-
-        {drafts.length > 0 ? (
-          <div className="import-preview-list">
-            {drafts.map((draft) => (
-              <div className="import-preview-row" key={`${draft.name}-${draft.host}`}>
-                <Server size={15} />
-                <span>
-                  <strong>{draft.name}</strong>
-                  <small>
-                    {draft.user}@{draft.host}
-                    {draft.port ? `:${draft.port}` : ""}
-                  </small>
-                </span>
-                {draft.proxyJump ? <small>via {draft.proxyJump}</small> : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-import">No importable Host entries were found.</p>
-        )}
-
-        {unsupportedDirectives.length > 0 ? (
-          <section className="unsupported-list">
-            <header>
-              <strong>Unsupported directives</strong>
-              <span>{unsupportedDirectives.length}</span>
-            </header>
-            {unsupportedDirectives.map((item) => (
-              <div className="unsupported-row" key={`${item.line}-${item.directive}-${item.value}`}>
-                <span>Line {item.line}</span>
-                <code>{item.directive}</code>
-                <small>{item.hostPattern ?? "global"}</small>
-              </div>
-            ))}
-          </section>
-        ) : null}
-
-        {error ? <p className="form-error">{error}</p> : null}
-
-        <div className="dialog-actions">
-          <button className="toolbar-button" type="button" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            className="approve-button"
-            disabled={saving || drafts.length === 0}
-            onClick={onSave}
-            type="button"
-          >
-            <Check size={15} />
-            {saving ? "Saving" : "Save drafts"}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
 }
 
 function TabStrip() {

@@ -147,7 +147,6 @@ button {
 .file-pane header,
 .transfer-queue header,
 .approval-card header,
-.top-bar,
 .status-bar {
   display: flex;
   align-items: center;
@@ -272,6 +271,7 @@ h2 {
   align-items: center;
   min-height: 34px;
   min-width: 0;
+  width: 100%;
   padding: 7px 10px;
   color: var(--text);
   text-align: left;
@@ -296,6 +296,16 @@ h2 {
 
 .quick-connect-submenu {
   position: relative;
+  min-width: 0;
+}
+
+.quick-connect-submenu::after {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 8px;
+  height: 100%;
+  content: "";
 }
 
 .quick-connect-submenu > button svg:last-child {
@@ -570,19 +580,11 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-rows: 48px 38px minmax(0, 1fr) 28px;
+  grid-template-rows: 38px minmax(0, 1fr) 28px;
   min-width: 0;
   background: var(--chrome-strong);
 }
 
-.top-bar {
-  gap: 14px;
-  justify-content: flex-end;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.top-actions,
 .toolbar-cluster,
 .approval-actions {
   display: flex;
@@ -590,7 +592,6 @@ h2 {
   align-items: center;
 }
 
-.runtime-status,
 .status-bar span {
   display: inline-flex;
   gap: 6px;
@@ -599,19 +600,6 @@ h2 {
   font-size: 12px;
 }
 
-.top-actions {
-  flex: 0 0 auto;
-}
-
-.hidden-file-input {
-  display: none;
-}
-
-.runtime-status {
-  max-width: 170px;
-}
-
-.runtime-status,
 .terminal-pane header small {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1634,8 +1622,7 @@ progress {
 }
 
 .connection-dialog,
-.settings-dialog,
-.import-dialog {
+.settings-dialog {
   display: grid;
   gap: 11px;
   padding: 16px;
@@ -1691,13 +1678,8 @@ progress {
   font-weight: 800;
 }
 
-.import-dialog {
-  width: min(620px, calc(100vw - 40px));
-}
-
 .connection-dialog header,
 .settings-dialog header,
-.import-dialog > header,
 .dialog-actions {
   display: flex;
   align-items: center;
@@ -1826,79 +1808,4 @@ progress {
 
 .tree-error {
   margin: -4px 0 10px;
-}
-
-.import-preview-list,
-.unsupported-list {
-  display: grid;
-  max-height: 220px;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-}
-
-.import-preview-row,
-.unsupported-row {
-  display: grid;
-  gap: 9px;
-  align-items: center;
-  min-height: 38px;
-  padding: 7px 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-}
-
-.import-preview-row {
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-}
-
-.unsupported-row {
-  grid-template-columns: 62px 150px minmax(0, 1fr);
-}
-
-.import-preview-row:last-child,
-.unsupported-row:last-child {
-  border-bottom: 0;
-}
-
-.import-preview-row span {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.import-preview-row strong,
-.import-preview-row small,
-.unsupported-row small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.import-preview-row small,
-.unsupported-row,
-.unsupported-list header span,
-.empty-import {
-  color: var(--text-muted);
-}
-
-.unsupported-list header {
-  display: flex;
-  justify-content: space-between;
-  min-height: 32px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-}
-
-.unsupported-row code {
-  overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.empty-import {
-  margin: 0;
-  font-size: 13px;
 }

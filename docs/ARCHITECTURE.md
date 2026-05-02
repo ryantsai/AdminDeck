@@ -70,7 +70,7 @@ Later connection types:
 
 ### Connection Tree
 
-Owns root-level saved Connections, optional folders, subfolders, search/filter, drag/drop ordering, rename/delete/duplicate, quick connect, SSH config import display, and open-session status badges.
+Owns root-level saved Connections, optional folders, subfolders, search/filter, drag/drop ordering, rename/delete/duplicate, quick connect, and open-session status badges.
 
 Current implementation note: a Connection may have no folder and live directly in the root of the tree. Folders may contain Connections and subfolders. Status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
 
@@ -111,7 +111,7 @@ Owns SFTP sessions launched from SSH Connections, local/remote listing, multi-se
 
 Parses SSH config and creates draft connections. It should preserve supported directives and visibly report unsupported directives.
 
-Current implementation note: the importer supports `Host`, `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump`. It skips wildcard-only host patterns, reports unsupported global or host-scoped directives with line numbers, previews draft Connections in the UI, and only persists them after explicit user confirmation.
+Current implementation note: the importer supports `Host`, `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump`. It skips wildcard-only host patterns and reports unsupported global or host-scoped directives with line numbers through the typed Tauri command. The previous top chrome import button has been removed; a future visible entry point should live in the connection tree or Settings rather than a standalone global button bar.
 
 ### AI Assist
 

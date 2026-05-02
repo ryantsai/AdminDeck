@@ -21,7 +21,7 @@ v0.1 includes:
 - SFTP dual-pane file manager
 - left activity rail with Dashboard and Settings entries
 - left-side connection tree with root Connections and optional nested folders
-- SSH config import
+- SSH config import command support, with the user-facing entry point deferred from the simplified chrome
 - SQLite connection/settings storage
 - OS keychain secret storage
 - approval-based AI command assistance

@@ -4,7 +4,7 @@
 
 As of May 2, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections with optional nested folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs that preserve live Sessions across tab switching, split terminal panes, xterm-based local terminal sessions, settings storage, a left activity rail with Dashboard and Settings entries, and live status badges derived from active workspace Sessions. The current Settings surface is intentionally reduced to Language (i18n) and Color Scheme placeholders.
 
-Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH Connections.
+Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import command that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives, and persisted SSH defaults for new SSH Connections. The previous top chrome import button has been removed, so SSH config import needs a new visible entry point before it is user-facing again.
 
 Milestone C has started with native `russh-sftp` sessions launched from SSH Connections using the same stored credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SSH terminal tabs now expose an SFTP action beside split-pane controls; SFTP tabs open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, folder opening on both sides, scrollable file panes, sorting by name or modified date, multi-select upload/download by button or drag/drop, overwrite conflict prompts with overwrite-all handling for the active transfer queue, remote create folder, inline rename, delete, a scoped SFTP context menu, remote properties with chmod/chown editing, a visible transfer queue with byte progress, cancellation for queued or active transfers, clearable finished transfer history, and an SSH terminal at the current remote directory.
 
@@ -56,7 +56,8 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 - [x] Add optional system ssh fallback/debug path.
 - [x] Persist SSH defaults for new SSH Connections.
 - [ ] Reintroduce SSH defaults controls after the Settings UX is redesigned.
-- [x] Add SSH config import with unsupported directive reporting.
+- [x] Add SSH config import command with unsupported directive reporting.
+- [ ] Reintroduce SSH config import through the connection tree or Settings after the simplified chrome UX settles.
 
 ## Milestone C: SFTP Core
 
@@ -133,7 +134,7 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 - [ ] Add a more colorful default UI while preserving dense, professional workspace ergonomics.
 - [ ] Implement Color Scheme settings for app chrome and workspace surfaces.
 - [ ] Implement Language (i18n) settings.
-- [ ] Reintroduce diagnostics, terminal, SSH, SFTP, and AI provider settings controls in the simplified Settings surface where they still fit.
+- [ ] Reintroduce diagnostics, terminal, SSH, SFTP, SSH config import, and AI provider settings controls in the simplified Settings surface where they still fit.
 - [ ] Add editable keybindings.
 
 ### Extension Platform

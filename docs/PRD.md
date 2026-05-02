@@ -8,7 +8,7 @@ AdminDeck is intended to be a fast, professional desktop workspace for personal/
 
 ## Solution
 
-AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions, SFTP dual-pane file management, SSH config import, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
+AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions, SFTP dual-pane file management, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
 
 The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. Mobile, RDP, VNC, team vaults, and sync are explicitly later-stage work.
 
@@ -106,6 +106,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
 - SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
 - Settings: current surface is intentionally limited to two to-be-implemented placeholders, Language (i18n) and Color Scheme. Deeper terminal, SSH, SFTP, AI provider, diagnostics, update, and keybinding controls should be reintroduced only when their UX is clear and backed by the existing local storage/keychain boundaries.
+- SSH config import: the parser and typed Tauri command remain in place, but the previous top chrome import button has been removed. A visible import entry point should return through the connection tree or Settings only when that flow has a clear home.
 - Privacy: no telemetry or automatic crash upload in v0.1.
 - Distribution: Windows .msi or .exe installer, portable ZIP for dev/test, GitHub Releases. macOS .dmg and Linux AppImage/deb/rpm later.
 - v0.2 update mechanism: Windows installed app only, stable channel only, GitHub Releases static updater metadata, signed Tauri updater artifacts required for any user-facing update flow, update checks enabled by default with clear local-first wording, and user-mediated install from Settings plus a lightweight app-chrome update notification.
