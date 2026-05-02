@@ -133,6 +133,27 @@ export interface AppBootstrap {
   keychainStatus: KeychainStatus;
 }
 
+export interface PerformanceSnapshot {
+  uptimeMs: number;
+  workingSetBytes?: number;
+  memorySource: string;
+}
+
+export interface TerminalStartMetric {
+  kind: "local" | "ssh";
+  title: string;
+  durationMs: number;
+  recordedAt: string;
+}
+
+export interface PerformanceMetrics {
+  frontendLaunchMs?: number;
+  backendUptimeMs?: number;
+  workingSetBytes?: number;
+  memorySource?: string;
+  lastTerminalStart?: TerminalStartMetric;
+}
+
 export type SecretKind = "connectionPassword" | "connectionPassphrase" | "aiApiKey";
 
 export interface KeychainStatus {

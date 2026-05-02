@@ -116,6 +116,8 @@ function App() {
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
   const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
+  const setFrontendLaunchMs = useWorkspaceStore((state) => state.setFrontendLaunchMs);
+  const setPerformanceSnapshot = useWorkspaceStore((state) => state.setPerformanceSnapshot);
 
   useEffect(() => {
     invokeCommand("app_bootstrap")
@@ -126,6 +128,38 @@ function App() {
       )
       .catch(() => setBootstrap("Frontend preview mode"));
   }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setFrontendLaunchMs(Math.round(performance.now()));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [setFrontendLaunchMs]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    let disposed = false;
+    async function refreshPerformanceSnapshot() {
+      try {
+        const snapshot = await invokeCommand("get_performance_snapshot");
+        if (!disposed) {
+          setPerformanceSnapshot(snapshot);
+        }
+      } catch {
+        // Performance metrics are diagnostic only.
+      }
+    }
+
+    void refreshPerformanceSnapshot();
+    const interval = window.setInterval(() => void refreshPerformanceSnapshot(), 15_000);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [setPerformanceSnapshot]);
 
   useEffect(() => {
     invokeCommand("get_terminal_settings")
@@ -1263,6 +1297,9 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
   const markConnectionSessionEnded = useWorkspaceStore(
     (state) => state.markConnectionSessionEnded,
   );
+  const recordTerminalStartMetric = useWorkspaceStore(
+    (state) => state.recordTerminalStartMetric,
+  );
 
   useEffect(() => {
     const element = terminalElementRef.current;
@@ -1366,6 +1403,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
           await confirmTrustedSshHostKey(preview);
         }
 
+        const terminalStartAt = performance.now();
         const result = await invokeCommand("start_terminal_session", {
           request: {
             sessionId: requestedSessionId,
@@ -1388,6 +1426,12 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
           void invokeCommand("close_terminal_session", { sessionId: result.sessionId });
           return;
         }
+        recordTerminalStartMetric({
+          kind: terminalSessionType,
+          title: connection.name,
+          durationMs: Math.round(performance.now() - terminalStartAt),
+          recordedAt: new Date().toISOString(),
+        });
         sessionIdRef.current = result.sessionId;
         sessionStarted = true;
         markConnectionSessionStarted(connection.id);
@@ -1419,6 +1463,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     markConnectionSessionEnded,
     markConnectionSessionStarted,
     pane.connection,
+    recordTerminalStartMetric,
     terminalSettings,
   ]);
 
@@ -2975,6 +3020,19 @@ function planCommandProposalLocally(request: {
 }
 
 function StatusBar() {
+  const performanceMetrics = useWorkspaceStore((state) => state.performanceMetrics);
+  const launchLabel = performanceMetrics.frontendLaunchMs
+    ? `UI ready ${formatDuration(performanceMetrics.frontendLaunchMs)}`
+    : "UI timing pending";
+  const sessionLabel = performanceMetrics.lastTerminalStart
+    ? `${performanceMetrics.lastTerminalStart.kind.toUpperCase()} ready ${formatDuration(
+        performanceMetrics.lastTerminalStart.durationMs,
+      )}`
+    : "Terminal timing pending";
+  const memoryLabel = performanceMetrics.workingSetBytes
+    ? `Memory ${formatBytes(performanceMetrics.workingSetBytes)}`
+    : "Memory pending";
+
   return (
     <footer className="status-bar">
       <span>
@@ -2982,9 +3040,20 @@ function StatusBar() {
         Local-first
       </span>
       <span>Telemetry off</span>
-      <span>Windows acceptance target</span>
+      <span>{launchLabel}</span>
+      <span>{sessionLabel}</span>
+      <span title={performanceMetrics.memorySource}>{memoryLabel}</span>
     </footer>
   );
+}
+
+function formatDuration(durationMs: number) {
+  return durationMs < 1000 ? `${durationMs} ms` : `${(durationMs / 1000).toFixed(1)} s`;
+}
+
+function formatBytes(bytes: number) {
+  const mib = bytes / (1024 * 1024);
+  return `${mib.toFixed(mib >= 100 ? 0 : 1)} MiB`;
 }
 
 export default App;

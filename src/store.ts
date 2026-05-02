@@ -10,9 +10,12 @@ import type {
   AiProviderSettings,
   AssistantContextSnippet,
   Connection,
+  PerformanceMetrics,
+  PerformanceSnapshot,
   SftpSettings,
   SshSettings,
   TerminalSettings,
+  TerminalStartMetric,
   WorkspaceTab,
 } from "./types";
 
@@ -27,6 +30,7 @@ interface WorkspaceState {
   aiProviderHasApiKey: boolean;
   assistantContextSnippet?: AssistantContextSnippet;
   activeSessionCounts: Record<string, number>;
+  performanceMetrics: PerformanceMetrics;
   setQuery: (query: string) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
   setSshSettings: (settings: SshSettings) => void;
@@ -35,6 +39,9 @@ interface WorkspaceState {
   setAiProviderHasApiKey: (hasApiKey: boolean) => void;
   setAssistantContextSnippet: (snippet: AssistantContextSnippet) => void;
   clearAssistantContextSnippet: () => void;
+  setFrontendLaunchMs: (frontendLaunchMs: number) => void;
+  setPerformanceSnapshot: (snapshot: PerformanceSnapshot) => void;
+  recordTerminalStartMetric: (metric: TerminalStartMetric) => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -56,6 +63,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   aiProviderHasApiKey: false,
   assistantContextSnippet: undefined,
   activeSessionCounts: {},
+  performanceMetrics: {},
   setQuery: (query) => set({ query }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
   setSshSettings: (sshSettings) => set({ sshSettings }),
@@ -64,6 +72,29 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setAiProviderHasApiKey: (aiProviderHasApiKey) => set({ aiProviderHasApiKey }),
   setAssistantContextSnippet: (assistantContextSnippet) => set({ assistantContextSnippet }),
   clearAssistantContextSnippet: () => set({ assistantContextSnippet: undefined }),
+  setFrontendLaunchMs: (frontendLaunchMs) =>
+    set((state) => ({
+      performanceMetrics: {
+        ...state.performanceMetrics,
+        frontendLaunchMs,
+      },
+    })),
+  setPerformanceSnapshot: (snapshot) =>
+    set((state) => ({
+      performanceMetrics: {
+        ...state.performanceMetrics,
+        backendUptimeMs: snapshot.uptimeMs,
+        workingSetBytes: snapshot.workingSetBytes,
+        memorySource: snapshot.memorySource,
+      },
+    })),
+  recordTerminalStartMetric: (lastTerminalStart) =>
+    set((state) => ({
+      performanceMetrics: {
+        ...state.performanceMetrics,
+        lastTerminalStart,
+      },
+    })),
   activateTab: (tabId) => set({ activeTabId: tabId }),
   closeTab: (tabId) => {
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);

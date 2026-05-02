@@ -10,6 +10,7 @@ import type {
   KeychainStatus,
   MoveConnectionFolderRequest,
   MoveConnectionRequest,
+  PerformanceSnapshot,
   RenameConnectionFolderRequest,
   RenameConnectionRequest,
   SecretPresence,
@@ -233,6 +234,10 @@ type CommandMap = {
   keychain_status: {
     args: undefined;
     result: KeychainStatus;
+  };
+  get_performance_snapshot: {
+    args: undefined;
+    result: PerformanceSnapshot;
   };
   ssh_transport_plan: {
     args: undefined;

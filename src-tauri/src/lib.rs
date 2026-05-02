@@ -1,5 +1,6 @@
 mod ai;
 mod logging;
+mod performance;
 mod secrets;
 mod sessions;
 mod sftp;
@@ -183,6 +184,13 @@ fn plan_command_proposal(
 #[tauri::command]
 fn keychain_status(secrets: tauri::State<'_, secrets::Secrets>) -> secrets::KeychainStatus {
     secrets.status()
+}
+
+#[tauri::command]
+fn get_performance_snapshot(
+    performance: tauri::State<'_, performance::PerformanceMonitor>,
+) -> performance::PerformanceSnapshot {
+    performance.snapshot()
 }
 
 #[tauri::command]
@@ -370,6 +378,7 @@ pub fn run() {
                 .join("admin-deck.sqlite3");
             let storage = storage::Storage::open(db_path).map_err(setup_error)?;
             app.manage(storage);
+            app.manage(performance::PerformanceMonitor::new());
             app.manage(secrets::Secrets::new());
             app.manage(sessions::SessionManager::new());
             app.manage(sftp::SftpSessionManager::new());
@@ -397,6 +406,7 @@ pub fn run() {
             update_ai_provider_settings,
             plan_command_proposal,
             keychain_status,
+            get_performance_snapshot,
             ssh_transport_plan,
             import_ssh_config,
             inspect_ssh_host_key,

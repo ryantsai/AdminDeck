@@ -1082,11 +1082,21 @@ progress {
 
 .status-bar {
   justify-content: flex-start;
-  gap: 18px;
+  gap: 12px;
+  min-width: 0;
   padding: 0 12px;
+  overflow: hidden;
   color: var(--text-muted);
   background: var(--surface-muted);
   border-top: 1px solid var(--border);
+}
+
+.status-bar span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dialog-backdrop {

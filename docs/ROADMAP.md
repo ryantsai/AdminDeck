@@ -10,6 +10,8 @@ Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP
 
 Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged.
 
+Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, latest terminal Session start timing, and Windows process working set in the app chrome without adding telemetry or logging terminal contents.
+
 ## Milestone 0: Project Foundation
 
 - [x] Confirm working product name: AdminDeck.
@@ -74,6 +76,7 @@ Milestone D has a right-side AI assistant panel that scopes requests to the acti
 
 ## Milestone E: Performance and Terminal Quality
 
+- [x] Add local-only performance instrumentation for frontend ready time, terminal Session start time, and Windows process working set.
 - Measure cold launch time.
 - Measure new local terminal tab time.
 - Measure SSH terminal readiness after auth.
