@@ -840,7 +840,7 @@ async fn connect_ssh_agents() -> Result<Vec<SshAgent>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, io::Write};
+    use std::{env, fs, io::Write};
 
     #[test]
     fn milestone_b_prefers_in_process_rust_ssh() {
@@ -950,6 +950,201 @@ mod tests {
 
         assert!(error.contains("test SSH agent"));
         assert!(error.contains("failed to list SSH agent identities"));
+    }
+
+    #[test]
+    #[ignore = "requires a trusted SSH server and credentials in ADMINDECK_SSH_* environment variables"]
+    fn measure_native_ssh_terminal_readiness_after_auth() {
+        let config =
+            SshReadinessMeasurementConfig::from_env().expect("measurement env is configured");
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime is created");
+
+        let terminal_ready_ms = runtime
+            .block_on(measure_terminal_readiness_after_auth(config))
+            .expect("SSH readiness measurement succeeds");
+
+        println!("AdminDeck SSH terminal ready after auth: {terminal_ready_ms} ms");
+        assert!(
+            terminal_ready_ms <= 150,
+            "SSH terminal readiness budget is <= 150 ms after auth"
+        );
+    }
+
+    struct SshReadinessMeasurementConfig {
+        host: String,
+        user: String,
+        port: u16,
+        auth: NativeSshAuth,
+        known_hosts_path: PathBuf,
+        cols: u16,
+        rows: u16,
+        pixel_width: u16,
+        pixel_height: u16,
+        initial_directory: Option<String>,
+    }
+
+    impl SshReadinessMeasurementConfig {
+        fn from_env() -> Result<Self, String> {
+            let host = required_measurement_env("ADMINDECK_SSH_HOST")?;
+            let user = env::var("ADMINDECK_SSH_USER")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .or_else(|| env::var("USERNAME").ok())
+                .or_else(|| env::var("USER").ok())
+                .ok_or_else(|| "set ADMINDECK_SSH_USER for the measurement user".to_string())?;
+            let port = optional_measurement_env("ADMINDECK_SSH_PORT")
+                .map(|value| {
+                    value.parse::<u16>().map_err(|error| {
+                        format!("ADMINDECK_SSH_PORT must be a valid TCP port: {error}")
+                    })
+                })
+                .transpose()?
+                .unwrap_or(22);
+            let known_hosts_path = optional_measurement_env("ADMINDECK_SSH_KNOWN_HOSTS_PATH")
+                .map(PathBuf::from)
+                .or_else(default_app_known_hosts_path)
+                .ok_or_else(|| {
+                    "set ADMINDECK_SSH_KNOWN_HOSTS_PATH to AdminDeck's trusted known-hosts file"
+                        .to_string()
+                })?;
+            let auth = measurement_auth_from_env()?;
+            let cols = optional_measurement_env("ADMINDECK_SSH_COLS")
+                .and_then(|value| value.parse::<u16>().ok())
+                .unwrap_or(80);
+            let rows = optional_measurement_env("ADMINDECK_SSH_ROWS")
+                .and_then(|value| value.parse::<u16>().ok())
+                .unwrap_or(24);
+            let pixel_width = optional_measurement_env("ADMINDECK_SSH_PIXEL_WIDTH")
+                .and_then(|value| value.parse::<u16>().ok())
+                .unwrap_or(0);
+            let pixel_height = optional_measurement_env("ADMINDECK_SSH_PIXEL_HEIGHT")
+                .and_then(|value| value.parse::<u16>().ok())
+                .unwrap_or(0);
+            let initial_directory = optional_measurement_env("ADMINDECK_SSH_INITIAL_DIRECTORY");
+
+            Ok(Self {
+                host,
+                user,
+                port,
+                auth,
+                known_hosts_path,
+                cols,
+                rows,
+                pixel_width,
+                pixel_height,
+                initial_directory,
+            })
+        }
+    }
+
+    async fn measure_terminal_readiness_after_auth(
+        config: SshReadinessMeasurementConfig,
+    ) -> Result<u128, String> {
+        let session = connect_verified_client(NativeSshConnectionRequest {
+            host: config.host,
+            user: config.user,
+            port: config.port,
+            auth: config.auth,
+            known_hosts_path: config.known_hosts_path,
+        })
+        .await?;
+
+        let ready_start = Instant::now();
+        let channel = session
+            .channel_open_session()
+            .await
+            .map_err(|error| format!("failed to open SSH terminal channel: {error}"))?;
+        channel
+            .request_pty(
+                false,
+                "xterm-256color",
+                config.cols.into(),
+                config.rows.into(),
+                config.pixel_width.into(),
+                config.pixel_height.into(),
+                &[],
+            )
+            .await
+            .map_err(|error| format!("failed to allocate SSH PTY: {error}"))?;
+        channel
+            .request_shell(false)
+            .await
+            .map_err(|error| format!("failed to start SSH shell: {error}"))?;
+        if let Some(directory) = config.initial_directory.as_deref() {
+            let command = format!("cd -- {}\r", shell_single_quote(directory));
+            channel
+                .data(command.as_bytes())
+                .await
+                .map_err(|error| format!("failed to set SSH initial directory: {error}"))?;
+        }
+        let terminal_ready_ms = ready_start.elapsed().as_millis();
+
+        let _ = channel.eof().await;
+        let _ = channel.close().await;
+        session
+            .disconnect(Disconnect::ByApplication, "readiness measured", "en")
+            .await
+            .map_err(|error| format!("failed to disconnect SSH session: {error}"))?;
+        Ok(terminal_ready_ms)
+    }
+
+    fn measurement_auth_from_env() -> Result<NativeSshAuth, String> {
+        let auth_method = optional_measurement_env("ADMINDECK_SSH_AUTH").unwrap_or_else(|| {
+            if optional_measurement_env("ADMINDECK_SSH_PASSWORD").is_some() {
+                "password".to_string()
+            } else if optional_measurement_env("ADMINDECK_SSH_KEY_PATH").is_some() {
+                "keyFile".to_string()
+            } else {
+                "agent".to_string()
+            }
+        });
+
+        match auth_method.trim() {
+            "agent" | "sshAgent" | "ssh-agent" => Ok(NativeSshAuth::Agent),
+            "keyFile" | "key-file" | "key" => Ok(NativeSshAuth::KeyFile {
+                key_path: required_measurement_env("ADMINDECK_SSH_KEY_PATH")?,
+            }),
+            "password" => Ok(NativeSshAuth::Password {
+                password: required_measurement_env("ADMINDECK_SSH_PASSWORD")?,
+            }),
+            _ => Err("ADMINDECK_SSH_AUTH must be agent, keyFile, or password".to_string()),
+        }
+    }
+
+    fn required_measurement_env(name: &str) -> Result<String, String> {
+        optional_measurement_env(name).ok_or_else(|| format!("set {name} before measuring"))
+    }
+
+    fn optional_measurement_env(name: &str) -> Option<String> {
+        env::var(name)
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn default_app_known_hosts_path() -> Option<PathBuf> {
+        if cfg!(target_os = "windows") {
+            env::var_os("APPDATA")
+                .map(PathBuf::from)
+                .map(|path| path.join("com.admindeck.app").join("ssh_known_hosts"))
+        } else if let Some(data_home) = env::var_os("XDG_DATA_HOME") {
+            Some(
+                PathBuf::from(data_home)
+                    .join("com.admindeck.app")
+                    .join("ssh_known_hosts"),
+            )
+        } else {
+            env::var_os("HOME").map(|home| {
+                PathBuf::from(home)
+                    .join(".local")
+                    .join("share")
+                    .join("com.admindeck.app")
+                    .join("ssh_known_hosts")
+            })
+        }
     }
 
     fn temp_known_hosts_path(name: &str) -> PathBuf {
