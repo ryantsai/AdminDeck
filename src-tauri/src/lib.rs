@@ -301,6 +301,13 @@ fn close_terminal_session(
 }
 
 #[tauri::command]
+fn launch_elevated_terminal(
+    request: sessions::LaunchElevatedTerminalRequest,
+) -> Result<(), String> {
+    sessions::launch_elevated_terminal(request)
+}
+
+#[tauri::command]
 fn start_sftp_session(
     app: tauri::AppHandle,
     sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
@@ -457,6 +464,7 @@ pub fn run() {
             write_terminal_input,
             resize_terminal,
             close_terminal_session,
+            launch_elevated_terminal,
             start_sftp_session,
             list_sftp_directory,
             list_local_directory,

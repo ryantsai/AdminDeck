@@ -330,6 +330,10 @@ type CommandMap = {
     args: { sessionId: string };
     result: null;
   };
+  launch_elevated_terminal: {
+    args: { request: { shell: string } };
+    result: null;
+  };
   start_sftp_session: {
     args: { request: StartSftpSessionRequest };
     result: SftpSessionStarted;

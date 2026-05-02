@@ -259,7 +259,6 @@ h2 {
   right: 0;
   z-index: 45;
   display: grid;
-  overflow: hidden;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -293,6 +292,38 @@ h2 {
 
 .quick-connect-menu .connection-main {
   flex: 1 1 auto;
+}
+
+.quick-connect-submenu {
+  position: relative;
+}
+
+.quick-connect-submenu > button svg:last-child {
+  margin-left: auto;
+  transform: rotate(-90deg);
+}
+
+.quick-connect-submenu-panel {
+  position: absolute;
+  top: -1px;
+  left: calc(100% + 4px);
+  z-index: 46;
+  display: none;
+  min-width: 104px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  box-shadow: var(--shadow);
+}
+
+.quick-connect-submenu:hover .quick-connect-submenu-panel,
+.quick-connect-submenu:focus-within .quick-connect-submenu-panel {
+  display: grid;
+}
+
+.quick-connect-submenu-panel button {
+  min-height: 32px;
 }
 
 .quick-connect-menu-separator {

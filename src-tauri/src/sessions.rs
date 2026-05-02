@@ -50,6 +50,12 @@ pub struct StartTerminalSessionRequest {
     pub rows: Option<u16>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchElevatedTerminalRequest {
+    pub shell: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalSessionStarted {
@@ -268,6 +274,53 @@ impl SessionManager {
         }
         Ok(())
     }
+}
+
+pub fn launch_elevated_terminal(request: LaunchElevatedTerminalRequest) -> Result<(), String> {
+    launch_elevated_terminal_impl(normalize_elevated_shell(&request.shell)?)
+}
+
+fn normalize_elevated_shell(shell: &str) -> Result<&'static str, String> {
+    match shell.trim().to_lowercase().as_str() {
+        "cmd.exe" => Ok("cmd.exe"),
+        "powershell.exe" => Ok("powershell.exe"),
+        _ => Err("elevated terminal shell must be Command Prompt or PowerShell".to_string()),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn launch_elevated_terminal_impl(shell: &str) -> Result<(), String> {
+    use std::ptr::{null, null_mut};
+    use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
+
+    let operation = wide_string("runas");
+    let file = wide_string(shell);
+    let result = unsafe {
+        ShellExecuteW(
+            null_mut(),
+            operation.as_ptr(),
+            file.as_ptr(),
+            null(),
+            null(),
+            SW_SHOWNORMAL,
+        )
+    } as isize;
+
+    if result <= 32 {
+        return Err(format!("failed to launch elevated {shell}"));
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn launch_elevated_terminal_impl(_shell: &str) -> Result<(), String> {
+    Err("elevated local terminals are only available on Windows".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn wide_string(value: &str) -> Vec<u16> {
+    value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 fn pty_size_for(request: &StartTerminalSessionRequest) -> PtySize {

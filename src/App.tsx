@@ -124,6 +124,7 @@ const WINDOWS_LOCAL_SHELL_OPTIONS = [
 ];
 
 type LocalShellOption = {
+  canElevate?: boolean;
   label: string;
   value?: string;
 };
@@ -142,8 +143,11 @@ function localShellOptionsForPlatform(): LocalShellOption[] {
   }
 
   return [
-    { label: "Command Prompt", value: "cmd.exe" },
-    ...WINDOWS_LOCAL_SHELL_OPTIONS.filter((option) => option.value !== "cmd.exe"),
+    { canElevate: true, label: "Command Prompt", value: "cmd.exe" },
+    ...WINDOWS_LOCAL_SHELL_OPTIONS.filter((option) => option.value !== "cmd.exe").map((option) => ({
+      ...option,
+      canElevate: option.value === "powershell.exe",
+    })),
   ];
 }
 
@@ -472,6 +476,24 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       status: "idle",
     };
     openConnection(connection);
+  }
+
+  async function handleQuickAdminShell(option: LocalShellOption) {
+    if (!option.value) {
+      return;
+    }
+
+    setTreeError("");
+    setQuickConnectMenuOpen(false);
+    try {
+      await invokeCommand("launch_elevated_terminal", {
+        request: {
+          shell: option.value,
+        },
+      });
+    } catch (error) {
+      setTreeError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   async function storeConnectionPassword(connectionId: string, password: string) {
@@ -965,6 +987,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
               setQuickConnectMenuOpen(false);
               handleOpenConnection(connection);
             }}
+            onOpenElevatedShell={(option) => void handleQuickAdminShell(option)}
             onOpenLocalShell={handleQuickLocalShell}
           />
         ) : null}
@@ -1193,26 +1216,46 @@ function QuickConnectMenu({
   recentConnections,
   shellOptions,
   onOpenConnection,
+  onOpenElevatedShell,
   onOpenLocalShell,
 }: {
   recentConnections: Connection[];
   shellOptions: LocalShellOption[];
   onOpenConnection: (connection: Connection) => void;
+  onOpenElevatedShell: (option: LocalShellOption) => void;
   onOpenLocalShell: (option: LocalShellOption) => void;
 }) {
   return (
     <div className="quick-connect-menu" role="menu" aria-label="Quick connect">
-      {shellOptions.map((option) => (
-        <button
-          key={option.value ?? option.label}
-          onClick={() => onOpenLocalShell(option)}
-          role="menuitem"
-          type="button"
-        >
-          <Terminal size={15} />
-          <span>{option.label}</span>
-        </button>
-      ))}
+      {shellOptions.map((option) =>
+        option.canElevate ? (
+          <div className="quick-connect-submenu" key={option.value ?? option.label}>
+            <button aria-haspopup="menu" role="menuitem" type="button">
+              <Terminal size={15} />
+              <span>{option.label}</span>
+              <ChevronDown size={13} />
+            </button>
+            <div className="quick-connect-submenu-panel" role="menu">
+              <button onClick={() => onOpenLocalShell(option)} role="menuitem" type="button">
+                Normal
+              </button>
+              <button onClick={() => onOpenElevatedShell(option)} role="menuitem" type="button">
+                Admin
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            key={option.value ?? option.label}
+            onClick={() => onOpenLocalShell(option)}
+            role="menuitem"
+            type="button"
+          >
+            <Terminal size={15} />
+            <span>{option.label}</span>
+          </button>
+        ),
+      )}
       <div className="quick-connect-menu-separator" role="separator" />
       {recentConnections.length > 0 ? (
         recentConnections.map((connection) => {
