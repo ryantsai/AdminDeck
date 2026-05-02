@@ -105,6 +105,9 @@ Milestone D has started with a right-side AI assistant panel that scopes request
 
 ### UI Customization
 
+- Optimize the overall UI/UX for cleaner, more straightforward daily use.
+- Simplify common workflows and reduce unnecessary visual or interaction complexity.
+- Review navigation, workspace layout, settings, connection management, terminal panes, SFTP flows, and AI assistant entry points for clarity.
 - Add a more colorful default UI while preserving dense, professional workspace ergonomics.
 - Add theme support for app chrome and workspace surfaces.
 - Add editable keybindings.
