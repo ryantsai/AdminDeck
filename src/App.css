@@ -560,23 +560,38 @@ kbd + kbd {
   border-bottom: 1px solid var(--border);
 }
 
-.tab,
-.new-tab {
+.tab {
+  display: flex;
+  align-items: center;
+  max-width: 210px;
+  min-width: 132px;
   height: 37px;
   color: var(--text-muted);
+  background: transparent;
+  border-right: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.tab-button {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  height: 37px;
+  padding: 0 0 0 9px;
+  color: inherit;
+  text-align: left;
   background: transparent;
   cursor: pointer;
 }
 
-.tab {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  max-width: 210px;
-  min-width: 132px;
-  padding: 0 9px;
-  border-right: 1px solid var(--border);
-  font-size: 12px;
+.new-tab,
+.tab-close-button {
+  height: 37px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
 }
 
 .tab.active {
@@ -585,10 +600,16 @@ kbd + kbd {
   box-shadow: inset 0 2px 0 var(--accent);
 }
 
-.tab-close {
+.tab-close-button {
+  display: grid;
   flex: 0 0 auto;
-  margin-left: auto;
+  place-items: center;
+  width: 30px;
   color: var(--text-faint);
+}
+
+.tab-close-button:hover {
+  color: var(--text);
 }
 
 .terminal-workspace,

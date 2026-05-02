@@ -1342,6 +1342,7 @@ function TopBar({
           {runtimeStatus}
         </span>
         <input
+          aria-label="Import SSH config file"
           accept=".conf,.config,.txt"
           className="hidden-file-input"
           onChange={(event) => void handleImportFileChange(event)}
@@ -1470,28 +1471,36 @@ function TabStrip() {
   const openLocalTerminal = useWorkspaceStore((state) => state.openLocalTerminal);
 
   return (
-    <div className="tab-strip" role="tablist" aria-label="Workspace tabs">
+    <div className="tab-strip" aria-label="Workspace tabs">
       {tabs.map((tab) => (
-        <button
+        <div
           className={tab.id === activeTabId ? "tab active" : "tab"}
           key={tab.id}
-          onClick={() => activateTab(tab.id)}
-          role="tab"
-          aria-selected={tab.id === activeTabId}
         >
-          {tab.kind === "sftp" ? <Columns2 size={14} /> : <Terminal size={14} />}
-          <span>{tab.title}</span>
-          <X
-            className="tab-close"
-            size={13}
+          <button className="tab-button" onClick={() => activateTab(tab.id)} type="button">
+            {tab.kind === "sftp" ? <Columns2 size={14} /> : <Terminal size={14} />}
+            <span>{tab.title}</span>
+          </button>
+          <button
+            aria-label={`Close ${tab.title}`}
+            className="tab-close-button"
             onClick={(event) => {
               event.stopPropagation();
               closeTab(tab.id);
             }}
-          />
-        </button>
+            title={`Close ${tab.title}`}
+            type="button"
+          >
+            <X size={13} />
+          </button>
+        </div>
       ))}
-      <button className="new-tab" aria-label="New local terminal" onClick={openLocalTerminal}>
+      <button
+        className="new-tab"
+        aria-label="New local terminal"
+        onClick={openLocalTerminal}
+        type="button"
+      >
         <Plus size={15} />
       </button>
     </div>
@@ -1535,7 +1544,6 @@ function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspac
 
   return (
     <section
-      aria-hidden={!isActive}
       className={isActive ? "terminal-workspace active" : "terminal-workspace"}
     >
       <div className="workspace-toolbar">
@@ -2850,7 +2858,6 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
 
   return (
     <section
-      aria-hidden={!isActive}
       className={isActive ? "sftp-workspace active" : "sftp-workspace"}
     >
       <div className="workspace-toolbar">
@@ -3414,76 +3421,79 @@ function FilePane({
         {!isLoading && !status && sortedFiles.length === 0 && (
           <div className="file-row file-row-muted">No files</div>
         )}
-        {sortedFiles.map((file) => (
-          <div
-            aria-disabled={isLoading}
-            className={`file-row file-row-interactive${
-              selectedNames.includes(file.name) ? " selected" : ""
-            }`}
-            draggable={!isLoading}
-            key={file.name}
-            onClick={(event) => {
-              if (!isLoading && editingName !== file.name) {
-                selectFile(file.name, event);
-              }
-            }}
-            onDoubleClick={() => {
-              if (!isLoading && editingName !== file.name && file.kind === "folder") {
-                onOpenFolder?.(file.name);
-              }
-            }}
-            onContextMenu={(event) => {
-              if (isLoading || editingName === file.name) {
-                return;
-              }
+        {sortedFiles.map((file) => {
+          const isEditing = editingName === file.name;
 
-              event.stopPropagation();
-              const names = selectedNames.includes(file.name) ? selectedNames : [file.name];
-              onContextMenuRequest?.(side, names, event);
-            }}
-            onDragStart={(event) => handleDragStart(file.name, event)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && editingName !== file.name) {
-                event.preventDefault();
-                selectFile(file.name, event);
-                if (file.kind === "folder") {
+          return (
+            <div
+              className={`file-row file-row-interactive${
+                selectedNames.includes(file.name) ? " selected" : ""
+              }`}
+              draggable={!isLoading && !isEditing}
+              key={file.name}
+              onClick={(event) => {
+                if (!isLoading && !isEditing) {
+                  selectFile(file.name, event);
+                }
+              }}
+              onDoubleClick={() => {
+                if (!isLoading && !isEditing && file.kind === "folder") {
                   onOpenFolder?.(file.name);
                 }
-              }
-            }}
-            role="button"
-            tabIndex={isLoading ? -1 : 0}
-            title={file.kind === "folder" ? `Double-click to open ${file.name}` : file.name}
-          >
-            {file.kind === "folder" ? <Folder size={15} /> : <FileCode2 size={15} />}
-            {editingName === file.name ? (
-              <input
-                aria-label={`Rename ${file.name}`}
-                className="file-rename-input"
-                onBlur={() => void commitRename()}
-                onChange={(event) => setRenameDraft(event.currentTarget.value)}
-                onClick={(event) => event.stopPropagation()}
-                onDoubleClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    event.currentTarget.blur();
+              }}
+              onContextMenu={(event) => {
+                if (isLoading || isEditing) {
+                  return;
+                }
+
+                event.stopPropagation();
+                const names = selectedNames.includes(file.name) ? selectedNames : [file.name];
+                onContextMenuRequest?.(side, names, event);
+              }}
+              onDragStart={(event) => handleDragStart(file.name, event)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !isEditing) {
+                  event.preventDefault();
+                  selectFile(file.name, event);
+                  if (file.kind === "folder") {
+                    onOpenFolder?.(file.name);
                   }
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    cancelRename();
-                  }
-                }}
-                ref={renameInputRef}
-                value={renameDraft}
-              />
-            ) : (
-              <span>{file.name}</span>
-            )}
-            <small>{file.size}</small>
-            <small>{file.modified}</small>
-          </div>
-        ))}
+                }
+              }}
+              role={isEditing ? undefined : "button"}
+              tabIndex={isLoading || isEditing ? -1 : 0}
+              title={file.kind === "folder" ? `Double-click to open ${file.name}` : file.name}
+            >
+              {file.kind === "folder" ? <Folder size={15} /> : <FileCode2 size={15} />}
+              {isEditing ? (
+                <input
+                  aria-label={`Rename ${file.name}`}
+                  className="file-rename-input"
+                  onBlur={() => void commitRename()}
+                  onChange={(event) => setRenameDraft(event.currentTarget.value)}
+                  onClick={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      cancelRename();
+                    }
+                  }}
+                  ref={renameInputRef}
+                  value={renameDraft}
+                />
+              ) : (
+                <span>{file.name}</span>
+              )}
+              <small>{file.size}</small>
+              <small>{file.modified}</small>
+            </div>
+          );
+        })}
       </div>
     </article>
   );
