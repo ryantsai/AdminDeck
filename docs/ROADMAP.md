@@ -130,7 +130,12 @@ Milestone D has started with a right-side AI assistant panel that scopes request
 
 ### Distribution, Sync, and Trust
 
-- Add managed update channel and auto-update.
+- Add Windows installed-app auto-update mechanism for v0.2.
+- Use signed Tauri updater artifacts as a release gate for any user-facing update flow.
+- Use GitHub Releases static updater metadata for the stable update channel.
+- Enable update checks by default with clear local-first wording and no telemetry beyond the updater request.
+- Keep update installation user-mediated through Settings plus a lightweight app-chrome update notification.
+- Support normal forward updates only; defer rollback, downgrade, preview channels, managed update servers, silent installs, and portable ZIP self-update.
 - Add optional portable encrypted credential vault for users who need secrets to travel with a portable install.
 - Add optional crash reporting after explicit opt-in design.
 - Evaluate team sharing/sync as a major product-scope decision before implementation.

@@ -127,6 +127,14 @@ The AI module must enforce approval-based execution. CLI integrations should be 
 
 Owns structured local logs, diagnostics bundle creation, and redaction rules. No telemetry or automatic crash upload in v0.1.
 
+### Updates
+
+Owns update discovery and installation for packaged desktop builds. v0.2 targets the installed Windows app only, using the Tauri updater with signed update artifacts and GitHub Releases static updater metadata for a single stable channel.
+
+Update checks are enabled by default and may contact the configured GitHub Releases/update metadata endpoint. This network request is part of the updater flow and must be described clearly in Settings as distinct from telemetry. AdminDeck must not add analytics or crash upload as part of update checking.
+
+Installation is user-mediated. Settings owns manual update checks and update preferences, while app chrome may show a lightweight update-available notification after a successful check. The first v0.2 updater supports normal forward updates only. Rollback, downgrade, preview channels, managed update servers, silent installs, cross-platform updater support, and portable ZIP self-update are deferred.
+
 ## Data Boundaries
 
 SQLite contains local, non-secret data only. OS keychain contains secrets. Terminal contents should not be logged by default. Diagnostics bundles must avoid secrets and terminal output unless the user explicitly includes selected content. Any future encrypted SQLite vault must be treated as a separate secret backend, not as ordinary settings storage.
@@ -169,5 +177,13 @@ Deferred:
 
 - macOS .dmg
 - Linux AppImage/deb/rpm
-- auto-update
 - optional portable encrypted credential vault
+
+v0.2 update target:
+
+- Windows installed-app auto-update mechanism
+- signed Tauri updater artifacts as a release gate
+- GitHub Releases static updater metadata
+- stable update channel only
+- update checks enabled by default with local-first privacy wording
+- user-mediated install from Settings plus a lightweight app-chrome notification

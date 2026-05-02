@@ -64,6 +64,9 @@ The product will be light chrome with dark terminal panes by default, optimized 
 48. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
 49. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
 50. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
+51. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
+52. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
+53. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
 
 ## Implementation Decisions
 
@@ -101,7 +104,9 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - SFTP model: dual-pane file manager with basic operations and transfer queue.
 - Settings: light-first app chrome, dark terminal panes by default, font settings, terminal cursor, scrollback, copy-on-select, multiline paste confirmation, local shell default, SSH defaults, SFTP defaults, AI provider settings, fixed keybindings in v0.1.
 - Privacy: no telemetry or automatic crash upload in v0.1.
-- Distribution: Windows .msi or .exe installer, portable ZIP for dev/test, GitHub Releases. macOS .dmg and Linux AppImage/deb/rpm later. No auto-update until signing/release channel is settled.
+- Distribution: Windows .msi or .exe installer, portable ZIP for dev/test, GitHub Releases. macOS .dmg and Linux AppImage/deb/rpm later.
+- v0.2 update mechanism: Windows installed app only, stable channel only, GitHub Releases static updater metadata, signed Tauri updater artifacts required for any user-facing update flow, update checks enabled by default with clear local-first wording, and user-mediated install from Settings plus a lightweight app-chrome update notification.
+- v0.2 update limitations: normal forward updates only. Defer rollback, downgrade, preview channels, managed update servers, silent installs, cross-platform updater support, and portable ZIP self-update.
 
 ## Performance Budgets
 
@@ -130,7 +135,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - Lightweight webview/browser tabs.
 - Team sharing, team vaults, RBAC, SSO, managed cloud services, or paid AI service.
 - Settings sync.
-- Auto-update.
+- Silent, portable ZIP, rollback/downgrade, preview-channel, managed-server, or cross-platform auto-update behavior.
 - MobaXterm or RDCMan import.
 - Dynamic inventory from files, cloud APIs, Terraform, CMDB, or other external sources.
 - Folder sync, diff/compare, transfer resume, archive/extract, and remote file editing in SFTP.
