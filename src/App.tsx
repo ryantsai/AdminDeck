@@ -36,7 +36,7 @@ import {
   X,
 } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   ChangeEvent,
   DragEvent as ReactDragEvent,
@@ -1136,20 +1136,27 @@ function ConnectionDialog({
 }
 
 function TreeDragPreview({ preview }: { preview: TreeDragPreview }) {
+  const previewRef = useRef<HTMLDivElement>(null);
   const Icon =
     preview.kind === "folder"
       ? Folder
       : preview.connectionType === "local"
         ? Laptop
         : Server;
-  const style = {
-    left: `${preview.x - preview.offsetX}px`,
-    top: `${preview.y - preview.offsetY}px`,
-    width: `${preview.width}px`,
-  };
+
+  useLayoutEffect(() => {
+    const node = previewRef.current;
+    if (!node) {
+      return;
+    }
+
+    node.style.left = `${preview.x - preview.offsetX}px`;
+    node.style.top = `${preview.y - preview.offsetY}px`;
+    node.style.width = `${preview.width}px`;
+  }, [preview.offsetX, preview.offsetY, preview.width, preview.x, preview.y]);
 
   return (
-    <div className={`tree-drag-preview ${preview.kind}`} style={style}>
+    <div className={`tree-drag-preview ${preview.kind}`} ref={previewRef}>
       <Icon size={15} />
       <span className="connection-main">
         <strong>{preview.title}</strong>
@@ -3423,47 +3430,10 @@ function FilePane({
         )}
         {sortedFiles.map((file) => {
           const isEditing = editingName === file.name;
-
-          return (
-            <div
-              className={`file-row file-row-interactive${
-                selectedNames.includes(file.name) ? " selected" : ""
-              }`}
-              draggable={!isLoading && !isEditing}
-              key={file.name}
-              onClick={(event) => {
-                if (!isLoading && !isEditing) {
-                  selectFile(file.name, event);
-                }
-              }}
-              onDoubleClick={() => {
-                if (!isLoading && !isEditing && file.kind === "folder") {
-                  onOpenFolder?.(file.name);
-                }
-              }}
-              onContextMenu={(event) => {
-                if (isLoading || isEditing) {
-                  return;
-                }
-
-                event.stopPropagation();
-                const names = selectedNames.includes(file.name) ? selectedNames : [file.name];
-                onContextMenuRequest?.(side, names, event);
-              }}
-              onDragStart={(event) => handleDragStart(file.name, event)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !isEditing) {
-                  event.preventDefault();
-                  selectFile(file.name, event);
-                  if (file.kind === "folder") {
-                    onOpenFolder?.(file.name);
-                  }
-                }
-              }}
-              role={isEditing ? undefined : "button"}
-              tabIndex={isLoading || isEditing ? -1 : 0}
-              title={file.kind === "folder" ? `Double-click to open ${file.name}` : file.name}
-            >
+          const isSelected = selectedNames.includes(file.name);
+          const fileTitle = file.kind === "folder" ? `Double-click to open ${file.name}` : file.name;
+          const fileContents = (
+            <>
               {file.kind === "folder" ? <Folder size={15} /> : <FileCode2 size={15} />}
               {isEditing ? (
                 <input
@@ -3491,6 +3461,61 @@ function FilePane({
               )}
               <small>{file.size}</small>
               <small>{file.modified}</small>
+            </>
+          );
+
+          if (isEditing) {
+            return (
+              <div
+                className={`file-row file-row-interactive${isSelected ? " selected" : ""}`}
+                draggable={false}
+                key={file.name}
+                title={fileTitle}
+              >
+                {fileContents}
+              </div>
+            );
+          }
+
+          return (
+            <div
+              className={`file-row file-row-interactive${isSelected ? " selected" : ""}`}
+              draggable={!isLoading}
+              key={file.name}
+              onClick={(event) => {
+                if (!isLoading) {
+                  selectFile(file.name, event);
+                }
+              }}
+              onDoubleClick={() => {
+                if (!isLoading && file.kind === "folder") {
+                  onOpenFolder?.(file.name);
+                }
+              }}
+              onContextMenu={(event) => {
+                if (isLoading) {
+                  return;
+                }
+
+                event.stopPropagation();
+                const names = isSelected ? selectedNames : [file.name];
+                onContextMenuRequest?.(side, names, event);
+              }}
+              onDragStart={(event) => handleDragStart(file.name, event)}
+              onKeyDown={(event) => {
+                if ((event.key === "Enter" || event.key === " ") && !isLoading) {
+                  event.preventDefault();
+                  selectFile(file.name, event);
+                  if (event.key === "Enter" && file.kind === "folder") {
+                    onOpenFolder?.(file.name);
+                  }
+                }
+              }}
+              role="button"
+              tabIndex={isLoading ? -1 : 0}
+              title={fileTitle}
+            >
+              {fileContents}
             </div>
           );
         })}
@@ -3575,6 +3600,8 @@ function SftpContextMenu({
   onProperties: (menu: SftpContextMenuState) => void;
   onClose: () => void;
 }) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handlePointerDown = () => onClose();
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -3591,6 +3618,16 @@ function SftpContextMenu({
     };
   }, [onClose]);
 
+  useLayoutEffect(() => {
+    const node = menuRef.current;
+    if (!node) {
+      return;
+    }
+
+    node.style.left = `${menu.x}px`;
+    node.style.top = `${menu.y}px`;
+  }, [menu.x, menu.y]);
+
   const transferLabel = menu.side === "local" ? "Transfer upload" : "Transfer download";
   const canRename = menu.side === "remote" && menu.names.length === 1;
   const canDelete = menu.side === "remote" && menu.names.length > 0;
@@ -3600,8 +3637,8 @@ function SftpContextMenu({
       className="sftp-context-menu"
       onContextMenu={(event) => event.preventDefault()}
       onPointerDown={(event) => event.stopPropagation()}
+      ref={menuRef}
       role="menu"
-      style={{ left: menu.x, top: menu.y }}
     >
       <button onClick={() => onTransfer(menu)} role="menuitem" type="button">
         Transfer

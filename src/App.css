@@ -883,7 +883,6 @@ kbd + kbd {
   overflow-x: hidden;
   overflow-y: scroll;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .file-table.drop-target {
