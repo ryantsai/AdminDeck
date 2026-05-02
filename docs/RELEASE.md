@@ -63,10 +63,18 @@ The script runs the Tauri NSIS bundle target without code signing, copies the ge
 
 The installer uses a current-user install mode by default, creates AdminDeck Start Menu entries, and downloads the WebView2 bootstrapper only if the target machine needs WebView2 during install. The v0.1 installer is unsigned until release signing is configured.
 
+Smoke test the installer artifact with:
+
+```bash
+npm run smoke:installer
+```
+
+The smoke test verifies the release artifact checksum, silently installs into a temporary directory, confirms `admin-deck.exe` is present and non-empty, then silently uninstalls and removes only the temporary smoke-test directory it created.
+
 ## Known Limitations
 
 - Windows is the only v0.1 acceptance platform.
-- The Windows installer build is repeatable, but it still needs a smoke test before release.
+- The Windows installer build and smoke test are repeatable, but the v0.1 installer is unsigned until release signing is configured.
 - SSH readiness performance is instrumented for native post-auth terminal setup and retained in local performance snapshots after a native SSH Session starts, but the latest documented run still lacks a measured value because it requires a trusted non-`ProxyJump` SSH Connection with valid auth in the measurement environment.
 - Native SSH and SFTP do not support `ProxyJump`; those sessions use the system `ssh` fallback/debug path where available.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.

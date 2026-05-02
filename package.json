@@ -9,6 +9,7 @@
     "check": "tsc --noEmit",
     "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
     "package:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-installer.ps1",
+    "smoke:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installer.ps1",
     "preview": "vite preview",
     "tauri": "tauri"
   },
