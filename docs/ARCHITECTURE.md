@@ -150,10 +150,11 @@ The primary UI is a dense desktop workspace:
 - terminal split panes inside terminal tabs
 - SFTP dual-pane view
 - right AI assistant panel
-- command palette
 - settings
 
 Default visual direction: quiet productivity light chrome with dark terminal panes.
+
+AdminDeck does not include a global command palette in the current product scope; navigation and workflow entry points should stay visible in the connection tree, tab workspace, SFTP toolbar/context actions, assistant panel, and Settings.
 
 The main workspace treats Tabs as frontend containers over live Sessions. Selecting another Tab changes visibility and focus only; it must not run backend Session close commands. Closing a Tab via the tab-strip close control removes that container and tears down the live Session resources it owns.
 

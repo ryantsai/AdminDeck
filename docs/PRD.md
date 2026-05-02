@@ -51,27 +51,25 @@ The product will be light chrome with dark terminal panes by default, optimized 
 35. As an SFTP user, I want a transfer queue with progress, cancellation, and clearable finished history, so that long operations are visible without old records piling up.
 36. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
 37. As an SFTP user, I want overwrite prompts with an overwrite-all option, so that file transfer conflicts stay explicit without slowing down large batches.
-38. As a user, I want a command palette, so that I can navigate and trigger common actions without reaching for the mouse.
-39. As a user, I want the command palette to open connections, create terminals, split panes, search scrollback, open settings, and import SSH config, so that common workflows are keyboard-first.
-40. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
-41. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
-42. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
-43. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
-44. As a user, I want no telemetry by default, so that my terminal and host data remain private.
-45. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
-46. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
-47. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
-48. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
-49. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
-50. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
-51. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
-52. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
-53. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
-54. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
-55. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
-56. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
-57. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
-58. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
+38. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
+39. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
+40. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
+41. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
+42. As a user, I want no telemetry by default, so that my terminal and host data remain private.
+43. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
+44. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
+45. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
+46. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
+47. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
+48. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
+49. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
+50. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
+51. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
+52. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
+53. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
+54. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
+55. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
+56. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
 
 ## Implementation Decisions
 
@@ -140,6 +138,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - Lightweight webview/browser tabs.
 - Team sharing, team vaults, RBAC, SSO, managed cloud services, or paid AI service.
 - Settings sync.
+- Global command palette or command launcher.
 - Silent, portable ZIP, rollback/downgrade, preview-channel, managed-server, or cross-platform auto-update behavior.
 - MobaXterm or RDCMan import.
 - Dynamic inventory from files, cloud APIs, Terraform, CMDB, or other external sources.

@@ -300,9 +300,6 @@ function ActivityRail({ onOpenSettings }: { onOpenSettings: () => void }) {
       <button className="rail-button" aria-label="Terminal sessions">
         <Terminal size={18} />
       </button>
-      <button className="rail-button" aria-label="Command palette">
-        <Command size={18} />
-      </button>
       <button className="rail-button bottom" aria-label="Settings" onClick={onOpenSettings}>
         <Settings size={18} />
       </button>
@@ -1337,12 +1334,6 @@ function TopBar({
 
   return (
     <header className="top-bar">
-      <div className="command-search">
-        <Command size={15} />
-        <span>Open command palette</span>
-        <kbd>Ctrl</kbd>
-        <kbd>K</kbd>
-      </div>
       <div className="top-actions">
         <span className="runtime-status">
           <ShieldCheck size={14} />

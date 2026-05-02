@@ -463,50 +463,9 @@ h2 {
 
 .top-bar {
   gap: 14px;
+  justify-content: flex-end;
   padding: 0 14px;
   border-bottom: 1px solid var(--border);
-}
-
-.command-search {
-  display: flex;
-  flex: 1 1 180px;
-  gap: 8px;
-  align-items: center;
-  width: auto;
-  min-width: 150px;
-  height: 30px;
-  padding: 0 9px;
-  color: var(--text-muted);
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 12px;
-}
-
-.command-search span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 18px;
-  margin-left: auto;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-kbd + kbd {
-  margin-left: -4px;
 }
 
 .top-actions,
