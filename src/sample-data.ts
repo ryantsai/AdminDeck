@@ -99,17 +99,17 @@ export const defaultAiProviderSettings: AiProviderSettings = {
 };
 
 export const localFiles: FileEntry[] = [
-  { name: "admin-deck-0.1.0.zip", kind: "file", size: "18.4 MB", modified: "10:38" },
-  { name: "release-notes.md", kind: "file", size: "12 KB", modified: "10:16" },
-  { name: "symbols", kind: "folder", size: "-", modified: "09:52" },
-  { name: "checksums.txt", kind: "file", size: "2 KB", modified: "09:43" },
+  { name: "admin-deck-0.1.0.zip", kind: "file", size: "18.4 MB", modified: "10:38", modifiedTimestamp: 1_714_471_080 },
+  { name: "release-notes.md", kind: "file", size: "12 KB", modified: "10:16", modifiedTimestamp: 1_714_469_760 },
+  { name: "symbols", kind: "folder", size: "-", modified: "09:52", modifiedTimestamp: 1_714_468_320 },
+  { name: "checksums.txt", kind: "file", size: "2 KB", modified: "09:43", modifiedTimestamp: 1_714_467_780 },
 ];
 
 export const remoteFiles: FileEntry[] = [
-  { name: "current", kind: "folder", size: "-", modified: "10:02" },
-  { name: "incoming", kind: "folder", size: "-", modified: "09:58" },
-  { name: "admin-deck-0.0.9.zip", kind: "file", size: "17.8 MB", modified: "Apr 29" },
-  { name: "manifest.json", kind: "file", size: "4 KB", modified: "Apr 29" },
+  { name: "current", kind: "folder", size: "-", modified: "10:02", modifiedTimestamp: 1_714_468_920 },
+  { name: "incoming", kind: "folder", size: "-", modified: "09:58", modifiedTimestamp: 1_714_468_680 },
+  { name: "admin-deck-0.0.9.zip", kind: "file", size: "17.8 MB", modified: "Apr 29", modifiedTimestamp: 1_714_412_800 },
+  { name: "manifest.json", kind: "file", size: "4 KB", modified: "Apr 29", modifiedTimestamp: 1_714_412_700 },
 ];
 
 export const transferQueue = [

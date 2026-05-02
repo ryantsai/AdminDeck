@@ -369,6 +369,22 @@ fn delete_sftp_path(
 }
 
 #[tauri::command]
+fn sftp_path_properties(
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    request: sftp::SftpPathPropertiesRequest,
+) -> Result<sftp::SftpPathProperties, String> {
+    sftp_sessions.path_properties(request)
+}
+
+#[tauri::command]
+fn update_sftp_path_properties(
+    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+    request: sftp::UpdateSftpPathPropertiesRequest,
+) -> Result<sftp::SftpPathProperties, String> {
+    sftp_sessions.update_path_properties(request)
+}
+
+#[tauri::command]
 fn close_sftp_session(
     sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     session_id: String,
@@ -442,6 +458,8 @@ pub fn run() {
             create_sftp_folder,
             rename_sftp_path,
             delete_sftp_path,
+            sftp_path_properties,
+            update_sftp_path_properties,
             close_sftp_session
         ])
         .run(tauri::generate_context!())

@@ -1,8 +1,8 @@
 use crate::{secrets, ssh};
 use russh::{client, Disconnect};
 use russh_sftp::{
-    client::SftpSession,
-    protocol::{FileType, OpenFlags},
+    client::{fs::Metadata, SftpSession},
+    protocol::{FileAttributes, FileType, OpenFlags},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -113,6 +113,23 @@ pub struct DeleteSftpPathRequest {
     path: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SftpPathPropertiesRequest {
+    session_id: String,
+    path: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSftpPathPropertiesRequest {
+    session_id: String,
+    path: String,
+    permissions: Option<String>,
+    uid: Option<u32>,
+    gid: Option<u32>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SftpSessionStarted {
@@ -143,6 +160,12 @@ pub struct SftpDirectoryEntry {
     kind: String,
     size: Option<u64>,
     modified: Option<u64>,
+    accessed: Option<u64>,
+    permissions: Option<u32>,
+    uid: Option<u32>,
+    user: Option<String>,
+    gid: Option<u32>,
+    group: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -161,6 +184,23 @@ pub struct SftpTransferResult {
     files: u64,
     folders: u64,
     bytes: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SftpPathProperties {
+    path: String,
+    name: String,
+    kind: String,
+    size: Option<u64>,
+    modified: Option<u64>,
+    accessed: Option<u64>,
+    permissions: Option<u32>,
+    mode: Option<String>,
+    uid: Option<u32>,
+    user: Option<String>,
+    gid: Option<u32>,
+    group: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -403,6 +443,54 @@ impl SftpSessionManager {
         session
             .runtime
             .block_on(delete_remote_entry(&session.sftp, &request.path))
+    }
+
+    pub fn path_properties(
+        &self,
+        request: SftpPathPropertiesRequest,
+    ) -> Result<SftpPathProperties, String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "SFTP session lock is poisoned".to_string())?;
+        let session = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| "SFTP session was not found".to_string())?;
+        session
+            .runtime
+            .block_on(path_properties(&session.sftp, &request.path))
+    }
+
+    pub fn update_path_properties(
+        &self,
+        request: UpdateSftpPathPropertiesRequest,
+    ) -> Result<SftpPathProperties, String> {
+        let permissions = match request.permissions.as_deref() {
+            Some(value) => Some(parse_octal_permissions(value)?),
+            None => None,
+        };
+        if permissions.is_none() && request.uid.is_none() && request.gid.is_none() {
+            return Err("at least one SFTP property must be changed".to_string());
+        }
+
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "SFTP session lock is poisoned".to_string())?;
+        let session = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| "SFTP session was not found".to_string())?;
+        session.runtime.block_on(async {
+            update_path_properties(
+                &session.sftp,
+                &request.path,
+                permissions,
+                request.uid,
+                request.gid,
+            )
+            .await?;
+            path_properties(&session.sftp, &request.path).await
+        })
     }
 
     pub fn close_sftp_session(&self, session_id: String) -> Result<(), String> {
@@ -838,6 +926,15 @@ async fn read_directory(
                     .modified()
                     .ok()
                     .and_then(|time| unix_timestamp(time).ok()),
+                accessed: metadata
+                    .accessed()
+                    .ok()
+                    .and_then(|time| unix_timestamp(time).ok()),
+                permissions: metadata.permissions.map(sftp_file_mode),
+                uid: metadata.uid,
+                user: metadata.user,
+                gid: metadata.gid,
+                group: metadata.group,
             }
         })
         .collect::<Vec<_>>();
@@ -852,6 +949,73 @@ async fn read_directory(
         path: canonical_path,
         entries,
     })
+}
+
+async fn path_properties(sftp: &SftpSession, path: &str) -> Result<SftpPathProperties, String> {
+    let path = normalize_path(path);
+    let metadata = sftp
+        .symlink_metadata(path.clone())
+        .await
+        .map_err(|error| format!("failed to read SFTP properties: {error}"))?;
+    Ok(properties_from_metadata(path, metadata))
+}
+
+async fn update_path_properties(
+    sftp: &SftpSession,
+    path: &str,
+    permissions: Option<u32>,
+    uid: Option<u32>,
+    gid: Option<u32>,
+) -> Result<(), String> {
+    let path = normalize_path(path);
+    let mut attrs = FileAttributes::empty();
+    attrs.permissions = permissions;
+    attrs.uid = uid;
+    attrs.gid = gid;
+    sftp.set_metadata(path, attrs)
+        .await
+        .map_err(|error| format!("failed to update SFTP properties: {error}"))
+}
+
+fn properties_from_metadata(path: String, metadata: Metadata) -> SftpPathProperties {
+    let permissions = metadata.permissions.map(sftp_file_mode);
+    SftpPathProperties {
+        name: display_remote_path_name(&path),
+        path,
+        kind: file_kind(metadata.file_type()).to_string(),
+        size: metadata.size,
+        modified: metadata
+            .modified()
+            .ok()
+            .and_then(|time| unix_timestamp(time).ok()),
+        accessed: metadata
+            .accessed()
+            .ok()
+            .and_then(|time| unix_timestamp(time).ok()),
+        permissions,
+        mode: permissions.map(format_octal_permissions),
+        uid: metadata.uid,
+        user: metadata.user,
+        gid: metadata.gid,
+        group: metadata.group,
+    }
+}
+
+fn display_remote_path_name(path: &str) -> String {
+    path.trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .filter(|name| !name.is_empty())
+        .unwrap_or(path)
+        .to_string()
+}
+
+fn sftp_file_mode(permissions: u32) -> u32 {
+    permissions & 0o7777
+}
+
+fn format_octal_permissions(permissions: u32) -> String {
+    format!("{:03o}", permissions & 0o7777)
 }
 
 fn auth_for(
@@ -1352,6 +1516,20 @@ fn normalize_sftp_overwrite_behavior(value: Option<&str>) -> Result<SftpOverwrit
     }
 }
 
+fn parse_octal_permissions(value: &str) -> Result<u32, String> {
+    let trimmed = value.trim().trim_start_matches("0o");
+    if trimmed.is_empty()
+        || trimmed.len() > 4
+        || !trimmed.chars().all(|digit| ('0'..='7').contains(&digit))
+    {
+        return Err("SFTP permissions must be an octal mode like 755 or 0644".to_string());
+    }
+
+    u32::from_str_radix(trimmed, 8)
+        .map(|mode| mode & 0o7777)
+        .map_err(|_| "SFTP permissions must be an octal mode like 755 or 0644".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1458,6 +1636,16 @@ mod tests {
         );
         assert!(remote_path_name(".").is_err());
         assert!(remote_path_name("..").is_err());
+    }
+
+    #[test]
+    fn sftp_permission_modes_parse_octal_values() {
+        assert_eq!(parse_octal_permissions("755"), Ok(0o755));
+        assert_eq!(parse_octal_permissions("0644"), Ok(0o644));
+        assert_eq!(parse_octal_permissions("0o600"), Ok(0o600));
+        assert!(parse_octal_permissions("").is_err());
+        assert!(parse_octal_permissions("888").is_err());
+        assert!(parse_octal_permissions("10000").is_err());
     }
 
     #[test]

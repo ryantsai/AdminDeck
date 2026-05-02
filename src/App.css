@@ -548,6 +548,7 @@ kbd + kbd {
 .workspace-canvas {
   display: grid;
   min-height: 0;
+  overflow: hidden;
   background: var(--chrome-strong);
 }
 
@@ -593,7 +594,9 @@ kbd + kbd {
 .terminal-workspace,
 .sftp-workspace {
   display: none;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   padding: 14px;
   background: var(--chrome-strong);
 }
@@ -779,11 +782,29 @@ kbd + kbd {
   gap: 10px;
 }
 
+.sftp-workspace.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.sftp-workspace .workspace-toolbar {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.sftp-workspace .transfer-queue {
+  flex: 0 0 112px;
+  min-height: 0;
+}
+
 .file-manager {
   display: grid;
+  flex: 1 1 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  height: auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .file-pane,
@@ -796,8 +817,9 @@ kbd + kbd {
 }
 
 .file-pane {
-  display: grid;
-  grid-template-rows: 54px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -821,12 +843,32 @@ kbd + kbd {
   align-items: center;
 }
 
+.file-sort-button {
+  width: auto;
+  gap: 5px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .up-icon {
   transform: rotate(180deg);
 }
 
 .file-table {
-  overflow: auto;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.file-table.drop-target {
+  background: var(--accent-soft);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .file-row {
@@ -844,21 +886,22 @@ kbd + kbd {
   font-size: 12px;
 }
 
-button.file-row {
+.file-row-interactive {
   cursor: pointer;
 }
 
-button.file-row:hover:not(:disabled) {
+.file-row-interactive:hover {
   background: var(--surface-muted);
 }
 
-button.file-row.selected {
+.file-row-interactive.selected {
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-button.file-row:disabled {
+.file-row-interactive[aria-disabled="true"] {
   cursor: default;
+  opacity: 0.72;
 }
 
 .file-row small {
@@ -868,6 +911,270 @@ button.file-row:disabled {
 .file-row-muted {
   grid-template-columns: minmax(0, 1fr);
   color: var(--text-muted);
+}
+
+.file-rename-input {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 5px;
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  outline: none;
+  font-size: 12px;
+}
+
+.sftp-context-menu {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  width: 170px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  box-shadow: var(--shadow);
+}
+
+.sftp-context-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sftp-context-menu button:last-child {
+  border-bottom: 0;
+}
+
+.sftp-context-menu button:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.sftp-context-menu button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.sftp-context-menu small {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.sftp-properties-popover {
+  position: fixed;
+  top: 84px;
+  right: 360px;
+  z-index: 45;
+  display: grid;
+  gap: 12px;
+  width: min(360px, calc(100vw - 40px));
+  padding: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.sftp-properties-popover header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sftp-properties-popover header > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sftp-properties-popover header strong,
+.sftp-properties-popover header span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sftp-properties-popover header span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.properties-grid {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 7px 10px;
+  padding: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.properties-grid span {
+  color: var(--text-muted);
+}
+
+.properties-grid strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.properties-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.properties-edit-grid label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.properties-edit-grid span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.properties-edit-grid input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  font-size: 12px;
+}
+
+.properties-edit-grid input:focus {
+  border-color: #8db5ff;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.properties-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 12px;
+}
+
+.properties-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.primary-button,
+.secondary-button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.primary-button {
+  color: #ffffff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.secondary-button {
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.transfer-conflict-backdrop {
+  z-index: 55;
+}
+
+.transfer-conflict-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(440px, calc(100vw - 40px));
+  padding: 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.transfer-conflict-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.transfer-conflict-dialog header > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.transfer-conflict-dialog header span,
+.transfer-conflict-dialog small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.transfer-conflict-dialog p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.transfer-conflict-dialog code {
+  min-width: 0;
+  padding: 8px;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.transfer-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .transfer-queue {

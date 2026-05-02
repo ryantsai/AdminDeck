@@ -15,6 +15,7 @@ This repository currently contains the v0.1 foundation:
 - OS keychain secret operations
 - xterm-based local terminal Sessions over `portable-pty`
 - Live workspace-derived connection status badges
+- SSH-launched SFTP workspace with dual-pane local/remote browsing, drag/drop transfer, overwrite prompts, remote properties, chmod, and chown
 - SSH config import preview with unsupported directive reporting
 - Local logging bootstrap
 - Windows-first CI skeleton

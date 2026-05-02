@@ -122,7 +122,16 @@ export interface FileEntry {
   name: string;
   kind: "file" | "folder" | "symlink" | "other";
   size: string;
+  sizeBytes?: number;
   modified: string;
+  modifiedTimestamp?: number;
+  accessedTimestamp?: number;
+  permissions?: number;
+  mode?: string;
+  uid?: number;
+  user?: string;
+  gid?: number;
+  group?: string;
 }
 
 export interface AppBootstrap {

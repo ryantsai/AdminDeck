@@ -68,6 +68,12 @@ export interface SftpDirectoryEntry {
   kind: "file" | "folder" | "symlink" | "other";
   size?: number;
   modified?: number;
+  accessed?: number;
+  permissions?: number;
+  uid?: number;
+  user?: string;
+  gid?: number;
+  group?: string;
 }
 
 export interface SftpDirectoryListing {
@@ -102,6 +108,21 @@ export interface SftpTransferProgress {
   transferredBytes: number;
   totalBytes: number;
   progress: number;
+}
+
+export interface SftpPathProperties {
+  path: string;
+  name: string;
+  kind: "file" | "folder" | "symlink" | "other";
+  size?: number;
+  modified?: number;
+  accessed?: number;
+  permissions?: number;
+  mode?: string;
+  uid?: number;
+  user?: string;
+  gid?: number;
+  group?: string;
 }
 
 export interface SshTransportPlan {
@@ -355,6 +376,22 @@ type CommandMap = {
   delete_sftp_path: {
     args: { request: { sessionId: string; path: string } };
     result: null;
+  };
+  sftp_path_properties: {
+    args: { request: { sessionId: string; path: string } };
+    result: SftpPathProperties;
+  };
+  update_sftp_path_properties: {
+    args: {
+      request: {
+        sessionId: string;
+        path: string;
+        permissions?: string;
+        uid?: number;
+        gid?: number;
+      };
+    };
+    result: SftpPathProperties;
   };
   close_sftp_session: {
     args: { sessionId: string };

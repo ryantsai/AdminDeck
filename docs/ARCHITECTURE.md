@@ -105,7 +105,7 @@ Evaluate `russh` first. Evaluate `ssh2` if `russh` does not meet v0.1 needs.
 
 ### SFTP
 
-Owns SFTP sessions launched from SSH Connections, local/remote listing, upload/download, create folder, rename, delete, refresh, transfer queue, progress, cancellation, overwrite policy, and "open terminal here."
+Owns SFTP sessions launched from SSH Connections, local/remote listing, multi-select upload/download by button or drag/drop, create folder, inline rename, delete, refresh, scoped context menu actions, remote properties, chmod/chown updates, transfer queue, progress, cancellation, overwrite conflict prompts, overwrite-all queue handling, and "open terminal here."
 
 ### SSH Config Importer
 

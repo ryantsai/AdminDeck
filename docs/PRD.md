@@ -45,30 +45,33 @@ The product will be light chrome with dark terminal panes by default, optimized 
 29. As an SFTP user, I want a dual-pane file manager, so that local and remote files can be transferred without switching tools.
 30. As an SFTP user, I want upload and download for files and folders, so that common transfer work is covered.
 31. As an SFTP user, I want create folder, rename, delete, and refresh, so that I can manage remote files.
-32. As an SFTP user, I want a transfer queue with progress and cancellation, so that long operations are visible and controllable.
-33. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
-34. As an SFTP user, I want overwrite behavior settings, so that file transfer conflicts are predictable.
-35. As a user, I want a command palette, so that I can navigate and trigger common actions without reaching for the mouse.
-36. As a user, I want the command palette to open connections, create terminals, split panes, search scrollback, open settings, and import SSH config, so that common workflows are keyboard-first.
-37. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
-38. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
-39. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
-40. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
-41. As a user, I want no telemetry by default, so that my terminal and host data remain private.
-42. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
-43. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
-44. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
-45. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
-46. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
-47. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
-48. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
-49. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
-50. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
-51. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
-52. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
-53. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
-54. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
-55. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
+32. As an SFTP user, I want multi-select drag/drop transfer between local and remote panes, so that batch upload and download feels natural.
+33. As an SFTP user, I want a focused right-click menu with transfer, rename, delete, and properties, so that file actions stay predictable in the SFTP workspace.
+34. As an SFTP user, I want remote properties with chmod and chown controls, so that permission and ownership fixes can be made without leaving the app.
+35. As an SFTP user, I want a transfer queue with progress and cancellation, so that long operations are visible and controllable.
+36. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
+37. As an SFTP user, I want overwrite prompts with an overwrite-all option, so that file transfer conflicts stay explicit without slowing down large batches.
+38. As a user, I want a command palette, so that I can navigate and trigger common actions without reaching for the mouse.
+39. As a user, I want the command palette to open connections, create terminals, split panes, search scrollback, open settings, and import SSH config, so that common workflows are keyboard-first.
+40. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
+41. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
+42. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
+43. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
+44. As a user, I want no telemetry by default, so that my terminal and host data remain private.
+45. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
+46. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
+47. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
+48. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
+49. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
+50. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
+51. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
+52. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
+53. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
+54. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
+55. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
+56. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
+57. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
+58. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
 
 ## Implementation Decisions
 
@@ -103,7 +106,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - CLI agent integrations: suggest-only/ask-before-execute where possible.
 - UI model: left-side connection manager/tree, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
 - Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
-- SFTP model: dual-pane file manager with basic operations and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
+- SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
 - Settings: light-first app chrome, dark terminal panes by default, font settings, terminal cursor, scrollback, copy-on-select, multiline paste confirmation, local shell default, SSH defaults, SFTP defaults, AI provider settings, fixed keybindings in v0.1.
 - Privacy: no telemetry or automatic crash upload in v0.1.
 - Distribution: Windows .msi or .exe installer, portable ZIP for dev/test, GitHub Releases. macOS .dmg and Linux AppImage/deb/rpm later.

@@ -77,6 +77,7 @@ The smoke test verifies the release artifact checksum, silently installs into a 
 - The Windows installer build and smoke test are repeatable, but the v0.1 installer is unsigned until release signing is configured.
 - SSH readiness performance is instrumented for native post-auth terminal setup and retained in local performance snapshots after a native SSH Session starts. The repeatable `npm run measure:ssh-readiness` helper can validate the `<= 150 ms` budget against a trusted non-`ProxyJump` SSH Connection, but the latest documented run still lacks a measured value because valid SSH auth was not available in the measurement environment.
 - Native SSH-launched SFTP does not support `ProxyJump`; SSH terminal sessions with `ProxyJump` use the system `ssh` fallback/debug path where available.
+- SFTP supports recursive file and folder transfer, multi-select drag/drop, overwrite prompts with overwrite-all handling, remote properties, chmod, and chown, but folder sync, diff/compare, transfer resume, archive/extract, and remote file editing remain deferred.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.
 - AI command assistance stages proposals only; it does not autonomously execute commands.
 - Diagnostics bundles are folders, not compressed archives.
