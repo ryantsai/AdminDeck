@@ -42,6 +42,7 @@ interface WorkspaceState {
   setFrontendLaunchMs: (frontendLaunchMs: number) => void;
   setPerformanceSnapshot: (snapshot: PerformanceSnapshot) => void;
   recordTerminalStartMetric: (metric: TerminalStartMetric) => void;
+  clearTerminalStartMetric: (kind: TerminalStartMetric["kind"]) => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -96,6 +97,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...(lastTerminalStart.kind === "local"
           ? { lastLocalTerminalStart: lastTerminalStart }
           : { lastSshTerminalStart: lastTerminalStart }),
+      },
+    })),
+  clearTerminalStartMetric: (kind) =>
+    set((state) => ({
+      performanceMetrics: {
+        ...state.performanceMetrics,
+        ...(kind === "local"
+          ? { lastLocalTerminalStart: undefined }
+          : { lastSshTerminalStart: undefined }),
       },
     })),
   activateTab: (tabId) => set({ activeTabId: tabId }),

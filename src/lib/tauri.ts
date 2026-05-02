@@ -40,6 +40,7 @@ export interface StartTerminalSessionRequest {
 
 export interface TerminalSessionStarted {
   sessionId: string;
+  terminalReadyMs?: number;
 }
 
 export interface TerminalOutput {

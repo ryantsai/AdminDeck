@@ -52,6 +52,8 @@ pub struct StartTerminalSessionRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TerminalSessionStarted {
     session_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    terminal_ready_ms: Option<u128>,
 }
 
 #[derive(Serialize, Clone)]
@@ -112,6 +114,7 @@ impl SessionManager {
                     initial_directory: request.initial_directory.clone(),
                 },
             )?;
+            let terminal_ready_ms = session.terminal_ready_ms();
             self.sessions
                 .lock()
                 .map_err(|_| "terminal session lock is poisoned".to_string())?
@@ -121,7 +124,10 @@ impl SessionManager {
                         transport: TerminalTransport::NativeSsh(session),
                     },
                 );
-            return Ok(TerminalSessionStarted { session_id });
+            return Ok(TerminalSessionStarted {
+                session_id,
+                terminal_ready_ms: Some(terminal_ready_ms),
+            });
         }
 
         let pty_system = native_pty_system();
@@ -191,7 +197,10 @@ impl SessionManager {
             }
         });
 
-        Ok(TerminalSessionStarted { session_id })
+        Ok(TerminalSessionStarted {
+            session_id,
+            terminal_ready_ms: None,
+        })
     }
 
     pub fn write_terminal_input(&self, request: TerminalInputRequest) -> Result<(), String> {

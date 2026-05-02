@@ -37,9 +37,8 @@ Users should review the generated files before sharing them. Future diagnostics 
 
 - Windows is the only v0.1 acceptance platform.
 - Packaging still needs a successful Windows installer or portable ZIP build and smoke test before release.
-- SSH readiness performance is not yet measured in the latest documented run because it requires a trusted non-`ProxyJump` SSH Connection with valid auth in the measurement environment.
+- SSH readiness performance is instrumented for native post-auth terminal setup, but the latest documented run still lacks a measured value because it requires a trusted non-`ProxyJump` SSH Connection with valid auth in the measurement environment.
 - Native SSH and SFTP do not support `ProxyJump`; those sessions use the system `ssh` fallback/debug path where available.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.
 - AI command assistance stages proposals only; it does not autonomously execute commands.
 - Diagnostics bundles are folders, not compressed archives.
-

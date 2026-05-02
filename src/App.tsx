@@ -1310,6 +1310,9 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
   const recordTerminalStartMetric = useWorkspaceStore(
     (state) => state.recordTerminalStartMetric,
   );
+  const clearTerminalStartMetric = useWorkspaceStore(
+    (state) => state.clearTerminalStartMetric,
+  );
 
   useEffect(() => {
     const element = terminalElementRef.current;
@@ -1429,12 +1432,20 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
           void invokeCommand("close_terminal_session", { sessionId: result.sessionId });
           return;
         }
-        recordTerminalStartMetric({
-          kind: terminalSessionType,
-          title: connection.name,
-          durationMs: Math.round(performance.now() - terminalStartAt),
-          recordedAt: new Date().toISOString(),
-        });
+        const frontendDurationMs = Math.round(performance.now() - terminalStartAt);
+        if (terminalSessionType === "ssh" && result.terminalReadyMs === undefined) {
+          clearTerminalStartMetric("ssh");
+        } else {
+          recordTerminalStartMetric({
+            kind: terminalSessionType,
+            title: connection.name,
+            durationMs:
+              terminalSessionType === "ssh"
+                ? result.terminalReadyMs ?? frontendDurationMs
+                : frontendDurationMs,
+            recordedAt: new Date().toISOString(),
+          });
+        }
         sessionIdRef.current = result.sessionId;
         sessionStarted = true;
         markConnectionSessionStarted(connection.id);
@@ -1466,6 +1477,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
       terminal.dispose();
     };
   }, [
+    clearTerminalStartMetric,
     markConnectionSessionEnded,
     markConnectionSessionStarted,
     pane.connection,

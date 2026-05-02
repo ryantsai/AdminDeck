@@ -8,7 +8,7 @@ AdminDeck performance checks are local-only. They use the app chrome status bar,
 | --- | ---: | --- |
 | Cold launch to usable UI | <= 1,000 ms acceptable, <= 500 ms target | Status bar `UI ready` value after launch |
 | New local terminal tab ready | <= 100 ms | Status bar `Local ready` value after opening a local terminal |
-| SSH terminal ready after auth | <= 150 ms, excluding network/auth wait | Status bar `SSH ready` value after opening an SSH Connection |
+| SSH terminal ready after auth | <= 150 ms, excluding network/auth wait | Status bar `SSH ready` value after opening a native non-`ProxyJump` SSH Connection |
 | Idle memory | <= 150 MiB target | Status bar `Memory` value after the app is idle |
 
 ## Measurement Run
@@ -21,8 +21,8 @@ Use a release-like Tauri build when possible. Development builds are still usefu
 4. Record the `Memory` value and its tooltip source.
 5. Open a new local terminal tab.
 6. Record the `Local ready` value.
-7. Open a non-`ProxyJump` SSH Connection that has already completed host-key trust.
-8. Record the `SSH ready` value after authentication completes.
+7. Open a native non-`ProxyJump` SSH Connection that has already completed host-key trust.
+8. Record the `SSH ready` value after authentication completes. The value is measured in the Rust SSH path after verified connect/auth returns and covers terminal channel, PTY, shell, and initial directory setup.
 
 Record the machine, OS, build type, date, and values in release notes or the validating issue before marking a milestone measurement item complete.
 
@@ -53,7 +53,7 @@ Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `sr
 | New local terminal tab ready | 16 ms | <= 100 ms | Pass | Triggered the `New local terminal` button in the release app and read the app chrome `Local ready` value. |
 | Working set after one local terminal | 29.4 MiB | No separate budget | Informational | Process private bytes were 6.5 MiB. Shell child-process memory is not included in this app-process value. |
 | Release executable size | 16.9 MiB | Not Electron-scale | Pass | Size of `src-tauri/target/release/admin-deck.exe`. |
-| SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | Requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
+| SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | The app now records native SSH post-auth terminal readiness only. This run still requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
 
 This run meets every measured performance budget. SSH readiness remains the only documented performance budget not validated by this run.
 

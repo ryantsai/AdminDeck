@@ -11,7 +11,7 @@ use std::{
     path::PathBuf,
     sync::{mpsc as std_mpsc, Arc},
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
@@ -37,6 +37,13 @@ pub fn transport_plan() -> SshTransportPlan {
 pub struct NativeSshTerminal {
     control: mpsc::UnboundedSender<SshTerminalControl>,
     worker: Option<JoinHandle<()>>,
+    terminal_ready_ms: u128,
+}
+
+impl NativeSshTerminal {
+    pub fn terminal_ready_ms(&self) -> u128 {
+        self.terminal_ready_ms
+    }
 }
 
 #[derive(Clone)]
@@ -241,9 +248,10 @@ pub fn start_native_terminal(
         .recv_timeout(Duration::from_secs(15))
         .map_err(|_| "timed out while starting native SSH session".to_string())?
     {
-        Ok(()) => Ok(NativeSshTerminal {
+        Ok(terminal_ready_ms) => Ok(NativeSshTerminal {
             control: control_tx,
             worker: Some(worker),
+            terminal_ready_ms,
         }),
         Err(error) => {
             let _ = worker.join();
@@ -368,7 +376,7 @@ fn run_native_terminal_thread(
     app: AppHandle,
     request: NativeSshTerminalRequest,
     control_rx: mpsc::UnboundedReceiver<SshTerminalControl>,
-    ready_tx: std_mpsc::SyncSender<Result<(), String>>,
+    ready_tx: std_mpsc::SyncSender<Result<u128, String>>,
 ) -> Result<(), String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -387,7 +395,7 @@ async fn run_native_terminal(
     app: AppHandle,
     request: NativeSshTerminalRequest,
     mut control_rx: mpsc::UnboundedReceiver<SshTerminalControl>,
-    ready_tx: std_mpsc::SyncSender<Result<(), String>>,
+    ready_tx: std_mpsc::SyncSender<Result<u128, String>>,
 ) -> Result<(), String> {
     let session = connect_verified_client(NativeSshConnectionRequest {
         host: request.host.clone(),
@@ -398,6 +406,7 @@ async fn run_native_terminal(
     })
     .await?;
 
+    let ready_start = Instant::now();
     let mut channel = session
         .channel_open_session()
         .await
@@ -426,7 +435,7 @@ async fn run_native_terminal(
             .map_err(|error| format!("failed to set SSH initial directory: {error}"))?;
     }
 
-    let _ = ready_tx.send(Ok(()));
+    let _ = ready_tx.send(Ok(ready_start.elapsed().as_millis()));
 
     loop {
         tokio::select! {
