@@ -269,9 +269,14 @@ h2 {
   gap: 4px;
 }
 
-.tree-folder-row[draggable="true"],
-.connection-row[draggable="true"] {
+.tree-folder-row[draggable="true"] .drag-handle,
+.connection-row[draggable="true"] .drag-handle {
   cursor: grab;
+}
+
+.tree-folder-row[draggable="true"] .drag-handle:active,
+.connection-row[draggable="true"] .drag-handle:active {
+  cursor: grabbing;
 }
 
 .tree-folder-row.drop-target,
@@ -285,6 +290,29 @@ h2 {
 .connection-open,
 .row-action {
   cursor: pointer;
+}
+
+.drag-handle {
+  flex: 0 0 18px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  background: transparent;
+  border-radius: 4px;
+  touch-action: none;
+}
+
+.drag-handle:hover:not(:disabled),
+.drag-handle:focus-visible {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.drag-handle:disabled {
+  cursor: default;
+  opacity: 0.35;
 }
 
 .tree-folder {
@@ -304,7 +332,7 @@ h2 {
 .connection-row {
   gap: 9px;
   min-height: 42px;
-  padding: 6px 6px 6px 26px;
+  padding: 6px;
 }
 
 .connection-row:hover {
