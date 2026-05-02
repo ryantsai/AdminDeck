@@ -15,9 +15,9 @@ The product will be light chrome with dark terminal panes by default, optimized 
 ## User Stories
 
 1. As a Windows administrator, I want AdminDeck to launch quickly, so that I can start work without waiting on a heavy desktop app.
-2. As an operator, I want a left-side connection tree, so that I can organize hosts in folders like RDCMan or MobaXterm.
+2. As an operator, I want a left-side connection tree, so that I can open Connections from the root or organize them into folders when useful.
 3. As an operator, I want to create saved SSH connections, so that I do not retype hostnames, usernames, ports, or key paths.
-4. As an operator, I want folders in the connection tree, so that I can group hosts by project, environment, customer, or region.
+4. As an operator, I want optional folders and subfolders in the connection tree, so that I can group hosts by project, environment, customer, or region without forcing every Connection into a folder.
 5. As an operator, I want search and filtering in the connection tree, so that large host lists remain usable.
 6. As an operator, I want drag/drop reorder in the tree, so that I can keep my workspace arranged naturally.
 7. As an operator, I want rename, delete, and duplicate actions for folders and connections, so that connection maintenance is fast.
@@ -95,14 +95,14 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - SSH/SFTP implementation: in-process Rust implementation as primary path.
 - SSH library candidates: evaluate russh first, ssh2/libssh2 as fallback candidate.
 - System ssh: optional fallback/debug path only.
-- Storage: local SQLite for connections, tree, settings, layout, recent sessions, and non-secret AI provider metadata.
+- Storage: local SQLite for connections, optional nested tree folders, settings, layout, recent sessions, and non-secret AI provider metadata.
 - Secrets: OS keychain for passwords, SSH passphrases, and AI API keys.
 - Optional later idea: portable vault mode could store credentials encrypted in SQLite for portable installs, but only with explicit opt-in, a user-supplied master password, clear lock/unlock behavior, and no plaintext or disk-stored encryption key.
 - SSH keys: reference existing key files by path; do not manage/generate keypairs in v0.1.
 - AI model: approval-based command assist only.
 - AI providers: OpenAI-compatible BYO API key plus Claude Code CLI and Codex CLI adapters.
 - CLI agent integrations: suggest-only/ask-before-execute where possible.
-- UI model: left activity rail with Dashboard and Settings entries, left-side connection manager/tree, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
+- UI model: left activity rail with Dashboard and Settings entries, left-side connection manager/tree with root Connections and optional nested folders, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
 - Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
 - SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
 - Settings: current surface is intentionally limited to two to-be-implemented placeholders, Language (i18n) and Color Scheme. Deeper terminal, SSH, SFTP, AI provider, diagnostics, update, and keybinding controls should be reintroduced only when their UX is clear and backed by the existing local storage/keychain boundaries.

@@ -41,6 +41,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   ChangeEvent,
+  CSSProperties,
   DragEvent as ReactDragEvent,
   FormEvent,
   KeyboardEvent,
@@ -62,14 +63,15 @@ import {
   type CommandProposalPlan,
   type TerminalOutput,
 } from "./lib/tauri";
-import { aiSuggestions, connectionGroups } from "./sample-data";
+import { aiSuggestions, connectionTree } from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import { createTerminalRenderer, type TerminalRenderer } from "./terminal/renderer";
 import type {
   AiProviderSettings,
   Connection,
-  ConnectionGroup,
+  ConnectionFolder,
   ConnectionStatus,
+  ConnectionTree,
   ConnectionType,
   CreateConnectionRequest,
   FileEntry,
@@ -84,10 +86,11 @@ type DraggedTreeItem =
   | { kind: "connection"; connectionId: string };
 
 type TreeDropTarget =
+  | { kind: "root"; targetIndex: number }
   | { kind: "folder"; folderId: string; targetIndex: number }
   | {
       kind: "connection";
-      folderId: string;
+      folderId?: string;
       connectionId: string;
       targetIndex: number;
     };
@@ -317,7 +320,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   const openConnection = useWorkspaceStore((state) => state.openConnection);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
-  const [groups, setGroups] = useState<ConnectionGroup[]>(connectionGroups);
+  const [tree, setTree] = useState<ConnectionTree>(connectionTree);
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
   const [treeError, setTreeError] = useState("");
@@ -345,14 +348,14 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
 
   async function reloadConnectionGroups() {
     try {
-      setGroups(await invokeCommand("list_connection_groups"));
+      setTree(await invokeCommand("list_connection_tree"));
     } catch {
-      setGroups(connectionGroups);
+      setTree(connectionTree);
     }
   }
 
   function handleConnectionReady(connection: Connection) {
-    setGroups((currentGroups) => upsertConnectionGroup(currentGroups, connection));
+    setTree((currentTree) => upsertRootConnection(currentTree, connection));
     openConnection(connection);
     setFormMode(null);
     setFormError("");
@@ -416,7 +419,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     }
   }
 
-  async function handleCreateFolder() {
+  async function handleCreateFolder(parentFolderId?: string) {
     const name = window.prompt("New folder name")?.trim();
     if (!name) {
       return;
@@ -425,7 +428,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     try {
       setTreeError("");
       await invokeCommand("create_connection_folder", {
-        request: { name },
+        request: { name, parentFolderId },
       });
       await reloadConnectionGroups();
     } catch (error) {
@@ -433,16 +436,16 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     }
   }
 
-  async function handleRenameFolder(group: ConnectionGroup) {
-    const name = window.prompt("Rename folder", group.name)?.trim();
-    if (!name || name === group.name) {
+  async function handleRenameFolder(folder: ConnectionFolder) {
+    const name = window.prompt("Rename folder", folder.name)?.trim();
+    if (!name || name === folder.name) {
       return;
     }
 
     try {
       setTreeError("");
       await invokeCommand("rename_connection_folder", {
-        request: { id: group.id, name },
+        request: { id: folder.id, name },
       });
       await reloadConnectionGroups();
     } catch (error) {
@@ -450,18 +453,15 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     }
   }
 
-  async function handleDeleteFolder(group: ConnectionGroup) {
-    if (group.id === "local") {
-      setTreeError("The local workspace folder cannot be deleted.");
-      return;
-    }
-
+  async function handleDeleteFolder(folder: ConnectionFolder) {
+    const childFolderCount = countFolders(folder.folders);
+    const connectionCount = countConnections(folder);
     const detail =
-      group.connections.length === 0
-        ? `Delete folder ${group.name}?`
-        : `Delete folder ${group.name} and ${group.connections.length} connection${
-            group.connections.length === 1 ? "" : "s"
-          }?`;
+      connectionCount === 0 && childFolderCount === 0
+        ? `Delete folder ${folder.name}?`
+        : `Delete folder ${folder.name}, ${connectionCount} connection${
+            connectionCount === 1 ? "" : "s"
+          }, and ${childFolderCount} subfolder${childFolderCount === 1 ? "" : "s"}?`;
     if (!window.confirm(detail)) {
       return;
     }
@@ -469,7 +469,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     try {
       setTreeError("");
       await invokeCommand("delete_connection_folder", {
-        folderId: group.id,
+        folderId: folder.id,
       });
       await reloadConnectionGroups();
     } catch (error) {
@@ -506,12 +506,16 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     }
   }
 
-  async function handleMoveFolder(folderId: string, targetIndex: number) {
+  async function handleMoveFolder(
+    folderId: string,
+    parentFolderId: string | undefined,
+    targetIndex: number,
+  ) {
     try {
       setTreeError("");
-      setGroups(
+      setTree(
         await invokeCommand("move_connection_folder", {
-          request: { id: folderId, targetIndex },
+          request: { id: folderId, parentFolderId, targetIndex },
         }),
       );
     } catch (error) {
@@ -519,10 +523,14 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     }
   }
 
-  async function handleMoveConnection(connectionId: string, folderId: string, targetIndex: number) {
+  async function handleMoveConnection(
+    connectionId: string,
+    folderId: string | undefined,
+    targetIndex: number,
+  ) {
     try {
       setTreeError("");
-      setGroups(
+      setTree(
         await invokeCommand("move_connection", {
           request: { id: connectionId, folderId, targetIndex },
         }),
@@ -548,44 +556,19 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     }
   }
 
-  const groupsWithLiveStatuses = useMemo(
-    () => withLiveConnectionStatuses(groups, activeSessionCounts),
-    [activeSessionCounts, groups],
+  const treeWithLiveStatuses = useMemo(
+    () => withLiveConnectionStatuses(tree, activeSessionCounts),
+    [activeSessionCounts, tree],
   );
 
-  const filteredGroups = useMemo(() => {
+  const filteredTree = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
-      return groupsWithLiveStatuses;
+      return treeWithLiveStatuses;
     }
 
-    return groupsWithLiveStatuses
-      .map((group) => {
-        if (group.name.toLowerCase().includes(normalizedQuery)) {
-          return group;
-        }
-
-        return {
-          ...group,
-          connections: group.connections.filter((connection) =>
-            [
-              connection.name,
-              connection.host,
-              connection.user,
-              connection.type,
-            ]
-              .join(" ")
-              .toLowerCase()
-              .includes(normalizedQuery),
-          ),
-        };
-      })
-      .filter(
-        (group) =>
-          group.connections.length > 0 ||
-          group.name.toLowerCase().includes(normalizedQuery),
-      );
-  }, [groupsWithLiveStatuses, query]);
+    return filterConnectionTree(treeWithLiveStatuses, normalizedQuery);
+  }, [query, treeWithLiveStatuses]);
   const isTreeFiltered = query.trim().length > 0;
 
   function handleDragEnd() {
@@ -607,8 +590,20 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   }
 
   function completeTreeDrop(item: DraggedTreeItem, target: TreeDropTarget) {
-    if (item.kind === "folder" && target.kind === "folder" && item.folderId !== target.folderId) {
-      void handleMoveFolder(item.folderId, target.targetIndex);
+    if (item.kind === "folder") {
+      if (target.kind === "connection") {
+        return;
+      }
+
+      if (target.kind === "folder" && item.folderId === target.folderId) {
+        return;
+      }
+
+      void handleMoveFolder(
+        item.folderId,
+        target.kind === "folder" ? target.folderId : undefined,
+        target.targetIndex,
+      );
       return;
     }
 
@@ -617,7 +612,11 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
         return;
       }
 
-      void handleMoveConnection(item.connectionId, target.folderId, target.targetIndex);
+      void handleMoveConnection(
+        item.connectionId,
+        target.kind === "root" ? undefined : target.folderId,
+        target.targetIndex,
+      );
     }
   }
 
@@ -639,39 +638,51 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       return null;
     }
 
+    if (row.dataset.treeDropKind === "root") {
+      return {
+        kind: "root",
+        targetIndex:
+          item.kind === "connection"
+            ? Number(row.dataset.connectionCount ?? 0)
+            : Number(row.dataset.folderCount ?? 0),
+      } satisfies TreeDropTarget;
+    }
+
     if (row.dataset.treeDropKind === "folder") {
       const folderId = row.dataset.folderId;
       if (!folderId) {
         return null;
       }
 
-      const folderIndex = Number(row.dataset.folderIndex ?? 0);
       const connectionCount = Number(row.dataset.connectionCount ?? 0);
+      const folderCount = Number(row.dataset.folderCount ?? 0);
       return {
         kind: "folder",
         folderId,
-        targetIndex: item.kind === "connection" ? connectionCount : folderIndex,
+        targetIndex: item.kind === "connection" ? connectionCount : folderCount,
       } satisfies TreeDropTarget;
     }
 
     const folderId = row.dataset.folderId;
     const connectionId = row.dataset.connectionId;
-    if (!folderId || !connectionId) {
+    if (!connectionId) {
       return null;
     }
 
     return {
       kind: "connection",
-      folderId,
+      folderId: folderId || undefined,
       connectionId,
       targetIndex: Number(row.dataset.connectionIndex ?? 0),
     } satisfies TreeDropTarget;
   }
 
   function treeDropTargetId(target: TreeDropTarget) {
-    return target.kind === "folder"
-      ? `folder-${target.folderId}`
-      : `connection-${target.connectionId}`;
+    if (target.kind === "root") {
+      return "root";
+    }
+
+    return target.kind === "folder" ? `folder-${target.folderId}` : `connection-${target.connectionId}`;
   }
 
   function treeItemId(item: DraggedTreeItem) {
@@ -820,87 +831,59 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       </button>
       {treeError ? <p className="form-error tree-error">{treeError}</p> : null}
 
-      <div className="tree-list" aria-label="Connection tree">
-        {filteredGroups.map((group, groupIndex) => (
-          <section className="tree-group" key={group.id}>
-            <div
-              className={`tree-folder-row ${isTreeFiltered ? "" : "can-drag"} ${
-                dropTarget === `folder-${group.id}` ? "drop-target" : ""
-              } ${draggedSourceId === `folder-${group.id}` ? "dragging-source" : ""
-              }`}
-              data-connection-count={group.connections.length}
-              data-folder-id={group.id}
-              data-folder-index={groupIndex}
-              data-tree-drop-kind="folder"
-              onClickCapture={handleTreeClickCapture}
-              onPointerDown={(event) =>
-                handlePointerDragStart(
-                  event,
-                  { kind: "folder", folderId: group.id },
-                  {
-                    kind: "folder",
-                    title: group.name,
-                    connectionCount: group.connections.length,
-                  },
-                )
-              }
-            >
-              <button className="tree-folder">
-                <ChevronDown size={14} />
-                <Folder size={15} />
-                <span>{group.name}</span>
-                <small>{group.connections.length}</small>
-              </button>
-              <span className="folder-actions">
-                <button
-                  className="row-action"
-                  aria-label={`Rename folder ${group.name}`}
-                  onClick={() => void handleRenameFolder(group)}
-                >
-                  <Pencil size={13} />
-                </button>
-                <button
-                  className="row-action danger"
-                  aria-label={`Delete folder ${group.name}`}
-                  onClick={() => void handleDeleteFolder(group)}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </span>
-            </div>
-            {group.connections.map((connection, connectionIndex) => (
-              <ConnectionRow
-                connection={connection}
-                key={connection.id}
-                folderId={group.id}
-                connectionIndex={connectionIndex}
-                dragDisabled={isTreeFiltered}
-                isDraggingSource={draggedSourceId === `connection-${connection.id}`}
-                isDropTarget={dropTarget === `connection-${connection.id}`}
-                onClickCapture={handleTreeClickCapture}
-                onDelete={() => void handleDeleteConnection(connection)}
-                onDuplicate={() => void handleDuplicateConnection(connection)}
-                onOpen={() => openConnection(connection)}
-                onPointerDragStart={(event) =>
-                  handlePointerDragStart(
-                    event,
-                    {
-                      kind: "connection",
-                      connectionId: connection.id,
-                    },
-                    {
-                      kind: "connection",
-                      title: connection.name,
-                      subtitle: connection.host,
-                      connectionType: connection.type,
-                      connectionStatus: connection.status,
-                    },
-                  )
-                }
-                onRename={() => void handleRenameConnection(connection)}
-              />
-            ))}
-          </section>
+      <div
+        className={`tree-list ${dropTarget === "root" ? "drop-target" : ""}`}
+        aria-label="Connection tree"
+        data-connection-count={filteredTree.connections.length}
+        data-folder-count={filteredTree.folders.length}
+        data-tree-drop-kind="root"
+      >
+        {filteredTree.connections.map((connection, connectionIndex) => (
+          <ConnectionRow
+            connection={connection}
+            key={connection.id}
+            connectionIndex={connectionIndex}
+            dragDisabled={isTreeFiltered}
+            isDraggingSource={draggedSourceId === `connection-${connection.id}`}
+            isDropTarget={dropTarget === `connection-${connection.id}`}
+            onClickCapture={handleTreeClickCapture}
+            onDelete={() => void handleDeleteConnection(connection)}
+            onDuplicate={() => void handleDuplicateConnection(connection)}
+            onOpen={() => openConnection(connection)}
+            onPointerDragStart={(event) =>
+              handlePointerDragStart(
+                event,
+                { kind: "connection", connectionId: connection.id },
+                {
+                  kind: "connection",
+                  title: connection.name,
+                  subtitle: connection.host,
+                  connectionType: connection.type,
+                  connectionStatus: connection.status,
+                },
+              )
+            }
+            onRename={() => void handleRenameConnection(connection)}
+          />
+        ))}
+        {filteredTree.folders.map((folder) => (
+          <ConnectionFolderNode
+            dragDisabled={isTreeFiltered}
+            draggedSourceId={draggedSourceId}
+            dropTarget={dropTarget}
+            folder={folder}
+            key={folder.id}
+            level={0}
+            onClickCapture={handleTreeClickCapture}
+            onCreateFolder={handleCreateFolder}
+            onDeleteConnection={handleDeleteConnection}
+            onDeleteFolder={handleDeleteFolder}
+            onDuplicateConnection={handleDuplicateConnection}
+            onOpenConnection={openConnection}
+            onPointerDragStart={handlePointerDragStart}
+            onRenameConnection={handleRenameConnection}
+            onRenameFolder={handleRenameFolder}
+          />
         ))}
       </div>
 
@@ -909,7 +892,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       {formMode ? (
         <ConnectionDialog
           error={formError}
-          groups={groups}
+          tree={tree}
           mode={formMode}
           sshSettings={sshSettings}
           onCancel={() => {
@@ -923,16 +906,159 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   );
 }
 
+function ConnectionFolderNode({
+  dragDisabled,
+  draggedSourceId,
+  dropTarget,
+  folder,
+  level,
+  onClickCapture,
+  onCreateFolder,
+  onDeleteConnection,
+  onDeleteFolder,
+  onDuplicateConnection,
+  onOpenConnection,
+  onPointerDragStart,
+  onRenameConnection,
+  onRenameFolder,
+}: {
+  dragDisabled: boolean;
+  draggedSourceId: string;
+  dropTarget: string;
+  folder: ConnectionFolder;
+  level: number;
+  onClickCapture: (event: ReactMouseEvent) => void;
+  onCreateFolder: (parentFolderId?: string) => void | Promise<void>;
+  onDeleteConnection: (connection: Connection) => void | Promise<void>;
+  onDeleteFolder: (folder: ConnectionFolder) => void | Promise<void>;
+  onDuplicateConnection: (connection: Connection) => void | Promise<void>;
+  onOpenConnection: (connection: Connection) => void;
+  onPointerDragStart: (
+    event: ReactPointerEvent<HTMLElement>,
+    item: DraggedTreeItem,
+    preview: Omit<TreeDragPreview, "x" | "y" | "offsetX" | "offsetY" | "width">,
+  ) => void;
+  onRenameConnection: (connection: Connection) => void | Promise<void>;
+  onRenameFolder: (folder: ConnectionFolder) => void | Promise<void>;
+}) {
+  const connectionCount = countConnections(folder);
+  const folderCount = countFolders(folder.folders);
+
+  return (
+    <section className="tree-group" style={{ paddingLeft: level * 14 } as CSSProperties}>
+      <div
+        className={`tree-folder-row ${dragDisabled ? "" : "can-drag"} ${
+          dropTarget === `folder-${folder.id}` ? "drop-target" : ""
+        } ${draggedSourceId === `folder-${folder.id}` ? "dragging-source" : ""}`}
+        data-connection-count={folder.connections.length}
+        data-folder-count={folder.folders.length}
+        data-folder-id={folder.id}
+        data-tree-drop-kind="folder"
+        onClickCapture={onClickCapture}
+        onPointerDown={(event) =>
+          onPointerDragStart(
+            event,
+            { kind: "folder", folderId: folder.id },
+            {
+              kind: "folder",
+              title: folder.name,
+              connectionCount,
+            },
+          )
+        }
+      >
+        <button className="tree-folder">
+          <ChevronDown size={14} />
+          <Folder size={15} />
+          <span>{folder.name}</span>
+          <small>{connectionCount + folderCount}</small>
+        </button>
+        <span className="folder-actions">
+          <button
+            className="row-action"
+            aria-label={`New subfolder in ${folder.name}`}
+            onClick={() => void onCreateFolder(folder.id)}
+          >
+            <FolderPlus size={13} />
+          </button>
+          <button
+            className="row-action"
+            aria-label={`Rename folder ${folder.name}`}
+            onClick={() => void onRenameFolder(folder)}
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            className="row-action danger"
+            aria-label={`Delete folder ${folder.name}`}
+            onClick={() => void onDeleteFolder(folder)}
+          >
+            <Trash2 size={13} />
+          </button>
+        </span>
+      </div>
+      {folder.connections.map((connection, connectionIndex) => (
+        <ConnectionRow
+          connection={connection}
+          connectionIndex={connectionIndex}
+          dragDisabled={dragDisabled}
+          folderId={folder.id}
+          isDraggingSource={draggedSourceId === `connection-${connection.id}`}
+          isDropTarget={dropTarget === `connection-${connection.id}`}
+          key={connection.id}
+          onClickCapture={onClickCapture}
+          onDelete={() => void onDeleteConnection(connection)}
+          onDuplicate={() => void onDuplicateConnection(connection)}
+          onOpen={() => onOpenConnection(connection)}
+          onPointerDragStart={(event) =>
+            onPointerDragStart(
+              event,
+              { kind: "connection", connectionId: connection.id },
+              {
+                kind: "connection",
+                title: connection.name,
+                subtitle: connection.host,
+                connectionType: connection.type,
+                connectionStatus: connection.status,
+              },
+            )
+          }
+          onRename={() => void onRenameConnection(connection)}
+        />
+      ))}
+      {folder.folders.map((childFolder) => (
+        <ConnectionFolderNode
+          dragDisabled={dragDisabled}
+          draggedSourceId={draggedSourceId}
+          dropTarget={dropTarget}
+          folder={childFolder}
+          key={childFolder.id}
+          level={level + 1}
+          onClickCapture={onClickCapture}
+          onCreateFolder={onCreateFolder}
+          onDeleteConnection={onDeleteConnection}
+          onDeleteFolder={onDeleteFolder}
+          onDuplicateConnection={onDuplicateConnection}
+          onOpenConnection={onOpenConnection}
+          onPointerDragStart={onPointerDragStart}
+          onRenameConnection={onRenameConnection}
+          onRenameFolder={onRenameFolder}
+        />
+      ))}
+    </section>
+  );
+}
+
 function ConnectionDialog({
   error,
-  groups,
+  tree,
   mode,
   sshSettings,
   onCancel,
   onSubmit,
 }: {
   error: string;
-  groups: ConnectionGroup[];
+  tree: ConnectionTree;
   mode: "save" | "quick";
   sshSettings: SshSettings;
   onCancel: () => void;
@@ -941,10 +1067,7 @@ function ConnectionDialog({
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
   const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
   const usesSshDefaults = connectionType === "ssh";
-  const folderOptions = useMemo(
-    () => groups.filter((group) => !["local", "manual"].includes(group.id)),
-    [groups],
-  );
+  const folderOptions = useMemo(() => flattenFolders(tree.folders), [tree.folders]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -970,8 +1093,8 @@ function ConnectionDialog({
       type: connectionType,
       folderId:
         connectionType === "local"
-          ? "local"
-          : String(form.get("folderId") ?? "").trim() || "manual",
+          ? undefined
+          : String(form.get("folderId") ?? "").trim() || undefined,
       port: portValue ? Number(portValue) : undefined,
       keyPath: usesSshDefaults && authMethod === "keyFile" ? keyPath || undefined : undefined,
       proxyJump: proxyJump || undefined,
@@ -1008,11 +1131,12 @@ function ConnectionDialog({
         {mode === "save" && connectionType !== "local" ? (
           <label>
             <span>Folder</span>
-            <select name="folderId" defaultValue="manual">
-              <option value="manual">Manual</option>
-              {folderOptions.map((group) => (
-                <option value={group.id} key={group.id}>
-                  {group.name}
+            <select name="folderId" defaultValue="">
+              <option value="">Root</option>
+              {folderOptions.map((option) => (
+                <option value={option.folder.id} key={option.folder.id}>
+                  {"  ".repeat(option.level)}
+                  {option.folder.name}
                 </option>
               ))}
             </select>
@@ -1189,7 +1313,7 @@ function ConnectionRow({
   connection: Connection;
   connectionIndex: number;
   dragDisabled: boolean;
-  folderId: string;
+  folderId?: string;
   isDraggingSource: boolean;
   isDropTarget: boolean;
   onDelete: () => void;
@@ -1209,7 +1333,7 @@ function ConnectionRow({
       }`}
       data-connection-id={connection.id}
       data-connection-index={connectionIndex}
-      data-folder-id={folderId}
+      data-folder-id={folderId ?? ""}
       data-tree-drop-kind="connection"
       onClickCapture={onClickCapture}
       onPointerDown={onPointerDragStart}
@@ -1237,44 +1361,126 @@ function ConnectionRow({
   );
 }
 
-function upsertConnectionGroup(groups: ConnectionGroup[], connection: Connection) {
-  const groupId = connection.type === "local" ? "local" : "manual";
-  const groupName = connection.type === "local" ? "Local workspace" : "Manual";
-  const withoutConnection = groups.map((group) => ({
-    ...group,
-    connections: group.connections.filter((item) => item.id !== connection.id),
-  }));
-  const targetGroup = withoutConnection.find((group) => group.id === groupId);
-
-  if (targetGroup) {
-    return withoutConnection.map((group) =>
-      group.id === groupId
-        ? { ...group, connections: [connection, ...group.connections] }
-        : group,
-    );
-  }
-
-  return [
+function upsertRootConnection(tree: ConnectionTree, connection: Connection): ConnectionTree {
+  const withoutConnection = removeConnectionFromTree(tree, connection.id);
+  return {
     ...withoutConnection,
-    {
-      id: groupId,
-      name: groupName,
-      connections: [connection],
-    },
-  ];
+    connections: [connection, ...withoutConnection.connections],
+  };
 }
 
 function withLiveConnectionStatuses(
-  groups: ConnectionGroup[],
+  tree: ConnectionTree,
   activeSessionCounts: Record<string, number>,
-) {
-  return groups.map((group) => ({
-    ...group,
-    connections: group.connections.map((connection) => ({
+): ConnectionTree {
+  return {
+    connections: tree.connections.map((connection) => ({
       ...connection,
       status: liveConnectionStatus(connection.id, activeSessionCounts),
     })),
-  }));
+    folders: tree.folders.map((folder) => withLiveFolderStatuses(folder, activeSessionCounts)),
+  };
+}
+
+function withLiveFolderStatuses(
+  folder: ConnectionFolder,
+  activeSessionCounts: Record<string, number>,
+): ConnectionFolder {
+  return {
+    ...folder,
+    connections: folder.connections.map((connection) => ({
+      ...connection,
+      status: liveConnectionStatus(connection.id, activeSessionCounts),
+    })),
+    folders: folder.folders.map((childFolder) =>
+      withLiveFolderStatuses(childFolder, activeSessionCounts),
+    ),
+  };
+}
+
+function removeConnectionFromTree(tree: ConnectionTree, connectionId: string): ConnectionTree {
+  return {
+    connections: tree.connections.filter((connection) => connection.id !== connectionId),
+    folders: tree.folders.map((folder) => removeConnectionFromFolder(folder, connectionId)),
+  };
+}
+
+function removeConnectionFromFolder(
+  folder: ConnectionFolder,
+  connectionId: string,
+): ConnectionFolder {
+  return {
+    ...folder,
+    connections: folder.connections.filter((connection) => connection.id !== connectionId),
+    folders: folder.folders.map((childFolder) =>
+      removeConnectionFromFolder(childFolder, connectionId),
+    ),
+  };
+}
+
+function filterConnectionTree(tree: ConnectionTree, normalizedQuery: string): ConnectionTree {
+  return {
+    connections: tree.connections.filter((connection) =>
+      connectionMatchesQuery(connection, normalizedQuery),
+    ),
+    folders: tree.folders
+      .map((folder) => filterConnectionFolder(folder, normalizedQuery))
+      .filter((folder): folder is ConnectionFolder => Boolean(folder)),
+  };
+}
+
+function filterConnectionFolder(
+  folder: ConnectionFolder,
+  normalizedQuery: string,
+): ConnectionFolder | null {
+  const folderMatches = folder.name.toLowerCase().includes(normalizedQuery);
+  const connections = folderMatches
+    ? folder.connections
+    : folder.connections.filter((connection) => connectionMatchesQuery(connection, normalizedQuery));
+  const folders = folder.folders
+    .map((childFolder) => filterConnectionFolder(childFolder, normalizedQuery))
+    .filter((childFolder): childFolder is ConnectionFolder => Boolean(childFolder));
+
+  if (!folderMatches && connections.length === 0 && folders.length === 0) {
+    return null;
+  }
+
+  return {
+    ...folder,
+    connections,
+    folders: folderMatches ? folder.folders : folders,
+  };
+}
+
+function connectionMatchesQuery(connection: Connection, normalizedQuery: string) {
+  return [connection.name, connection.host, connection.user, connection.type]
+    .join(" ")
+    .toLowerCase()
+    .includes(normalizedQuery);
+}
+
+function flattenFolders(
+  folders: ConnectionFolder[],
+  level = 0,
+): Array<{ folder: ConnectionFolder; level: number }> {
+  return folders.flatMap((folder) => [
+    { folder, level },
+    ...flattenFolders(folder.folders, level + 1),
+  ]);
+}
+
+function countConnections(folder: ConnectionFolder): number {
+  return (
+    folder.connections.length +
+    folder.folders.reduce((total, childFolder) => total + countConnections(childFolder), 0)
+  );
+}
+
+function countFolders(folders: ConnectionFolder[]): number {
+  return folders.reduce(
+    (total, folder) => total + 1 + countFolders(folder.folders),
+    0,
+  );
 }
 
 function liveConnectionStatus(
@@ -1308,7 +1514,7 @@ function TopBar({
       const content = await file.text();
       setImportPreview(
         await invokeCommand("import_ssh_config", {
-          request: { content, folderId: "manual" },
+          request: { content },
         }),
       );
     } catch (error) {

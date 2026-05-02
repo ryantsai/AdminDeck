@@ -3,7 +3,8 @@ import type {
   AiProviderSettings,
   AppBootstrap,
   Connection,
-  ConnectionGroup,
+  ConnectionFolder,
+  ConnectionTree,
   CreateConnectionFolderRequest,
   CreateConnectionRequest,
   DuplicateConnectionRequest,
@@ -179,7 +180,11 @@ type CommandMap = {
   };
   list_connection_groups: {
     args: undefined;
-    result: ConnectionGroup[];
+    result: ConnectionTree;
+  };
+  list_connection_tree: {
+    args: undefined;
+    result: ConnectionTree;
   };
   create_connection: {
     args: { request: CreateConnectionRequest };
@@ -187,11 +192,11 @@ type CommandMap = {
   };
   create_connection_folder: {
     args: { request: CreateConnectionFolderRequest };
-    result: ConnectionGroup;
+    result: ConnectionFolder;
   };
   rename_connection_folder: {
     args: { request: RenameConnectionFolderRequest };
-    result: ConnectionGroup;
+    result: ConnectionFolder;
   };
   delete_connection_folder: {
     args: { folderId: string };
@@ -211,11 +216,11 @@ type CommandMap = {
   };
   move_connection_folder: {
     args: { request: MoveConnectionFolderRequest };
-    result: ConnectionGroup[];
+    result: ConnectionTree;
   };
   move_connection: {
     args: { request: MoveConnectionRequest };
-    result: ConnectionGroup[];
+    result: ConnectionTree;
   };
   get_terminal_settings: {
     args: undefined;

@@ -39,8 +39,15 @@ fn app_bootstrap(
 #[tauri::command]
 fn list_connection_groups(
     storage: tauri::State<'_, storage::Storage>,
-) -> Result<Vec<storage::ConnectionGroup>, String> {
+) -> Result<storage::ConnectionTree, String> {
     storage.list_connection_groups()
+}
+
+#[tauri::command]
+fn list_connection_tree(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::ConnectionTree, String> {
+    storage.list_connection_tree()
 }
 
 #[tauri::command]
@@ -55,7 +62,7 @@ fn create_connection(
 fn create_connection_folder(
     storage: tauri::State<'_, storage::Storage>,
     request: storage::CreateConnectionFolderRequest,
-) -> Result<storage::ConnectionGroup, String> {
+) -> Result<storage::ConnectionFolder, String> {
     storage.create_connection_folder(request)
 }
 
@@ -63,7 +70,7 @@ fn create_connection_folder(
 fn rename_connection_folder(
     storage: tauri::State<'_, storage::Storage>,
     request: storage::RenameConnectionFolderRequest,
-) -> Result<storage::ConnectionGroup, String> {
+) -> Result<storage::ConnectionFolder, String> {
     storage.rename_connection_folder(request)
 }
 
@@ -103,7 +110,7 @@ fn duplicate_connection(
 fn move_connection_folder(
     storage: tauri::State<'_, storage::Storage>,
     request: storage::MoveConnectionFolderRequest,
-) -> Result<Vec<storage::ConnectionGroup>, String> {
+) -> Result<storage::ConnectionTree, String> {
     storage.move_connection_folder(request)
 }
 
@@ -111,7 +118,7 @@ fn move_connection_folder(
 fn move_connection(
     storage: tauri::State<'_, storage::Storage>,
     request: storage::MoveConnectionRequest,
-) -> Result<Vec<storage::ConnectionGroup>, String> {
+) -> Result<storage::ConnectionTree, String> {
     storage.move_connection(request)
 }
 
@@ -417,6 +424,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_bootstrap,
             list_connection_groups,
+            list_connection_tree,
             create_connection,
             create_connection_folder,
             rename_connection_folder,

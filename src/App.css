@@ -275,6 +275,7 @@ h2 {
   min-height: 0;
   overflow: auto;
   padding-right: 2px;
+  border-radius: 6px;
 }
 
 .tree-group {
@@ -312,6 +313,7 @@ h2 {
   cursor: grabbing;
 }
 
+.tree-list.drop-target,
 .tree-folder-row.drop-target,
 .connection-row.drop-target {
   background: var(--accent-soft);

@@ -70,9 +70,9 @@ Later connection types:
 
 ### Connection Tree
 
-Owns folders, saved connections, search/filter, drag/drop ordering, rename/delete/duplicate, quick connect, SSH config import display, and open-session status badges.
+Owns root-level saved Connections, optional folders, subfolders, search/filter, drag/drop ordering, rename/delete/duplicate, quick connect, SSH config import display, and open-session status badges.
 
-Current implementation note: status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
+Current implementation note: a Connection may have no folder and live directly in the root of the tree. Folders may contain Connections and subfolders. Status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
 
 ### Terminal Session
 
@@ -146,7 +146,7 @@ SQLite contains local, non-secret data only. OS keychain contains secrets. Termi
 The primary UI is a dense desktop workspace:
 
 - left activity rail with Dashboard and Settings entries
-- left connection tree
+- left connection tree with root Connections and optional nested folders
 - main tabs/workspace
 - terminal split panes inside terminal tabs
 - SFTP dual-pane view

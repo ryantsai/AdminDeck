@@ -17,6 +17,18 @@ export interface Connection {
   status: ConnectionStatus;
 }
 
+export interface ConnectionFolder {
+  id: string;
+  name: string;
+  connections: Connection[];
+  folders: ConnectionFolder[];
+}
+
+export interface ConnectionTree {
+  connections: Connection[];
+  folders: ConnectionFolder[];
+}
+
 export interface CreateConnectionRequest {
   name: string;
   host: string;
@@ -32,6 +44,7 @@ export interface CreateConnectionRequest {
 
 export interface CreateConnectionFolderRequest {
   name: string;
+  parentFolderId?: string;
 }
 
 export interface RenameConnectionFolderRequest {
@@ -51,19 +64,14 @@ export interface DuplicateConnectionRequest {
 
 export interface MoveConnectionFolderRequest {
   id: string;
+  parentFolderId?: string;
   targetIndex: number;
 }
 
 export interface MoveConnectionRequest {
   id: string;
-  folderId: string;
+  folderId?: string;
   targetIndex: number;
-}
-
-export interface ConnectionGroup {
-  id: string;
-  name: string;
-  connections: Connection[];
 }
 
 export interface TerminalPane {

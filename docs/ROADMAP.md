@@ -2,7 +2,7 @@
 
 ## Current Progress
 
-As of May 2, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs that preserve live Sessions across tab switching, split terminal panes, xterm-based local terminal sessions, settings storage, a left activity rail with Dashboard and Settings entries, and live status badges derived from active workspace Sessions. The current Settings surface is intentionally reduced to Language (i18n) and Color Scheme placeholders.
+As of May 2, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections with optional nested folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs that preserve live Sessions across tab switching, split terminal panes, xterm-based local terminal sessions, settings storage, a left activity rail with Dashboard and Settings entries, and live status badges derived from active workspace Sessions. The current Settings surface is intentionally reduced to Language (i18n) and Color Scheme placeholders.
 
 Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH Connections.
 
@@ -33,7 +33,7 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 - [x] Add SQLite migrations and repository layer.
 - [x] Add OS keychain abstraction.
 - [x] Add connection model for local terminal and SSH terminal.
-- [x] Add connection tree with folders, saved connections, search/filter, drag/drop reorder, rename/delete/duplicate, quick connect, and live status badges.
+- [x] Add connection tree with root Connections, optional nested folders, search/filter, drag/drop reorder, rename/delete/duplicate, quick connect, and live status badges.
 - [x] Add tab workspace.
 - [x] Add split panes inside terminal tabs.
 - [x] Add local terminal session lifecycle.

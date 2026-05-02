@@ -20,7 +20,7 @@ v0.1 includes:
 - SSH terminal
 - SFTP dual-pane file manager
 - left activity rail with Dashboard and Settings entries
-- left-side connection tree
+- left-side connection tree with root Connections and optional nested folders
 - SSH config import
 - SQLite connection/settings storage
 - OS keychain secret storage

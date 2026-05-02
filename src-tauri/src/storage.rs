@@ -6,12 +6,13 @@ const MIGRATION_001: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
+    parent_folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
     sort_order INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS connections (
     id TEXT PRIMARY KEY,
-    folder_id TEXT NOT NULL REFERENCES connection_folders(id) ON DELETE CASCADE,
+    folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     host TEXT NOT NULL,
     username TEXT NOT NULL,
@@ -32,6 +33,9 @@ CREATE TABLE IF NOT EXISTS connection_tags (
 
 CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
     ON connections(folder_id, sort_order);
+
+CREATE INDEX IF NOT EXISTS idx_connection_folders_parent_sort
+    ON connection_folders(parent_folder_id, sort_order);
 
 CREATE INDEX IF NOT EXISTS idx_connection_tags_connection_sort
     ON connection_tags(connection_id, sort_order);
@@ -91,15 +95,23 @@ pub struct AiProviderSettings {
     codex_cli_path: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ConnectionGroup {
+pub struct ConnectionTree {
+    connections: Vec<SavedConnection>,
+    folders: Vec<ConnectionFolder>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionFolder {
     id: String,
     name: String,
     connections: Vec<SavedConnection>,
+    folders: Vec<ConnectionFolder>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedConnection {
     id: String,
@@ -137,6 +149,7 @@ pub struct CreateConnectionRequest {
 #[serde(rename_all = "camelCase")]
 pub struct CreateConnectionFolderRequest {
     name: String,
+    parent_folder_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -164,6 +177,7 @@ pub struct DuplicateConnectionRequest {
 #[serde(rename_all = "camelCase")]
 pub struct MoveConnectionFolderRequest {
     id: String,
+    parent_folder_id: Option<String>,
     target_index: usize,
 }
 
@@ -171,7 +185,7 @@ pub struct MoveConnectionFolderRequest {
 #[serde(rename_all = "camelCase")]
 pub struct MoveConnectionRequest {
     id: String,
-    folder_id: String,
+    folder_id: Option<String>,
     target_index: usize,
 }
 
@@ -205,34 +219,16 @@ impl Storage {
         format!("SQLite: {}", self.db_path.display())
     }
 
-    pub fn list_connection_groups(&self) -> Result<Vec<ConnectionGroup>, String> {
+    pub fn list_connection_tree(&self) -> Result<ConnectionTree, String> {
         let connection = self.lock()?;
-        let mut folder_statement = connection
-            .prepare(
-                "SELECT id, name
-                 FROM connection_folders
-                 ORDER BY sort_order, name",
-            )
-            .map_err(to_storage_error)?;
+        Ok(ConnectionTree {
+            connections: list_connections_for_folder(&connection, None)?,
+            folders: list_folders_for_parent(&connection, None)?,
+        })
+    }
 
-        let folder_rows = folder_statement
-            .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
-            .map_err(to_storage_error)?;
-
-        let mut groups = Vec::new();
-        for folder_row in folder_rows {
-            let (id, name) = folder_row.map_err(to_storage_error)?;
-            let connections = list_connections_for_folder(&connection, &id)?;
-            groups.push(ConnectionGroup {
-                id,
-                name,
-                connections,
-            });
-        }
-
-        Ok(groups)
+    pub fn list_connection_groups(&self) -> Result<ConnectionTree, String> {
+        self.list_connection_tree()
     }
 
     pub fn terminal_settings(&self) -> Result<TerminalSettings, String> {
@@ -410,6 +406,39 @@ impl Storage {
             &connection,
             "ALTER TABLE connections ADD COLUMN local_shell TEXT",
         )?;
+        add_optional_column(
+            &connection,
+            "ALTER TABLE connection_folders ADD COLUMN parent_folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE",
+        )?;
+        connection
+            .execute_batch(
+                "CREATE INDEX IF NOT EXISTS idx_connection_folders_parent_sort
+                    ON connection_folders(parent_folder_id, sort_order);",
+            )
+            .map_err(to_storage_error)?;
+        ensure_connections_allow_root_folder(&connection)?;
+        connection
+            .execute(
+                "UPDATE connections
+                 SET folder_id = NULL
+                 WHERE connection_type = 'local'
+                   AND folder_id = 'local'",
+                [],
+            )
+            .map_err(to_storage_error)?;
+        connection
+            .execute(
+                "DELETE FROM connection_folders
+                 WHERE id = 'local'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM connections WHERE folder_id = 'local'
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1 FROM connection_folders WHERE parent_folder_id = 'local'
+                   )",
+                [],
+            )
+            .map_err(to_storage_error)?;
         connection
             .execute(
                 "UPDATE connections
@@ -439,9 +468,7 @@ impl Storage {
         let name = required_field("name", request.name)?;
         let host = required_field("host", request.host)?;
         let user = required_field("user", request.user)?;
-        let folder_id = request
-            .folder_id
-            .unwrap_or_else(|| default_folder_for(&connection_type));
+        let folder_id = normalize_optional_id(request.folder_id);
         let key_path = request.key_path.and_then(|value| {
             let trimmed = value.trim().to_string();
             (!trimmed.is_empty()).then_some(trimmed)
@@ -457,14 +484,10 @@ impl Storage {
 
         let mut connection = self.lock()?;
         let transaction = connection.transaction().map_err(to_storage_error)?;
-        ensure_folder_exists(&transaction, &folder_id, folder_name_for(&folder_id))?;
-        let next_sort_order: i64 = transaction
-            .query_row(
-                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections WHERE folder_id = ?1",
-                params![folder_id],
-                |row| row.get(0),
-            )
-            .map_err(to_storage_error)?;
+        if let Some(folder_id) = folder_id.as_deref() {
+            ensure_folder_exists(&transaction, folder_id, folder_name_for(folder_id))?;
+        }
+        let next_sort_order = next_connection_sort_order(&transaction, folder_id.as_deref())?;
 
         transaction
             .execute(
@@ -519,36 +542,39 @@ impl Storage {
     pub fn create_connection_folder(
         &self,
         request: CreateConnectionFolderRequest,
-    ) -> Result<ConnectionGroup, String> {
+    ) -> Result<ConnectionFolder, String> {
         let name = required_field("folder name", request.name)?;
+        let parent_folder_id = normalize_optional_id(request.parent_folder_id);
         let id = make_folder_id(&name);
         let connection = self.lock()?;
-        let next_sort_order: i64 = connection
-            .query_row(
-                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connection_folders",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(to_storage_error)?;
+        if let Some(parent_folder_id) = parent_folder_id.as_deref() {
+            ensure_folder_exists(
+                &connection,
+                parent_folder_id,
+                folder_name_for(parent_folder_id),
+            )?;
+        }
+        let next_sort_order = next_folder_sort_order(&connection, parent_folder_id.as_deref())?;
 
         connection
             .execute(
-                "INSERT INTO connection_folders (id, name, sort_order) VALUES (?1, ?2, ?3)",
-                params![id, name, next_sort_order],
+                "INSERT INTO connection_folders (id, name, parent_folder_id, sort_order) VALUES (?1, ?2, ?3, ?4)",
+                params![id, name, parent_folder_id, next_sort_order],
             )
             .map_err(to_storage_error)?;
 
-        Ok(ConnectionGroup {
+        Ok(ConnectionFolder {
             id,
             name,
             connections: Vec::new(),
+            folders: Vec::new(),
         })
     }
 
     pub fn rename_connection_folder(
         &self,
         request: RenameConnectionFolderRequest,
-    ) -> Result<ConnectionGroup, String> {
+    ) -> Result<ConnectionFolder, String> {
         let id = required_field("folder id", request.id)?;
         let name = required_field("folder name", request.name)?;
         let connection = self.lock()?;
@@ -563,19 +589,11 @@ impl Storage {
             return Err("connection folder was not found".to_string());
         }
 
-        Ok(ConnectionGroup {
-            connections: list_connections_for_folder(&connection, &id)?,
-            id,
-            name,
-        })
+        get_folder_by_id(&connection, &id, name)
     }
 
     pub fn delete_connection_folder(&self, folder_id: String) -> Result<(), String> {
         let folder_id = required_field("folder id", folder_id)?;
-        if folder_id == "local" {
-            return Err("the local workspace folder cannot be deleted".to_string());
-        }
-
         let connection = self.lock()?;
         let affected = connection
             .execute(
@@ -645,7 +663,7 @@ impl Storage {
                 params![source_id],
                 |row| {
                     Ok((
-                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(0)?,
                         row.get::<_, String>(1)?,
                         row.get::<_, String>(2)?,
                         row.get::<_, String>(3)?,
@@ -679,13 +697,7 @@ impl Storage {
             .filter(|name| !name.is_empty())
             .unwrap_or_else(|| format!("Copy of {source_name}"));
         let duplicate_id = make_connection_id(&duplicate_name);
-        let next_sort_order: i64 = transaction
-            .query_row(
-                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections WHERE folder_id = ?1",
-                params![folder_id],
-                |row| row.get(0),
-            )
-            .map_err(to_storage_error)?;
+        let next_sort_order = next_connection_sort_order(&transaction, folder_id.as_deref())?;
 
         transaction
             .execute(
@@ -716,35 +728,59 @@ impl Storage {
     pub fn move_connection_folder(
         &self,
         request: MoveConnectionFolderRequest,
-    ) -> Result<Vec<ConnectionGroup>, String> {
+    ) -> Result<ConnectionTree, String> {
         let id = required_field("folder id", request.id)?;
+        let target_parent_folder_id = normalize_optional_id(request.parent_folder_id);
+        if target_parent_folder_id.as_deref() == Some(id.as_str()) {
+            return Err("a folder cannot be moved into itself".to_string());
+        }
         let mut connection = self.lock()?;
         let transaction = connection.transaction().map_err(to_storage_error)?;
-        let mut folder_ids = list_folder_ids(&transaction)?;
-        let current_index = folder_ids
-            .iter()
-            .position(|folder_id| folder_id == &id)
+        let source_parent_folder_id = folder_parent_id(&transaction, &id)?
             .ok_or_else(|| "connection folder was not found".to_string())?;
-        let folder_id = folder_ids.remove(current_index);
-        let target_index = if current_index < request.target_index {
-            request.target_index.saturating_sub(1)
+        if let Some(parent_id) = target_parent_folder_id.as_deref() {
+            ensure_folder_exists(&transaction, parent_id, folder_name_for(parent_id))?;
+            if folder_has_descendant(&transaction, &id, parent_id)? {
+                return Err("a folder cannot be moved into one of its subfolders".to_string());
+            }
+        }
+
+        let target_index = if source_parent_folder_id == target_parent_folder_id {
+            let folder_ids =
+                list_folder_ids_for_parent(&transaction, source_parent_folder_id.as_deref())?;
+            match folder_ids.iter().position(|folder_id| folder_id == &id) {
+                Some(current_index) if current_index < request.target_index => {
+                    request.target_index.saturating_sub(1)
+                }
+                _ => request.target_index,
+            }
         } else {
             request.target_index
-        }
-        .min(folder_ids.len());
-        folder_ids.insert(target_index, folder_id);
-        update_folder_sort_order(&transaction, &folder_ids)?;
+        };
+
+        transaction
+            .execute(
+                "UPDATE connection_folders SET parent_folder_id = ?1 WHERE id = ?2",
+                params![target_parent_folder_id, id],
+            )
+            .map_err(to_storage_error)?;
+        reorder_folder_ids(&transaction, source_parent_folder_id.as_deref(), None)?;
+        reorder_folder_ids(
+            &transaction,
+            target_parent_folder_id.as_deref(),
+            Some((&id, target_index)),
+        )?;
         transaction.commit().map_err(to_storage_error)?;
         drop(connection);
-        self.list_connection_groups()
+        self.list_connection_tree()
     }
 
     pub fn move_connection(
         &self,
         request: MoveConnectionRequest,
-    ) -> Result<Vec<ConnectionGroup>, String> {
+    ) -> Result<ConnectionTree, String> {
         let id = required_field("connection id", request.id)?;
-        let target_folder_id = required_field("folder id", request.folder_id)?;
+        let target_folder_id = normalize_optional_id(request.folder_id);
         let mut connection = self.lock()?;
         let transaction = connection.transaction().map_err(to_storage_error)?;
 
@@ -752,14 +788,15 @@ impl Storage {
             .query_row(
                 "SELECT folder_id FROM connections WHERE id = ?1",
                 params![id],
-                |row| row.get::<_, String>(0),
+                |row| row.get::<_, Option<String>>(0),
             )
             .optional()
             .map_err(to_storage_error)?
             .ok_or_else(|| "connection was not found".to_string())?;
 
         let target_index = if source_folder_id == target_folder_id {
-            let connection_ids = list_connection_ids_for_folder(&transaction, &source_folder_id)?;
+            let connection_ids =
+                list_connection_ids_for_folder(&transaction, source_folder_id.as_deref())?;
             match connection_ids
                 .iter()
                 .position(|connection_id| connection_id == &id)
@@ -773,11 +810,13 @@ impl Storage {
             request.target_index
         };
 
-        ensure_folder_exists(
-            &transaction,
-            &target_folder_id,
-            folder_name_for(&target_folder_id),
-        )?;
+        if let Some(target_folder_id) = target_folder_id.as_deref() {
+            ensure_folder_exists(
+                &transaction,
+                target_folder_id,
+                folder_name_for(target_folder_id),
+            )?;
+        }
 
         transaction
             .execute(
@@ -786,11 +825,15 @@ impl Storage {
             )
             .map_err(to_storage_error)?;
 
-        reorder_connection_ids(&transaction, &source_folder_id, None)?;
-        reorder_connection_ids(&transaction, &target_folder_id, Some((&id, target_index)))?;
+        reorder_connection_ids(&transaction, source_folder_id.as_deref(), None)?;
+        reorder_connection_ids(
+            &transaction,
+            target_folder_id.as_deref(),
+            Some((&id, target_index)),
+        )?;
         transaction.commit().map_err(to_storage_error)?;
         drop(connection);
-        self.list_connection_groups()
+        self.list_connection_tree()
     }
 
     fn seed_starter_connections(&self) -> Result<(), String> {
@@ -807,15 +850,14 @@ impl Storage {
 
         let transaction = connection.transaction().map_err(to_storage_error)?;
 
-        seed_folder(&transaction, "local", "Local workspace", 0)?;
-        seed_folder(&transaction, "production", "Production", 1)?;
-        seed_folder(&transaction, "staging", "Staging", 2)?;
+        seed_folder(&transaction, "production", "Production", None, 0)?;
+        seed_folder(&transaction, "staging", "Staging", None, 1)?;
 
         seed_connection(
             &transaction,
             NewConnection {
                 id: "local-pwsh",
-                folder_id: "local",
+                folder_id: None,
                 name: "PowerShell",
                 host: "localhost",
                 username: "ryan",
@@ -831,7 +873,7 @@ impl Storage {
             &transaction,
             NewConnection {
                 id: "local-wsl",
-                folder_id: "local",
+                folder_id: None,
                 name: "WSL",
                 host: "localhost",
                 username: "ryan",
@@ -847,7 +889,7 @@ impl Storage {
             &transaction,
             NewConnection {
                 id: "bastion-east",
-                folder_id: "production",
+                folder_id: Some("production"),
                 name: "Bastion East",
                 host: "bastion-east.internal",
                 username: "admin",
@@ -863,7 +905,7 @@ impl Storage {
             &transaction,
             NewConnection {
                 id: "api-stage",
-                folder_id: "staging",
+                folder_id: Some("staging"),
                 name: "API Stage",
                 host: "api-stage.internal",
                 username: "ops",
@@ -888,39 +930,39 @@ impl Storage {
 
 fn list_connections_for_folder(
     connection: &SqliteConnection,
-    folder_id: &str,
+    folder_id: Option<&str>,
 ) -> Result<Vec<SavedConnection>, String> {
+    let where_clause = if folder_id.is_some() {
+        "folder_id = ?1"
+    } else {
+        "folder_id IS NULL"
+    };
     let mut statement = connection
-        .prepare(
+        .prepare(&format!(
             "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type
              FROM connections
-             WHERE folder_id = ?1
+             WHERE {where_clause}
              ORDER BY sort_order, name",
-        )
+        ))
         .map_err(to_storage_error)?;
 
-    let rows = statement
-        .query_map(params![folder_id], |row| {
-            Ok(SavedConnection {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                host: row.get(2)?,
-                user: row.get(3)?,
-                port: optional_port(row.get::<_, Option<i64>>(4)?)?,
-                key_path: row.get(5)?,
-                proxy_jump: row.get(6)?,
-                auth_method: row.get(7)?,
-                local_shell: row.get(8)?,
-                connection_type: row.get(9)?,
-                status: "idle".to_string(),
-                tags: Vec::new(),
-            })
-        })
-        .map_err(to_storage_error)?;
+    let rows = if let Some(folder_id) = folder_id {
+        statement
+            .query_map(params![folder_id], saved_connection_from_row)
+            .map_err(to_storage_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)?
+    } else {
+        statement
+            .query_map([], saved_connection_from_row)
+            .map_err(to_storage_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)?
+    };
 
     let mut connections = Vec::new();
     for row in rows {
-        let mut saved_connection = row.map_err(to_storage_error)?;
+        let mut saved_connection = row;
         saved_connection.tags = list_tags(connection, &saved_connection.id)?;
         connections.push(saved_connection);
     }
@@ -928,27 +970,160 @@ fn list_connections_for_folder(
     Ok(connections)
 }
 
-fn list_folder_ids(connection: &SqliteConnection) -> Result<Vec<String>, String> {
+fn list_folders_for_parent(
+    connection: &SqliteConnection,
+    parent_folder_id: Option<&str>,
+) -> Result<Vec<ConnectionFolder>, String> {
+    let folder_ids = list_folder_ids_for_parent(connection, parent_folder_id)?;
+    folder_ids
+        .into_iter()
+        .map(|folder_id| {
+            let name = connection
+                .query_row(
+                    "SELECT name FROM connection_folders WHERE id = ?1",
+                    params![folder_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .map_err(to_storage_error)?;
+            get_folder_by_id(connection, &folder_id, name)
+        })
+        .collect()
+}
+
+fn get_folder_by_id(
+    connection: &SqliteConnection,
+    id: &str,
+    name: String,
+) -> Result<ConnectionFolder, String> {
+    Ok(ConnectionFolder {
+        id: id.to_string(),
+        name,
+        connections: list_connections_for_folder(connection, Some(id))?,
+        folders: list_folders_for_parent(connection, Some(id))?,
+    })
+}
+
+fn list_folder_ids_for_parent(
+    connection: &SqliteConnection,
+    parent_folder_id: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let where_clause = if parent_folder_id.is_some() {
+        "parent_folder_id = ?1"
+    } else {
+        "parent_folder_id IS NULL"
+    };
     let mut statement = connection
-        .prepare(
+        .prepare(&format!(
             "SELECT id
              FROM connection_folders
+             WHERE {where_clause}
              ORDER BY sort_order, name",
+        ))
+        .map_err(to_storage_error)?;
+
+    if let Some(parent_folder_id) = parent_folder_id {
+        statement
+            .query_map(params![parent_folder_id], |row| row.get::<_, String>(0))
+            .map_err(to_storage_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)
+    } else {
+        statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(to_storage_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)
+    }
+}
+
+fn folder_parent_id(
+    connection: &SqliteConnection,
+    folder_id: &str,
+) -> Result<Option<Option<String>>, String> {
+    connection
+        .query_row(
+            "SELECT parent_folder_id FROM connection_folders WHERE id = ?1",
+            params![folder_id],
+            |row| row.get::<_, Option<String>>(0),
         )
-        .map_err(to_storage_error)?;
-
-    let rows = statement
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(to_storage_error)?;
-
-    rows.collect::<Result<Vec<_>, _>>()
+        .optional()
         .map_err(to_storage_error)
 }
 
-fn update_folder_sort_order(
+fn folder_has_descendant(
     connection: &SqliteConnection,
-    folder_ids: &[String],
+    folder_id: &str,
+    descendant_id: &str,
+) -> Result<bool, String> {
+    let children = list_folder_ids_for_parent(connection, Some(folder_id))?;
+    for child_id in children {
+        if child_id == descendant_id || folder_has_descendant(connection, &child_id, descendant_id)?
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn next_connection_sort_order(
+    connection: &SqliteConnection,
+    folder_id: Option<&str>,
+) -> Result<i64, String> {
+    if let Some(folder_id) = folder_id {
+        connection
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections WHERE folder_id = ?1",
+                params![folder_id],
+                |row| row.get(0),
+            )
+            .map_err(to_storage_error)
+    } else {
+        connection
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections WHERE folder_id IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(to_storage_error)
+    }
+}
+
+fn next_folder_sort_order(
+    connection: &SqliteConnection,
+    parent_folder_id: Option<&str>,
+) -> Result<i64, String> {
+    if let Some(parent_folder_id) = parent_folder_id {
+        connection
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connection_folders WHERE parent_folder_id = ?1",
+                params![parent_folder_id],
+                |row| row.get(0),
+            )
+            .map_err(to_storage_error)
+    } else {
+        connection
+            .query_row(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connection_folders WHERE parent_folder_id IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(to_storage_error)
+    }
+}
+
+fn reorder_folder_ids(
+    connection: &SqliteConnection,
+    parent_folder_id: Option<&str>,
+    moved_folder: Option<(&str, usize)>,
 ) -> Result<(), String> {
+    let mut folder_ids = list_folder_ids_for_parent(connection, parent_folder_id)?;
+    if let Some((folder_id, target_index)) = moved_folder {
+        folder_ids.retain(|id| id != folder_id);
+        let target_index = target_index.min(folder_ids.len());
+        folder_ids.insert(target_index, folder_id.to_string());
+    }
+
     for (index, folder_id) in folder_ids.iter().enumerate() {
         connection
             .execute(
@@ -963,7 +1138,7 @@ fn update_folder_sort_order(
 
 fn reorder_connection_ids(
     connection: &SqliteConnection,
-    folder_id: &str,
+    folder_id: Option<&str>,
     moved_connection: Option<(&str, usize)>,
 ) -> Result<(), String> {
     let mut connection_ids = list_connection_ids_for_folder(connection, folder_id)?;
@@ -987,23 +1162,35 @@ fn reorder_connection_ids(
 
 fn list_connection_ids_for_folder(
     connection: &SqliteConnection,
-    folder_id: &str,
+    folder_id: Option<&str>,
 ) -> Result<Vec<String>, String> {
+    let where_clause = if folder_id.is_some() {
+        "folder_id = ?1"
+    } else {
+        "folder_id IS NULL"
+    };
     let mut statement = connection
-        .prepare(
+        .prepare(&format!(
             "SELECT id
              FROM connections
-             WHERE folder_id = ?1
+             WHERE {where_clause}
              ORDER BY sort_order, name",
-        )
+        ))
         .map_err(to_storage_error)?;
 
-    let rows = statement
-        .query_map(params![folder_id], |row| row.get::<_, String>(0))
-        .map_err(to_storage_error)?;
-
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(to_storage_error)
+    if let Some(folder_id) = folder_id {
+        statement
+            .query_map(params![folder_id], |row| row.get::<_, String>(0))
+            .map_err(to_storage_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)
+    } else {
+        statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(to_storage_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)
+    }
 }
 
 fn get_connection_by_id(
@@ -1043,6 +1230,23 @@ fn get_connection_by_id(
     })
 }
 
+fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedConnection> {
+    Ok(SavedConnection {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        host: row.get(2)?,
+        user: row.get(3)?,
+        port: optional_port(row.get::<_, Option<i64>>(4)?)?,
+        key_path: row.get(5)?,
+        proxy_jump: row.get(6)?,
+        auth_method: row.get(7)?,
+        local_shell: row.get(8)?,
+        connection_type: row.get(9)?,
+        status: "idle".to_string(),
+        tags: Vec::new(),
+    })
+}
+
 fn list_tags(connection: &SqliteConnection, connection_id: &str) -> Result<Vec<String>, String> {
     let mut statement = connection
         .prepare(
@@ -1065,12 +1269,13 @@ fn seed_folder(
     connection: &SqliteConnection,
     id: &str,
     name: &str,
+    parent_folder_id: Option<&str>,
     sort_order: i64,
 ) -> Result<(), String> {
     connection
         .execute(
-            "INSERT INTO connection_folders (id, name, sort_order) VALUES (?1, ?2, ?3)",
-            params![id, name, sort_order],
+            "INSERT INTO connection_folders (id, name, parent_folder_id, sort_order) VALUES (?1, ?2, ?3, ?4)",
+            params![id, name, parent_folder_id, sort_order],
         )
         .map(|_| ())
         .map_err(to_storage_error)
@@ -1078,7 +1283,7 @@ fn seed_folder(
 
 struct NewConnection<'a> {
     id: &'a str,
-    folder_id: &'a str,
+    folder_id: Option<&'a str>,
     name: &'a str,
     host: &'a str,
     username: &'a str,
@@ -1143,6 +1348,91 @@ fn add_optional_column(connection: &SqliteConnection, sql: &str) -> Result<(), S
     }
 }
 
+fn ensure_connections_allow_root_folder(connection: &SqliteConnection) -> Result<(), String> {
+    let mut statement = connection
+        .prepare("PRAGMA table_info(connections)")
+        .map_err(to_storage_error)?;
+    let columns = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(1)?, row.get::<_, i64>(3)?))
+        })
+        .map_err(to_storage_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(to_storage_error)?;
+
+    let folder_id_is_not_null = columns
+        .iter()
+        .any(|(name, not_null)| name == "folder_id" && *not_null == 1);
+    if !folder_id_is_not_null {
+        return Ok(());
+    }
+
+    connection
+        .execute_batch(
+            r#"
+            PRAGMA foreign_keys = OFF;
+
+            CREATE TABLE connections_new (
+                id TEXT PRIMARY KEY,
+                folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                host TEXT NOT NULL,
+                username TEXT NOT NULL,
+                port INTEGER,
+                key_path TEXT,
+                proxy_jump TEXT,
+                auth_method TEXT NOT NULL DEFAULT 'keyFile',
+                local_shell TEXT,
+                connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'sftp')),
+                status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
+                sort_order INTEGER NOT NULL
+            );
+
+            INSERT INTO connections_new (
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, connection_type, status, sort_order
+            )
+            SELECT
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, connection_type, status, sort_order
+            FROM connections;
+
+            CREATE TABLE connection_tags_new (
+                connection_id TEXT NOT NULL,
+                tag TEXT NOT NULL,
+                sort_order INTEGER NOT NULL,
+                PRIMARY KEY (connection_id, tag)
+            );
+
+            INSERT INTO connection_tags_new (connection_id, tag, sort_order)
+            SELECT connection_id, tag, sort_order FROM connection_tags;
+
+            DROP TABLE connection_tags;
+            DROP TABLE connections;
+            ALTER TABLE connections_new RENAME TO connections;
+
+            CREATE TABLE connection_tags (
+                connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+                tag TEXT NOT NULL,
+                sort_order INTEGER NOT NULL,
+                PRIMARY KEY (connection_id, tag)
+            );
+
+            INSERT INTO connection_tags (connection_id, tag, sort_order)
+            SELECT connection_id, tag, sort_order FROM connection_tags_new;
+            DROP TABLE connection_tags_new;
+
+            CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
+                ON connections(folder_id, sort_order);
+            CREATE INDEX IF NOT EXISTS idx_connection_tags_connection_sort
+                ON connection_tags(connection_id, sort_order);
+
+            PRAGMA foreign_keys = ON;
+            "#,
+        )
+        .map_err(to_storage_error)
+}
+
 fn ensure_folder_exists(
     connection: &SqliteConnection,
     id: &str,
@@ -1160,14 +1450,8 @@ fn ensure_folder_exists(
         return Ok(());
     }
 
-    let next_sort_order: i64 = connection
-        .query_row(
-            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connection_folders",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(to_storage_error)?;
-    seed_folder(connection, id, fallback_name, next_sort_order)
+    let next_sort_order = next_folder_sort_order(connection, None)?;
+    seed_folder(connection, id, fallback_name, None, next_sort_order)
 }
 
 fn normalize_connection_type(value: &str) -> Result<String, String> {
@@ -1221,20 +1505,18 @@ fn normalize_auth_method(
     }
 }
 
-fn default_folder_for(connection_type: &str) -> String {
-    if connection_type == "local" {
-        "local".to_string()
-    } else {
-        "manual".to_string()
-    }
-}
-
 fn folder_name_for(folder_id: &str) -> &str {
     match folder_id {
         "local" => "Local workspace",
         "manual" => "Manual",
         other => other,
     }
+}
+
+fn normalize_optional_id(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn required_field(field: &str, value: String) -> Result<String, String> {
@@ -1447,26 +1729,54 @@ fn optional_port(value: Option<i64>) -> rusqlite::Result<Option<u16>> {
 mod tests {
     use super::*;
 
+    fn find_folder<'a>(
+        folders: &'a [ConnectionFolder],
+        folder_id: &str,
+    ) -> Option<&'a ConnectionFolder> {
+        folders.iter().find_map(|folder| {
+            if folder.id == folder_id {
+                Some(folder)
+            } else {
+                find_folder(&folder.folders, folder_id)
+            }
+        })
+    }
+
+    fn all_connections(tree: &ConnectionTree) -> impl Iterator<Item = &SavedConnection> {
+        tree.connections
+            .iter()
+            .chain(tree.folders.iter().flat_map(folder_connections))
+    }
+
+    fn folder_connections(
+        folder: &ConnectionFolder,
+    ) -> Box<dyn Iterator<Item = &SavedConnection> + '_> {
+        Box::new(
+            folder
+                .connections
+                .iter()
+                .chain(folder.folders.iter().flat_map(folder_connections)),
+        )
+    }
+
     #[test]
     fn migrations_seed_the_starter_connection_tree() {
         let storage = Storage::open(temp_db_path("seed")).expect("storage opens");
 
-        let groups = storage
-            .list_connection_groups()
-            .expect("connection groups load");
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
 
-        assert_eq!(groups.len(), 3);
-        assert_eq!(groups[0].id, "local");
-        assert_eq!(groups[0].connections[0].name, "PowerShell");
+        assert_eq!(tree.connections.len(), 2);
+        assert_eq!(tree.folders.len(), 2);
+        assert_eq!(tree.folders[0].id, "production");
+        assert_eq!(tree.connections[0].name, "PowerShell");
         assert_eq!(
-            groups[0].connections[0].local_shell.as_deref(),
+            tree.connections[0].local_shell.as_deref(),
             Some("powershell.exe")
         );
-        assert_eq!(groups[1].connections[0].tags, Vec::<String>::new());
-        assert!(groups
-            .iter()
-            .flat_map(|group| group.connections.iter())
-            .all(|connection| connection.status == "idle"));
+        assert_eq!(tree.folders[0].connections[0].tags, Vec::<String>::new());
+        assert!(all_connections(&tree).all(|connection| connection.status == "idle"));
     }
 
     #[test]
@@ -1476,16 +1786,16 @@ mod tests {
         drop(storage);
 
         let reopened_storage = Storage::open(db_path).expect("second open succeeds");
-        let groups = reopened_storage
-            .list_connection_groups()
-            .expect("connection groups load");
-        let connection_count: usize = groups.iter().map(|group| group.connections.len()).sum();
+        let tree = reopened_storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let connection_count = all_connections(&tree).count();
 
         assert_eq!(connection_count, 4);
     }
 
     #[test]
-    fn create_connection_persists_manual_ssh_connection() {
+    fn create_connection_can_persist_root_ssh_connection() {
         let storage = Storage::open(temp_db_path("create")).expect("storage opens");
 
         let created = storage
@@ -1494,7 +1804,7 @@ mod tests {
                 host: "lab.internal".to_string(),
                 user: "admin".to_string(),
                 connection_type: "ssh".to_string(),
-                folder_id: Some("manual".to_string()),
+                folder_id: None,
                 port: Some(2222),
                 key_path: Some("C:\\Users\\ryan\\.ssh\\id_ed25519".to_string()),
                 proxy_jump: Some("jump.internal".to_string()),
@@ -1507,17 +1817,17 @@ mod tests {
         assert_eq!(created.port, Some(2222));
         assert_eq!(created.proxy_jump.as_deref(), Some("jump.internal"));
 
-        let groups = storage
-            .list_connection_groups()
-            .expect("connection groups load");
-        let manual = groups
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let root_connection = tree
+            .connections
             .iter()
-            .find(|group| group.id == "manual")
-            .expect("manual folder exists");
+            .find(|connection| connection.host == "lab.internal")
+            .expect("root connection exists");
 
-        assert_eq!(manual.name, "Manual");
-        assert_eq!(manual.connections[0].host, "lab.internal");
-        assert_eq!(manual.connections[0].tags, Vec::<String>::new());
+        assert_eq!(root_connection.name, "Lab Host");
+        assert_eq!(root_connection.tags, Vec::<String>::new());
     }
 
     #[test]
@@ -1534,13 +1844,10 @@ mod tests {
         assert_eq!(renamed.id, "api-stage");
         assert_eq!(renamed.name, "API Stage Blue");
 
-        let groups = storage
-            .list_connection_groups()
-            .expect("connection groups load");
-        let staging = groups
-            .iter()
-            .find(|group| group.id == "staging")
-            .expect("staging folder exists");
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let staging = find_folder(&tree.folders, "staging").expect("staging folder exists");
 
         assert_eq!(staging.connections[0].name, "API Stage Blue");
     }
@@ -1553,13 +1860,11 @@ mod tests {
             .delete_connection("bastion-east".to_string())
             .expect("connection is deleted");
 
-        let groups = storage
-            .list_connection_groups()
-            .expect("connection groups load");
-        let production = groups
-            .iter()
-            .find(|group| group.id == "production")
-            .expect("production folder exists");
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let production =
+            find_folder(&tree.folders, "production").expect("production folder exists");
 
         assert!(production.connections.is_empty());
     }
@@ -1582,13 +1887,11 @@ mod tests {
         assert_eq!(duplicated.tags, Vec::<String>::new());
         assert_eq!(duplicated.status, "idle");
 
-        let groups = storage
-            .list_connection_groups()
-            .expect("connection groups load");
-        let production = groups
-            .iter()
-            .find(|group| group.id == "production")
-            .expect("production folder exists");
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let production =
+            find_folder(&tree.folders, "production").expect("production folder exists");
 
         assert_eq!(production.connections.len(), 2);
         assert_eq!(production.connections[1].id, duplicated.id);
@@ -1601,6 +1904,7 @@ mod tests {
         let created = storage
             .create_connection_folder(CreateConnectionFolderRequest {
                 name: "Customer A".to_string(),
+                parent_folder_id: None,
             })
             .expect("folder is created");
         assert_eq!(created.name, "Customer A");
@@ -1615,15 +1919,38 @@ mod tests {
         assert_eq!(renamed.name, "Customer A Production");
 
         storage
-            .delete_connection_folder(created.id)
+            .delete_connection_folder(created.id.clone())
             .expect("folder is deleted");
 
-        let groups = storage
-            .list_connection_groups()
-            .expect("connection groups load");
-        assert!(!groups
-            .iter()
-            .any(|group| group.name == "Customer A Production"));
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        assert!(find_folder(&tree.folders, &created.id).is_none());
+    }
+
+    #[test]
+    fn folders_can_contain_subfolders() {
+        let storage = Storage::open(temp_db_path("folder-nesting")).expect("storage opens");
+        let parent = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Customer A".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("parent folder is created");
+        let child = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Production".to_string(),
+                parent_folder_id: Some(parent.id.clone()),
+            })
+            .expect("child folder is created");
+
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let parent = find_folder(&tree.folders, &parent.id).expect("parent folder exists");
+
+        assert_eq!(parent.folders[0].id, child.id);
+        assert_eq!(parent.folders[0].name, "Production");
     }
 
     #[test]
@@ -1632,6 +1959,7 @@ mod tests {
         let folder = storage
             .create_connection_folder(CreateConnectionFolderRequest {
                 name: "Ephemeral".to_string(),
+                parent_folder_id: None,
             })
             .expect("folder is created");
 
@@ -1654,93 +1982,69 @@ mod tests {
             .delete_connection_folder(folder.id)
             .expect("folder is deleted");
 
-        let groups = storage
-            .list_connection_groups()
-            .expect("connection groups load");
-        assert!(!groups.iter().any(|group| {
-            group
-                .connections
-                .iter()
-                .any(|connection| connection.host == "throwaway.internal")
-        }));
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        assert!(!all_connections(&tree).any(|connection| connection.host == "throwaway.internal"));
     }
 
     #[test]
-    fn local_workspace_folder_cannot_be_deleted() {
-        let storage = Storage::open(temp_db_path("folder-delete-local")).expect("storage opens");
-
-        let error = storage
-            .delete_connection_folder("local".to_string())
-            .expect_err("local workspace delete is rejected");
-
-        assert_eq!(error, "the local workspace folder cannot be deleted");
-    }
-
-    #[test]
-    fn move_connection_folder_updates_durable_folder_order() {
+    fn move_connection_folder_updates_durable_root_folder_order() {
         let storage = Storage::open(temp_db_path("folder-move")).expect("storage opens");
 
-        let groups = storage
+        let tree = storage
             .move_connection_folder(MoveConnectionFolderRequest {
                 id: "staging".to_string(),
+                parent_folder_id: None,
                 target_index: 0,
             })
             .expect("folder is moved");
 
-        assert_eq!(groups[0].id, "staging");
-        assert_eq!(groups[1].id, "local");
+        assert_eq!(tree.folders[0].id, "staging");
+        assert_eq!(tree.folders[1].id, "production");
 
         let reloaded = storage
-            .list_connection_groups()
-            .expect("connection groups reload");
-        assert_eq!(reloaded[0].id, "staging");
+            .list_connection_tree()
+            .expect("connection tree reloads");
+        assert_eq!(reloaded.folders[0].id, "staging");
     }
 
     #[test]
     fn move_connection_reorders_within_target_folder() {
         let storage = Storage::open(temp_db_path("connection-move")).expect("storage opens");
 
-        let groups = storage
+        let tree = storage
             .move_connection(MoveConnectionRequest {
                 id: "api-stage".to_string(),
-                folder_id: "production".to_string(),
+                folder_id: Some("production".to_string()),
                 target_index: 1,
             })
             .expect("connection is moved");
 
-        let production = groups
-            .iter()
-            .find(|group| group.id == "production")
-            .expect("production folder exists");
+        let production =
+            find_folder(&tree.folders, "production").expect("production folder exists");
         assert_eq!(production.connections[1].id, "api-stage");
         assert_eq!(production.connections.len(), 2);
 
-        let staging = groups
-            .iter()
-            .find(|group| group.id == "staging")
-            .expect("staging folder exists");
+        let staging = find_folder(&tree.folders, "staging").expect("staging folder exists");
         assert!(staging.connections.is_empty());
     }
 
     #[test]
-    fn move_connection_before_later_connection_in_same_folder() {
+    fn move_connection_before_later_connection_in_root() {
         let storage =
             Storage::open(temp_db_path("connection-move-same-folder")).expect("storage opens");
 
-        let groups = storage
+        let tree = storage
             .move_connection(MoveConnectionRequest {
                 id: "local-wsl".to_string(),
-                folder_id: "local".to_string(),
+                folder_id: None,
                 target_index: 0,
             })
             .expect("connection order is normalized");
 
-        let local = groups
-            .iter()
-            .find(|group| group.id == "local")
-            .expect("local folder exists");
-        assert_eq!(local.connections[0].id, "local-wsl");
-        assert_eq!(local.connections[1].id, "local-pwsh");
+        assert_eq!(tree.connections[0].id, "local-wsl");
+        assert_eq!(tree.connections[1].id, "local-pwsh");
     }
 
     #[test]

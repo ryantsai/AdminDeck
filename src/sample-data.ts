@@ -1,6 +1,6 @@
 import type {
   AiProviderSettings,
-  ConnectionGroup,
+  ConnectionTree,
   FileEntry,
   SftpSettings,
   SshSettings,
@@ -8,62 +8,69 @@ import type {
   WorkspaceTab,
 } from "./types";
 
-export const connectionGroups: ConnectionGroup[] = [
-  {
-    id: "local",
-    name: "Local workspace",
-    connections: [
-      {
-        id: "local-pwsh",
-        name: "PowerShell",
-        host: "localhost",
-        user: "ryan",
-        localShell: "powershell.exe",
-        type: "local",
-        status: "idle",
-      },
-      {
-        id: "local-wsl",
-        name: "WSL",
-        host: "localhost",
-        user: "ryan",
-        localShell: "wsl.exe",
-        type: "local",
-        status: "idle",
-      },
-    ],
-  },
-  {
-    id: "production",
-    name: "Production",
-    connections: [
-      {
-        id: "bastion-east",
-        name: "Bastion East",
-        host: "bastion-east.internal",
-        user: "admin",
-        type: "ssh",
-        authMethod: "agent",
-        status: "idle",
-      },
-    ],
-  },
-  {
-    id: "staging",
-    name: "Staging",
-    connections: [
-      {
-        id: "api-stage",
-        name: "API Stage",
-        host: "api-stage.internal",
-        user: "ops",
-        type: "ssh",
-        authMethod: "agent",
-        status: "idle",
-      },
-    ],
-  },
-];
+export const connectionTree: ConnectionTree = {
+  connections: [
+    {
+      id: "local-pwsh",
+      name: "PowerShell",
+      host: "localhost",
+      user: "ryan",
+      localShell: "powershell.exe",
+      type: "local",
+      status: "idle",
+    },
+    {
+      id: "local-wsl",
+      name: "WSL",
+      host: "localhost",
+      user: "ryan",
+      localShell: "wsl.exe",
+      type: "local",
+      status: "idle",
+    },
+  ],
+  folders: [
+    {
+      id: "production",
+      name: "Production",
+      connections: [
+        {
+          id: "bastion-east",
+          name: "Bastion East",
+          host: "bastion-east.internal",
+          user: "admin",
+          type: "ssh",
+          authMethod: "agent",
+          status: "idle",
+        },
+      ],
+      folders: [
+        {
+          id: "production-api",
+          name: "API",
+          connections: [],
+          folders: [],
+        },
+      ],
+    },
+    {
+      id: "staging",
+      name: "Staging",
+      connections: [
+        {
+          id: "api-stage",
+          name: "API Stage",
+          host: "api-stage.internal",
+          user: "ops",
+          type: "ssh",
+          authMethod: "agent",
+          status: "idle",
+        },
+      ],
+      folders: [],
+    },
+  ],
+};
 
 export const initialTabs: WorkspaceTab[] = [];
 

@@ -22,7 +22,7 @@ pub struct SshConfigConnectionDraft {
     user: String,
     #[serde(rename = "type")]
     connection_type: &'static str,
-    folder_id: String,
+    folder_id: Option<String>,
     port: Option<u16>,
     key_path: Option<String>,
     proxy_jump: Option<String>,
@@ -50,20 +50,19 @@ struct HostBlock {
 pub fn import_ssh_config(
     request: ImportSshConfigRequest,
 ) -> Result<SshConfigImportPreview, String> {
-    parse_ssh_config(
-        &request.content,
-        request.folder_id.as_deref().unwrap_or("manual"),
-    )
+    parse_ssh_config(&request.content, request.folder_id.as_deref())
 }
 
 fn parse_ssh_config(
     content: &str,
-    folder_id: &str,
+    folder_id: Option<&str>,
 ) -> Result<SshConfigImportPreview, String> {
     let mut unsupported_directives = Vec::new();
     let mut drafts = Vec::new();
     let mut current_block: Option<HostBlock> = None;
-    let folder_id = required_field("folder id", folder_id.to_string())?;
+    let folder_id = folder_id
+        .map(|folder_id| required_field("folder id", folder_id.to_string()))
+        .transpose()?;
 
     for (line_index, raw_line) in content.lines().enumerate() {
         let line_number = line_index + 1;
@@ -81,7 +80,7 @@ fn parse_ssh_config(
         let values = &tokens[1..];
         if directive == "host" {
             if let Some(block) = current_block.take() {
-                drafts.extend(drafts_for_block(block, &folder_id));
+                drafts.extend(drafts_for_block(block, folder_id.as_deref()));
             }
 
             current_block = Some(HostBlock {
@@ -121,7 +120,7 @@ fn parse_ssh_config(
     }
 
     if let Some(block) = current_block {
-        drafts.extend(drafts_for_block(block, &folder_id));
+        drafts.extend(drafts_for_block(block, folder_id.as_deref()));
     }
 
     Ok(SshConfigImportPreview {
@@ -130,25 +129,23 @@ fn parse_ssh_config(
     })
 }
 
-fn drafts_for_block(block: HostBlock, folder_id: &str) -> Vec<SshConfigConnectionDraft> {
+fn drafts_for_block(block: HostBlock, folder_id: Option<&str>) -> Vec<SshConfigConnectionDraft> {
     block
         .patterns
         .iter()
         .filter(|pattern| is_importable_host_pattern(pattern))
-        .map(|pattern| {
-            SshConfigConnectionDraft {
-                name: pattern.to_string(),
-                host: block
-                    .host_name
-                    .clone()
-                    .unwrap_or_else(|| pattern.to_string()),
-                user: block.user.clone().unwrap_or_else(default_ssh_user),
-                connection_type: "ssh",
-                folder_id: folder_id.to_string(),
-                port: block.port,
-                key_path: block.key_path.clone(),
-                proxy_jump: block.proxy_jump.clone(),
-            }
+        .map(|pattern| SshConfigConnectionDraft {
+            name: pattern.to_string(),
+            host: block
+                .host_name
+                .clone()
+                .unwrap_or_else(|| pattern.to_string()),
+            user: block.user.clone().unwrap_or_else(default_ssh_user),
+            connection_type: "ssh",
+            folder_id: folder_id.map(ToString::to_string),
+            port: block.port,
+            key_path: block.key_path.clone(),
+            proxy_jump: block.proxy_jump.clone(),
         })
         .collect()
 }
@@ -262,7 +259,7 @@ Host bastion-east
   IdentityFile "C:\Users\ryan\.ssh\id_ed25519"
   ProxyJump jump.internal
 "#,
-            "imported",
+            Some("imported"),
         )
         .expect("SSH config parses");
 
@@ -292,7 +289,7 @@ Host api-stage *.internal
   User ops
   ForwardAgent yes
 "#,
-            "manual",
+            None,
         )
         .expect("SSH config parses");
 
@@ -314,7 +311,7 @@ Host api-stage *.internal
 Host bad-port
   Port nope
 "#,
-            "manual",
+            None,
         )
         .expect_err("invalid port is rejected");
 
