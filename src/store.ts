@@ -46,6 +46,7 @@ interface WorkspaceState {
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
+  openSftpBrowser: (connection: Connection) => void;
   openTerminalHere: (connection: Connection, remotePath: string) => void;
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
@@ -138,34 +139,49 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    const tab: WorkspaceTab =
-      connection.type === "sftp"
-        ? {
-            id: `tab-${connection.id}`,
-            title: connection.name,
-            subtitle: `${connection.user}@${connection.host}`,
-            kind: "sftp",
-            panes: [],
-            connection,
-          }
-        : {
-            id: `tab-${connection.id}`,
-            title: connection.name,
-            subtitle:
-              connection.type === "local"
-                ? "Local terminal session"
-                : `${connection.user}@${connection.host}`,
-            kind: "terminal",
-            panes: [
-              {
-                id: `pane-${connection.id}`,
-                title: connection.type === "local" ? "local shell" : "ssh",
-                cwd: connection.type === "local" ? "C:\\Users\\ryan" : "~",
-                buffer: "",
-                connection,
-              },
-            ],
-          };
+    const tab: WorkspaceTab = {
+      id: `tab-${connection.id}`,
+      title: connection.name,
+      subtitle:
+        connection.type === "local" ? "Local terminal session" : `${connection.user}@${connection.host}`,
+      kind: "terminal",
+      panes: [
+        {
+          id: `pane-${connection.id}`,
+          title: connection.type === "local" ? connection.name : "ssh",
+          cwd: connection.type === "local" ? "C:\\Users\\ryan" : "~",
+          buffer: "",
+          connection,
+        },
+      ],
+      connection,
+    };
+
+    set((state) => ({
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
+    }));
+  },
+  openSftpBrowser: (connection) => {
+    if (connection.type !== "ssh") {
+      return;
+    }
+
+    const tabId = `tab-${connection.id}-sftp`;
+    const existingTab = get().tabs.find((tab) => tab.id === tabId);
+    if (existingTab) {
+      set({ activeTabId: existingTab.id });
+      return;
+    }
+
+    const tab: WorkspaceTab = {
+      id: tabId,
+      title: `${connection.name} SFTP`,
+      subtitle: `${connection.user}@${connection.host}`,
+      kind: "sftp",
+      panes: [],
+      connection,
+    };
 
     set((state) => ({
       tabs: [...state.tabs, tab],
@@ -205,8 +221,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       name: shell,
       host: "localhost",
       user: "local",
+      localShell: shell,
       type: "local",
-      tags: ["local", "shell"],
       status: "idle",
     });
   },

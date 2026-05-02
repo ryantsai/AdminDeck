@@ -110,6 +110,7 @@ pub struct SavedConnection {
     key_path: Option<String>,
     proxy_jump: Option<String>,
     auth_method: String,
+    local_shell: Option<String>,
     #[serde(rename = "type")]
     connection_type: String,
     tags: Vec<String>,
@@ -129,7 +130,7 @@ pub struct CreateConnectionRequest {
     key_path: Option<String>,
     proxy_jump: Option<String>,
     auth_method: Option<String>,
-    tags: Vec<String>,
+    local_shell: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -405,11 +406,23 @@ impl Storage {
             &connection,
             "ALTER TABLE connections ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'keyFile'",
         )?;
+        add_optional_column(
+            &connection,
+            "ALTER TABLE connections ADD COLUMN local_shell TEXT",
+        )?;
+        connection
+            .execute(
+                "UPDATE connections
+                 SET connection_type = 'ssh'
+                 WHERE connection_type = 'sftp'",
+                [],
+            )
+            .map_err(to_storage_error)?;
         connection
             .execute(
                 "UPDATE connections
                  SET auth_method = 'agent'
-                 WHERE connection_type IN ('ssh', 'sftp')
+                 WHERE connection_type = 'ssh'
                    AND auth_method = 'keyFile'
                    AND (key_path IS NULL OR TRIM(key_path) = '')",
                 [],
@@ -438,8 +451,9 @@ impl Storage {
             (!trimmed.is_empty()).then_some(trimmed)
         });
         let auth_method = normalize_auth_method(request.auth_method, &connection_type, &key_path)?;
+        let local_shell = normalize_local_shell(request.local_shell, &connection_type)?;
         let id = make_connection_id(&name);
-        let tags = normalize_tags(request.tags);
+        let tags = Vec::new();
 
         let mut connection = self.lock()?;
         let transaction = connection.transaction().map_err(to_storage_error)?;
@@ -455,8 +469,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'idle', ?11)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'idle', ?12)",
                 params![
                     id,
                     folder_id,
@@ -467,6 +481,7 @@ impl Storage {
                     key_path,
                     proxy_jump,
                     auth_method,
+                    local_shell,
                     connection_type,
                     next_sort_order
                 ],
@@ -494,6 +509,7 @@ impl Storage {
             key_path,
             proxy_jump,
             auth_method,
+            local_shell,
             connection_type,
             tags,
             status: "idle".to_string(),
@@ -623,7 +639,7 @@ impl Storage {
 
         let source = transaction
             .query_row(
-                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type
+                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type
                  FROM connections
                  WHERE id = ?1",
                 params![source_id],
@@ -637,7 +653,8 @@ impl Storage {
                         row.get::<_, Option<String>>(5)?,
                         row.get::<_, Option<String>>(6)?,
                         row.get::<_, String>(7)?,
-                        row.get::<_, String>(8)?,
+                        row.get::<_, Option<String>>(8)?,
+                        row.get::<_, String>(9)?,
                     ))
                 },
             )
@@ -653,6 +670,7 @@ impl Storage {
             key_path,
             proxy_jump,
             auth_method,
+            local_shell,
             connection_type,
         ) = source;
         let duplicate_name = request
@@ -672,8 +690,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'idle', ?11)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'idle', ?12)",
                 params![
                     duplicate_id,
                     folder_id,
@@ -684,22 +702,12 @@ impl Storage {
                     key_path,
                     proxy_jump,
                     auth_method,
+                    local_shell,
                     connection_type,
                     next_sort_order
                 ],
             )
             .map_err(to_storage_error)?;
-
-        let tags = list_tags(&transaction, &source_id)?;
-        for (index, tag) in tags.iter().enumerate() {
-            transaction
-                .execute(
-                    "INSERT INTO connection_tags (connection_id, tag, sort_order)
-                     VALUES (?1, ?2, ?3)",
-                    params![duplicate_id, tag, index as i64],
-                )
-                .map_err(to_storage_error)?;
-        }
 
         transaction.commit().map_err(to_storage_error)?;
         get_connection_by_id(&connection, &duplicate_id)
@@ -811,11 +819,12 @@ impl Storage {
                 name: "PowerShell",
                 host: "localhost",
                 username: "ryan",
+                local_shell: Some("powershell.exe"),
                 connection_type: "local",
                 auth_method: "keyFile",
                 status: "idle",
                 sort_order: 0,
-                tags: &["local", "shell"],
+                tags: &[],
             },
         )?;
         seed_connection(
@@ -823,14 +832,15 @@ impl Storage {
             NewConnection {
                 id: "local-wsl",
                 folder_id: "local",
-                name: "WSL Ubuntu",
-                host: "wsl.local",
+                name: "WSL",
+                host: "localhost",
                 username: "ryan",
+                local_shell: Some("wsl.exe"),
                 connection_type: "local",
                 auth_method: "keyFile",
                 status: "idle",
                 sort_order: 1,
-                tags: &["local", "linux"],
+                tags: &[],
             },
         )?;
         seed_connection(
@@ -841,26 +851,12 @@ impl Storage {
                 name: "Bastion East",
                 host: "bastion-east.internal",
                 username: "admin",
+                local_shell: None,
                 connection_type: "ssh",
                 auth_method: "agent",
                 status: "idle",
                 sort_order: 0,
-                tags: &["prod", "ssh", "jump"],
-            },
-        )?;
-        seed_connection(
-            &transaction,
-            NewConnection {
-                id: "files-prod",
-                folder_id: "production",
-                name: "Release Files",
-                host: "files01.internal",
-                username: "deploy",
-                connection_type: "sftp",
-                auth_method: "agent",
-                status: "idle",
-                sort_order: 1,
-                tags: &["prod", "sftp"],
+                tags: &[],
             },
         )?;
         seed_connection(
@@ -871,11 +867,12 @@ impl Storage {
                 name: "API Stage",
                 host: "api-stage.internal",
                 username: "ops",
+                local_shell: None,
                 connection_type: "ssh",
                 auth_method: "agent",
                 status: "idle",
                 sort_order: 0,
-                tags: &["stage", "api"],
+                tags: &[],
             },
         )?;
 
@@ -895,7 +892,7 @@ fn list_connections_for_folder(
 ) -> Result<Vec<SavedConnection>, String> {
     let mut statement = connection
         .prepare(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type
              FROM connections
              WHERE folder_id = ?1
              ORDER BY sort_order, name",
@@ -913,7 +910,8 @@ fn list_connections_for_folder(
                 key_path: row.get(5)?,
                 proxy_jump: row.get(6)?,
                 auth_method: row.get(7)?,
-                connection_type: row.get(8)?,
+                local_shell: row.get(8)?,
+                connection_type: row.get(9)?,
                 status: "idle".to_string(),
                 tags: Vec::new(),
             })
@@ -1014,7 +1012,7 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, connection_type
+            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, connection_type
              FROM connections
              WHERE id = ?1",
             params![connection_id],
@@ -1028,7 +1026,8 @@ fn get_connection_by_id(
                     key_path: row.get(5)?,
                     proxy_jump: row.get(6)?,
                     auth_method: row.get(7)?,
-                    connection_type: row.get(8)?,
+                    local_shell: row.get(8)?,
+                    connection_type: row.get(9)?,
                     status: "idle".to_string(),
                     tags: Vec::new(),
                 })
@@ -1083,6 +1082,7 @@ struct NewConnection<'a> {
     name: &'a str,
     host: &'a str,
     username: &'a str,
+    local_shell: Option<&'a str>,
     connection_type: &'a str,
     auth_method: &'a str,
     status: &'a str,
@@ -1097,8 +1097,8 @@ fn seed_connection(
     connection
         .execute(
             "INSERT INTO connections (
-                id, folder_id, name, host, username, auth_method, connection_type, status, sort_order
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                id, folder_id, name, host, username, auth_method, local_shell, connection_type, status, sort_order
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 new_connection.id,
                 new_connection.folder_id,
@@ -1106,6 +1106,7 @@ fn seed_connection(
                 new_connection.host,
                 new_connection.username,
                 new_connection.auth_method,
+                new_connection.local_shell,
                 new_connection.connection_type,
                 new_connection.status,
                 new_connection.sort_order
@@ -1171,8 +1172,29 @@ fn ensure_folder_exists(
 
 fn normalize_connection_type(value: &str) -> Result<String, String> {
     match value.trim().to_lowercase().as_str() {
-        "local" | "ssh" | "sftp" => Ok(value.trim().to_lowercase()),
-        _ => Err("connection type must be local, ssh, or sftp".to_string()),
+        "local" | "ssh" => Ok(value.trim().to_lowercase()),
+        _ => Err("connection type must be local or ssh".to_string()),
+    }
+}
+
+fn normalize_local_shell(
+    value: Option<String>,
+    connection_type: &str,
+) -> Result<Option<String>, String> {
+    if connection_type != "local" {
+        return Ok(None);
+    }
+
+    match value
+        .as_deref()
+        .map(str::trim)
+        .filter(|shell| !shell.is_empty())
+    {
+        Some(shell @ ("powershell.exe" | "cmd.exe" | "wsl.exe")) => Ok(Some(shell.to_string())),
+        Some(_) => {
+            Err("local terminal shell must be PowerShell, Command Prompt, or WSL".to_string())
+        }
+        None => Ok(None),
     }
 }
 
@@ -1222,17 +1244,6 @@ fn required_field(field: &str, value: String) -> Result<String, String> {
     } else {
         Ok(trimmed)
     }
-}
-
-fn normalize_tags(tags: Vec<String>) -> Vec<String> {
-    let mut normalized = Vec::new();
-    for tag in tags {
-        let trimmed = tag.trim().to_lowercase();
-        if !trimmed.is_empty() && !normalized.contains(&trimmed) {
-            normalized.push(trimmed);
-        }
-    }
-    normalized
 }
 
 fn default_terminal_settings() -> TerminalSettings {
@@ -1447,7 +1458,11 @@ mod tests {
         assert_eq!(groups.len(), 3);
         assert_eq!(groups[0].id, "local");
         assert_eq!(groups[0].connections[0].name, "PowerShell");
-        assert_eq!(groups[1].connections[0].tags, ["prod", "ssh", "jump"]);
+        assert_eq!(
+            groups[0].connections[0].local_shell.as_deref(),
+            Some("powershell.exe")
+        );
+        assert_eq!(groups[1].connections[0].tags, Vec::<String>::new());
         assert!(groups
             .iter()
             .flat_map(|group| group.connections.iter())
@@ -1466,7 +1481,7 @@ mod tests {
             .expect("connection groups load");
         let connection_count: usize = groups.iter().map(|group| group.connections.len()).sum();
 
-        assert_eq!(connection_count, 5);
+        assert_eq!(connection_count, 4);
     }
 
     #[test]
@@ -1484,7 +1499,7 @@ mod tests {
                 key_path: Some("C:\\Users\\ryan\\.ssh\\id_ed25519".to_string()),
                 proxy_jump: Some("jump.internal".to_string()),
                 auth_method: Some("keyFile".to_string()),
-                tags: vec!["Lab".to_string(), " ssh ".to_string()],
+                local_shell: None,
             })
             .expect("connection is created");
 
@@ -1502,7 +1517,7 @@ mod tests {
 
         assert_eq!(manual.name, "Manual");
         assert_eq!(manual.connections[0].host, "lab.internal");
-        assert_eq!(manual.connections[0].tags, ["lab", "ssh"]);
+        assert_eq!(manual.connections[0].tags, Vec::<String>::new());
     }
 
     #[test]
@@ -1546,12 +1561,11 @@ mod tests {
             .find(|group| group.id == "production")
             .expect("production folder exists");
 
-        assert_eq!(production.connections.len(), 1);
-        assert_eq!(production.connections[0].id, "files-prod");
+        assert!(production.connections.is_empty());
     }
 
     #[test]
-    fn duplicate_connection_copies_non_secret_connection_data_and_tags() {
+    fn duplicate_connection_copies_non_secret_connection_data() {
         let storage = Storage::open(temp_db_path("duplicate")).expect("storage opens");
 
         let duplicated = storage
@@ -1565,7 +1579,7 @@ mod tests {
         assert_eq!(duplicated.name, "Bastion East Copy");
         assert_eq!(duplicated.host, "bastion-east.internal");
         assert_eq!(duplicated.user, "admin");
-        assert_eq!(duplicated.tags, ["prod", "ssh", "jump"]);
+        assert_eq!(duplicated.tags, Vec::<String>::new());
         assert_eq!(duplicated.status, "idle");
 
         let groups = storage
@@ -1576,8 +1590,8 @@ mod tests {
             .find(|group| group.id == "production")
             .expect("production folder exists");
 
-        assert_eq!(production.connections.len(), 3);
-        assert_eq!(production.connections[2].id, duplicated.id);
+        assert_eq!(production.connections.len(), 2);
+        assert_eq!(production.connections[1].id, duplicated.id);
     }
 
     #[test]
@@ -1632,7 +1646,7 @@ mod tests {
                 key_path: None,
                 proxy_jump: None,
                 auth_method: Some("agent".to_string()),
-                tags: vec!["temp".to_string()],
+                local_shell: None,
             })
             .expect("connection is created in folder");
 
@@ -1699,7 +1713,7 @@ mod tests {
             .find(|group| group.id == "production")
             .expect("production folder exists");
         assert_eq!(production.connections[1].id, "api-stage");
-        assert_eq!(production.connections.len(), 3);
+        assert_eq!(production.connections.len(), 2);
 
         let staging = groups
             .iter()
@@ -1715,18 +1729,18 @@ mod tests {
 
         let groups = storage
             .move_connection(MoveConnectionRequest {
-                id: "bastion-east".to_string(),
-                folder_id: "production".to_string(),
-                target_index: 1,
+                id: "local-wsl".to_string(),
+                folder_id: "local".to_string(),
+                target_index: 0,
             })
             .expect("connection order is normalized");
 
-        let production = groups
+        let local = groups
             .iter()
-            .find(|group| group.id == "production")
-            .expect("production folder exists");
-        assert_eq!(production.connections[0].id, "bastion-east");
-        assert_eq!(production.connections[1].id, "files-prod");
+            .find(|group| group.id == "local")
+            .expect("local folder exists");
+        assert_eq!(local.connections[0].id, "local-wsl");
+        assert_eq!(local.connections[1].id, "local-pwsh");
     }
 
     #[test]

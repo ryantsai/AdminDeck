@@ -18,55 +18,57 @@ The product will be light chrome with dark terminal panes by default, optimized 
 2. As an operator, I want a left-side connection tree, so that I can organize hosts in folders like RDCMan or MobaXterm.
 3. As an operator, I want to create saved SSH connections, so that I do not retype hostnames, usernames, ports, or key paths.
 4. As an operator, I want folders in the connection tree, so that I can group hosts by project, environment, customer, or region.
-5. As an operator, I want tags on connections, so that I can find related hosts across folder boundaries.
-6. As an operator, I want search and filtering in the connection tree, so that large host lists remain usable.
-7. As an operator, I want drag/drop reorder in the tree, so that I can keep my workspace arranged naturally.
-8. As an operator, I want rename, delete, and duplicate actions for folders and connections, so that connection maintenance is fast.
-9. As an operator, I want quick connect, so that I can connect to a host without saving a full connection first.
-10. As an SSH user, I want to import entries from my SSH config, so that AdminDeck can bootstrap my existing workflow.
-11. As an SSH user, I want imported SSH config entries to preserve host, user, port, identity file, and proxy jump when possible, so that imported connections behave as expected.
-12. As an SSH user, I want unsupported SSH config directives to be visible, so that I understand what may need manual adjustment.
-13. As a terminal user, I want local terminal tabs, so that AdminDeck can replace my daily terminal for common work.
-14. As a terminal user, I want SSH terminal tabs, so that remote shell work happens in the same workspace as local work.
-15. As a terminal user, I want split terminal panes, so that I can monitor and operate multiple shells in one tab.
-16. As a terminal user, I want xterm-compatible behavior, so that tools like vim, tmux, htop, btop, lazygit, git, npm, pnpm, and cargo work correctly.
-17. As a terminal user, I want truecolor, mouse support, alternate screen, bracketed paste, hyperlinks, and scrollback search, so that modern terminal apps feel correct.
-18. As a terminal user, I want configurable font family, font size, line height, cursor style, and scrollback size, so that the terminal fits my workflow.
-19. As a terminal user, I want copy-on-select as a toggle, so that I can choose the selection behavior I prefer.
-20. As a terminal user, I want multiline paste confirmation, so that accidental command floods are prevented.
-21. As a Windows user, I want a configurable default shell, so that local terminals can use PowerShell, Command Prompt, WSL, or another shell later.
-22. As an SSH user, I want password authentication, so that I can connect to hosts that do not use key auth.
-23. As an SSH user, I want key-file authentication by path, so that AdminDeck uses my existing SSH keys.
-24. As an SSH user, I want SSH agent support where practical, so that I can use existing key workflows.
-25. As an SSH user, I want known-host verification, so that first connections and host-key changes are explicit.
-26. As an SSH user, I want resize events to propagate to remote terminals, so that full-screen terminal apps render correctly.
-27. As an SFTP user, I want a dual-pane file manager, so that local and remote files can be transferred without switching tools.
-28. As an SFTP user, I want upload and download for files and folders, so that common transfer work is covered.
-29. As an SFTP user, I want create folder, rename, delete, and refresh, so that I can manage remote files.
-30. As an SFTP user, I want a transfer queue with progress and cancellation, so that long operations are visible and controllable.
-31. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
-32. As an SFTP user, I want overwrite behavior settings, so that file transfer conflicts are predictable.
-33. As a user, I want a command palette, so that I can navigate and trigger common actions without reaching for the mouse.
-34. As a user, I want the command palette to open connections, create terminals, split panes, search scrollback, open settings, and import SSH config, so that common workflows are keyboard-first.
-35. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
-36. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
-37. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
-38. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
-39. As a user, I want no telemetry by default, so that my terminal and host data remain private.
-40. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
-41. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
-42. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
-43. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
-44. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
-45. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
-46. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
-47. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
-48. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
-49. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
-50. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
-51. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
-52. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
-53. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
+5. As an operator, I want search and filtering in the connection tree, so that large host lists remain usable.
+6. As an operator, I want drag/drop reorder in the tree, so that I can keep my workspace arranged naturally.
+7. As an operator, I want rename, delete, and duplicate actions for folders and connections, so that connection maintenance is fast.
+8. As an operator, I want quick connect, so that I can connect to a host without saving a full connection first.
+9. As an SSH user, I want to import entries from my SSH config, so that AdminDeck can bootstrap my existing workflow.
+10. As an SSH user, I want imported SSH config entries to preserve host, user, port, identity file, and proxy jump when possible, so that imported connections behave as expected.
+11. As an SSH user, I want unsupported SSH config directives to be visible, so that I understand what may need manual adjustment.
+12. As a terminal user, I want local terminal tabs, so that AdminDeck can replace my daily terminal for common work.
+13. As a terminal user, I want local terminal connections to require no host details, so that launching the default shell is fast and obvious.
+14. As a Windows user, I want saved local terminal options for PowerShell, Command Prompt, and WSL, so that local terminals match the shell I need.
+15. As a terminal user, I want SSH terminal tabs, so that remote shell work happens in the same workspace as local work.
+16. As a terminal user, I want split terminal panes, so that I can monitor and operate multiple shells in one tab.
+17. As a terminal user, I want xterm-compatible behavior, so that tools like vim, tmux, htop, btop, lazygit, git, npm, pnpm, and cargo work correctly.
+18. As a terminal user, I want truecolor, mouse support, alternate screen, bracketed paste, hyperlinks, and scrollback search, so that modern terminal apps feel correct.
+19. As a terminal user, I want configurable font family, font size, line height, cursor style, and scrollback size, so that the terminal fits my workflow.
+20. As a terminal user, I want copy-on-select as a toggle, so that I can choose the selection behavior I prefer.
+21. As a terminal user, I want multiline paste confirmation, so that accidental command floods are prevented.
+22. As a Windows user, I want a configurable default shell, so that local terminals can use PowerShell, Command Prompt, WSL, or another shell later.
+23. As an SSH user, I want password authentication, so that I can connect to hosts that do not use key auth.
+24. As an SSH user, I want key-file authentication by path, so that AdminDeck uses my existing SSH keys.
+25. As an SSH user, I want SSH agent support where practical, so that I can use existing key workflows.
+26. As an SSH user, I want known-host verification, so that first connections and host-key changes are explicit.
+27. As an SSH user, I want resize events to propagate to remote terminals, so that full-screen terminal apps render correctly.
+28. As an SSH user, I want to open SFTP from an SSH terminal, so that file transfer uses the same saved Connection instead of a separate SFTP entry.
+29. As an SFTP user, I want a dual-pane file manager, so that local and remote files can be transferred without switching tools.
+30. As an SFTP user, I want upload and download for files and folders, so that common transfer work is covered.
+31. As an SFTP user, I want create folder, rename, delete, and refresh, so that I can manage remote files.
+32. As an SFTP user, I want a transfer queue with progress and cancellation, so that long operations are visible and controllable.
+33. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
+34. As an SFTP user, I want overwrite behavior settings, so that file transfer conflicts are predictable.
+35. As a user, I want a command palette, so that I can navigate and trigger common actions without reaching for the mouse.
+36. As a user, I want the command palette to open connections, create terminals, split panes, search scrollback, open settings, and import SSH config, so that common workflows are keyboard-first.
+37. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
+38. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
+39. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
+40. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
+41. As a user, I want no telemetry by default, so that my terminal and host data remain private.
+42. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
+43. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
+44. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
+45. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
+46. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
+47. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
+48. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
+49. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
+50. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
+51. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
+52. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
+53. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
+54. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
+55. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
 
 ## Implementation Decisions
 
@@ -74,7 +76,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - First shippable target: desktop app.
 - Primary acceptance platform: Windows.
 - Follow-on platforms: macOS and Linux using the same architecture.
-- v0.1 protocols: local terminal, SSH terminal, and SFTP only.
+- v0.1 protocols: local terminal, SSH terminal, and SFTP launched from SSH connections only.
 - Deferred protocols: RDP, VNC, and lightweight webview tabs.
 - Desktop shell: Tauri v2.
 - Core/backend: Rust.
@@ -92,7 +94,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - SSH/SFTP implementation: in-process Rust implementation as primary path.
 - SSH library candidates: evaluate russh first, ssh2/libssh2 as fallback candidate.
 - System ssh: optional fallback/debug path only.
-- Storage: local SQLite for connections, tree, tags, settings, layout, recent sessions, and non-secret AI provider metadata.
+- Storage: local SQLite for connections, tree, settings, layout, recent sessions, and non-secret AI provider metadata.
 - Secrets: OS keychain for passwords, SSH passphrases, and AI API keys.
 - Optional later idea: portable vault mode could store credentials encrypted in SQLite for portable installs, but only with explicit opt-in, a user-supplied master password, clear lock/unlock behavior, and no plaintext or disk-stored encryption key.
 - SSH keys: reference existing key files by path; do not manage/generate keypairs in v0.1.
@@ -100,8 +102,8 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - AI providers: OpenAI-compatible BYO API key plus Claude Code CLI and Codex CLI adapters.
 - CLI agent integrations: suggest-only/ask-before-execute where possible.
 - UI model: left-side connection manager/tree, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
-- Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
-- SFTP model: dual-pane file manager with basic operations and transfer queue.
+- Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
+- SFTP model: dual-pane file manager with basic operations and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
 - Settings: light-first app chrome, dark terminal panes by default, font settings, terminal cursor, scrollback, copy-on-select, multiline paste confirmation, local shell default, SSH defaults, SFTP defaults, AI provider settings, fixed keybindings in v0.1.
 - Privacy: no telemetry or automatic crash upload in v0.1.
 - Distribution: Windows .msi or .exe installer, portable ZIP for dev/test, GitHub Releases. macOS .dmg and Linux AppImage/deb/rpm later.

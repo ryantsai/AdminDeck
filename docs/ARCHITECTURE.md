@@ -34,7 +34,6 @@ Owns SQLite migrations and repositories for:
 
 - connection tree nodes
 - saved connections
-- tags
 - settings
 - UI layout
 - recent sessions
@@ -60,7 +59,8 @@ Represents all openable resources as saved connections. v0.1 connection types:
 
 - Local Terminal
 - SSH Terminal
-- SFTP Browser
+
+SFTP is a related workspace surface opened from an SSH Connection, not a standalone saved Connection type.
 
 Later connection types:
 
@@ -70,7 +70,7 @@ Later connection types:
 
 ### Connection Tree
 
-Owns folders, saved connections, tags, search/filter, drag/drop ordering, rename/delete/duplicate, quick connect, SSH config import display, and open-session status badges.
+Owns folders, saved connections, search/filter, drag/drop ordering, rename/delete/duplicate, quick connect, SSH config import display, and open-session status badges.
 
 Current implementation note: status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
 
@@ -105,7 +105,7 @@ Evaluate `russh` first. Evaluate `ssh2` if `russh` does not meet v0.1 needs.
 
 ### SFTP
 
-Owns SFTP sessions, local/remote listing, upload/download, create folder, rename, delete, refresh, transfer queue, progress, cancellation, overwrite policy, and "open terminal here."
+Owns SFTP sessions launched from SSH Connections, local/remote listing, upload/download, create folder, rename, delete, refresh, transfer queue, progress, cancellation, overwrite policy, and "open terminal here."
 
 ### SSH Config Importer
 

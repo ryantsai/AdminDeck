@@ -5,7 +5,7 @@ AdminDeck is a local-first desktop administration workspace for terminal, SSH, S
 ## Language
 
 **Connection**:
-A durable openable profile stored in SQLite for a local terminal, SSH terminal, or SFTP browser.
+A durable openable resource stored in SQLite for a local terminal or SSH terminal. SFTP is opened from an SSH Connection and is not stored as a standalone Connection.
 _Avoid_: Profile, saved session, host entry
 
 **Quick Connect**:
@@ -27,6 +27,7 @@ _Avoid_: Session, split
 ## Relationships
 
 - A **Connection** may start zero or more **Sessions** over time.
+- An SSH **Connection** may start terminal **Sessions** and related SFTP browser **Sessions**.
 - A **Quick Connect** starts exactly one **Session** unless the user saves it as a **Connection**.
 - A **Session** may be presented by one **Tab**.
 - A terminal **Tab** may contain one or more **Panes**.
@@ -37,7 +38,7 @@ _Avoid_: Session, split
 ## Example Dialogue
 
 > **Dev:** "When the user opens the Bastion East **Connection**, should we mutate that row to mark it active?"
-> **Domain expert:** "No — opening the **Connection** creates a **Session**. The **Connection** stays durable profile data; live state belongs to the **Session** and its **Tab**."
+> **Domain expert:** "No — opening the **Connection** creates a **Session**. The **Connection** stays durable resource data; live state belongs to the **Session** and its **Tab**."
 
 ## Flagged Ambiguities
 

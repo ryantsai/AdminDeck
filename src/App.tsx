@@ -109,6 +109,11 @@ type ConnectionDialogRequest = CreateConnectionRequest & {
 
 const AI_PROVIDER_SECRET_OWNER_ID = "openai-compatible-provider";
 const ASSISTANT_CONTEXT_MAX_CHARS = 4000;
+const LOCAL_SHELL_OPTIONS = [
+  { label: "PowerShell", value: "powershell.exe" },
+  { label: "Command Prompt", value: "cmd.exe" },
+  { label: "WSL", value: "wsl.exe" },
+];
 
 type TransferRecord = {
   id: string;
@@ -254,9 +259,6 @@ function ActivityRail({ onOpenSettings }: { onOpenSettings: () => void }) {
       <button className="rail-button" aria-label="Terminal sessions">
         <Terminal size={18} />
       </button>
-      <button className="rail-button" aria-label="SFTP browser">
-        <Columns2 size={18} />
-      </button>
       <button className="rail-button" aria-label="Command palette">
         <Command size={18} />
       </button>
@@ -358,7 +360,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       authMethod: connectionRequest.authMethod,
       hasPassword: Boolean(password),
       type: connectionRequest.type,
-      tags: connectionRequest.tags,
+      localShell: connectionRequest.localShell,
       status: "idle",
     };
 
@@ -529,7 +531,6 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
               connection.host,
               connection.user,
               connection.type,
-              ...connection.tags,
             ]
               .join(" ")
               .toLowerCase()
@@ -767,7 +768,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
         <input
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
-          placeholder="Search hosts, tags, folders"
+          placeholder="Search hosts, folders"
         />
       </label>
 
@@ -897,7 +898,7 @@ function ConnectionDialog({
 }) {
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
   const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
-  const usesSshDefaults = connectionType !== "local";
+  const usesSshDefaults = connectionType === "ssh";
   const folderOptions = useMemo(
     () => groups.filter((group) => !["local", "manual"].includes(group.id)),
     [groups],
@@ -906,21 +907,24 @@ function ConnectionDialog({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const host = String(form.get("host") ?? "").trim();
-    const name = String(form.get("name") ?? "").trim() || host;
+    const selectedLocalShell = String(form.get("localShell") ?? LOCAL_SHELL_OPTIONS[0].value);
+    const selectedLocalShellLabel =
+      LOCAL_SHELL_OPTIONS.find((option) => option.value === selectedLocalShell)?.label ??
+      "Local terminal";
+    const host = connectionType === "local" ? "localhost" : String(form.get("host") ?? "").trim();
+    const name =
+      connectionType === "local"
+        ? selectedLocalShellLabel
+        : String(form.get("name") ?? "").trim() || host;
     const portValue = String(form.get("port") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const keyPath = String(form.get("keyPath") ?? "").trim();
     const proxyJump = String(form.get("proxyJump") ?? "").trim();
-    const tags = String(form.get("tags") ?? "")
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean);
 
     void onSubmit({
       name,
       host,
-      user: String(form.get("user") ?? "").trim(),
+      user: connectionType === "local" ? "local" : String(form.get("user") ?? "").trim(),
       type: connectionType,
       folderId:
         connectionType === "local"
@@ -930,8 +934,8 @@ function ConnectionDialog({
       keyPath: usesSshDefaults && authMethod === "keyFile" ? keyPath || undefined : undefined,
       proxyJump: proxyJump || undefined,
       authMethod: usesSshDefaults ? authMethod : undefined,
+      localShell: connectionType === "local" ? selectedLocalShell : undefined,
       password: usesSshDefaults && authMethod === "password" ? password : undefined,
-      tags,
     });
   }
 
@@ -956,7 +960,6 @@ function ConnectionDialog({
           >
             <option value="ssh">SSH terminal</option>
             <option value="local">Local terminal</option>
-            <option value="sftp">SFTP browser</option>
           </select>
         </label>
 
@@ -974,41 +977,56 @@ function ConnectionDialog({
           </label>
         ) : null}
 
-        <label>
-          <span>Name</span>
-          <input name="name" placeholder="Bastion East" />
-        </label>
-
-        <label>
-          <span>Host</span>
-          <input name="host" placeholder="example.internal" required />
-        </label>
-
-        <div className="form-grid">
+        {connectionType === "local" ? (
           <label>
-            <span>User</span>
-            <input
-              key={`user-${connectionType}`}
-              name="user"
-              defaultValue={usesSshDefaults ? sshSettings.defaultUser : "local"}
-              placeholder={usesSshDefaults ? "admin" : "local"}
-              required
-            />
+            <span>Shell</span>
+            <select name="localShell" defaultValue={LOCAL_SHELL_OPTIONS[0].value}>
+              {LOCAL_SHELL_OPTIONS.map((option) => (
+                <option value={option.value} key={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
-          <label>
-            <span>Port</span>
-            <input
-              key={`port-${connectionType}`}
-              name="port"
-              defaultValue={usesSshDefaults ? sshSettings.defaultPort : undefined}
-              inputMode="numeric"
-              min="1"
-              max="65535"
-              type="number"
-              placeholder={usesSshDefaults ? "22" : ""}
-            />
-          </label>
-        </div>
+        ) : (
+          <>
+            <label>
+              <span>Name</span>
+              <input name="name" placeholder="Bastion East" />
+            </label>
+
+            <label>
+              <span>Host</span>
+              <input name="host" placeholder="example.internal" required />
+            </label>
+
+            <div className="form-grid">
+              <label>
+                <span>User</span>
+                <input
+                  key={`user-${connectionType}`}
+                  name="user"
+                  defaultValue={sshSettings.defaultUser}
+                  placeholder="admin"
+                  required
+                />
+              </label>
+              <label>
+                <span>Port</span>
+                <input
+                  key={`port-${connectionType}`}
+                  name="port"
+                  defaultValue={sshSettings.defaultPort}
+                  inputMode="numeric"
+                  min="1"
+                  max="65535"
+                  type="number"
+                  placeholder="22"
+                />
+              </label>
+            </div>
+          </>
+        )}
 
         {usesSshDefaults ? (
           <>
@@ -1060,11 +1078,6 @@ function ConnectionDialog({
           </>
         ) : null}
 
-        <label>
-          <span>Tags</span>
-          <input name="tags" placeholder="prod, jump" />
-        </label>
-
         {error ? <p className="form-error">{error}</p> : null}
 
         <div className="dialog-actions">
@@ -1087,9 +1100,7 @@ function TreeDragPreview({ preview }: { preview: TreeDragPreview }) {
       ? Folder
       : preview.connectionType === "local"
         ? Laptop
-        : preview.connectionType === "sftp"
-          ? Columns2
-          : Server;
+        : Server;
   const style = {
     left: `${preview.x - preview.offsetX}px`,
     top: `${preview.y - preview.offsetY}px`,
@@ -1139,7 +1150,7 @@ function ConnectionRow({
   onPointerDragStart: (event: ReactPointerEvent<HTMLElement>) => void;
   onRename: () => void;
 }) {
-  const Icon = connection.type === "local" ? Laptop : connection.type === "sftp" ? Columns2 : Server;
+  const Icon = connection.type === "local" ? Laptop : Server;
 
   return (
     <div
@@ -1248,7 +1259,7 @@ function TopBar({
       const content = await file.text();
       setImportPreview(
         await invokeCommand("import_ssh_config", {
-          request: { content, folderId: "manual", tags: [] },
+          request: { content, folderId: "manual" },
         }),
       );
     } catch (error) {
@@ -1456,7 +1467,7 @@ function WorkspaceCanvas() {
         <section className="empty-workspace">
           <Terminal size={28} />
           <h2>No active session</h2>
-          <p>Open a local terminal, SSH connection, or SFTP browser from the tree.</p>
+          <p>Open a local terminal or SSH connection from the tree.</p>
         </section>
       </div>
     );
@@ -1477,7 +1488,9 @@ function WorkspaceCanvas() {
 
 function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
   const splitTerminalPane = useWorkspaceStore((state) => state.splitTerminalPane);
+  const openSftpBrowser = useWorkspaceStore((state) => state.openSftpBrowser);
   const canSplit = tab.panes.some((pane) => pane.connection);
+  const sshConnection = tab.connection?.type === "ssh" ? tab.connection : undefined;
 
   return (
     <section
@@ -1490,6 +1503,17 @@ function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspac
           <span>{tab.subtitle}</span>
         </div>
         <div className="toolbar-cluster">
+          <button
+            className="toolbar-button"
+            aria-label="Open SFTP browser"
+            disabled={!sshConnection}
+            onClick={() => sshConnection && openSftpBrowser(sshConnection)}
+            title="Open SFTP browser"
+            type="button"
+          >
+            <Columns2 size={15} />
+            SFTP
+          </button>
           <button
             className="icon-button"
             aria-label="Split terminal"
@@ -1663,7 +1687,10 @@ function TerminalPaneView({ isActive, pane }: { isActive: boolean; pane: Termina
             proxyJump: connection.proxyJump,
             authMethod: connection.authMethod,
             secretOwnerId: connection.id,
-            shell: connection.type === "local" ? terminalSettings.defaultShell : undefined,
+            shell:
+              connection.type === "local"
+                ? connection.localShell ?? terminalSettings.defaultShell
+                : undefined,
             initialDirectory: connection.type === "local" ? undefined : pane.cwd.trim() || undefined,
             cols: terminalDimensions.cols,
             pixelHeight: terminalDimensions.pixelHeight,
@@ -1961,7 +1988,7 @@ function normalizeAssistantContextText(text: string) {
 
 function usesNativeSshHostKeyVerification(connection: Connection) {
   return (
-    (connection.type === "ssh" || connection.type === "sftp") &&
+    connection.type === "ssh" &&
     (Boolean(connection.keyPath?.trim()) ||
       Boolean(connection.hasPassword) ||
       connection.authMethod === "password" ||
@@ -2095,7 +2122,7 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
 
   useEffect(() => {
     if (!connection) {
-      setStatus("No SFTP connection selected");
+      setStatus("No SSH connection selected");
       return;
     }
 

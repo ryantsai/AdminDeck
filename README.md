@@ -11,7 +11,7 @@ This repository currently contains the v0.1 foundation:
 - Zustand workspace state
 - Dense first-pass AdminDeck app shell
 - Rust command boundary with a typed frontend wrapper
-- SQLite-backed durable Connections, folders, tags, reorder, and terminal settings
+- SQLite-backed durable Connections, folders, reorder, and terminal settings
 - OS keychain secret operations
 - xterm-based local terminal Sessions over `portable-pty`
 - Live workspace-derived connection status badges

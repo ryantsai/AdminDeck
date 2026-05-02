@@ -257,7 +257,7 @@ type CommandMap = {
     result: SshTransportPlan;
   };
   import_ssh_config: {
-    args: { request: { content: string; folderId?: string; tags?: string[] } };
+    args: { request: { content: string; folderId?: string } };
     result: SshConfigImportPreview;
   };
   inspect_ssh_host_key: {

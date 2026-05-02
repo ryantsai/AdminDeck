@@ -4,9 +4,9 @@
 
 As of May 2, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs that preserve live Sessions across tab switching, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
 
-Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH/SFTP Connections.
+Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH Connections.
 
-Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP Connection credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SFTP tabs now open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, and folder opening on both sides, support upload/download of selected files or folders with configurable overwrite behavior, provide remote create folder, rename, and delete actions, include a visible transfer queue with byte progress and cancellation for queued or active transfers, and can open an SSH terminal at the current remote directory.
+Milestone C has started with native `russh-sftp` sessions launched from SSH Connections using the same stored credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SSH terminal tabs now expose an SFTP action beside split-pane controls; SFTP tabs open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, and folder opening on both sides, support upload/download of selected files or folders with configurable overwrite behavior, provide remote create folder, rename, and delete actions, include a visible transfer queue with byte progress and cancellation for queued or active transfers, and can open an SSH terminal at the current remote directory.
 
 Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged.
 
@@ -32,11 +32,12 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 - [x] Implement typed Tauri command wrapper.
 - [x] Add SQLite migrations and repository layer.
 - [x] Add OS keychain abstraction.
-- [x] Add connection model for local terminal, SSH terminal, and SFTP.
-- [x] Add connection tree with folders, saved connections, tags, search/filter, drag/drop reorder, rename/delete/duplicate, quick connect, and live status badges.
+- [x] Add connection model for local terminal and SSH terminal.
+- [x] Add connection tree with folders, saved connections, search/filter, drag/drop reorder, rename/delete/duplicate, quick connect, and live status badges.
 - [x] Add tab workspace.
 - [x] Add split panes inside terminal tabs.
 - [x] Add local terminal session lifecycle.
+- [x] Add Windows local terminal creation options for PowerShell, Command Prompt, and WSL.
 - [x] Add initial terminal view using the fastest reliable implementation.
 - [x] Add settings shell for terminal font, line height, cursor, scrollback, copy-on-select, multiline paste confirmation, and default shell.
 
@@ -57,6 +58,7 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 ## Milestone C: SFTP Core
 
 - [x] Implement SFTP session reuse from connection credentials where possible.
+- [x] Launch SFTP from SSH terminal tabs instead of standalone SFTP Connections.
 - [x] Add dual-pane local/remote file manager.
 - [x] Add upload and download for files and folders.
 - [x] Add create folder, rename, delete, and refresh.

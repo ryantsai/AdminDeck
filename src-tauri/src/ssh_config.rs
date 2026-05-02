@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct ImportSshConfigRequest {
     content: String,
     folder_id: Option<String>,
-    tags: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -27,7 +26,6 @@ pub struct SshConfigConnectionDraft {
     port: Option<u16>,
     key_path: Option<String>,
     proxy_jump: Option<String>,
-    tags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -55,20 +53,17 @@ pub fn import_ssh_config(
     parse_ssh_config(
         &request.content,
         request.folder_id.as_deref().unwrap_or("manual"),
-        request.tags.unwrap_or_default(),
     )
 }
 
 fn parse_ssh_config(
     content: &str,
     folder_id: &str,
-    requested_tags: Vec<String>,
 ) -> Result<SshConfigImportPreview, String> {
     let mut unsupported_directives = Vec::new();
     let mut drafts = Vec::new();
     let mut current_block: Option<HostBlock> = None;
     let folder_id = required_field("folder id", folder_id.to_string())?;
-    let tags = normalize_tags(requested_tags);
 
     for (line_index, raw_line) in content.lines().enumerate() {
         let line_number = line_index + 1;
@@ -86,7 +81,7 @@ fn parse_ssh_config(
         let values = &tokens[1..];
         if directive == "host" {
             if let Some(block) = current_block.take() {
-                drafts.extend(drafts_for_block(block, &folder_id, &tags));
+                drafts.extend(drafts_for_block(block, &folder_id));
             }
 
             current_block = Some(HostBlock {
@@ -126,7 +121,7 @@ fn parse_ssh_config(
     }
 
     if let Some(block) = current_block {
-        drafts.extend(drafts_for_block(block, &folder_id, &tags));
+        drafts.extend(drafts_for_block(block, &folder_id));
     }
 
     Ok(SshConfigImportPreview {
@@ -135,23 +130,12 @@ fn parse_ssh_config(
     })
 }
 
-fn drafts_for_block(
-    block: HostBlock,
-    folder_id: &str,
-    requested_tags: &[String],
-) -> Vec<SshConfigConnectionDraft> {
+fn drafts_for_block(block: HostBlock, folder_id: &str) -> Vec<SshConfigConnectionDraft> {
     block
         .patterns
         .iter()
         .filter(|pattern| is_importable_host_pattern(pattern))
         .map(|pattern| {
-            let mut tags = vec!["ssh".to_string(), "imported".to_string()];
-            for tag in requested_tags {
-                if !tags.contains(tag) {
-                    tags.push(tag.clone());
-                }
-            }
-
             SshConfigConnectionDraft {
                 name: pattern.to_string(),
                 host: block
@@ -164,7 +148,6 @@ fn drafts_for_block(
                 port: block.port,
                 key_path: block.key_path.clone(),
                 proxy_jump: block.proxy_jump.clone(),
-                tags,
             }
         })
         .collect()
@@ -264,17 +247,6 @@ fn required_field(field: &str, value: String) -> Result<String, String> {
     }
 }
 
-fn normalize_tags(tags: Vec<String>) -> Vec<String> {
-    let mut normalized = Vec::new();
-    for tag in tags {
-        let trimmed = tag.trim().to_lowercase();
-        if !trimmed.is_empty() && !normalized.contains(&trimmed) {
-            normalized.push(trimmed);
-        }
-    }
-    normalized
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,7 +263,6 @@ Host bastion-east
   ProxyJump jump.internal
 "#,
             "imported",
-            vec!["Prod".to_string()],
         )
         .expect("SSH config parses");
 
@@ -308,7 +279,6 @@ Host bastion-east
             preview.drafts[0].proxy_jump.as_deref(),
             Some("jump.internal")
         );
-        assert_eq!(preview.drafts[0].tags, ["ssh", "imported", "prod"]);
     }
 
     #[test]
@@ -323,7 +293,6 @@ Host api-stage *.internal
   ForwardAgent yes
 "#,
             "manual",
-            Vec::new(),
         )
         .expect("SSH config parses");
 
@@ -346,7 +315,6 @@ Host bad-port
   Port nope
 "#,
             "manual",
-            Vec::new(),
         )
         .expect_err("invalid port is rejected");
 
