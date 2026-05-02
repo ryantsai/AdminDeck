@@ -44,6 +44,7 @@ pub struct SecretPresence {
 enum SecretKind {
     ConnectionPassword,
     ConnectionPassphrase,
+    UrlPassword,
     AiApiKey,
 }
 
@@ -134,6 +135,13 @@ impl Secrets {
         })
     }
 
+    pub(crate) fn read_url_password(&self, owner_id: String) -> Result<Option<String>, String> {
+        self.read_secret(SecretReferenceRequest {
+            kind: SecretKind::UrlPassword,
+            owner_id,
+        })
+    }
+
     #[allow(dead_code)]
     pub(crate) fn read_ai_api_key(&self, owner_id: String) -> Result<Option<String>, String> {
         self.read_secret(SecretReferenceRequest {
@@ -201,6 +209,7 @@ impl SecretKind {
         match self {
             Self::ConnectionPassword => "connection-password",
             Self::ConnectionPassphrase => "connection-passphrase",
+            Self::UrlPassword => "url-password",
             Self::AiApiKey => "ai-api-key",
         }
     }
@@ -297,5 +306,33 @@ mod tests {
             .read_ai_api_key(owner_id)
             .expect("AI API key can be read by backend");
         assert_eq!(secret.as_deref(), Some("sk-test-key"));
+    }
+
+    #[test]
+    fn stores_url_passwords_under_their_own_secret_kind() {
+        let _guard = test_keychain_lock().lock().expect("test keychain lock");
+        let secrets = Secrets::new_for_test();
+        let owner_id = "url-connection-test-secret".to_string();
+
+        secrets
+            .store_secret(StoreSecretRequest {
+                kind: SecretKind::UrlPassword,
+                owner_id: owner_id.clone(),
+                secret: "browser-login-password".to_string(),
+            })
+            .expect("URL password is stored");
+
+        let presence = secrets
+            .secret_exists(SecretReferenceRequest {
+                kind: SecretKind::UrlPassword,
+                owner_id: owner_id.clone(),
+            })
+            .expect("presence check succeeds");
+        assert!(presence.exists);
+
+        let secret = secrets
+            .read_url_password(owner_id)
+            .expect("URL password can be read by backend");
+        assert_eq!(secret.as_deref(), Some("browser-login-password"));
     }
 }

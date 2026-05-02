@@ -1849,6 +1849,12 @@ progress {
   min-width: 200px;
 }
 
+.webview-toolbar-status {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .webview-placeholder {
   flex: 1;
   min-height: 0;

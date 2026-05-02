@@ -51,6 +51,10 @@ interface WorkspaceState {
   openTerminalHere: (connection: Connection, remotePath: string) => void;
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
+  updateWebviewTabMetadata: (
+    tabId: string,
+    metadata: { title?: string; subtitle?: string; url?: string },
+  ) => void;
   markConnectionSessionStarted: (connectionId: string) => void;
   markConnectionSessionEnded: (connectionId: string) => void;
 }
@@ -292,6 +296,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               connection,
             },
           ],
+        };
+      }),
+    }));
+  },
+  updateWebviewTabMetadata: (tabId, metadata) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.id !== tabId || tab.kind !== "webview") {
+          return tab;
+        }
+
+        return {
+          ...tab,
+          title: metadata.title ?? tab.title,
+          subtitle: metadata.subtitle ?? tab.subtitle,
+          url: metadata.url ?? tab.url,
         };
       }),
     }));

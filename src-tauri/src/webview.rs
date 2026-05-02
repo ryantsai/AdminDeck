@@ -5,11 +5,94 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl,
+    webview::{DownloadEvent, PageLoadEvent},
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl,
 };
 
 const HOST_WINDOW_LABEL: &str = "main";
 const DEFAULT_PARTITION: &str = "shared";
+const AUTOFILL_AGENT: &str = r#"
+(() => {
+  const agent = {
+    fill(credential) {
+      const passwordInput = findPasswordInput();
+      if (!passwordInput) {
+        return { filled: false, reason: "no-password-field" };
+      }
+
+      const usernameInput = findUsernameInput(passwordInput);
+      if (usernameInput && credential.username) {
+        setInputValue(usernameInput, credential.username);
+      }
+      setInputValue(passwordInput, credential.password);
+      passwordInput.focus({ preventScroll: true });
+      return { filled: true, usernameFilled: Boolean(usernameInput && credential.username) };
+    },
+  };
+
+  function findPasswordInput() {
+    return Array.from(document.querySelectorAll("input[type='password']")).find(isUsableInput);
+  }
+
+  function findUsernameInput(passwordInput) {
+    const form = passwordInput.form || passwordInput.closest("form") || document;
+    const candidates = Array.from(form.querySelectorAll("input")).filter((input) => {
+      if (!isUsableInput(input) || input === passwordInput) {
+        return false;
+      }
+      const type = (input.getAttribute("type") || "text").toLowerCase();
+      return ["", "text", "email", "tel", "search", "url"].includes(type);
+    });
+    if (candidates.length === 0) {
+      return undefined;
+    }
+    return candidates
+      .map((input, index) => ({ input, index, score: usernameScore(input, index) }))
+      .sort((left, right) => right.score - left.score || right.index - left.index)[0].input;
+  }
+
+  function usernameScore(input, index) {
+    const label = [
+      input.name,
+      input.id,
+      input.getAttribute("autocomplete"),
+      input.getAttribute("aria-label"),
+      input.placeholder,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    let score = index;
+    if (/user|email|login|account|name/.test(label)) {
+      score += 100;
+    }
+    if (/one-time|otp|code|search/.test(label)) {
+      score -= 100;
+    }
+    return score;
+  }
+
+  function isUsableInput(input) {
+    return input instanceof HTMLInputElement &&
+      !input.disabled &&
+      !input.readOnly &&
+      input.type !== "hidden" &&
+      input.offsetParent !== null;
+  }
+
+  function setInputValue(input, value) {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    descriptor.set.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  Object.defineProperty(window, "__ADMINDECK_URL_AUTOFILL__", {
+    configurable: true,
+    value: agent,
+  });
+})();
+"#;
 
 pub struct WebviewSessionManager {
     sessions: Mutex<HashMap<String, Webview>>,
@@ -69,6 +152,44 @@ pub struct WebviewSimpleRequest {
     session_id: String,
 }
 
+pub(crate) struct WebviewFillCredentialRequest {
+    pub(crate) session_id: String,
+    pub(crate) username: String,
+    pub(crate) password: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebviewNavigationPayload {
+    session_id: String,
+    url: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebviewPageLoadPayload {
+    session_id: String,
+    url: String,
+    status: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebviewTitleChangedPayload {
+    session_id: String,
+    title: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebviewDownloadPayload {
+    session_id: String,
+    url: String,
+    status: &'static str,
+    path: Option<String>,
+    success: Option<bool>,
+}
+
 impl WebviewSessionManager {
     pub fn new() -> Self {
         Self {
@@ -105,9 +226,7 @@ impl WebviewSessionManager {
         {
             let sessions = self.lock()?;
             if sessions.contains_key(&session_id) {
-                return Err(format!(
-                    "webview session '{session_id}' is already running"
-                ));
+                return Err(format!("webview session '{session_id}' is already running"));
             }
         }
 
@@ -116,7 +235,77 @@ impl WebviewSessionManager {
             .ok_or_else(|| format!("host window '{HOST_WINDOW_LABEL}' is not available"))?;
 
         let label = webview_label_for(&session_id);
-        let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url)).auto_resize();
+        let navigation_app = app.clone();
+        let navigation_session_id = session_id.clone();
+        let page_load_app = app.clone();
+        let page_load_session_id = session_id.clone();
+        let title_app = app.clone();
+        let title_session_id = session_id.clone();
+        let download_app = app.clone();
+        let download_session_id = session_id.clone();
+        let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url))
+            .initialization_script(AUTOFILL_AGENT)
+            .on_navigation(move |url| {
+                let _ = navigation_app.emit(
+                    "webview-navigation",
+                    WebviewNavigationPayload {
+                        session_id: navigation_session_id.clone(),
+                        url: url.to_string(),
+                    },
+                );
+                true
+            })
+            .on_page_load(move |_webview, payload| {
+                let status = match payload.event() {
+                    PageLoadEvent::Started => "started",
+                    PageLoadEvent::Finished => "finished",
+                };
+                let _ = page_load_app.emit(
+                    "webview-page-load",
+                    WebviewPageLoadPayload {
+                        session_id: page_load_session_id.clone(),
+                        url: payload.url().to_string(),
+                        status,
+                    },
+                );
+            })
+            .on_document_title_changed(move |_webview, title| {
+                let _ = title_app.emit(
+                    "webview-title-changed",
+                    WebviewTitleChangedPayload {
+                        session_id: title_session_id.clone(),
+                        title,
+                    },
+                );
+            })
+            .on_download(move |_webview, event| {
+                let payload = match event {
+                    DownloadEvent::Requested { url, destination } => WebviewDownloadPayload {
+                        session_id: download_session_id.clone(),
+                        url: url.to_string(),
+                        status: "requested",
+                        path: Some(destination.display().to_string()),
+                        success: None,
+                    },
+                    DownloadEvent::Finished { url, path, success } => WebviewDownloadPayload {
+                        session_id: download_session_id.clone(),
+                        url: url.to_string(),
+                        status: "finished",
+                        path: path.map(|path| path.display().to_string()),
+                        success: Some(success),
+                    },
+                    _ => WebviewDownloadPayload {
+                        session_id: download_session_id.clone(),
+                        url: String::new(),
+                        status: "unknown",
+                        path: None,
+                        success: None,
+                    },
+                };
+                let _ = download_app.emit("webview-download", payload);
+                true
+            })
+            .auto_resize();
 
         let position = LogicalPosition::new(x.max(0.0), y.max(0.0));
         let size = LogicalSize::new(width.max(1.0), height.max(1.0));
@@ -232,6 +421,27 @@ impl WebviewSessionManager {
             .map_err(|error| format!("failed to navigate webview forward: {error}"))
     }
 
+    pub(crate) fn fill_credential(
+        &self,
+        request: WebviewFillCredentialRequest,
+    ) -> Result<(), String> {
+        let payload = serde_json::json!({
+            "username": request.username,
+            "password": request.password,
+        });
+        let payload = serde_json::to_string(&payload)
+            .map_err(|error| format!("failed to prepare URL credential payload: {error}"))?;
+        let sessions = self.lock()?;
+        let webview = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| format!("webview session '{}' was not found", request.session_id))?;
+        webview
+            .eval(format!(
+                "window.__ADMINDECK_URL_AUTOFILL__?.fill({payload});"
+            ))
+            .map_err(|error| format!("failed to fill webview credential: {error}"))
+    }
+
     pub fn close_session(&self, request: WebviewSimpleRequest) -> Result<(), String> {
         let mut sessions = self.lock()?;
         if let Some(webview) = sessions.remove(&request.session_id) {
@@ -265,9 +475,7 @@ fn required_id(value: String) -> Result<String, String> {
         .chars()
         .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
     {
-        return Err(
-            "webview session id may only contain letters, digits, '-' or '_'".to_string(),
-        );
+        return Err("webview session id may only contain letters, digits, '-' or '_'".to_string());
     }
     Ok(trimmed.to_string())
 }
@@ -282,8 +490,8 @@ fn parse_external_url(value: &str) -> Result<url::Url, String> {
     } else {
         format!("https://{trimmed}")
     };
-    let parsed = url::Url::parse(&candidate)
-        .map_err(|error| format!("URL is not valid: {error}"))?;
+    let parsed =
+        url::Url::parse(&candidate).map_err(|error| format!("URL is not valid: {error}"))?;
     match parsed.scheme() {
         "http" | "https" => Ok(parsed),
         other => Err(format!("URL scheme must be http or https, got {other}")),

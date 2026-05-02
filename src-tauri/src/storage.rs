@@ -2,7 +2,7 @@ use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
-const SCHEMA_USER_VERSION: i32 = 1;
+const SCHEMA_USER_VERSION: i32 = 2;
 
 const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
@@ -37,6 +37,12 @@ CREATE TABLE IF NOT EXISTS connection_tags (
     PRIMARY KEY (connection_id, tag)
 );
 
+CREATE TABLE IF NOT EXISTS url_credentials (
+    connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE,
+    username TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
     ON connections(folder_id, sort_order);
 
@@ -45,6 +51,9 @@ CREATE INDEX IF NOT EXISTS idx_connection_folders_parent_sort
 
 CREATE INDEX IF NOT EXISTS idx_connection_tags_connection_sort
     ON connection_tags(connection_id, sort_order);
+
+CREATE INDEX IF NOT EXISTS idx_url_credentials_connection
+    ON url_credentials(connection_id);
 
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -131,6 +140,8 @@ pub struct SavedConnection {
     local_shell: Option<String>,
     url: Option<String>,
     data_partition: Option<String>,
+    url_credential_username: Option<String>,
+    has_url_credential: bool,
     #[serde(rename = "type")]
     connection_type: String,
     tags: Vec<String>,
@@ -199,6 +210,13 @@ pub struct MoveConnectionRequest {
     id: String,
     folder_id: Option<String>,
     target_index: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertUrlCredentialRequest {
+    connection_id: String,
+    username: String,
 }
 
 impl Storage {
@@ -490,10 +508,46 @@ impl Storage {
             local_shell,
             url,
             data_partition,
+            url_credential_username: None,
+            has_url_credential: false,
             connection_type,
             tags,
             status: "idle".to_string(),
         })
+    }
+
+    pub fn upsert_url_credential(
+        &self,
+        request: UpsertUrlCredentialRequest,
+    ) -> Result<SavedConnection, String> {
+        let connection_id = required_field("connection id", request.connection_id)?;
+        let username = required_field("URL credential username", request.username)?;
+        let connection = self.lock()?;
+        let connection_type = connection
+            .query_row(
+                "SELECT connection_type FROM connections WHERE id = ?1",
+                params![&connection_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?
+            .ok_or_else(|| "connection was not found".to_string())?;
+        if connection_type != "url" {
+            return Err("URL credentials can only be stored for URL connections".to_string());
+        }
+
+        connection
+            .execute(
+                "INSERT INTO url_credentials (connection_id, username, updated_at)
+                 VALUES (?1, ?2, CURRENT_TIMESTAMP)
+                 ON CONFLICT(connection_id) DO UPDATE SET
+                    username = excluded.username,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![&connection_id, &username],
+            )
+            .map_err(to_storage_error)?;
+
+        get_connection_by_id(&connection, &connection_id)
     }
 
     pub fn create_connection_folder(
@@ -817,8 +871,10 @@ fn list_connections_for_folder(
     };
     let mut statement = connection
         .prepare(&format!(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type,
+                    url_credentials.username
              FROM connections
+             LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
              WHERE {where_clause}
              ORDER BY sort_order, name",
         ))
@@ -1077,11 +1133,14 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type,
+                    url_credentials.username
              FROM connections
-             WHERE id = ?1",
+             LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
+             WHERE connections.id = ?1",
             params![connection_id],
             |row| {
+                let url_credential_username: Option<String> = row.get(12)?;
                 Ok(SavedConnection {
                     id: row.get(0)?,
                     name: row.get(1)?,
@@ -1095,6 +1154,8 @@ fn get_connection_by_id(
                     url: row.get(9)?,
                     data_partition: row.get(10)?,
                     connection_type: row.get(11)?,
+                    url_credential_username: url_credential_username.clone(),
+                    has_url_credential: url_credential_username.is_some(),
                     status: "idle".to_string(),
                     tags: Vec::new(),
                 })
@@ -1111,6 +1172,7 @@ fn get_connection_by_id(
 }
 
 fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedConnection> {
+    let url_credential_username: Option<String> = row.get(12)?;
     Ok(SavedConnection {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -1124,6 +1186,8 @@ fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedC
         url: row.get(9)?,
         data_partition: row.get(10)?,
         connection_type: row.get(11)?,
+        url_credential_username: url_credential_username.clone(),
+        has_url_credential: url_credential_username.is_some(),
         status: "idle".to_string(),
         tags: Vec::new(),
     })
@@ -1178,6 +1242,10 @@ fn run_migrations(connection: &mut SqliteConnection) -> Result<(), String> {
 
     if current < 1 {
         rebuild_connections_for_url_kind(connection)?;
+    }
+
+    if current < 2 {
+        ensure_url_credentials_table(connection)?;
     }
 
     connection
@@ -1237,6 +1305,23 @@ fn rebuild_connections_for_url_kind(connection: &mut SqliteConnection) -> Result
         .map_err(to_storage_error)?;
     transaction.commit().map_err(to_storage_error)?;
     Ok(())
+}
+
+fn ensure_url_credentials_table(connection: &mut SqliteConnection) -> Result<(), String> {
+    connection
+        .execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS url_credentials (
+                connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE,
+                username TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_url_credentials_connection
+                ON url_credentials(connection_id);
+            "#,
+        )
+        .map_err(to_storage_error)
 }
 
 fn column_missing(
@@ -1303,8 +1388,8 @@ fn normalize_url_field(
     } else {
         format!("https://{raw}")
     };
-    let parsed = url::Url::parse(&candidate)
-        .map_err(|error| format!("URL is not valid: {error}"))?;
+    let parsed =
+        url::Url::parse(&candidate).map_err(|error| format!("URL is not valid: {error}"))?;
     match parsed.scheme() {
         "http" | "https" => Ok(Some(parsed.to_string())),
         other => Err(format!("URL scheme must be http or https, got {other}")),
@@ -1337,9 +1422,7 @@ fn normalize_data_partition(
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
         {
-            return Err(
-                "data partition may only contain letters, digits, '-' or '_'".to_string(),
-            );
+            return Err("data partition may only contain letters, digits, '-' or '_'".to_string());
         }
         if partition.len() > 64 {
             return Err("data partition must be 64 characters or fewer".to_string());
@@ -1754,6 +1837,68 @@ mod tests {
 
         assert_eq!(root_connection.name, "Lab Host");
         assert_eq!(root_connection.tags, Vec::<String>::new());
+    }
+
+    #[test]
+    fn url_credentials_round_trip_without_storing_passwords_in_sqlite() {
+        let storage = Storage::open(temp_db_path("url-credentials")).expect("storage opens");
+        let created = storage
+            .create_connection(CreateConnectionRequest {
+                name: "Router UI".to_string(),
+                host: String::new(),
+                user: String::new(),
+                connection_type: "url".to_string(),
+                folder_id: None,
+                port: None,
+                key_path: None,
+                proxy_jump: None,
+                auth_method: None,
+                local_shell: None,
+                url: Some("router.internal".to_string()),
+                data_partition: Some("ops".to_string()),
+            })
+            .expect("URL connection is created");
+
+        assert_eq!(created.url.as_deref(), Some("https://router.internal/"));
+        assert!(!created.has_url_credential);
+
+        let updated = storage
+            .upsert_url_credential(UpsertUrlCredentialRequest {
+                connection_id: created.id.clone(),
+                username: "admin".to_string(),
+            })
+            .expect("URL credential metadata is stored");
+        assert!(updated.has_url_credential);
+        assert_eq!(updated.url_credential_username.as_deref(), Some("admin"));
+
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let reloaded = tree
+            .connections
+            .iter()
+            .find(|connection| connection.id == created.id)
+            .expect("URL connection exists");
+        assert!(reloaded.has_url_credential);
+        assert_eq!(reloaded.url_credential_username.as_deref(), Some("admin"));
+    }
+
+    #[test]
+    fn url_credentials_reject_non_url_connections() {
+        let storage = Storage::open(temp_db_path("url-credential-type")).expect("storage opens");
+        let connection = create_test_ssh_connection(&storage, "Bastion", "bastion.internal", None);
+
+        let error = match storage.upsert_url_credential(UpsertUrlCredentialRequest {
+            connection_id: connection.id,
+            username: "admin".to_string(),
+        }) {
+            Ok(_) => panic!("SSH connections cannot store URL credentials"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            "URL credentials can only be stored for URL connections"
+        );
     }
 
     #[test]

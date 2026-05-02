@@ -10,7 +10,7 @@ mod ssh_config;
 mod storage;
 mod webview;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
 #[derive(Serialize)]
@@ -21,6 +21,14 @@ struct AppBootstrap {
     log_status: String,
     storage_status: String,
     keychain_status: secrets::KeychainStatus,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FillWebviewCredentialRequest {
+    session_id: String,
+    secret_owner_id: String,
+    username: String,
 }
 
 #[tauri::command]
@@ -121,6 +129,14 @@ fn move_connection(
     request: storage::MoveConnectionRequest,
 ) -> Result<storage::ConnectionTree, String> {
     storage.move_connection(request)
+}
+
+#[tauri::command]
+fn upsert_url_credential(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::UpsertUrlCredentialRequest,
+) -> Result<storage::SavedConnection, String> {
+    storage.upsert_url_credential(request)
 }
 
 #[tauri::command]
@@ -465,6 +481,27 @@ fn webview_go_forward(
 }
 
 #[tauri::command]
+fn fill_webview_credential(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: FillWebviewCredentialRequest,
+) -> Result<(), String> {
+    let username = request.username.trim().to_string();
+    if username.is_empty() {
+        return Err("URL credential username is required".to_string());
+    }
+    let password = secrets
+        .read_url_password(request.secret_owner_id)
+        .map_err(|error| format!("failed to read URL password: {error}"))?
+        .ok_or_else(|| "stored URL password was not found".to_string())?;
+    webviews.fill_credential(webview::WebviewFillCredentialRequest {
+        session_id: request.session_id,
+        username,
+        password,
+    })
+}
+
+#[tauri::command]
 fn close_webview_session(
     webviews: tauri::State<'_, webview::WebviewSessionManager>,
     request: webview::WebviewSimpleRequest,
@@ -508,6 +545,7 @@ pub fn run() {
             duplicate_connection,
             move_connection_folder,
             move_connection,
+            upsert_url_credential,
             get_terminal_settings,
             update_terminal_settings,
             get_ssh_settings,
@@ -551,6 +589,7 @@ pub fn run() {
             webview_reload,
             webview_go_back,
             webview_go_forward,
+            fill_webview_credential,
             close_webview_session
         ])
         .run(tauri::generate_context!())

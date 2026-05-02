@@ -154,6 +154,32 @@ type TreeDragPreview = {
 
 type ConnectionDialogRequest = CreateConnectionRequest & {
   password?: string;
+  urlCredentialUsername?: string;
+  urlPassword?: string;
+};
+
+type WebviewNavigationEvent = {
+  sessionId: string;
+  url: string;
+};
+
+type WebviewPageLoadEvent = {
+  sessionId: string;
+  url: string;
+  status: "started" | "finished" | "unknown";
+};
+
+type WebviewTitleChangedEvent = {
+  sessionId: string;
+  title: string;
+};
+
+type WebviewDownloadEvent = {
+  sessionId: string;
+  url: string;
+  status: "requested" | "finished" | "unknown";
+  path?: string;
+  success?: boolean;
 };
 
 const AI_PROVIDER_SECRET_OWNER_ID = "openai-compatible-provider";
@@ -537,9 +563,36 @@ function ConnectionSidebar() {
     });
   }
 
+  async function storeUrlPassword(connectionId: string, password: string) {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    await invokeCommand("store_secret", {
+      request: {
+        kind: "urlPassword",
+        ownerId: connectionId,
+        secret: password,
+      },
+    });
+  }
+
+  async function upsertUrlCredential(connectionId: string, username: string) {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    await invokeCommand("upsert_url_credential", {
+      request: {
+        connectionId,
+        username,
+      },
+    });
+  }
+
   async function handleConnectionSubmit(request: ConnectionDialogRequest) {
     setFormError("");
-    const { password, ...connectionRequest } = request;
+    const { password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
     if (formMode === "save") {
       try {
         const connection = await invokeCommand("create_connection", {
@@ -548,7 +601,17 @@ function ConnectionSidebar() {
         if (password) {
           await storeConnectionPassword(connection.id, password);
         }
-        handleConnectionReady({ ...connection, hasPassword: Boolean(password) });
+        if (connection.type === "url" && urlCredentialUsername && urlPassword) {
+          await storeUrlPassword(connection.id, urlPassword);
+          await upsertUrlCredential(connection.id, urlCredentialUsername);
+        }
+        handleConnectionReady({
+          ...connection,
+          hasPassword: Boolean(password),
+          urlCredentialUsername:
+            connection.type === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
+          hasUrlCredential: connection.type === "url" && Boolean(urlCredentialUsername && urlPassword),
+        });
       } catch (error) {
         setFormError(error instanceof Error ? error.message : String(error));
       }
@@ -569,12 +632,18 @@ function ConnectionSidebar() {
       localShell: connectionRequest.localShell,
       url: connectionRequest.url,
       dataPartition: connectionRequest.dataPartition,
+      urlCredentialUsername:
+        connectionRequest.type === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
+      hasUrlCredential: connectionRequest.type === "url" && Boolean(urlCredentialUsername && urlPassword),
       status: "idle",
     };
 
     try {
       if (password) {
         await storeConnectionPassword(connection.id, password);
+      }
+      if (connection.type === "url" && urlCredentialUsername && urlPassword) {
+        await storeUrlPassword(connection.id, urlPassword);
       }
       handleConnectionReady(connection);
     } catch (error) {
@@ -1359,6 +1428,8 @@ function ConnectionDialog({
           : String(form.get("name") ?? "").trim() || host;
     const portValue = String(form.get("port") ?? "").trim();
     const password = String(form.get("password") ?? "");
+    const urlCredentialUsername = String(form.get("urlCredentialUsername") ?? "").trim();
+    const urlPassword = String(form.get("urlPassword") ?? "");
     const keyPath = String(form.get("keyPath") ?? "").trim();
     const proxyJump = String(form.get("proxyJump") ?? "").trim();
 
@@ -1384,6 +1455,9 @@ function ConnectionDialog({
       url: connectionType === "url" ? url : undefined,
       dataPartition: connectionType === "url" ? dataPartition || undefined : undefined,
       password: usesSshDefaults && authMethod === "password" ? password : undefined,
+      urlCredentialUsername:
+        connectionType === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
+      urlPassword: connectionType === "url" && urlCredentialUsername ? urlPassword : undefined,
     });
   }
 
@@ -1460,6 +1534,25 @@ function ConnectionDialog({
                 placeholder="Leave blank for per-connection isolation"
               />
             </label>
+            <div className="form-grid">
+              <label>
+                <span>Username</span>
+                <input
+                  autoComplete="username"
+                  name="urlCredentialUsername"
+                  placeholder="Optional fill username"
+                />
+              </label>
+              <label>
+                <span>Password</span>
+                <input
+                  autoComplete="current-password"
+                  name="urlPassword"
+                  placeholder="Stored in OS keychain"
+                  type="password"
+                />
+              </label>
+            </div>
           </>
         ) : (
           <>
@@ -1887,15 +1980,20 @@ function WorkspaceCanvas() {
 }
 
 function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
+  const updateWebviewTabMetadata = useWorkspaceStore((state) => state.updateWebviewTabMetadata);
   const placeholderRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(false);
   const sessionIdRef = useRef<string>(`webview-${tab.id}`);
   const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rafRef = useRef<number | null>(null);
   const [navError, setNavError] = useState("");
+  const [fillStatus, setFillStatus] = useState("");
+  const [webviewSuppressed, setWebviewSuppressed] = useState(false);
   const [addressInput, setAddressInput] = useState(tab.url ?? "");
 
   const initialUrl = tab.url ?? "";
+  const urlCredentialUsername = tab.connection?.urlCredentialUsername;
+  const canFillCredential = Boolean(tab.connection?.hasUrlCredential && urlCredentialUsername);
 
   const computeBounds = () => {
     const node = placeholderRef.current;
@@ -2001,6 +2099,26 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
   }, []);
 
   useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    const updateSuppression = () => {
+      setWebviewSuppressed(documentHasWebviewOverlay());
+    };
+    updateSuppression();
+    const observer = new MutationObserver(updateSuppression);
+    observer.observe(document.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isTauriRuntime() || !sessionStartedRef.current) {
       return;
     }
@@ -2009,15 +2127,77 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
       return;
     }
     void invokeCommand("set_webview_visibility", {
-      request: { sessionId: sessionIdRef.current, visible: isActive, ...bounds },
+      request: { sessionId: sessionIdRef.current, visible: isActive && !webviewSuppressed, ...bounds },
     }).catch((error) => {
       setNavError(error instanceof Error ? error.message : String(error));
     });
-    if (isActive) {
+    if (isActive && !webviewSuppressed) {
       lastBoundsRef.current = bounds;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive]);
+  }, [isActive, webviewSuppressed]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    let disposed = false;
+    const disposers: Array<() => void> = [];
+    void Promise.all([
+      listen<WebviewNavigationEvent>("webview-navigation", (event) => {
+        if (event.payload.sessionId !== sessionIdRef.current) {
+          return;
+        }
+        setAddressInput(event.payload.url);
+        updateWebviewTabMetadata(tab.id, {
+          subtitle: formatWebviewSubtitle(event.payload.url),
+          url: event.payload.url,
+        });
+      }),
+      listen<WebviewPageLoadEvent>("webview-page-load", (event) => {
+        if (event.payload.sessionId !== sessionIdRef.current) {
+          return;
+        }
+        setAddressInput(event.payload.url);
+        if (event.payload.status === "finished") {
+          setFillStatus("");
+        }
+      }),
+      listen<WebviewTitleChangedEvent>("webview-title-changed", (event) => {
+        if (event.payload.sessionId !== sessionIdRef.current) {
+          return;
+        }
+        const title = event.payload.title.trim();
+        if (title) {
+          updateWebviewTabMetadata(tab.id, { title });
+        }
+      }),
+      listen<WebviewDownloadEvent>("webview-download", (event) => {
+        if (event.payload.sessionId !== sessionIdRef.current) {
+          return;
+        }
+        if (event.payload.status === "requested") {
+          setFillStatus("Download started");
+          return;
+        }
+        if (event.payload.status === "finished") {
+          setFillStatus(event.payload.success ? "Download complete" : "Download failed");
+        }
+      }),
+    ]).then((unlistenFns) => {
+      if (disposed) {
+        unlistenFns.forEach((unlisten) => unlisten());
+        return;
+      }
+      disposers.push(...unlistenFns);
+    });
+
+    return () => {
+      disposed = true;
+      disposers.forEach((dispose) => dispose());
+    };
+  }, [tab.id, updateWebviewTabMetadata]);
 
   function handleNavigate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2041,6 +2221,26 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
     }).catch((error) => {
       setNavError(error instanceof Error ? error.message : String(error));
     });
+  }
+
+  function handleFillCredential() {
+    if (!isTauriRuntime() || !sessionStartedRef.current || !tab.connection || !urlCredentialUsername) {
+      return;
+    }
+    setNavError("");
+    setFillStatus("Filling credential");
+    void invokeCommand("fill_webview_credential", {
+      request: {
+        sessionId: sessionIdRef.current,
+        secretOwnerId: tab.connection.id,
+        username: urlCredentialUsername,
+      },
+    })
+      .then(() => setFillStatus("Credential filled"))
+      .catch((error) => {
+        setFillStatus("");
+        setNavError(error instanceof Error ? error.message : String(error));
+      });
   }
 
   return (
@@ -2089,13 +2289,15 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
           </form>
           <button
             className="toolbar-button"
-            disabled
-            title="Phase 2: fill saved credential"
+            disabled={!canFillCredential}
+            onClick={handleFillCredential}
+            title={canFillCredential ? "Fill saved credential" : "No saved URL credential"}
             type="button"
           >
             <KeyRound size={15} />
             Fill
           </button>
+          {fillStatus ? <span className="webview-toolbar-status">{fillStatus}</span> : null}
         </div>
       </div>
 
@@ -2111,6 +2313,22 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
       </div>
     </section>
   );
+}
+
+function documentHasWebviewOverlay() {
+  return Boolean(
+    document.querySelector(
+      ".dialog-backdrop, .quick-connect-menu, .sftp-context-menu, .sftp-properties-popover",
+    ),
+  );
+}
+
+function formatWebviewSubtitle(url: string) {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
 }
 
 function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {

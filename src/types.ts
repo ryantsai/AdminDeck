@@ -15,6 +15,8 @@ export interface Connection {
   localShell?: string;
   url?: string;
   dataPartition?: string;
+  urlCredentialUsername?: string;
+  hasUrlCredential?: boolean;
   type: ConnectionType;
   status: ConnectionStatus;
 }
@@ -181,7 +183,11 @@ export interface PerformanceMetrics {
   lastSshTerminalStart?: TerminalStartMetric;
 }
 
-export type SecretKind = "connectionPassword" | "connectionPassphrase" | "aiApiKey";
+export type SecretKind =
+  | "connectionPassword"
+  | "connectionPassphrase"
+  | "urlPassword"
+  | "aiApiKey";
 
 export interface KeychainStatus {
   available: boolean;

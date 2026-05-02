@@ -215,6 +215,12 @@ export interface WebviewSimpleRequest {
   sessionId: string;
 }
 
+export interface FillWebviewCredentialRequest {
+  sessionId: string;
+  secretOwnerId: string;
+  username: string;
+}
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -263,6 +269,10 @@ type CommandMap = {
   move_connection: {
     args: { request: MoveConnectionRequest };
     result: ConnectionTree;
+  };
+  upsert_url_credential: {
+    args: { request: { connectionId: string; username: string } };
+    result: Connection;
   };
   get_terminal_settings: {
     args: undefined;
@@ -474,6 +484,10 @@ type CommandMap = {
   };
   webview_go_forward: {
     args: { request: WebviewSimpleRequest };
+    result: null;
+  };
+  fill_webview_credential: {
+    args: { request: FillWebviewCredentialRequest };
     result: null;
   };
   close_webview_session: {
