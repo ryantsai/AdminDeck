@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Mutex, MutexGuard},
 };
 
@@ -11,6 +11,7 @@ use tauri::{
 
 const HOST_WINDOW_LABEL: &str = "main";
 const DEFAULT_PARTITION: &str = "shared";
+const HIDDEN_WEBVIEW_POSITION: f64 = -32_000.0;
 const AUTOFILL_AGENT: &str = r#"
 (() => {
   const agent = {
@@ -96,6 +97,7 @@ const AUTOFILL_AGENT: &str = r#"
 
 pub struct WebviewSessionManager {
     sessions: Mutex<HashMap<String, Webview>>,
+    starting_sessions: Mutex<HashSet<String>>,
 }
 
 #[derive(Deserialize)]
@@ -194,6 +196,7 @@ impl WebviewSessionManager {
     pub fn new() -> Self {
         Self {
             sessions: Mutex::new(HashMap::new()),
+            starting_sessions: Mutex::new(HashSet::new()),
         }
     }
 
@@ -229,10 +232,22 @@ impl WebviewSessionManager {
                 return Err(format!("webview session '{session_id}' is already running"));
             }
         }
+        {
+            let mut starting_sessions = self.lock_starting()?;
+            if !starting_sessions.insert(session_id.clone()) {
+                return Err(format!("webview session '{session_id}' is already starting"));
+            }
+        }
 
         let host_window = app
             .get_window(HOST_WINDOW_LABEL)
-            .ok_or_else(|| format!("host window '{HOST_WINDOW_LABEL}' is not available"))?;
+            .map_or_else(
+                || {
+                    self.clear_starting(&session_id);
+                    Err(format!("host window '{HOST_WINDOW_LABEL}' is not available"))
+                },
+                Ok,
+            )?;
 
         let label = webview_label_for(&session_id);
         let navigation_app = app.clone();
@@ -312,10 +327,14 @@ impl WebviewSessionManager {
 
         let webview = host_window
             .add_child(builder, position, size)
-            .map_err(|error| format!("failed to attach child webview: {error}"))?;
+            .map_err(|error| {
+                self.clear_starting(&session_id);
+                format!("failed to attach child webview: {error}")
+            })?;
 
         let mut sessions = self.lock()?;
         sessions.insert(session_id.clone(), webview);
+        self.clear_starting(&session_id);
 
         Ok(WebviewSessionStarted {
             session_id,
@@ -336,12 +355,7 @@ impl WebviewSessionManager {
         let webview = sessions
             .get(&session_id)
             .ok_or_else(|| format!("webview session '{session_id}' was not found"))?;
-        webview
-            .set_position(LogicalPosition::new(x.max(0.0), y.max(0.0)))
-            .map_err(|error| format!("failed to position webview: {error}"))?;
-        webview
-            .set_size(LogicalSize::new(width.max(1.0), height.max(1.0)))
-            .map_err(|error| format!("failed to size webview: {error}"))?;
+        show_webview(webview, x, y, width, height)?;
         Ok(())
     }
 
@@ -363,19 +377,14 @@ impl WebviewSessionManager {
             .get(&session_id)
             .ok_or_else(|| format!("webview session '{session_id}' was not found"))?;
         if visible {
-            webview
-                .set_position(LogicalPosition::new(x.max(0.0), y.max(0.0)))
-                .map_err(|error| format!("failed to position webview: {error}"))?;
-            webview
-                .set_size(LogicalSize::new(width.max(1.0), height.max(1.0)))
-                .map_err(|error| format!("failed to size webview: {error}"))?;
+            for (other_session_id, other_webview) in sessions.iter() {
+                if other_session_id != &session_id {
+                    hide_webview(other_webview)?;
+                }
+            }
+            show_webview(webview, x, y, width, height)?;
         } else {
-            webview
-                .set_position(LogicalPosition::new(-32_000.0, -32_000.0))
-                .map_err(|error| format!("failed to hide webview: {error}"))?;
-            webview
-                .set_size(LogicalSize::new(1.0, 1.0))
-                .map_err(|error| format!("failed to hide webview: {error}"))?;
+            hide_webview(webview)?;
         }
         Ok(())
     }
@@ -457,10 +466,43 @@ impl WebviewSessionManager {
             .lock()
             .map_err(|_| "webview session lock is poisoned".to_string())
     }
+
+    fn lock_starting(&self) -> Result<MutexGuard<'_, HashSet<String>>, String> {
+        self.starting_sessions
+            .lock()
+            .map_err(|_| "webview startup lock is poisoned".to_string())
+    }
+
+    fn clear_starting(&self, session_id: &str) {
+        if let Ok(mut starting_sessions) = self.starting_sessions.lock() {
+            starting_sessions.remove(session_id);
+        }
+    }
 }
 
 fn webview_label_for(session_id: &str) -> String {
     format!("url-session-{session_id}")
+}
+
+fn show_webview(webview: &Webview, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
+    webview
+        .set_position(LogicalPosition::new(x.max(0.0), y.max(0.0)))
+        .map_err(|error| format!("failed to position webview: {error}"))?;
+    webview
+        .set_size(LogicalSize::new(width.max(1.0), height.max(1.0)))
+        .map_err(|error| format!("failed to size webview: {error}"))
+}
+
+fn hide_webview(webview: &Webview) -> Result<(), String> {
+    webview
+        .set_position(LogicalPosition::new(
+            HIDDEN_WEBVIEW_POSITION,
+            HIDDEN_WEBVIEW_POSITION,
+        ))
+        .map_err(|error| format!("failed to hide webview: {error}"))?;
+    webview
+        .set_size(LogicalSize::new(1.0, 1.0))
+        .map_err(|error| format!("failed to hide webview: {error}"))
 }
 
 fn required_id(value: String) -> Result<String, String> {

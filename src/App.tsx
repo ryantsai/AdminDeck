@@ -1979,13 +1979,91 @@ function WorkspaceCanvas() {
   );
 }
 
+interface WebviewSessionLease {
+  promise: Promise<void>;
+  refCount: number;
+  closeTimer: number | null;
+  started: boolean;
+  closed: boolean;
+}
+
+const webviewSessionLeases = new Map<string, WebviewSessionLease>();
+
+function acquireWebviewSession(sessionId: string, start: () => Promise<unknown>) {
+  const current = webviewSessionLeases.get(sessionId);
+  if (current && !current.closed) {
+    if (current.closeTimer !== null) {
+      window.clearTimeout(current.closeTimer);
+      current.closeTimer = null;
+    }
+    current.refCount += 1;
+    return current;
+  }
+
+  let lease: WebviewSessionLease;
+  const promise = Promise.resolve()
+    .then(start)
+    .then(() => {
+      lease.started = true;
+    });
+  lease = {
+    promise,
+    refCount: 1,
+    closeTimer: null,
+    started: false,
+    closed: false,
+  };
+  promise.catch(() => {
+    if (webviewSessionLeases.get(sessionId) === lease) {
+      webviewSessionLeases.delete(sessionId);
+    }
+  });
+  webviewSessionLeases.set(sessionId, lease);
+  return lease;
+}
+
+function releaseWebviewSession(sessionId: string) {
+  const lease = webviewSessionLeases.get(sessionId);
+  if (!lease) {
+    return;
+  }
+  lease.refCount = Math.max(0, lease.refCount - 1);
+  if (lease.refCount > 0) {
+    return;
+  }
+  if (lease.closeTimer !== null) {
+    window.clearTimeout(lease.closeTimer);
+  }
+  lease.closeTimer = window.setTimeout(() => {
+    if (lease.refCount > 0 || webviewSessionLeases.get(sessionId) !== lease) {
+      return;
+    }
+    lease.closed = true;
+    void lease.promise
+      .then(
+        () =>
+          invokeCommand("close_webview_session", {
+            request: { sessionId },
+          }).catch(() => undefined),
+        () => undefined,
+      )
+      .finally(() => {
+        if (webviewSessionLeases.get(sessionId) === lease) {
+          webviewSessionLeases.delete(sessionId);
+        }
+      });
+  }, 50);
+}
+
 function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
   const updateWebviewTabMetadata = useWorkspaceStore((state) => state.updateWebviewTabMetadata);
   const placeholderRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(false);
+  const sessionStartingRef = useRef(false);
   const sessionIdRef = useRef<string>(`webview-${tab.id}`);
   const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rafRef = useRef<number | null>(null);
+  const visibilityRef = useRef({ isActive, webviewSuppressed: false });
   const [navError, setNavError] = useState("");
   const [fillStatus, setFillStatus] = useState("");
   const [webviewSuppressed, setWebviewSuppressed] = useState(false);
@@ -2009,6 +2087,25 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
     };
   };
 
+  const pushWebviewVisibility = () => {
+    if (!sessionStartedRef.current) {
+      return;
+    }
+    const bounds = computeBounds();
+    if (!bounds) {
+      return;
+    }
+    const visible = visibilityRef.current.isActive && !visibilityRef.current.webviewSuppressed;
+    void invokeCommand("set_webview_visibility", {
+      request: { sessionId: sessionIdRef.current, visible, ...bounds },
+    }).catch((error) => {
+      setNavError(error instanceof Error ? error.message : String(error));
+    });
+    if (visible) {
+      lastBoundsRef.current = bounds;
+    }
+  };
+
   const scheduleBoundsPush = () => {
     if (!sessionStartedRef.current) {
       return;
@@ -2020,6 +2117,14 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
       rafRef.current = null;
       const bounds = computeBounds();
       if (!bounds) {
+        return;
+      }
+      if (!visibilityRef.current.isActive || visibilityRef.current.webviewSuppressed) {
+        void invokeCommand("set_webview_visibility", {
+          request: { sessionId: sessionIdRef.current, visible: false, ...bounds },
+        }).catch((error) => {
+          setNavError(error instanceof Error ? error.message : String(error));
+        });
         return;
       }
       const previous = lastBoundsRef.current;
@@ -2042,41 +2147,63 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
   };
 
   useEffect(() => {
-    if (!isTauriRuntime() || sessionStartedRef.current || !initialUrl) {
+    if (!isTauriRuntime() || sessionStartedRef.current || sessionStartingRef.current || !initialUrl) {
       return;
     }
     const bounds = computeBounds();
     if (!bounds) {
       return;
     }
-    sessionStartedRef.current = true;
+    let disposed = false;
+    const sessionId = sessionIdRef.current;
+    sessionStartingRef.current = true;
     lastBoundsRef.current = bounds;
-    invokeCommand("start_webview_session", {
-      request: {
-        sessionId: sessionIdRef.current,
-        url: initialUrl,
-        dataPartition: tab.dataPartition,
-        ...bounds,
-      },
-    }).catch((error) => {
-      sessionStartedRef.current = false;
-      setNavError(error instanceof Error ? error.message : String(error));
-    });
+    const lease = acquireWebviewSession(sessionId, () =>
+      invokeCommand("start_webview_session", {
+        request: {
+          sessionId,
+          url: initialUrl,
+          dataPartition: tab.dataPartition,
+          ...bounds,
+        },
+      }),
+    );
+    lease.promise
+      .then(() => {
+        sessionStartingRef.current = false;
+        if (disposed) {
+          return;
+        }
+        sessionStartedRef.current = true;
+        pushWebviewVisibility();
+      })
+      .catch((error) => {
+        sessionStartingRef.current = false;
+        sessionStartedRef.current = false;
+        if (!disposed) {
+          setNavError(error instanceof Error ? error.message : String(error));
+        }
+      });
 
     return () => {
+      disposed = true;
       if (rafRef.current !== null) {
         window.cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      if (sessionStartedRef.current) {
-        sessionStartedRef.current = false;
-        void invokeCommand("close_webview_session", {
-          request: { sessionId: sessionIdRef.current },
-        }).catch(() => undefined);
+      const ownsSession = sessionStartingRef.current || sessionStartedRef.current;
+      sessionStartingRef.current = false;
+      sessionStartedRef.current = false;
+      if (ownsSession) {
+        releaseWebviewSession(sessionId);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    visibilityRef.current = { isActive, webviewSuppressed };
+  }, [isActive, webviewSuppressed]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -2122,18 +2249,7 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
     if (!isTauriRuntime() || !sessionStartedRef.current) {
       return;
     }
-    const bounds = computeBounds();
-    if (!bounds) {
-      return;
-    }
-    void invokeCommand("set_webview_visibility", {
-      request: { sessionId: sessionIdRef.current, visible: isActive && !webviewSuppressed, ...bounds },
-    }).catch((error) => {
-      setNavError(error instanceof Error ? error.message : String(error));
-    });
-    if (isActive && !webviewSuppressed) {
-      lastBoundsRef.current = bounds;
-    }
+    pushWebviewVisibility();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, webviewSuppressed]);
 
