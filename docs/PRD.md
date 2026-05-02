@@ -100,7 +100,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - AI providers: OpenAI-compatible BYO API key plus Claude Code CLI and Codex CLI adapters.
 - CLI agent integrations: suggest-only/ask-before-execute where possible.
 - UI model: left-side connection manager/tree, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
-- Tab model: VSCode-style tabs with split panes inside terminal tabs.
+- Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
 - SFTP model: dual-pane file manager with basic operations and transfer queue.
 - Settings: light-first app chrome, dark terminal panes by default, font settings, terminal cursor, scrollback, copy-on-select, multiline paste confirmation, local shell default, SSH defaults, SFTP defaults, AI provider settings, fixed keybindings in v0.1.
 - Privacy: no telemetry or automatic crash upload in v0.1.

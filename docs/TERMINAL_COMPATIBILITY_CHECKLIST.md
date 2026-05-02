@@ -38,6 +38,7 @@ The checklist passes when:
 | --- | --- | --- | --- |
 | Open baseline local terminal | Open a new local terminal tab. Run `echo $PSVersionTable.PSVersion` in PowerShell or `echo %COMSPEC%` in cmd. | Prompt accepts input and output appears without layout shifts. | |
 | Open optional SSH terminal | Open a trusted native SSH Connection if available. | Session reaches a prompt and resize/status behavior remains normal. | |
+| Switch tabs without disconnecting | Open two terminal tabs. Run a long-lived safe command or leave a prompt active in the first tab, switch to the second tab, then switch back. Repeat with native SSH when available. | The first Session remains connected and usable after tab switches. No disconnect occurs unless the tab-strip close `X` is explicitly pressed or the process/remote host ends the Session. | |
 | Split terminal panes | Split the terminal tab into at least two Panes. Run a different command in each Pane. | Focus, typing, and output stay isolated to the active Pane. | |
 | Resize app window | Resize the AdminDeck window while a prompt is visible. | Prompt redraws cleanly, with no duplicated prompt fragments or stale rows. | |
 

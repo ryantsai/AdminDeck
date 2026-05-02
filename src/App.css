@@ -545,6 +545,12 @@ kbd + kbd {
   white-space: nowrap;
 }
 
+.workspace-canvas {
+  display: grid;
+  min-height: 0;
+  background: var(--chrome-strong);
+}
+
 .tab-strip {
   display: flex;
   align-items: end;
@@ -586,10 +592,15 @@ kbd + kbd {
 
 .terminal-workspace,
 .sftp-workspace {
-  display: grid;
+  display: none;
   min-height: 0;
   padding: 14px;
   background: var(--chrome-strong);
+}
+
+.terminal-workspace.active,
+.sftp-workspace.active {
+  display: grid;
 }
 
 .terminal-workspace {

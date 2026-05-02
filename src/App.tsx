@@ -1447,33 +1447,43 @@ function TabStrip() {
 }
 
 function WorkspaceCanvas() {
-  const activeTab = useWorkspaceStore((state) =>
-    state.tabs.find((tab) => tab.id === state.activeTabId),
-  );
+  const tabs = useWorkspaceStore((state) => state.tabs);
+  const activeTabId = useWorkspaceStore((state) => state.activeTabId);
 
-  if (!activeTab) {
+  if (tabs.length === 0) {
     return (
-      <section className="empty-workspace">
-        <Terminal size={28} />
-        <h2>No active session</h2>
-        <p>Open a local terminal, SSH connection, or SFTP browser from the tree.</p>
-      </section>
+      <div className="workspace-canvas">
+        <section className="empty-workspace">
+          <Terminal size={28} />
+          <h2>No active session</h2>
+          <p>Open a local terminal, SSH connection, or SFTP browser from the tree.</p>
+        </section>
+      </div>
     );
   }
 
-  if (activeTab.kind === "sftp") {
-    return <SftpWorkspace tab={activeTab} />;
-  }
-
-  return <TerminalWorkspace tab={activeTab} />;
+  return (
+    <div className="workspace-canvas">
+      {tabs.map((tab) =>
+        tab.kind === "sftp" ? (
+          <SftpWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />
+        ) : (
+          <TerminalWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />
+        ),
+      )}
+    </div>
+  );
 }
 
-function TerminalWorkspace({ tab }: { tab: WorkspaceTab }) {
+function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
   const splitTerminalPane = useWorkspaceStore((state) => state.splitTerminalPane);
   const canSplit = tab.panes.some((pane) => pane.connection);
 
   return (
-    <section className="terminal-workspace">
+    <section
+      aria-hidden={!isActive}
+      className={isActive ? "terminal-workspace active" : "terminal-workspace"}
+    >
       <div className="workspace-toolbar">
         <div>
           <strong>{tab.title}</strong>
@@ -1500,14 +1510,14 @@ function TerminalWorkspace({ tab }: { tab: WorkspaceTab }) {
 
       <div className="terminal-grid">
         {tab.panes.map((pane) => (
-          <TerminalPaneView pane={pane} key={pane.id} />
+          <TerminalPaneView isActive={isActive} pane={pane} key={pane.id} />
         ))}
       </div>
     </section>
   );
 }
 
-function TerminalPaneView({ pane }: { pane: TerminalPane }) {
+function TerminalPaneView({ isActive, pane }: { isActive: boolean; pane: TerminalPane }) {
   const terminalElementRef = useRef<HTMLDivElement | null>(null);
   const terminalRendererRef = useRef<TerminalRenderer | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -1717,6 +1727,24 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     recordTerminalStartMetric,
     terminalSettings,
   ]);
+
+  useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const renderer = terminalRendererRef.current;
+      if (!renderer) {
+        return;
+      }
+
+      renderer.fit();
+      renderer.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isActive]);
 
   useEffect(() => {
     if (searchOpen) {
@@ -1973,7 +2001,7 @@ async function confirmTrustedSshHostKey(preview: SshHostKeyPreview) {
   });
 }
 
-function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
+function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
   const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
   const openTerminalHere = useWorkspaceStore((state) => state.openTerminalHere);
   const connection = tab.connection;
@@ -2466,7 +2494,10 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   const activeTransferCount = transfers.filter((transfer) => transfer.state === "active").length;
 
   return (
-    <section className="sftp-workspace">
+    <section
+      aria-hidden={!isActive}
+      className={isActive ? "sftp-workspace active" : "sftp-workspace"}
+    >
       <div className="workspace-toolbar">
         <div>
           <strong>{tab.title}</strong>

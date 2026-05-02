@@ -31,6 +31,8 @@ _Avoid_: Session, split
 - A **Session** may be presented by one **Tab**.
 - A terminal **Tab** may contain one or more **Panes**.
 - A **Tab** is UI state only and is not the durable backend model.
+- Switching the active **Tab** does not end, disconnect, or recreate its **Session**.
+- A **Session** is intentionally ended only by an explicit close action on the presenting **Tab** or by the remote/process ending itself.
 
 ## Example Dialogue
 

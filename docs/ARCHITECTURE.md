@@ -78,6 +78,8 @@ Current implementation note: status badges are derived from active frontend work
 
 Owns local PTY lifecycle, SSH terminal channel lifecycle, input/output streams, resize events, tab integration, split pane integration, and terminal compatibility behavior.
 
+Lifecycle invariant: switching the active workspace Tab must not disconnect, close, or recreate a local terminal Session, SSH terminal Session, or SFTP Session. Open Tab surfaces stay mounted while inactive so their live Sessions remain attached. Explicit tab close from the tab strip is the user-owned teardown action for the Session or Sessions presented by that Tab.
+
 ### Terminal Engine
 
 Owns terminal parsing/state and exposes a renderer-neutral model. Evaluate `alacritty_terminal` first.
@@ -152,6 +154,8 @@ The primary UI is a dense desktop workspace:
 - settings
 
 Default visual direction: quiet productivity light chrome with dark terminal panes.
+
+The main workspace treats Tabs as frontend containers over live Sessions. Selecting another Tab changes visibility and focus only; it must not run backend Session close commands. Closing a Tab via the tab-strip close control removes that container and tears down the live Session resources it owns.
 
 ## Performance Strategy
 
