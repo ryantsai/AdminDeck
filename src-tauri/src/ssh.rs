@@ -664,75 +664,137 @@ async fn authenticate_with_agent(
     session: &mut client::Handle<VerifyingClient>,
     user: &str,
 ) -> Result<(), String> {
-    let mut agent = connect_ssh_agent().await?;
-    let identities = agent
-        .request_identities()
-        .await
-        .map_err(|error| format!("failed to list SSH agent identities: {error}"))?;
-    if identities.is_empty() {
-        return Err("SSH agent has no identities loaded".to_string());
-    }
-
     let rsa_hash = session
         .best_supported_rsa_hash()
         .await
         .map_err(|error| format!("failed to negotiate SSH agent key algorithm: {error}"))?
         .flatten();
-    let mut last_rejection = None;
-    for identity in identities {
-        let auth_result = match identity {
-            AgentIdentity::PublicKey { key, comment } => session
-                .authenticate_publickey_with(user.to_string(), key, rsa_hash, &mut agent)
-                .await
-                .map_err(|error| {
-                    format!("SSH agent authentication failed for {comment}: {error}")
-                })?,
-            AgentIdentity::Certificate {
-                certificate,
-                comment,
-            } => session
-                .authenticate_certificate_with(user.to_string(), certificate, rsa_hash, &mut agent)
-                .await
-                .map_err(|error| {
-                    format!("SSH agent certificate authentication failed for {comment}: {error}")
-                })?,
-        };
 
-        if auth_result.success() {
-            return Ok(());
+    let mut agents = connect_ssh_agents().await?;
+    let mut failures = Vec::new();
+    for agent in &mut agents {
+        let identities = match request_agent_identities(agent).await {
+            Ok(identities) => identities,
+            Err(error) => {
+                failures.push(error);
+                continue;
+            }
+        };
+        if identities.is_empty() {
+            failures.push(format!("{} has no identities loaded", agent.source));
+            continue;
         }
-        last_rejection = Some("SSH agent identity was rejected".to_string());
+
+        for identity in identities {
+            let auth_result = match identity {
+                AgentIdentity::PublicKey { key, comment } => session
+                    .authenticate_publickey_with(user.to_string(), key, rsa_hash, &mut agent.client)
+                    .await
+                    .map_err(|error| {
+                        format!(
+                            "{} authentication failed for {comment}: {error}",
+                            agent.source
+                        )
+                    })?,
+                AgentIdentity::Certificate {
+                    certificate,
+                    comment,
+                } => session
+                    .authenticate_certificate_with(
+                        user.to_string(),
+                        certificate,
+                        rsa_hash,
+                        &mut agent.client,
+                    )
+                    .await
+                    .map_err(|error| {
+                        format!(
+                            "{} certificate authentication failed for {comment}: {error}",
+                            agent.source
+                        )
+                    })?,
+            };
+
+            if auth_result.success() {
+                return Ok(());
+            }
+            failures.push(format!("{} identity was rejected", agent.source));
+        }
     }
 
-    Err(last_rejection.unwrap_or_else(|| "SSH agent authentication was rejected".to_string()))
+    Err(if failures.is_empty() {
+        "SSH agent authentication was rejected".to_string()
+    } else {
+        format!(
+            "SSH agent authentication was unavailable: {}",
+            failures.join("; ")
+        )
+    })
 }
 
 type DynamicAgentClient =
     AgentClient<Box<dyn russh::keys::agent::client::AgentStream + Send + Unpin + 'static>>;
 
+struct SshAgent {
+    source: &'static str,
+    client: DynamicAgentClient,
+}
+
+async fn request_agent_identities(agent: &mut SshAgent) -> Result<Vec<AgentIdentity>, String> {
+    agent.client.request_identities().await.map_err(|error| {
+        format!(
+            "{} failed to list SSH agent identities: {error}",
+            agent.source
+        )
+    })
+}
+
 #[cfg(unix)]
-async fn connect_ssh_agent() -> Result<DynamicAgentClient, String> {
+async fn connect_ssh_agents() -> Result<Vec<SshAgent>, String> {
     AgentClient::connect_env()
         .await
-        .map(AgentClient::dynamic)
+        .map(|agent| {
+            vec![SshAgent {
+                source: "SSH_AUTH_SOCK agent",
+                client: agent.dynamic(),
+            }]
+        })
         .map_err(|error| format!("failed to connect to SSH agent from SSH_AUTH_SOCK: {error}"))
 }
 
 #[cfg(windows)]
-async fn connect_ssh_agent() -> Result<DynamicAgentClient, String> {
+async fn connect_ssh_agents() -> Result<Vec<SshAgent>, String> {
+    let mut agents = Vec::new();
+    let mut failures = Vec::new();
+
     match AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await {
-        Ok(agent) => return Ok(agent.dynamic()),
-        Err(open_ssh_error) => match AgentClient::connect_pageant().await {
-            Ok(agent) => Ok(agent.dynamic()),
-            Err(pageant_error) => Err(format!(
-                "failed to connect to Windows SSH agents; OpenSSH agent: {open_ssh_error}; Pageant: {pageant_error}"
-            )),
-        },
+        Ok(agent) => agents.push(SshAgent {
+            source: "Windows OpenSSH agent",
+            client: agent.dynamic(),
+        }),
+        Err(error) => failures.push(format!("Windows OpenSSH agent: {error}")),
+    }
+
+    match AgentClient::connect_pageant().await {
+        Ok(agent) => agents.push(SshAgent {
+            source: "Pageant agent",
+            client: agent.dynamic(),
+        }),
+        Err(error) => failures.push(format!("Pageant agent: {error}")),
+    }
+
+    if agents.is_empty() {
+        Err(format!(
+            "failed to connect to Windows SSH agents: {}",
+            failures.join("; ")
+        ))
+    } else {
+        Ok(agents)
     }
 }
 
 #[cfg(not(any(unix, windows)))]
-async fn connect_ssh_agent() -> Result<DynamicAgentClient, String> {
+async fn connect_ssh_agents() -> Result<Vec<SshAgent>, String> {
     Err("SSH agent authentication is not supported on this platform yet".to_string())
 }
 
@@ -825,6 +887,30 @@ mod tests {
             host_key_status("example.com", 22, &host_key, &path).expect("status loads"),
             HostKeyTrustStatus::Trusted
         );
+    }
+
+    #[test]
+    fn agent_identity_listing_error_mentions_the_agent_source() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime is created");
+
+        let error = runtime.block_on(async {
+            let (client_stream, server_stream) = tokio::io::duplex(64);
+            drop(server_stream);
+            let mut agent = SshAgent {
+                source: "test SSH agent",
+                client: AgentClient::connect(client_stream).dynamic(),
+            };
+
+            request_agent_identities(&mut agent)
+                .await
+                .expect_err("closed agent stream fails")
+        });
+
+        assert!(error.contains("test SSH agent"));
+        assert!(error.contains("failed to list SSH agent identities"));
     }
 
     fn temp_known_hosts_path(name: &str) -> PathBuf {
