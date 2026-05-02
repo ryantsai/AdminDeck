@@ -22,6 +22,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  SendHorizontal,
   Server,
   Settings,
   ShieldCheck,
@@ -86,6 +87,16 @@ type TransferRecord = {
   remoteDirectory?: string;
   remotePath?: string;
   localDirectory?: string;
+};
+
+type AssistantDraft = {
+  id: string;
+  title: string;
+  risk: string;
+  command: string;
+  reason: string;
+  contextLabel: string;
+  status: "pending" | "approved" | "rejected";
 };
 
 function App() {
@@ -2462,8 +2473,44 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
 }
 
 function AssistantPanel() {
+  const activeTab = useWorkspaceStore((state) =>
+    state.tabs.find((tab) => tab.id === state.activeTabId),
+  );
   const [selectedSuggestion, setSelectedSuggestion] = useState(aiSuggestions[0].id);
+  const [prompt, setPrompt] = useState("");
+  const [draft, setDraft] = useState<AssistantDraft | null>(null);
   const suggestion = aiSuggestions.find((item) => item.id === selectedSuggestion) ?? aiSuggestions[0];
+  const contextLabel = activeTab
+    ? `${activeTab.title} - ${activeTab.kind === "sftp" ? "SFTP browser" : "Terminal"}`
+    : "No active session";
+  const connectionLabel = activeTab?.connection
+    ? `${activeTab.connection.user}@${activeTab.connection.host}`
+    : "Workspace";
+
+  function handleSuggestionSelect(suggestionId: string) {
+    const nextSuggestion = aiSuggestions.find((item) => item.id === suggestionId);
+    setSelectedSuggestion(suggestionId);
+    if (nextSuggestion) {
+      setPrompt(nextSuggestion.title);
+    }
+  }
+
+  function handleDraftProposal() {
+    const normalizedPrompt = prompt.trim();
+    setDraft({
+      id: `${suggestion.id}-${Date.now()}`,
+      title: normalizedPrompt || suggestion.title,
+      risk: suggestion.risk,
+      command: suggestion.command,
+      reason: suggestion.reason,
+      contextLabel,
+      status: "pending",
+    });
+  }
+
+  function handleCopyCommand(command: string) {
+    void navigator.clipboard?.writeText(command);
+  }
 
   return (
     <aside className="assistant-panel">
@@ -2477,15 +2524,38 @@ function AssistantPanel() {
 
       <div className="assistant-context">
         <Bot size={16} />
-        <span>Scoped to active session output. No command runs without approval.</span>
+        <span>
+          <strong>{contextLabel}</strong>
+          <small>{connectionLabel}</small>
+        </span>
       </div>
+
+      <label className="assistant-composer">
+        <span>Request</span>
+        <textarea
+          value={prompt}
+          onChange={(event) => setPrompt(event.currentTarget.value)}
+          placeholder="Draft a command for the active session"
+          rows={4}
+        />
+      </label>
+      <button
+        className="approve-button"
+        disabled={!activeTab}
+        onClick={handleDraftProposal}
+        type="button"
+      >
+        <SendHorizontal size={15} />
+        Draft proposal
+      </button>
 
       <div className="suggestion-list">
         {aiSuggestions.map((item) => (
           <button
             className={item.id === selectedSuggestion ? "suggestion active" : "suggestion"}
             key={item.id}
-            onClick={() => setSelectedSuggestion(item.id)}
+            onClick={() => handleSuggestionSelect(item.id)}
+            type="button"
           >
             <span>{item.title}</span>
             <small>{item.risk}</small>
@@ -2493,21 +2563,46 @@ function AssistantPanel() {
         ))}
       </div>
 
-      <section className="approval-card">
+      <section className={`approval-card ${draft ? `approval-card-${draft.status}` : ""}`}>
         <header>
-          <span>Proposed command</span>
-          <strong>{suggestion.risk}</strong>
+          <span>{draft ? draft.contextLabel : "Proposed command"}</span>
+          <strong>{draft?.status ?? "pending"}</strong>
         </header>
-        <pre>
-          <code>{suggestion.command}</code>
-        </pre>
-        <p>{suggestion.reason}</p>
+        {draft ? (
+          <>
+            <pre>
+              <code>{draft.command}</code>
+            </pre>
+            <p>{draft.reason}</p>
+          </>
+        ) : (
+          <p className="approval-empty">No proposal staged.</p>
+        )}
         <div className="approval-actions">
-          <button className="toolbar-button">
+          <button
+            className="toolbar-button"
+            disabled={!draft}
+            onClick={() => draft && setDraft({ ...draft, status: "rejected" })}
+            type="button"
+          >
             <X size={15} />
             Reject
           </button>
-          <button className="approve-button">
+          <button
+            className="toolbar-button"
+            disabled={!draft}
+            onClick={() => draft && handleCopyCommand(draft.command)}
+            type="button"
+          >
+            <Copy size={15} />
+            Copy
+          </button>
+          <button
+            className="approve-button"
+            disabled={!draft}
+            onClick={() => draft && setDraft({ ...draft, status: "approved" })}
+            type="button"
+          >
             <Check size={15} />
             Approve
           </button>

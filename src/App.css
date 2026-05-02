@@ -237,6 +237,11 @@ h2 {
   background: var(--green);
 }
 
+.approve-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .tree-list {
   min-height: 0;
   overflow: auto;
@@ -825,6 +830,49 @@ progress {
   line-height: 1.45;
 }
 
+.assistant-context span,
+.assistant-composer {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.assistant-context strong,
+.assistant-context small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-context strong {
+  color: var(--text);
+}
+
+.assistant-composer span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.assistant-composer textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  padding: 9px 10px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.assistant-composer textarea:focus {
+  border-color: #8db5ff;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .suggestion-list {
   display: grid;
   gap: 7px;
@@ -884,6 +932,22 @@ progress {
 .approval-card p {
   margin: 0;
   line-height: 1.45;
+}
+
+.approval-card-approved header strong {
+  color: var(--green);
+}
+
+.approval-card-rejected header strong {
+  color: var(--red);
+}
+
+.approval-empty {
+  min-height: 80px;
+  padding: 10px;
+  background: var(--surface-muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
 }
 
 .settings-stack {

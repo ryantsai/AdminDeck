@@ -8,6 +8,8 @@ Milestone B has started with the accepted Rust SSH direction, durable SSH `proxy
 
 Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP Connection credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SFTP tabs now open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, and folder opening on both sides, support upload/download of selected files or folders with configurable overwrite behavior, provide remote create folder, rename, and delete actions, include a visible transfer queue with byte progress and cancellation for queued or active transfers, and can open an SSH terminal at the current remote directory.
 
+Milestone D has started with a right-side AI assistant panel that scopes requests to the active workspace Tab, stages command proposals, and keeps approval or rejection explicit without executing commands.
+
 ## Milestone 0: Project Foundation
 
 - [x] Confirm working product name: AdminDeck.
@@ -58,7 +60,7 @@ Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP
 
 ## Milestone D: AI Command Assist
 
-- Add AI assistant panel.
+- [x] Add AI assistant panel.
 - Add OpenAI-compatible provider settings.
 - Store API keys in OS keychain.
 - Add model selector.
