@@ -1599,7 +1599,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     : "";
 
   return (
-    <article className="terminal-pane">
+    <article className={searchOpen ? "terminal-pane terminal-pane-search-open" : "terminal-pane"}>
       <header>
         <span>
           <Circle size={9} fill="currentColor" />

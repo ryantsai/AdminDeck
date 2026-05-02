@@ -576,7 +576,7 @@ kbd + kbd {
 
 .terminal-pane {
   display: grid;
-  grid-template-rows: 34px auto minmax(0, 1fr);
+  grid-template-rows: 34px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -585,6 +585,10 @@ kbd + kbd {
   border: 1px solid var(--terminal-border);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.terminal-pane-search-open {
+  grid-template-rows: 34px auto minmax(0, 1fr);
 }
 
 .terminal-pane header {
@@ -704,8 +708,10 @@ kbd + kbd {
 }
 
 .xterm-host {
+  height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   padding: 8px;
 }
 
