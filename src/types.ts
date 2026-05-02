@@ -152,6 +152,8 @@ export interface PerformanceMetrics {
   workingSetBytes?: number;
   memorySource?: string;
   lastTerminalStart?: TerminalStartMetric;
+  lastLocalTerminalStart?: TerminalStartMetric;
+  lastSshTerminalStart?: TerminalStartMetric;
 }
 
 export type SecretKind = "connectionPassword" | "connectionPassphrase" | "aiApiKey";

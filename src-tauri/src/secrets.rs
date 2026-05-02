@@ -226,9 +226,16 @@ fn to_secret_error(error: Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn test_keychain_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn stores_checks_reads_and_deletes_secret_without_sqlite() {
+        let _guard = test_keychain_lock().lock().expect("test keychain lock");
         let secrets = Secrets::new_for_test();
         let owner_id = "connection-test-secret".to_string();
 
@@ -266,6 +273,7 @@ mod tests {
 
     #[test]
     fn stores_ai_api_keys_under_their_own_secret_kind() {
+        let _guard = test_keychain_lock().lock().expect("test keychain lock");
         let secrets = Secrets::new_for_test();
         let owner_id = "openai-compatible-provider".to_string();
 

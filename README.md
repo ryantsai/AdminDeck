@@ -18,6 +18,7 @@ This repository currently contains the v0.1 foundation:
 - SSH config import preview with unsupported directive reporting
 - Local logging bootstrap
 - Windows-first CI skeleton
+- Local performance budget status for UI readiness, terminal readiness, and memory
 
 ## Development
 
@@ -47,3 +48,6 @@ npm run build
 cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
+
+Performance and terminal compatibility checks are documented in
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).

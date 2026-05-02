@@ -93,6 +93,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       performanceMetrics: {
         ...state.performanceMetrics,
         lastTerminalStart,
+        ...(lastTerminalStart.kind === "local"
+          ? { lastLocalTerminalStart: lastTerminalStart }
+          : { lastSshTerminalStart: lastTerminalStart }),
       },
     })),
   activateTab: (tabId) => set({ activeTabId: tabId }),

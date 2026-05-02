@@ -1099,6 +1099,18 @@ progress {
   white-space: nowrap;
 }
 
+.status-bar .metric-ok {
+  color: var(--green);
+}
+
+.status-bar .metric-over {
+  color: var(--amber);
+}
+
+.status-bar .metric-pending {
+  color: var(--text-muted);
+}
+
 .dialog-backdrop {
   position: fixed;
   inset: 0;
