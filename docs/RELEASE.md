@@ -15,7 +15,7 @@ AdminDeck is local-first by default.
 
 ## Diagnostics Bundle Flow
 
-Users can create a diagnostics bundle from Settings with **Create diagnostics bundle**.
+Diagnostics bundle creation is implemented as a local app command, but the current simplified Settings surface does not expose the diagnostics action. The user-facing diagnostics entry point should be reintroduced only after the Settings UX is redesigned.
 
 The current bundle is a local folder under the app data directory. It includes:
 
@@ -80,4 +80,5 @@ The smoke test verifies the release artifact checksum, silently installs into a 
 - SFTP supports recursive file and folder transfer, multi-select drag/drop, overwrite prompts with overwrite-all handling, clearable finished transfer history, remote properties, chmod, and chown, but folder sync, diff/compare, transfer resume, archive/extract, and remote file editing remain deferred.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.
 - AI command assistance stages proposals only; it does not autonomously execute commands.
+- The current Settings surface only shows Language (i18n) and Color Scheme placeholders; diagnostics, terminal, SSH, SFTP, AI provider, update, and keybinding controls are not exposed there yet.
 - Diagnostics bundles are folders, not compressed archives.

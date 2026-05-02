@@ -8,7 +8,7 @@ AdminDeck is intended to be a fast, professional desktop workspace for personal/
 
 ## Solution
 
-AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions, SFTP dual-pane file management, SSH config import, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
+AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions, SFTP dual-pane file management, SSH config import, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
 
 The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. Mobile, RDP, VNC, team vaults, and sync are explicitly later-stage work.
 
@@ -52,7 +52,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 36. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
 37. As an SFTP user, I want overwrite prompts with an overwrite-all option, so that file transfer conflicts stay explicit without slowing down large batches.
 38. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
-39. As a user, I want theme settings, so that dark chrome can be added later without changing the product architecture.
+39. As a user, I want a Settings entry point that clearly shows Language (i18n) and Color Scheme as planned areas, so that future customization work has an obvious home without implying unfinished controls work today.
 40. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
 41. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
 42. As a user, I want no telemetry by default, so that my terminal and host data remain private.
@@ -102,10 +102,10 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - AI model: approval-based command assist only.
 - AI providers: OpenAI-compatible BYO API key plus Claude Code CLI and Codex CLI adapters.
 - CLI agent integrations: suggest-only/ask-before-execute where possible.
-- UI model: left-side connection manager/tree, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
+- UI model: left activity rail with Dashboard and Settings entries, left-side connection manager/tree, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
 - Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
 - SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
-- Settings: light-first app chrome, dark terminal panes by default, font settings, terminal cursor, scrollback, copy-on-select, multiline paste confirmation, local shell default, SSH defaults, SFTP defaults, AI provider settings, fixed keybindings in v0.1.
+- Settings: current surface is intentionally limited to two to-be-implemented placeholders, Language (i18n) and Color Scheme. Deeper terminal, SSH, SFTP, AI provider, diagnostics, update, and keybinding controls should be reintroduced only when their UX is clear and backed by the existing local storage/keychain boundaries.
 - Privacy: no telemetry or automatic crash upload in v0.1.
 - Distribution: Windows .msi or .exe installer, portable ZIP for dev/test, GitHub Releases. macOS .dmg and Linux AppImage/deb/rpm later.
 - v0.2 update mechanism: Windows installed app only, stable channel only, GitHub Releases static updater metadata, signed Tauri updater artifacts required for any user-facing update flow, update checks enabled by default with clear local-first wording, and user-mediated install from Settings plus a lightweight app-chrome update notification.

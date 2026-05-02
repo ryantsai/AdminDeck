@@ -72,6 +72,7 @@ button {
   gap: 6px;
   align-items: center;
   padding: 10px 7px;
+  overflow: visible;
   background: #202936;
   color: #d8e1ef;
 }
@@ -90,13 +91,41 @@ button {
   cursor: pointer;
 }
 
+.rail-button {
+  position: relative;
+}
+
 .rail-button:hover,
 .rail-button.active {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.rail-button.bottom {
-  margin-top: auto;
+.rail-tooltip {
+  position: absolute;
+  left: calc(100% + 9px);
+  top: 50%;
+  z-index: 30;
+  padding: 5px 8px;
+  color: #f8fafc;
+  white-space: nowrap;
+  pointer-events: none;
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(-50%) translateX(-2px);
+  transition:
+    opacity 140ms ease 2s,
+    transform 140ms ease 2s;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rail-button:hover .rail-tooltip,
+.rail-button:focus-visible .rail-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 
 .connection-sidebar,
@@ -1537,7 +1566,44 @@ progress {
 }
 
 .settings-dialog {
-  width: min(620px, calc(100vw - 40px));
+  width: min(460px, calc(100vw - 40px));
+}
+
+.settings-placeholder-list {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-placeholder-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 11px;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: default;
+}
+
+.settings-placeholder-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settings-placeholder-item strong {
+  color: var(--text-faint);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .import-dialog {

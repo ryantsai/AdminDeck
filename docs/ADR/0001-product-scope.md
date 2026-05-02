@@ -19,6 +19,7 @@ v0.1 includes:
 - local terminal
 - SSH terminal
 - SFTP dual-pane file manager
+- left activity rail with Dashboard and Settings entries
 - left-side connection tree
 - SSH config import
 - SQLite connection/settings storage
@@ -27,6 +28,7 @@ v0.1 includes:
 - OpenAI-compatible BYO API key
 - Claude Code CLI and Codex CLI path configuration
 - light app chrome with dark terminal panes
+- Settings placeholder surface for Language (i18n) and Color Scheme
 
 v0.1 excludes:
 

@@ -15,10 +15,12 @@ import {
   FolderPlus,
   HardDrive,
   KeyRound,
+  Languages,
   Laptop,
-  LayoutPanelLeft,
+  LayoutDashboard,
   MoreHorizontal,
   PanelRight,
+  Palette,
   Pencil,
   Play,
   Plus,
@@ -74,7 +76,6 @@ import type {
   SftpSettings,
   SshSettings,
   TerminalPane,
-  TerminalSettings,
   WorkspaceTab,
 } from "./types";
 
@@ -294,14 +295,17 @@ function App() {
 function ActivityRail({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <nav className="activity-rail" aria-label="Primary">
-      <button className="rail-button active" aria-label="Connections">
-        <LayoutPanelLeft size={18} />
+      <button className="rail-button active" aria-label="Dashboard">
+        <LayoutDashboard size={18} />
+        <span className="rail-tooltip" role="tooltip">
+          Dashboard
+        </span>
       </button>
-      <button className="rail-button" aria-label="Terminal sessions">
-        <Terminal size={18} />
-      </button>
-      <button className="rail-button bottom" aria-label="Settings" onClick={onOpenSettings}>
+      <button className="rail-button" aria-label="Settings" onClick={onOpenSettings}>
         <Settings size={18} />
+        <span className="rail-tooltip" role="tooltip">
+          Settings
+        </span>
       </button>
     </nav>
   );
@@ -3795,383 +3799,32 @@ function SftpPropertiesPopup({
 }
 
 function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
-  const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
-  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
-  const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
-  const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
-  const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
-  const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
-  const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
-  const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
-  const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
-  const [error, setError] = useState("");
-  const [diagnosticsStatus, setDiagnosticsStatus] = useState("");
-  const [creatingDiagnostics, setCreatingDiagnostics] = useState(false);
-
-  async function handleCreateDiagnosticsBundle() {
-    if (!isTauriRuntime()) {
-      setDiagnosticsStatus("Diagnostics bundles require the Tauri desktop runtime.");
-      return;
-    }
-
-    try {
-      setCreatingDiagnostics(true);
-      setDiagnosticsStatus("");
-      const bundle = await invokeCommand("create_diagnostics_bundle");
-      const warningText =
-        bundle.warnings.length > 0 ? ` Warnings: ${bundle.warnings.join("; ")}` : "";
-      setDiagnosticsStatus(`Created ${bundle.files.length} files at ${bundle.path}.${warningText}`);
-    } catch (error) {
-      setDiagnosticsStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setCreatingDiagnostics(false);
-    }
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const request: TerminalSettings = {
-      fontFamily: String(form.get("fontFamily") ?? "").trim(),
-      fontSize: Number(form.get("fontSize")),
-      lineHeight: Number(form.get("lineHeight")),
-      cursorStyle: String(form.get("cursorStyle")) as TerminalSettings["cursorStyle"],
-      scrollbackLines: Number(form.get("scrollbackLines")),
-      copyOnSelect: form.get("copyOnSelect") === "on",
-      confirmMultilinePaste: form.get("confirmMultilinePaste") === "on",
-      defaultShell: String(form.get("defaultShell") ?? "").trim(),
-    };
-    const sshRequest: SshSettings = {
-      defaultUser: String(form.get("defaultUser") ?? "").trim(),
-      defaultPort: Number(form.get("defaultPort")),
-      defaultKeyPath: String(form.get("defaultKeyPath") ?? "").trim() || undefined,
-      defaultProxyJump: String(form.get("defaultProxyJump") ?? "").trim() || undefined,
-    };
-    const sftpRequest: SftpSettings = {
-      overwriteBehavior: String(
-        form.get("overwriteBehavior") ?? "fail",
-      ) as SftpSettings["overwriteBehavior"],
-    };
-    const aiProviderRequest: AiProviderSettings = {
-      enabled: form.get("aiProviderEnabled") === "on",
-      baseUrl: String(form.get("aiProviderBaseUrl") ?? "").trim(),
-      model: String(form.get("aiProviderModel") ?? "").trim(),
-      cliExecutionPolicy: "suggestOnly",
-      claudeCliPath: String(form.get("claudeCliPath") ?? "").trim() || undefined,
-      codexCliPath: String(form.get("codexCliPath") ?? "").trim() || undefined,
-    };
-    const aiProviderApiKey = String(form.get("aiProviderApiKey") ?? "").trim();
-
-    if (aiProviderRequest.enabled && !aiProviderApiKey && !aiProviderHasApiKey) {
-      setError("Enter an API key before enabling the command assist provider.");
-      return;
-    }
-
-    try {
-      setError("");
-      if (!isTauriRuntime()) {
-        setTerminalSettings(request);
-        setSshSettings(sshRequest);
-        setSftpSettings(sftpRequest);
-        setAiProviderSettings(aiProviderRequest);
-        if (aiProviderApiKey) {
-          setAiProviderHasApiKey(true);
-        }
-        onClose();
-        return;
-      }
-
-      const [
-        updatedTerminalSettings,
-        updatedSshSettings,
-        updatedSftpSettings,
-        updatedAiProviderSettings,
-      ] = await Promise.all([
-        invokeCommand("update_terminal_settings", { request }),
-        invokeCommand("update_ssh_settings", { request: sshRequest }),
-        invokeCommand("update_sftp_settings", { request: sftpRequest }),
-        invokeCommand("update_ai_provider_settings", { request: aiProviderRequest }),
-      ]);
-      if (aiProviderApiKey) {
-        await invokeCommand("store_secret", {
-          request: {
-            kind: "aiApiKey",
-            ownerId: AI_PROVIDER_SECRET_OWNER_ID,
-            secret: aiProviderApiKey,
-          },
-        });
-        setAiProviderHasApiKey(true);
-      }
-      setTerminalSettings(updatedTerminalSettings);
-      setSshSettings(updatedSshSettings);
-      setSftpSettings(updatedSftpSettings);
-      setAiProviderSettings(updatedAiProviderSettings);
-      onClose();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
   return (
     <div className="dialog-backdrop" role="presentation">
-      <form className="settings-dialog" onSubmit={handleSubmit}>
+      <section className="settings-dialog" aria-labelledby="settings-title">
         <header>
           <div>
             <p className="panel-label">Settings</p>
-            <h2>Workspace defaults</h2>
+            <h2 id="settings-title">Settings</h2>
           </div>
           <button className="icon-button" type="button" aria-label="Close" onClick={onClose}>
             <X size={15} />
           </button>
         </header>
 
-        <section className="settings-section">
-          <label>
-            <span>Font family</span>
-            <input name="fontFamily" defaultValue={terminalSettings.fontFamily} required />
-          </label>
-          <div className="form-grid three-columns">
-            <label>
-              <span>Font size</span>
-              <input
-                name="fontSize"
-                defaultValue={terminalSettings.fontSize}
-                min="8"
-                max="32"
-                type="number"
-              />
-            </label>
-            <label>
-              <span>Line height</span>
-              <input
-                name="lineHeight"
-                defaultValue={terminalSettings.lineHeight}
-                min="1"
-                max="2"
-                step="0.05"
-                type="number"
-              />
-            </label>
-            <label>
-              <span>Cursor</span>
-              <select name="cursorStyle" defaultValue={terminalSettings.cursorStyle}>
-                <option value="block">Block</option>
-                <option value="bar">Bar</option>
-                <option value="underline">Underline</option>
-              </select>
-            </label>
-          </div>
-          <div className="form-grid">
-            <label>
-              <span>Scrollback</span>
-              <input
-                name="scrollbackLines"
-                defaultValue={terminalSettings.scrollbackLines}
-                min="100"
-                max="100000"
-                step="100"
-                type="number"
-              />
-            </label>
-            <label>
-              <span>Default shell</span>
-              <input name="defaultShell" defaultValue={terminalSettings.defaultShell} required />
-            </label>
-          </div>
-        </section>
-
-        <section className="settings-toggles">
-          <label>
-            <input
-              name="copyOnSelect"
-              type="checkbox"
-              defaultChecked={terminalSettings.copyOnSelect}
-            />
-            <span>Copy terminal selection automatically</span>
-          </label>
-          <label>
-            <input
-              name="confirmMultilinePaste"
-              type="checkbox"
-              defaultChecked={terminalSettings.confirmMultilinePaste}
-            />
-            <span>Confirm multiline paste before sending input</span>
-          </label>
-        </section>
-
-        <section className="settings-section">
-          <div className="settings-section-heading">
-            <span>SSH defaults</span>
-          </div>
-          <div className="form-grid">
-            <label>
-              <span>Default user</span>
-              <input name="defaultUser" defaultValue={sshSettings.defaultUser} required />
-            </label>
-            <label>
-              <span>Default port</span>
-              <input
-                name="defaultPort"
-                defaultValue={sshSettings.defaultPort}
-                inputMode="numeric"
-                min="1"
-                max="65535"
-                type="number"
-              />
-            </label>
-          </div>
-          <label>
-            <span>Default key path</span>
-            <input
-              name="defaultKeyPath"
-              defaultValue={sshSettings.defaultKeyPath ?? ""}
-              placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
-            />
-          </label>
-          <label>
-            <span>Default proxy jump</span>
-            <input
-              name="defaultProxyJump"
-              defaultValue={sshSettings.defaultProxyJump ?? ""}
-              placeholder="jump.internal"
-            />
-          </label>
-        </section>
-
-        <section className="settings-section">
-          <div className="settings-section-heading">
-            <span>SFTP defaults</span>
-          </div>
-          <label>
-            <span>Existing destination</span>
-            <select name="overwriteBehavior" defaultValue={sftpSettings.overwriteBehavior}>
-              <option value="fail">Stop transfer</option>
-              <option value="overwrite">Overwrite files</option>
-            </select>
-          </label>
-        </section>
-
-        <section className="settings-section">
-          <div className="settings-section-heading">
-            <span>Diagnostics</span>
-          </div>
-          <div className="diagnostics-actions">
-            <button
-              className="toolbar-button"
-              disabled={creatingDiagnostics}
-              onClick={() => void handleCreateDiagnosticsBundle()}
-              type="button"
-            >
-              <Download size={15} />
-              {creatingDiagnostics ? "Creating" : "Create diagnostics bundle"}
-            </button>
-            <small className="field-hint">
-              Local only. Excludes terminal output, secrets, and the SQLite database by default.
-            </small>
-          </div>
-          {diagnosticsStatus ? <p className="diagnostics-status">{diagnosticsStatus}</p> : null}
-        </section>
-
-        <section className="settings-section">
-          <div className="settings-section-heading">
-            <span>AI provider</span>
-          </div>
-          <label>
-            <span>OpenAI-compatible endpoint</span>
-            <input
-              name="aiProviderBaseUrl"
-              defaultValue={aiProviderSettings.baseUrl}
-              placeholder="https://api.openai.com/v1"
-              required
-              type="url"
-            />
-          </label>
-          <label>
-            <span>Model</span>
-            <input
-              defaultValue={aiProviderSettings.model}
-              list="ai-model-options"
-              name="aiProviderModel"
-              placeholder="gpt-5-mini"
-              required
-            />
-            <datalist id="ai-model-options">
-              <option value="gpt-5-mini" />
-              <option value="gpt-5" />
-              <option value="gpt-4.1-mini" />
-              <option value="gpt-4o-mini" />
-            </datalist>
-          </label>
-          <label>
-            <span>API key</span>
-            <input
-              autoComplete="off"
-              name="aiProviderApiKey"
-              placeholder={
-                aiProviderHasApiKey ? "Stored in OS keychain" : "Paste API key to store"
-              }
-              type="password"
-            />
-            <small className="field-hint">
-              {aiProviderHasApiKey
-                ? "Leave blank to keep the existing keychain entry."
-                : "Saved only to the OS keychain."}
-            </small>
-          </label>
-          <div className="form-grid">
-            <label>
-              <span>Claude Code CLI path</span>
-              <input
-                name="claudeCliPath"
-                defaultValue={aiProviderSettings.claudeCliPath ?? ""}
-                placeholder="claude"
-              />
-            </label>
-            <label>
-              <span>Codex CLI path</span>
-              <input
-                name="codexCliPath"
-                defaultValue={aiProviderSettings.codexCliPath ?? ""}
-                placeholder="codex"
-              />
-            </label>
-          </div>
-          <label>
-            <span>CLI adapter policy</span>
-            <input
-              name="cliExecutionPolicy"
-              readOnly
-              value="Suggest-only"
-            />
-            <small className="field-hint">
-              CLI adapters may draft commands, but AdminDeck still requires approval before use.
-            </small>
-          </label>
-          <div className="settings-toggles compact">
-            <label>
-              <input
-                name="aiProviderEnabled"
-                type="checkbox"
-                defaultChecked={aiProviderSettings.enabled}
-              />
-              <span>Enable command assist provider</span>
-            </label>
-          </div>
-        </section>
-
-        {error ? <p className="form-error">{error}</p> : null}
-
-        <div className="dialog-actions">
-          <button className="toolbar-button" type="button" onClick={onClose}>
-            Cancel
+        <div className="settings-placeholder-list">
+          <button className="settings-placeholder-item" type="button">
+            <Languages size={17} />
+            <span>Language (i18n)</span>
+            <strong>To be implemented</strong>
           </button>
-          <button className="approve-button" type="submit">
-            <Check size={15} />
-            Save settings
+          <button className="settings-placeholder-item" type="button">
+            <Palette size={17} />
+            <span>Color Scheme</span>
+            <strong>To be implemented</strong>
           </button>
         </div>
-      </form>
+      </section>
     </div>
   );
 }

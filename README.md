@@ -9,15 +9,16 @@ This repository currently contains the v0.1 foundation:
 - React, TypeScript, and Vite frontend
 - Tailwind design-token setup
 - Zustand workspace state
-- Dense first-pass AdminDeck app shell
+- Dense first-pass AdminDeck app shell with Dashboard and Settings rail entries
 - Rust command boundary with a typed frontend wrapper
-- SQLite-backed durable Connections, folders, reorder, and terminal settings
+- SQLite-backed durable Connections, folders, reorder, and settings storage
 - OS keychain secret operations
 - xterm-based local terminal Sessions over `portable-pty`
 - Live workspace-derived connection status badges
 - SSH-launched SFTP workspace with dual-pane local/remote browsing, drag/drop transfer, overwrite prompts, clearable transfer history, remote properties, chmod, and chown
 - SSH config import preview with unsupported directive reporting
 - Local logging bootstrap
+- Settings placeholder surface for Language (i18n) and Color Scheme
 - Windows-first CI skeleton
 - Local performance budget status for UI readiness, terminal readiness, and memory
 

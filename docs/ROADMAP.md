@@ -2,13 +2,13 @@
 
 ## Current Progress
 
-As of May 2, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs that preserve live Sessions across tab switching, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
+As of May 2, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs that preserve live Sessions across tab switching, split terminal panes, xterm-based local terminal sessions, settings storage, a left activity rail with Dashboard and Settings entries, and live status badges derived from active workspace Sessions. The current Settings surface is intentionally reduced to Language (i18n) and Color Scheme placeholders.
 
 Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH Connections.
 
 Milestone C has started with native `russh-sftp` sessions launched from SSH Connections using the same stored credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SSH terminal tabs now expose an SFTP action beside split-pane controls; SFTP tabs open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, folder opening on both sides, scrollable file panes, sorting by name or modified date, multi-select upload/download by button or drag/drop, overwrite conflict prompts with overwrite-all handling for the active transfer queue, remote create folder, inline rename, delete, a scoped SFTP context menu, remote properties with chmod/chown editing, a visible transfer queue with byte progress, cancellation for queued or active transfers, clearable finished transfer history, and an SSH terminal at the current remote directory.
 
-Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged.
+Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged. AI provider settings are not currently exposed in the simplified Settings placeholder surface.
 
 Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, local terminal Session start timing, native SSH post-auth terminal readiness timing, Windows process working set, and budget status in the app chrome without adding telemetry or logging terminal contents. Native SSH post-auth readiness is retained in local performance snapshots and diagnostics manifests after a native SSH Session starts, and can be measured repeatably with `npm run measure:ssh-readiness` against a trusted non-`ProxyJump` SSH Connection. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink and scrollback-search support, keeps terminal behavior configured through stored terminal settings, propagates cell and pixel terminal geometry to local PTYs and native SSH channels, and has backend tests covering performance snapshot basics. Manual performance checks live in `docs/PERFORMANCE.md`, with the detailed terminal compatibility runbook in `docs/TERMINAL_COMPATIBILITY_CHECKLIST.md`.
 
@@ -39,7 +39,9 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 - [x] Add local terminal session lifecycle.
 - [x] Add Windows local terminal creation options for PowerShell, Command Prompt, and WSL.
 - [x] Add initial terminal view using the fastest reliable implementation.
-- [x] Add settings shell for terminal font, line height, cursor, scrollback, copy-on-select, multiline paste confirmation, and default shell.
+- [x] Add left activity rail with Dashboard and Settings entries.
+- [x] Add simplified Settings shell with Language (i18n) and Color Scheme placeholders.
+- [ ] Reintroduce terminal font, line height, cursor, scrollback, copy-on-select, multiline paste confirmation, and default shell controls after the Settings UX is redesigned.
 
 ## Milestone B: SSH Core
 
@@ -52,7 +54,8 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 - [x] Implement terminal channel allocation.
 - [x] Implement resize events.
 - [x] Add optional system ssh fallback/debug path.
-- [x] Add SSH defaults in settings.
+- [x] Persist SSH defaults for new SSH Connections.
+- [ ] Reintroduce SSH defaults controls after the Settings UX is redesigned.
 - [x] Add SSH config import with unsupported directive reporting.
 
 ## Milestone C: SFTP Core
@@ -74,7 +77,7 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 ## Milestone D: AI Command Assist
 
 - [x] Add AI assistant panel.
-- [x] Add OpenAI-compatible provider settings.
+- [x] Add OpenAI-compatible provider settings storage.
 - [x] Store API keys in OS keychain.
 - [x] Add model selector.
 - [x] Add command proposal flow.
@@ -128,7 +131,9 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:i
 - [ ] Simplify common workflows and reduce unnecessary visual or interaction complexity.
 - [ ] Review navigation, workspace layout, settings, connection management, terminal panes, SFTP flows, and AI assistant entry points for clarity.
 - [ ] Add a more colorful default UI while preserving dense, professional workspace ergonomics.
-- [ ] Add theme support for app chrome and workspace surfaces.
+- [ ] Implement Color Scheme settings for app chrome and workspace surfaces.
+- [ ] Implement Language (i18n) settings.
+- [ ] Reintroduce diagnostics, terminal, SSH, SFTP, and AI provider settings controls in the simplified Settings surface where they still fit.
 - [ ] Add editable keybindings.
 
 ### Extension Platform

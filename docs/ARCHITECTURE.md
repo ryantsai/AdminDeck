@@ -145,6 +145,7 @@ SQLite contains local, non-secret data only. OS keychain contains secrets. Termi
 
 The primary UI is a dense desktop workspace:
 
+- left activity rail with Dashboard and Settings entries
 - left connection tree
 - main tabs/workspace
 - terminal split panes inside terminal tabs
@@ -154,7 +155,9 @@ The primary UI is a dense desktop workspace:
 
 Default visual direction: quiet productivity light chrome with dark terminal panes.
 
-AdminDeck does not include a global command palette in the current product scope; navigation and workflow entry points should stay visible in the connection tree, tab workspace, SFTP toolbar/context actions, assistant panel, and Settings.
+The activity rail uses icons with delayed hover labels for top-level destinations. The top rail entry is Dashboard, and the second entry is Settings. The current Settings surface intentionally exposes only Language (i18n) and Color Scheme as to-be-implemented placeholders.
+
+AdminDeck does not include a global command palette in the current product scope; navigation and workflow entry points should stay visible in the Dashboard/connection tree, tab workspace, SFTP toolbar/context actions, assistant panel, and Settings.
 
 The main workspace treats Tabs as frontend containers over live Sessions. Selecting another Tab changes visibility and focus only; it must not run backend Session close commands. Closing a Tab via the tab-strip close control removes that container and tears down the live Session resources it owns.
 
