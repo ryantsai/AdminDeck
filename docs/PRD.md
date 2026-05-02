@@ -48,7 +48,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 32. As an SFTP user, I want multi-select drag/drop transfer between local and remote panes, so that batch upload and download feels natural.
 33. As an SFTP user, I want a focused right-click menu with transfer, rename, delete, and properties, so that file actions stay predictable in the SFTP workspace.
 34. As an SFTP user, I want remote properties with chmod and chown controls, so that permission and ownership fixes can be made without leaving the app.
-35. As an SFTP user, I want a transfer queue with progress and cancellation, so that long operations are visible and controllable.
+35. As an SFTP user, I want a transfer queue with progress, cancellation, and clearable finished history, so that long operations are visible without old records piling up.
 36. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
 37. As an SFTP user, I want overwrite prompts with an overwrite-all option, so that file transfer conflicts stay explicit without slowing down large batches.
 38. As a user, I want a command palette, so that I can navigate and trigger common actions without reaching for the mouse.

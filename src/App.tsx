@@ -139,6 +139,8 @@ type TransferRecord = {
   localDirectory?: string;
 };
 
+const TRANSFER_HISTORY_STATES: TransferRecord["state"][] = ["canceled", "done", "failed"];
+
 type TransferDirection = TransferRecord["direction"];
 
 type TransferConflictDecision = "overwrite" | "overwriteAll" | "skip" | "cancel";
@@ -2842,6 +2844,9 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
   const isConnected = status === "Connected" && Boolean(sessionIdRef.current);
   const isTransferring = transfers.some((transfer) => transfer.state === "active");
   const activeTransferCount = transfers.filter((transfer) => transfer.state === "active").length;
+  const clearableTransferCount = transfers.filter((transfer) =>
+    TRANSFER_HISTORY_STATES.includes(transfer.state),
+  ).length;
 
   return (
     <section
@@ -2924,7 +2929,22 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
       <div className="transfer-queue">
         <header>
           <strong>Transfer activity</strong>
-          <span>{activeTransferCount} active</span>
+          <div className="transfer-queue-actions">
+            <span>{activeTransferCount} active</span>
+            <button
+              className="toolbar-button transfer-clear-button"
+              disabled={clearableTransferCount === 0}
+              onClick={() =>
+                setTransfers((current) =>
+                  current.filter((transfer) => !TRANSFER_HISTORY_STATES.includes(transfer.state)),
+                )
+              }
+              type="button"
+            >
+              <Trash2 size={14} />
+              Clear
+            </button>
+          </div>
         </header>
         {transfers.length === 0 ? (
           <div className="transfer-row transfer-row-muted">No transfers yet</div>

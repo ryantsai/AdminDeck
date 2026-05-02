@@ -1187,6 +1187,18 @@ kbd + kbd {
   border-bottom: 1px solid var(--border);
 }
 
+.transfer-queue-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.transfer-clear-button {
+  height: 26px;
+  padding: 0 8px;
+}
+
 .transfer-row {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) 150px 64px minmax(150px, 0.85fr) 24px;
