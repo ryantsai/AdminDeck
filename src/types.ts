@@ -137,6 +137,8 @@ export interface PerformanceSnapshot {
   uptimeMs: number;
   workingSetBytes?: number;
   memorySource: string;
+  lastSshTerminalReadyMs?: number;
+  lastSshTerminalReadyAtUnixSeconds?: number;
 }
 
 export interface TerminalStartMetric {

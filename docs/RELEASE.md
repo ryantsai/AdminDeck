@@ -20,7 +20,7 @@ Users can create a diagnostics bundle from Settings with **Create diagnostics bu
 The current bundle is a local folder under the app data directory. It includes:
 
 - `README.txt` with sharing guidance.
-- `manifest.json` with app version, target OS/architecture, local performance snapshot, and included-file list.
+- `manifest.json` with app version, target OS/architecture, local performance snapshot, last native SSH terminal readiness when measured, and included-file list.
 - `admin-deck.log` when the local startup log is available.
 
 The bundle intentionally excludes by default:
@@ -52,7 +52,7 @@ Portable ZIP installs are intentionally manual and do not self-update. The v0.2 
 
 - Windows is the only v0.1 acceptance platform.
 - Packaging still needs a successful Windows installer build and smoke test before release.
-- SSH readiness performance is instrumented for native post-auth terminal setup, but the latest documented run still lacks a measured value because it requires a trusted non-`ProxyJump` SSH Connection with valid auth in the measurement environment.
+- SSH readiness performance is instrumented for native post-auth terminal setup and retained in local performance snapshots after a native SSH Session starts, but the latest documented run still lacks a measured value because it requires a trusted non-`ProxyJump` SSH Connection with valid auth in the measurement environment.
 - Native SSH and SFTP do not support `ProxyJump`; those sessions use the system `ssh` fallback/debug path where available.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.
 - AI command assistance stages proposals only; it does not autonomously execute commands.

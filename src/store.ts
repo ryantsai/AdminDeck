@@ -87,6 +87,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         backendUptimeMs: snapshot.uptimeMs,
         workingSetBytes: snapshot.workingSetBytes,
         memorySource: snapshot.memorySource,
+        ...(snapshot.lastSshTerminalReadyMs === undefined
+          ? {}
+          : {
+              lastSshTerminalStart: {
+                kind: "ssh",
+                title: "Native SSH terminal",
+                durationMs: snapshot.lastSshTerminalReadyMs,
+                recordedAt: snapshot.lastSshTerminalReadyAtUnixSeconds
+                  ? new Date(snapshot.lastSshTerminalReadyAtUnixSeconds * 1000).toISOString()
+                  : new Date().toISOString(),
+              },
+            }),
       },
     })),
   recordTerminalStartMetric: (lastTerminalStart) =>

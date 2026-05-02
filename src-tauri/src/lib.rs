@@ -259,9 +259,14 @@ fn start_terminal_session(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
+    performance: tauri::State<'_, performance::PerformanceMonitor>,
     request: sessions::StartTerminalSessionRequest,
 ) -> Result<sessions::TerminalSessionStarted, String> {
-    sessions.start_terminal_session(app, &secrets, request)
+    let started = sessions.start_terminal_session(app, &secrets, request)?;
+    if let Some(terminal_ready_ms) = started.terminal_ready_ms() {
+        performance.record_ssh_terminal_ready(terminal_ready_ms);
+    }
+    Ok(started)
 }
 
 #[tauri::command]

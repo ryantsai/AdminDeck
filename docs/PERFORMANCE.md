@@ -26,6 +26,8 @@ Use a release-like Tauri build when possible. Development builds are still usefu
 
 Record the machine, OS, build type, date, and values in release notes or the validating issue before marking a milestone measurement item complete.
 
+The last native SSH post-auth readiness value is also kept in the local performance snapshot and diagnostics manifest as `lastSshTerminalReadyMs`, with no Connection name, host, terminal output, or secret material.
+
 ## Latest Measurement
 
 Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `src-tauri/target/release/admin-deck.exe`. The Tauri bundler did not complete because the WiX download timed out, so this run uses the built release executable directly rather than an installed MSI.
@@ -53,7 +55,7 @@ Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `sr
 | New local terminal tab ready | 16 ms | <= 100 ms | Pass | Triggered the `New local terminal` button in the release app and read the app chrome `Local ready` value. |
 | Working set after one local terminal | 29.4 MiB | No separate budget | Informational | Process private bytes were 6.5 MiB. Shell child-process memory is not included in this app-process value. |
 | Release executable size | 16.9 MiB | Not Electron-scale | Pass | Size of `src-tauri/target/release/admin-deck.exe`. |
-| SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | The app now records native SSH post-auth terminal readiness only. This run still requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
+| SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | The app records native SSH post-auth terminal readiness in the status bar, performance snapshot, and diagnostics manifest. This run still requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
 
 This run meets every measured performance budget. SSH readiness remains the only documented performance budget not validated by this run.
 

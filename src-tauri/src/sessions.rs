@@ -58,6 +58,12 @@ pub struct TerminalSessionStarted {
     terminal_ready_ms: Option<u128>,
 }
 
+impl TerminalSessionStarted {
+    pub fn terminal_ready_ms(&self) -> Option<u128> {
+        self.terminal_ready_ms
+    }
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalOutput {
