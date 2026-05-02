@@ -374,6 +374,7 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
                     }
                 });
             let mut command = CommandBuilder::new(program);
+            set_terminal_environment(&mut command);
             if let Some(directory) = initial_directory_for(request) {
                 command.cwd(OsString::from(directory));
             }
@@ -386,6 +387,7 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
             }
 
             let mut command = CommandBuilder::new("ssh");
+            set_terminal_environment(&mut command);
             command.arg("-tt");
             if let Some(port) = request.port {
                 command.arg("-p");
@@ -418,6 +420,11 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
             "{other} sessions do not have a terminal transport yet"
         )),
     }
+}
+
+fn set_terminal_environment(command: &mut CommandBuilder) {
+    command.env("TERM", "xterm-256color");
+    command.env("COLORTERM", "truecolor");
 }
 
 fn initial_directory_for(request: &StartTerminalSessionRequest) -> Option<String> {
@@ -528,6 +535,23 @@ mod tests {
         assert_eq!(
             remote_shell_command_for_initial_directory("/srv/app's current"),
             "cd -- '/srv/app'\\''s current' && exec \"${SHELL:-sh}\" -i"
+        );
+    }
+
+    #[test]
+    fn terminal_commands_advertise_xterm_truecolor_capabilities() {
+        let mut command = CommandBuilder::new("shell");
+        set_terminal_environment(&mut command);
+
+        assert_eq!(
+            command.get_env("TERM").and_then(|value| value.to_str()),
+            Some("xterm-256color")
+        );
+        assert_eq!(
+            command
+                .get_env("COLORTERM")
+                .and_then(|value| value.to_str()),
+            Some("truecolor")
         );
     }
 }

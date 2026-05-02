@@ -26,6 +26,37 @@ Use a release-like Tauri build when possible. Development builds are still usefu
 
 Record the machine, OS, build type, date, and values in release notes or the validating issue before marking a milestone measurement item complete.
 
+## Latest Measurement
+
+Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `src-tauri/target/release/admin-deck.exe`. The Tauri bundler did not complete because the WiX download timed out, so this run uses the built release executable directly rather than an installed MSI.
+
+### System Specs
+
+| Component | Value |
+| --- | --- |
+| OS | Microsoft Windows 11 Pro 10.0.26200, 64-bit |
+| Machine | Micro-Star International Co., Ltd. MS-7E47, x64-based PC |
+| BIOS | American Megatrends International, LLC. 1.A77, 2025-09-10 |
+| CPU | AMD Ryzen 9 9950X3D 16-Core Processor, 16 cores / 32 logical processors, 4.3 GHz max clock |
+| Memory | 64 GiB installed, 2 x 32 GiB Micron CT32G56C46U5.C16B2 DDR5 at 5600 MT/s |
+| GPU | NVIDIA GeForce RTX 5080, driver 32.0.15.9636; AMD Radeon(TM) Graphics, driver 32.0.21043.5001; SudoMaker Virtual Display Adapter, driver 1.10.9.289 |
+| Storage | AMD-RAID Array 2 SCSI Disk Device, 2.05 TB; AMD-RAID Array 1 SCSI Disk Device, 2.00 TB |
+| Toolchain | Node v22.16.0, npm 10.9.2, rustc 1.93.1, cargo 1.93.1 |
+
+### Results
+
+| Metric | Measurement | Budget | Status | Notes |
+| --- | ---: | ---: | --- | --- |
+| Cold launch to usable UI | 71 ms | <= 1,000 ms acceptable, <= 500 ms target | Pass | Read from the app chrome `UI ready` status value. External WebView2 CDP page availability was 247 ms. |
+| Idle memory | 27.9 MiB | <= 150 MiB target | Pass | Read from the app chrome `Memory` status value after 30 seconds idle. Process working set was 27.9 MiB and private bytes were 5.0 MiB. |
+| Idle CPU | 0.000% | No formal budget | Informational | CPU delta over the 30 second idle window, normalized across 32 logical processors. |
+| New local terminal tab ready | 16 ms | <= 100 ms | Pass | Triggered the `New local terminal` button in the release app and read the app chrome `Local ready` value. |
+| Working set after one local terminal | 29.4 MiB | No separate budget | Informational | Process private bytes were 6.5 MiB. Shell child-process memory is not included in this app-process value. |
+| Release executable size | 16.9 MiB | Not Electron-scale | Pass | Size of `src-tauri/target/release/admin-deck.exe`. |
+| SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | Requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
+
+This run meets every measured performance budget. SSH readiness remains the only documented performance budget not validated by this run.
+
 ## Terminal Compatibility Checklist
 
 Run this checklist in a local terminal and, where practical, in a native SSH terminal. Keep terminal output private unless a user explicitly chooses to include selected text in diagnostics.

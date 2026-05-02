@@ -82,10 +82,10 @@ Milestone E has started with local-only performance instrumentation that surface
 - [x] Harden the current xterm path for configured scrollback, cursor style, selection/copy handling, multiline paste confirmation, resize propagation, and hyperlinks.
 - [x] Surface budget-aware status for cold launch, local terminal readiness, SSH terminal readiness, and idle memory.
 - [x] Document repeatable performance measurement and terminal compatibility checklist.
-- Measure cold launch time.
-- Measure new local terminal tab time.
+- [x] Measure cold launch time.
+- [x] Measure new local terminal tab time.
 - Measure SSH terminal readiness after auth.
-- Measure idle memory.
+- [x] Measure idle memory.
 - Run manual compatibility checklist: vim, tmux, htop/btop, git, npm, cargo.
 - Harden terminal bracketed paste, mouse support, and alternate screen behavior against the manual compatibility checklist.
 - Start WGPU renderer prototype if Milestone A terminal integration limits are clear.
@@ -96,9 +96,9 @@ Milestone E has started with local-only performance instrumentation that surface
 - Build Windows portable ZIP.
 - Smoke test installer.
 - Publish GitHub Release.
-- Document no-telemetry posture.
-- Document diagnostics bundle flow.
-- Document known limitations.
+- [x] Document no-telemetry posture.
+- [x] Document diagnostics bundle flow.
+- [x] Document known limitations.
 
 ## Milestone G: v0.2 Expansion
 

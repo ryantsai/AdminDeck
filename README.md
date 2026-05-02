@@ -51,3 +51,6 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 Performance and terminal compatibility checks are documented in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+
+Release posture, diagnostics bundle behavior, and known limitations are documented in
+[`docs/RELEASE.md`](docs/RELEASE.md).

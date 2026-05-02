@@ -142,6 +142,12 @@ export interface CommandProposalPlan {
   safetyNotes: string[];
 }
 
+export interface DiagnosticsBundle {
+  path: string;
+  files: string[];
+  warnings: string[];
+}
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -238,6 +244,10 @@ type CommandMap = {
   get_performance_snapshot: {
     args: undefined;
     result: PerformanceSnapshot;
+  };
+  create_diagnostics_bundle: {
+    args: undefined;
+    result: DiagnosticsBundle;
   };
   ssh_transport_plan: {
     args: undefined;

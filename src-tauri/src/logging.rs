@@ -6,14 +6,23 @@ use std::{
 };
 
 static LOG_STATUS: OnceLock<String> = OnceLock::new();
+static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 pub fn init() {
     let status = match write_startup_line() {
-        Ok(path) => format!("Local logs: {}", path.display()),
+        Ok(path) => {
+            let status = format!("Local logs: {}", path.display());
+            let _ = LOG_PATH.set(path);
+            status
+        }
         Err(error) => format!("Local logging unavailable: {error}"),
     };
 
     let _ = LOG_STATUS.set(status);
+}
+
+pub fn log_path() -> Option<PathBuf> {
+    LOG_PATH.get().cloned()
 }
 
 pub fn status() -> String {

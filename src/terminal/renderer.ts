@@ -111,13 +111,23 @@ class XtermTerminalRenderer implements TerminalRenderer {
 
 function terminalOptionsFor(settings: TerminalSettings): ITerminalOptions {
   return {
+    altClickMovesCursor: false,
+    convertEol: false,
+    customGlyphs: true,
     cursorBlink: true,
+    cursorInactiveStyle: "outline",
     cursorStyle: settings.cursorStyle,
+    drawBoldTextInBrightColors: true,
     fastScrollSensitivity: 5,
     fontFamily: settings.fontFamily,
     fontSize: settings.fontSize,
+    ignoreBracketedPasteMode: false,
     lineHeight: settings.lineHeight,
+    macOptionClickForcesSelection: true,
+    macOptionIsMeta: true,
+    minimumContrastRatio: 1,
     rightClickSelectsWord: true,
+    scrollOnEraseInDisplay: true,
     scrollOnUserInput: true,
     scrollback: clampScrollback(settings.scrollbackLines),
     smoothScrollDuration: 0,

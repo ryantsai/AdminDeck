@@ -1,4 +1,5 @@
 mod ai;
+mod diagnostics;
 mod logging;
 mod performance;
 mod secrets;
@@ -191,6 +192,14 @@ fn get_performance_snapshot(
     performance: tauri::State<'_, performance::PerformanceMonitor>,
 ) -> performance::PerformanceSnapshot {
     performance.snapshot()
+}
+
+#[tauri::command]
+fn create_diagnostics_bundle(
+    app: tauri::AppHandle,
+    performance: tauri::State<'_, performance::PerformanceMonitor>,
+) -> Result<diagnostics::DiagnosticsBundle, String> {
+    diagnostics::create_bundle(&app, &performance)
 }
 
 #[tauri::command]
@@ -407,6 +416,7 @@ pub fn run() {
             plan_command_proposal,
             keychain_status,
             get_performance_snapshot,
+            create_diagnostics_bundle,
             ssh_transport_plan,
             import_ssh_config,
             inspect_ssh_host_key,

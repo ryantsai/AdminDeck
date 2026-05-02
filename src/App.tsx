@@ -2383,6 +2383,28 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
   const [error, setError] = useState("");
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState("");
+  const [creatingDiagnostics, setCreatingDiagnostics] = useState(false);
+
+  async function handleCreateDiagnosticsBundle() {
+    if (!isTauriRuntime()) {
+      setDiagnosticsStatus("Diagnostics bundles require the Tauri desktop runtime.");
+      return;
+    }
+
+    try {
+      setCreatingDiagnostics(true);
+      setDiagnosticsStatus("");
+      const bundle = await invokeCommand("create_diagnostics_bundle");
+      const warningText =
+        bundle.warnings.length > 0 ? ` Warnings: ${bundle.warnings.join("; ")}` : "";
+      setDiagnosticsStatus(`Created ${bundle.files.length} files at ${bundle.path}.${warningText}`);
+    } catch (error) {
+      setDiagnosticsStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCreatingDiagnostics(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2605,6 +2627,27 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
               <option value="overwrite">Overwrite files</option>
             </select>
           </label>
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <span>Diagnostics</span>
+          </div>
+          <div className="diagnostics-actions">
+            <button
+              className="toolbar-button"
+              disabled={creatingDiagnostics}
+              onClick={() => void handleCreateDiagnosticsBundle()}
+              type="button"
+            >
+              <Download size={15} />
+              {creatingDiagnostics ? "Creating" : "Create diagnostics bundle"}
+            </button>
+            <small className="field-hint">
+              Local only. Excludes terminal output, secrets, and the SQLite database by default.
+            </small>
+          </div>
+          {diagnosticsStatus ? <p className="diagnostics-status">{diagnosticsStatus}</p> : null}
         </section>
 
         <section className="settings-section">

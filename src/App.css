@@ -1205,6 +1205,29 @@ progress {
   gap: 11px;
 }
 
+.diagnostics-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.diagnostics-actions .toolbar-button {
+  flex: 0 0 auto;
+}
+
+.diagnostics-status {
+  margin: 0;
+  padding: 9px 10px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .settings-section-heading {
   color: var(--text);
   font-size: 13px;
