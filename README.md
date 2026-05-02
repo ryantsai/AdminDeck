@@ -57,6 +57,14 @@ npm run package:portable
 
 The package is written to `artifacts/` with a `.sha256` checksum file.
 
+Build a Windows installer:
+
+```bash
+npm run package:installer
+```
+
+The NSIS setup executable is written to `artifacts/` with a `.sha256` checksum file.
+
 Performance and terminal compatibility checks are documented in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 

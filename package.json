@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "check": "tsc --noEmit",
     "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
+    "package:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-installer.ps1",
     "preview": "vite preview",
     "tauri": "tauri"
   },

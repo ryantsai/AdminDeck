@@ -12,9 +12,9 @@ Milestone D has a right-side AI assistant panel that scopes requests to the acti
 
 Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, local terminal Session start timing, native SSH post-auth terminal readiness timing, Windows process working set, and budget status in the app chrome without adding telemetry or logging terminal contents. Native SSH post-auth readiness is retained in local performance snapshots and diagnostics manifests after a native SSH Session starts. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink and scrollback-search support, keeps terminal behavior configured through stored terminal settings, propagates cell and pixel terminal geometry to local PTYs and native SSH channels, and has backend tests covering performance snapshot basics. Manual performance and terminal compatibility checks now live in `docs/PERFORMANCE.md`.
 
-Milestone F has started with a repeatable Windows portable ZIP packaging flow that builds the release executable, stages release/privacy documentation, writes a package manifest, and emits a SHA-256 checksum under `artifacts/`.
+Milestone F has started with a repeatable Windows portable ZIP packaging flow that builds the release executable, stages release/privacy documentation, writes a package manifest, and emits a SHA-256 checksum under `artifacts/`. It now also has a repeatable unsigned Windows NSIS setup executable packaging flow that copies the installer into `artifacts/` with a SHA-256 checksum.
 
-Latest validation on May 2, 2026: `npm run package:portable`, `npm run check`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after the portable ZIP packaging batch. `npm run package:portable` includes `npm run build`. The frontend production build still reports Vite's existing chunk-size warning.
+Latest validation on May 2, 2026: `npm run package:portable`, `npm run package:installer`, `npm run check`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after the packaging batches. `npm run package:portable` and `npm run package:installer` include `npm run build`. The frontend production build still reports Vite's existing chunk-size warning.
 
 ## Milestone 0: Project Foundation
 
@@ -97,7 +97,7 @@ Latest validation on May 2, 2026: `npm run package:portable`, `npm run check`, `
 
 ## Milestone F: Packaging and v0.1 Release
 
-- [ ] Build Windows .msi or .exe installer.
+- [x] Build Windows .msi or .exe installer.
 - [x] Build Windows portable ZIP.
 - [ ] Smoke test installer.
 - [ ] Publish GitHub Release.

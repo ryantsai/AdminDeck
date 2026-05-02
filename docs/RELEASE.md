@@ -48,10 +48,25 @@ The script builds the frontend and release executable, stages `admin-deck.exe`, 
 
 Portable ZIP installs are intentionally manual and do not self-update. The v0.2 updater scope is limited to normal forward updates for installed Windows builds.
 
+## Windows Installer
+
+Create the v0.1 Windows installer with:
+
+```bash
+npm run package:installer
+```
+
+The script runs the Tauri NSIS bundle target without code signing, copies the generated setup executable to a stable release filename, and writes:
+
+- `artifacts/admin-deck-<version>-windows-x64-setup.exe`
+- `artifacts/admin-deck-<version>-windows-x64-setup.exe.sha256`
+
+The installer uses a current-user install mode by default, creates AdminDeck Start Menu entries, and downloads the WebView2 bootstrapper only if the target machine needs WebView2 during install. The v0.1 installer is unsigned until release signing is configured.
+
 ## Known Limitations
 
 - Windows is the only v0.1 acceptance platform.
-- Packaging still needs a successful Windows installer build and smoke test before release.
+- The Windows installer build is repeatable, but it still needs a smoke test before release.
 - SSH readiness performance is instrumented for native post-auth terminal setup and retained in local performance snapshots after a native SSH Session starts, but the latest documented run still lacks a measured value because it requires a trusted non-`ProxyJump` SSH Connection with valid auth in the measurement environment.
 - Native SSH and SFTP do not support `ProxyJump`; those sessions use the system `ssh` fallback/debug path where available.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.
