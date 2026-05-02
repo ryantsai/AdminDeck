@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm build",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "build"],
+      "problemMatcher": []
+    },
+    {
+      "label": "cargo build (tauri debug)",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["build", "--manifest-path", "src-tauri/Cargo.toml"],
+      "problemMatcher": []
+    },
+    {
+      "label": "start Vite dev server",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*VITE.*",
+          "endsPattern": ".*Local:\\s+http://localhost:1420/.*"
+        }
+      }
+    },
+    {
+      "label": "build AdminDeck exe",
+      "dependsOrder": "sequence",
+      "dependsOn": ["npm build", "cargo build (tauri debug)"],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "debug AdminDeck exe",
+      "dependsOrder": "sequence",
+      "dependsOn": ["cargo build (tauri debug)", "start Vite dev server"],
+      "problemMatcher": []
+    }
+  ]
+}

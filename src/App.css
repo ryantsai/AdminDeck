@@ -954,7 +954,7 @@ h2 {
 
 .file-row {
   display: grid;
-  grid-template-columns: 18px minmax(140px, 1fr) 70px 86px;
+  grid-template-columns: 20px minmax(140px, 1fr) 70px 86px;
   gap: 8px;
   align-items: center;
   width: 100%;
@@ -965,6 +965,35 @@ h2 {
   background: transparent;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
+}
+
+.file-type-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+}
+
+.file-type-icon img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.file-type-icon-symlink::after {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  width: 6px;
+  height: 6px;
+  content: "";
+  background: var(--accent);
+  border: 1px solid var(--surface);
+  border-radius: 999px;
 }
 
 .file-row-interactive {

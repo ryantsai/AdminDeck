@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run AdminDeck exe",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\src-tauri\\target\\debug\\admin-deck.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "RUST_BACKTRACE",
+          "value": "1"
+        },
+        {
+          "name": "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+          "value": "--remote-debugging-port=9222"
+        }
+      ],
+      "preLaunchTask": "debug AdminDeck exe"
+    },
+    {
+      "name": "Attach AdminDeck WebView2",
+      "type": "msedge",
+      "request": "attach",
+      "port": 9222,
+      "useWebView": true,
+      "webRoot": "${workspaceFolder}"
+    }
+  ]
+}
