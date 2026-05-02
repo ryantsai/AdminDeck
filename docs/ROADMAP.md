@@ -93,19 +93,42 @@ Milestone D has started with a right-side AI assistant panel that scopes request
 - Document diagnostics bundle flow.
 - Document known limitations.
 
-## Later
+## Milestone G: v0.2 Expansion
 
-- macOS packaging with .dmg.
-- Linux packaging with AppImage/deb/rpm where reasonable.
-- WGPU terminal renderer replacement if not already complete.
-- Lightweight webview tab.
-- RDP connection type.
-- VNC connection type.
-- Editable keybindings.
-- MobaXterm/RDCMan import.
-- SFTP folder sync/diff/resume.
-- Team sharing/sync.
-- Managed update channel and auto-update.
-- Optional portable encrypted credential vault for users who need secrets to travel with a portable install.
-- Optional crash reporting after explicit opt-in design.
-- Mobile apps after desktop architecture proves itself.
+### Assistant Context and Automation
+
+- Add screenshot capture for the active connection window.
+- Add partial-area screenshot capture from a terminal pane, SFTP view, or other workspace surface.
+- Send captured screenshots to the AI assistant for analysis with explicit user action.
+- Support asking the AI assistant to create extensions.
+- Keep extension-generation flows approval-based before installing or running generated code.
+
+### UI Customization
+
+- Add a more colorful default UI while preserving dense, professional workspace ergonomics.
+- Add theme support for app chrome and workspace surfaces.
+- Add editable keybindings.
+
+### Extension Platform
+
+- Add extension support for user-installed features.
+- Define extension permissions, install/update lifecycle, storage access, and trust boundaries before enabling general extension execution.
+
+### Connection and Workspace Expansion
+
+- Add macOS packaging with .dmg.
+- Add Linux packaging with AppImage/deb/rpm where reasonable.
+- Add WGPU terminal renderer replacement if not already complete.
+- Add lightweight webview tab.
+- Add RDP connection type.
+- Add VNC connection type.
+- Add MobaXterm/RDCMan import.
+- Add SFTP folder sync/diff/resume.
+
+### Distribution, Sync, and Trust
+
+- Add managed update channel and auto-update.
+- Add optional portable encrypted credential vault for users who need secrets to travel with a portable install.
+- Add optional crash reporting after explicit opt-in design.
+- Evaluate team sharing/sync as a major product-scope decision before implementation.
+- Evaluate mobile apps as a major platform-scope decision after desktop architecture proves itself.
