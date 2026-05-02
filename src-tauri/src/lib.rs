@@ -408,7 +408,7 @@ fn close_sftp_session(
 }
 
 #[tauri::command]
-fn start_webview_session(
+async fn start_webview_session(
     app: tauri::AppHandle,
     webviews: tauri::State<'_, webview::WebviewSessionManager>,
     request: webview::StartWebviewSessionRequest,

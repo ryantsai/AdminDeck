@@ -1448,9 +1448,9 @@ function ConnectionDialog({
               <span>URL</span>
               <input
                 name="url"
-                placeholder="https://example.com"
+                placeholder="example.com (https:// assumed)"
                 required
-                type="url"
+                type="text"
               />
             </label>
             <label>

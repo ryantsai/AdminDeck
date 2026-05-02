@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    path::PathBuf,
     sync::{Mutex, MutexGuard},
 };
 
@@ -10,7 +9,6 @@ use tauri::{
 };
 
 const HOST_WINDOW_LABEL: &str = "main";
-const PARTITION_DIRECTORY: &str = "webview-partitions";
 const DEFAULT_PARTITION: &str = "shared";
 
 pub struct WebviewSessionManager {
@@ -95,14 +93,22 @@ impl WebviewSessionManager {
 
         let session_id = required_id(session_id)?;
         let parsed_url = parse_external_url(&url)?;
+        // WebView2 only supports one user-data folder per process. Tauri's
+        // host webview already owns one, so a child webview that asks for a
+        // different `data_directory` triggers a controller-creation crash
+        // inside `EmbeddedBrowserWebView.dll`. For Phase 1 every URL session
+        // shares the host process's data store; cookies and storage are
+        // therefore shared across all URL connections. Real per-connection
+        // isolation needs a separate WebView2 process and is deferred.
         let partition = resolve_partition(data_partition);
-        let data_directory = partition_directory(app, &partition)?;
 
-        let mut sessions = self.lock()?;
-        if sessions.contains_key(&session_id) {
-            return Err(format!(
-                "webview session '{session_id}' is already running"
-            ));
+        {
+            let sessions = self.lock()?;
+            if sessions.contains_key(&session_id) {
+                return Err(format!(
+                    "webview session '{session_id}' is already running"
+                ));
+            }
         }
 
         let host_window = app
@@ -110,9 +116,7 @@ impl WebviewSessionManager {
             .ok_or_else(|| format!("host window '{HOST_WINDOW_LABEL}' is not available"))?;
 
         let label = webview_label_for(&session_id);
-        let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url))
-            .data_directory(data_directory)
-            .auto_resize();
+        let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url)).auto_resize();
 
         let position = LogicalPosition::new(x.max(0.0), y.max(0.0));
         let size = LogicalSize::new(width.max(1.0), height.max(1.0));
@@ -121,6 +125,7 @@ impl WebviewSessionManager {
             .add_child(builder, position, size)
             .map_err(|error| format!("failed to attach child webview: {error}"))?;
 
+        let mut sessions = self.lock()?;
         sessions.insert(session_id.clone(), webview);
 
         Ok(WebviewSessionStarted {
@@ -290,12 +295,4 @@ fn resolve_partition(data_partition: Option<String>) -> String {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| DEFAULT_PARTITION.to_string())
-}
-
-fn partition_directory(app: &AppHandle, partition: &str) -> Result<PathBuf, String> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("failed to resolve app data directory: {error}"))?;
-    Ok(base.join(PARTITION_DIRECTORY).join(partition))
 }

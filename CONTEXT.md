@@ -9,7 +9,7 @@ A durable openable resource stored in SQLite. The supported kinds are local term
 _Avoid_: Profile, saved session, host entry
 
 **URL Connection**:
-A Connection of kind `url`. It stores an http(s) URL plus an optional `dataPartition` label. Each partition maps to its own on-disk WebView2 user-data directory under the app data folder, so two URL Connections with different partitions have independent cookies and storage. Leaving the partition blank uses a per-Connection partition; setting it to `shared` joins the shared default partition.
+A Connection of kind `url`. It stores an http(s) URL plus an optional `dataPartition` label. The address bar accepts hosts without a scheme; the backend assumes `https://` when no scheme is present. The `dataPartition` field is persisted but currently a no-op: WebView2 enforces one user-data folder per process, so all URL Connections share the host app's WebView2 cookie/storage in Phase 1. Real per-Connection isolation is deferred until Phase 2 explores out-of-process WebView2 environments.
 _Avoid_: Web tab, browser bookmark, URL profile
 
 **Quick Connect**:
