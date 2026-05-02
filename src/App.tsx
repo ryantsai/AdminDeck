@@ -89,6 +89,20 @@ type TreeDropTarget =
       targetIndex: number;
     };
 
+type TreeDragPreview = {
+  kind: "folder" | "connection";
+  title: string;
+  subtitle?: string;
+  connectionType?: ConnectionType;
+  connectionStatus?: ConnectionStatus;
+  connectionCount?: number;
+  x: number;
+  y: number;
+  offsetX: number;
+  offsetY: number;
+  width: number;
+};
+
 type ConnectionDialogRequest = CreateConnectionRequest & {
   password?: string;
 };
@@ -264,6 +278,8 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   const [formError, setFormError] = useState("");
   const [treeError, setTreeError] = useState("");
   const [dropTarget, setDropTarget] = useState("");
+  const [dragPreview, setDragPreview] = useState<TreeDragPreview | null>(null);
+  const [draggedSourceId, setDraggedSourceId] = useState("");
   const draggedItemRef = useRef<DraggedTreeItem | null>(null);
   const pointerDragTargetRef = useRef<TreeDropTarget | null>(null);
   const pointerDragListenersRef = useRef<{
@@ -532,6 +548,8 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   function handleDragEnd() {
     draggedItemRef.current = null;
     pointerDragTargetRef.current = null;
+    setDragPreview(null);
+    setDraggedSourceId("");
     setDropTarget("");
   }
 
@@ -613,22 +631,39 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       : `connection-${target.connectionId}`;
   }
 
+  function treeItemId(item: DraggedTreeItem) {
+    return item.kind === "folder" ? `folder-${item.folderId}` : `connection-${item.connectionId}`;
+  }
+
   function handlePointerDragStart(
     event: ReactPointerEvent<HTMLElement>,
     item: DraggedTreeItem,
+    preview: Omit<TreeDragPreview, "x" | "y" | "offsetX" | "offsetY" | "width">,
   ) {
     if (isTreeFiltered || event.button !== 0) {
       return;
     }
 
     removePointerDragListeners();
+    const sourceBounds = event.currentTarget.getBoundingClientRect();
     const startX = event.clientX;
     const startY = event.clientY;
+    const offsetX = startX - sourceBounds.left;
+    const offsetY = startY - sourceBounds.top;
+    const previewWidth = Math.min(sourceBounds.width, 320);
     const pointerId = event.pointerId;
     let dragStarted = false;
     pointerDragTargetRef.current = null;
 
-    const startDrag = () => {
+    const updateDragPreview = (pointerEvent: PointerEvent) => {
+      setDragPreview((currentPreview) =>
+        currentPreview
+          ? { ...currentPreview, x: pointerEvent.clientX, y: pointerEvent.clientY }
+          : null,
+      );
+    };
+
+    const startDrag = (pointerEvent: PointerEvent) => {
       if (dragStarted) {
         return;
       }
@@ -636,6 +671,15 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       dragStarted = true;
       draggedItemRef.current = item;
       suppressTreeClickRef.current = true;
+      setDraggedSourceId(treeItemId(item));
+      setDragPreview({
+        ...preview,
+        x: pointerEvent.clientX,
+        y: pointerEvent.clientY,
+        offsetX,
+        offsetY,
+        width: previewWidth,
+      });
       setDropTarget("");
     };
     const move = (pointerEvent: PointerEvent) => {
@@ -650,10 +694,11 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
           return;
         }
 
-        startDrag();
+        startDrag(pointerEvent);
       }
 
       pointerEvent.preventDefault();
+      updateDragPreview(pointerEvent);
       const target = treeDropTargetFromElement(
         document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY),
         item,
@@ -738,6 +783,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
             <div
               className={`tree-folder-row ${isTreeFiltered ? "" : "can-drag"} ${
                 dropTarget === `folder-${group.id}` ? "drop-target" : ""
+              } ${draggedSourceId === `folder-${group.id}` ? "dragging-source" : ""
               }`}
               data-connection-count={group.connections.length}
               data-folder-id={group.id}
@@ -745,7 +791,15 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
               data-tree-drop-kind="folder"
               onClickCapture={handleTreeClickCapture}
               onPointerDown={(event) =>
-                handlePointerDragStart(event, { kind: "folder", folderId: group.id })
+                handlePointerDragStart(
+                  event,
+                  { kind: "folder", folderId: group.id },
+                  {
+                    kind: "folder",
+                    title: group.name,
+                    connectionCount: group.connections.length,
+                  },
+                )
               }
             >
               <button className="tree-folder">
@@ -778,16 +832,27 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
                 folderId={group.id}
                 connectionIndex={connectionIndex}
                 dragDisabled={isTreeFiltered}
+                isDraggingSource={draggedSourceId === `connection-${connection.id}`}
                 isDropTarget={dropTarget === `connection-${connection.id}`}
                 onClickCapture={handleTreeClickCapture}
                 onDelete={() => void handleDeleteConnection(connection)}
                 onDuplicate={() => void handleDuplicateConnection(connection)}
                 onOpen={() => openConnection(connection)}
                 onPointerDragStart={(event) =>
-                  handlePointerDragStart(event, {
-                    kind: "connection",
-                    connectionId: connection.id,
-                  })
+                  handlePointerDragStart(
+                    event,
+                    {
+                      kind: "connection",
+                      connectionId: connection.id,
+                    },
+                    {
+                      kind: "connection",
+                      title: connection.name,
+                      subtitle: connection.host,
+                      connectionType: connection.type,
+                      connectionStatus: connection.status,
+                    },
+                  )
                 }
                 onRename={() => void handleRenameConnection(connection)}
               />
@@ -795,6 +860,8 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
           </section>
         ))}
       </div>
+
+      {dragPreview ? <TreeDragPreview preview={dragPreview} /> : null}
 
       {formMode ? (
         <ConnectionDialog
@@ -1014,11 +1081,43 @@ function ConnectionDialog({
   );
 }
 
+function TreeDragPreview({ preview }: { preview: TreeDragPreview }) {
+  const Icon =
+    preview.kind === "folder"
+      ? Folder
+      : preview.connectionType === "local"
+        ? Laptop
+        : preview.connectionType === "sftp"
+          ? Columns2
+          : Server;
+  const style = {
+    left: `${preview.x - preview.offsetX}px`,
+    top: `${preview.y - preview.offsetY}px`,
+    width: `${preview.width}px`,
+  };
+
+  return (
+    <div className={`tree-drag-preview ${preview.kind}`} style={style}>
+      <Icon size={15} />
+      <span className="connection-main">
+        <strong>{preview.title}</strong>
+        {preview.subtitle ? <small>{preview.subtitle}</small> : null}
+      </span>
+      {preview.kind === "folder" ? (
+        <small className="tree-drag-count">{preview.connectionCount ?? 0}</small>
+      ) : preview.connectionStatus ? (
+        <span className={`status-dot ${preview.connectionStatus}`} />
+      ) : null}
+    </div>
+  );
+}
+
 function ConnectionRow({
   connection,
   connectionIndex,
   dragDisabled,
   folderId,
+  isDraggingSource,
   isDropTarget,
   onDelete,
   onDuplicate,
@@ -1031,6 +1130,7 @@ function ConnectionRow({
   connectionIndex: number;
   dragDisabled: boolean;
   folderId: string;
+  isDraggingSource: boolean;
   isDropTarget: boolean;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -1045,6 +1145,7 @@ function ConnectionRow({
     <div
       className={`connection-row ${dragDisabled ? "" : "can-drag"} ${
         isDropTarget ? "drop-target" : ""
+      } ${isDraggingSource ? "dragging-source" : ""
       }`}
       data-connection-id={connection.id}
       data-connection-index={connectionIndex}

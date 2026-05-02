@@ -290,6 +290,41 @@ h2 {
   outline-offset: -1px;
 }
 
+.tree-folder-row.dragging-source,
+.connection-row.dragging-source {
+  opacity: 0.32;
+}
+
+.tree-drag-preview {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 7px 9px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid #8db5ff;
+  border-radius: 6px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
+  transform: rotate(-1deg);
+}
+
+.tree-drag-preview.folder {
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tree-drag-count {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
 .tree-folder,
 .connection-open,
 .row-action {
