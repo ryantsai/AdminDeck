@@ -54,3 +54,29 @@ fn process_working_set_bytes() -> (Option<u64>, &'static str) {
 fn process_working_set_bytes() -> (Option<u64>, &'static str) {
     (None, "unsupported-platform")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{thread, time::Duration};
+
+    #[test]
+    fn snapshot_reports_monotonic_uptime() {
+        let monitor = PerformanceMonitor::new();
+        let first = monitor.snapshot();
+        thread::sleep(Duration::from_millis(1));
+        let second = monitor.snapshot();
+
+        assert!(second.uptime_ms >= first.uptime_ms);
+        assert!(!second.memory_source.is_empty());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_snapshot_reports_working_set() {
+        let snapshot = PerformanceMonitor::new().snapshot();
+
+        assert!(snapshot.working_set_bytes.unwrap_or_default() > 0);
+        assert_eq!(snapshot.memory_source, "windows-working-set");
+    }
+}

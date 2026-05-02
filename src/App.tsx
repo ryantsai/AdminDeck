@@ -33,8 +33,6 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { FitAddon } from "@xterm/addon-fit";
-import { Terminal as TerminalEmulator } from "@xterm/xterm";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, FormEvent } from "react";
@@ -54,6 +52,7 @@ import {
 } from "./lib/tauri";
 import { aiSuggestions, connectionGroups } from "./sample-data";
 import { useWorkspaceStore } from "./store";
+import { createTerminalRenderer } from "./terminal/renderer";
 import type {
   AiProviderSettings,
   Connection,
@@ -1309,24 +1308,9 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     }
 
     startedRef.current = true;
-    const terminal = new TerminalEmulator({
-      cursorBlink: true,
-      cursorStyle: terminalSettings.cursorStyle,
-      fontFamily: terminalSettings.fontFamily,
-      fontSize: terminalSettings.fontSize,
-      lineHeight: terminalSettings.lineHeight,
-      scrollback: terminalSettings.scrollbackLines,
-      theme: {
-        background: "#0c1219",
-        foreground: "#d9e2ef",
-        cursor: "#d9e2ef",
-        selectionBackground: "#305f95",
-      },
-    });
-    const fitAddon = new FitAddon();
-    terminal.loadAddon(fitAddon);
+    const terminal = createTerminalRenderer(terminalSettings);
     terminal.open(element);
-    fitAddon.fit();
+    terminal.fit();
     terminal.focus();
     const terminalSessionType = connection.type === "local" ? "local" : "ssh";
     terminal.writeln(`Starting ${terminalSessionType} session for ${connection.name}...`);
@@ -1369,11 +1353,11 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     });
 
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
+      const dimensions = terminal.fit();
       const sessionId = sessionIdRef.current;
       if (sessionId) {
         void invokeCommand("resize_terminal", {
-          request: { sessionId, cols: terminal.cols, rows: terminal.rows },
+          request: { sessionId, cols: dimensions.cols, rows: dimensions.rows },
         });
       }
     });
@@ -1418,8 +1402,8 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
             secretOwnerId: connection.id,
             shell: connection.type === "local" ? terminalSettings.defaultShell : undefined,
             initialDirectory: connection.type === "local" ? undefined : pane.cwd.trim() || undefined,
-            cols: terminal.cols,
-            rows: terminal.rows,
+            cols: terminal.dimensions.cols,
+            rows: terminal.dimensions.rows,
           },
         });
         if (disposed) {

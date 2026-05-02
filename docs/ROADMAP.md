@@ -2,7 +2,7 @@
 
 ## Current Progress
 
-As of May 1, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
+As of May 2, 2026, Milestone A has a usable session spine in place: typed frontend Tauri commands, SQLite-backed durable Connections and folders, OS keychain operations, connection tree CRUD/search/reorder, quick connect, tabs, split terminal panes, xterm-based local terminal sessions, terminal settings, and live status badges derived from active workspace Sessions.
 
 Milestone B has started with the accepted Rust SSH direction, durable SSH `proxyJump` storage, native `russh` SSH terminal lifecycle for key-file, password, and SSH-agent Connections without `ProxyJump`, app-local known-host verification for native SSH sessions with explicit first-use trust and changed-key blocking, system `ssh` debug/fallback support for `ProxyJump` sessions, an SSH config import preview that preserves `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump` while reporting unsupported directives before saving drafts as Connections, and persisted SSH defaults for new SSH/SFTP Connections.
 
@@ -10,7 +10,7 @@ Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP
 
 Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged.
 
-Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, latest terminal Session start timing, and Windows process working set in the app chrome without adding telemetry or logging terminal contents.
+Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, latest terminal Session start timing, and Windows process working set in the app chrome without adding telemetry or logging terminal contents. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink support, keeps terminal behavior configured through stored terminal settings, and has backend tests covering performance snapshot basics.
 
 ## Milestone 0: Project Foundation
 
@@ -77,13 +77,15 @@ Milestone E has started with local-only performance instrumentation that surface
 ## Milestone E: Performance and Terminal Quality
 
 - [x] Add local-only performance instrumentation for frontend ready time, terminal Session start time, and Windows process working set.
+- [x] Add backend tests for local-only performance snapshots.
+- [x] Define terminal renderer interface in code so xterm can be swapped for a later WGPU renderer.
+- [x] Harden the current xterm path for configured scrollback, cursor style, selection/copy handling, multiline paste confirmation, resize propagation, and hyperlinks.
 - Measure cold launch time.
 - Measure new local terminal tab time.
 - Measure SSH terminal readiness after auth.
 - Measure idle memory.
 - Run manual compatibility checklist: vim, tmux, htop/btop, git, npm, cargo.
-- Harden terminal scrollback, selection, copy/paste, bracketed paste, mouse support, alternate screen, and hyperlinks.
-- Define WGPU renderer interface in code.
+- Harden terminal bracketed paste, mouse support, and alternate screen behavior against the manual compatibility checklist.
 - Start WGPU renderer prototype if Milestone A terminal integration limits are clear.
 
 ## Milestone F: Packaging and v0.1 Release
