@@ -8,6 +8,7 @@ import {
 } from "./sample-data";
 import type {
   AiProviderSettings,
+  AssistantContextSnippet,
   Connection,
   SftpSettings,
   SshSettings,
@@ -24,6 +25,7 @@ interface WorkspaceState {
   sftpSettings: SftpSettings;
   aiProviderSettings: AiProviderSettings;
   aiProviderHasApiKey: boolean;
+  assistantContextSnippet?: AssistantContextSnippet;
   activeSessionCounts: Record<string, number>;
   setQuery: (query: string) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
@@ -31,6 +33,8 @@ interface WorkspaceState {
   setSftpSettings: (settings: SftpSettings) => void;
   setAiProviderSettings: (settings: AiProviderSettings) => void;
   setAiProviderHasApiKey: (hasApiKey: boolean) => void;
+  setAssistantContextSnippet: (snippet: AssistantContextSnippet) => void;
+  clearAssistantContextSnippet: () => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -50,6 +54,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   sftpSettings: defaultSftpSettings,
   aiProviderSettings: defaultAiProviderSettings,
   aiProviderHasApiKey: false,
+  assistantContextSnippet: undefined,
   activeSessionCounts: {},
   setQuery: (query) => set({ query }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
@@ -57,6 +62,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setSftpSettings: (sftpSettings) => set({ sftpSettings }),
   setAiProviderSettings: (aiProviderSettings) => set({ aiProviderSettings }),
   setAiProviderHasApiKey: (aiProviderHasApiKey) => set({ aiProviderHasApiKey }),
+  setAssistantContextSnippet: (assistantContextSnippet) => set({ assistantContextSnippet }),
+  clearAssistantContextSnippet: () => set({ assistantContextSnippet: undefined }),
   activateTab: (tabId) => set({ activeTabId: tabId }),
   closeTab: (tabId) => {
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);

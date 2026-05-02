@@ -7,6 +7,7 @@ pub struct CommandProposalRequest {
     command: String,
     reason: String,
     context_label: String,
+    selected_output: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -29,7 +30,11 @@ pub fn plan_command_proposal(
     let command = trim_required("proposed command", request.command)?;
     let reason = trim_required("proposal reason", request.reason)?;
     let context_label = trim_required("proposal context", request.context_label)?;
-    let safety = classify_command_safety(&command);
+    let selected_output = request
+        .selected_output
+        .map(|output| output.trim().to_string())
+        .filter(|output| !output.is_empty());
+    let safety = classify_command_safety(&command, selected_output.as_deref());
 
     Ok(CommandProposalPlan {
         prompt,
@@ -52,9 +57,16 @@ struct CommandSafety {
     notes: Vec<String>,
 }
 
-fn classify_command_safety(command: &str) -> CommandSafety {
+fn classify_command_safety(command: &str, selected_output: Option<&str>) -> CommandSafety {
     let normalized = command.to_ascii_lowercase();
     let mut notes = Vec::new();
+    let mut extra_confirmation_required = false;
+    if selected_output.is_some() {
+        notes.push(
+            "Selected terminal output is included in the assistant context for this proposal."
+                .to_string(),
+        );
+    }
 
     if contains_any(
         &normalized,
@@ -71,6 +83,7 @@ fn classify_command_safety(command: &str) -> CommandSafety {
             "reboot",
         ],
     ) {
+        extra_confirmation_required = true;
         notes.push("May delete, overwrite, reboot, or otherwise change system state.".to_string());
     }
 
@@ -85,6 +98,7 @@ fn classify_command_safety(command: &str) -> CommandSafety {
             "kubectl delete",
         ],
     ) {
+        extra_confirmation_required = true;
         notes.push("May interrupt a service or running workload.".to_string());
     }
 
@@ -102,7 +116,15 @@ fn classify_command_safety(command: &str) -> CommandSafety {
             ".ssh",
         ],
     ) {
+        extra_confirmation_required = true;
         notes.push("Mentions credentials, tokens, or SSH key material.".to_string());
+    }
+
+    if selected_output.is_some_and(mentions_sensitive_material) {
+        extra_confirmation_required = true;
+        notes.push(
+            "Selected output may contain credentials, tokens, or SSH key material.".to_string(),
+        );
     }
 
     if notes.is_empty() {
@@ -113,13 +135,32 @@ fn classify_command_safety(command: &str) -> CommandSafety {
     }
 
     CommandSafety {
-        extra_confirmation_required: notes.iter().any(|note| !note.starts_with("Read-only")),
+        extra_confirmation_required,
         notes,
     }
 }
 
 fn contains_any(value: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| value.contains(needle))
+}
+
+fn mentions_sensitive_material(value: &str) -> bool {
+    contains_any(
+        &value.to_ascii_lowercase(),
+        &[
+            "password",
+            "passwd",
+            "secret",
+            "token",
+            "api_key",
+            "apikey",
+            "authorization:",
+            "bearer ",
+            "id_rsa",
+            "id_ed25519",
+            "-----begin",
+        ],
+    )
 }
 
 fn trim_required(label: &str, value: String) -> Result<String, String> {
@@ -142,6 +183,7 @@ mod tests {
             command: "   ".to_string(),
             reason: "Inspects recent errors.".to_string(),
             context_label: "Local - Terminal".to_string(),
+            selected_output: None,
         })
         .expect_err("empty command is rejected");
 
@@ -155,6 +197,7 @@ mod tests {
             command: "Get-PSDrive -PSProvider FileSystem".to_string(),
             reason: "Reads local filesystem capacity.".to_string(),
             context_label: "PowerShell - Terminal".to_string(),
+            selected_output: None,
         })
         .expect("proposal is planned");
 
@@ -170,6 +213,7 @@ mod tests {
             command: "rm -rf ./target".to_string(),
             reason: "Deletes build output.".to_string(),
             context_label: "Workspace - Terminal".to_string(),
+            selected_output: None,
         })
         .expect("proposal is planned");
 
@@ -185,6 +229,7 @@ mod tests {
             command: "ls -la ~/.ssh/id_ed25519".to_string(),
             reason: "Reads SSH key metadata.".to_string(),
             context_label: "Bastion - Terminal".to_string(),
+            selected_output: None,
         })
         .expect("proposal is planned");
 
@@ -193,5 +238,41 @@ mod tests {
             .safety_notes
             .iter()
             .any(|note| note.contains("credentials")));
+    }
+
+    #[test]
+    fn selected_output_is_not_extra_confirmation_unless_sensitive() {
+        let plan = plan_command_proposal(CommandProposalRequest {
+            prompt: "Explain this output".to_string(),
+            command: "Get-Content .\\service.log -Tail 50".to_string(),
+            reason: "Reads a small log tail.".to_string(),
+            context_label: "PowerShell - Terminal".to_string(),
+            selected_output: Some("INFO service healthy".to_string()),
+        })
+        .expect("proposal is planned");
+
+        assert!(!plan.extra_confirmation_required);
+        assert!(plan
+            .safety_notes
+            .iter()
+            .any(|note| note.contains("Selected terminal output")));
+    }
+
+    #[test]
+    fn sensitive_selected_output_requires_extra_confirmation() {
+        let plan = plan_command_proposal(CommandProposalRequest {
+            prompt: "Explain this output".to_string(),
+            command: "Get-Content .\\service.log -Tail 50".to_string(),
+            reason: "Reads a small log tail.".to_string(),
+            context_label: "PowerShell - Terminal".to_string(),
+            selected_output: Some("Authorization: Bearer abc123".to_string()),
+        })
+        .expect("proposal is planned");
+
+        assert!(plan.extra_confirmation_required);
+        assert!(plan
+            .safety_notes
+            .iter()
+            .any(|note| note.contains("Selected output may contain credentials")));
     }
 }

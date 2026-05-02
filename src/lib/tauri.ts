@@ -225,6 +225,7 @@ type CommandMap = {
         command: string;
         reason: string;
         contextLabel: string;
+        selectedOutput?: string;
       };
     };
     result: CommandProposalPlan;

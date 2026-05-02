@@ -105,6 +105,7 @@ export const defaultAiProviderSettings: AiProviderSettings = {
   enabled: false,
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-5-mini",
+  cliExecutionPolicy: "suggestOnly",
   claudeCliPath: "",
   codexCliPath: "",
 };

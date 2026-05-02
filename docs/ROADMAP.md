@@ -8,7 +8,7 @@ Milestone B has started with the accepted Rust SSH direction, durable SSH `proxy
 
 Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP Connection credentials, OS-keychain passwords, and app-local SSH known-host verification for non-`ProxyJump` Connections. SFTP tabs now open a backend session, list the remote home directory, close the session with the tab view, present a real dual-pane local/remote file manager with refresh, parent navigation, and folder opening on both sides, support upload/download of selected files or folders with configurable overwrite behavior, provide remote create folder, rename, and delete actions, include a visible transfer queue with byte progress and cancellation for queued or active transfers, and can open an SSH terminal at the current remote directory.
 
-Milestone D has started with a right-side AI assistant panel that scopes requests to the active workspace Tab, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, and runs command-planning safety classification before a proposal is staged.
+Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged.
 
 ## Milestone 0: Project Foundation
 
@@ -66,10 +66,10 @@ Milestone D has started with a right-side AI assistant panel that scopes request
 - [x] Add model selector.
 - [x] Add command proposal flow.
 - [x] Add explicit approval before execution.
-- Capture selected command output back into AI context.
+- [x] Capture selected command output back into AI context.
 - [x] Add Claude Code CLI path configuration.
 - [x] Add Codex CLI path configuration.
-- Constrain CLI integrations to suggest-only/ask-before-execute where possible.
+- [x] Constrain CLI integrations to suggest-only/ask-before-execute where possible.
 - [x] Add command planning safety tests.
 
 ## Milestone E: Performance and Terminal Quality

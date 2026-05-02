@@ -78,6 +78,7 @@ type ConnectionDialogRequest = CreateConnectionRequest & {
 };
 
 const AI_PROVIDER_SECRET_OWNER_ID = "openai-compatible-provider";
+const ASSISTANT_CONTEXT_MAX_CHARS = 4000;
 
 type TransferRecord = {
   id: string;
@@ -100,6 +101,7 @@ type AssistantDraft = {
   command: string;
   reason: string;
   contextLabel: string;
+  selectedOutput?: string;
   extraConfirmationRequired: boolean;
   safetyNotes: string[];
   status: "pending" | "approved" | "rejected";
@@ -1250,7 +1252,11 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
   const terminalElementRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const startedRef = useRef(false);
+  const [selectedTerminalText, setSelectedTerminalText] = useState("");
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
+  const setAssistantContextSnippet = useWorkspaceStore(
+    (state) => state.setAssistantContextSnippet,
+  );
   const markConnectionSessionStarted = useWorkspaceStore(
     (state) => state.markConnectionSessionStarted,
   );
@@ -1318,12 +1324,9 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
       });
     });
     const selectionDisposable = terminal.onSelectionChange(() => {
-      if (!terminalSettings.copyOnSelect) {
-        return;
-      }
-
       const selection = terminal.getSelection();
-      if (selection) {
+      setSelectedTerminalText(selection);
+      if (selection && terminalSettings.copyOnSelect) {
         void navigator.clipboard?.writeText(selection);
       }
     });
@@ -1409,6 +1412,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
         markConnectionSessionEnded(connection.id);
       }
       sessionIdRef.current = null;
+      setSelectedTerminalText("");
       terminal.dispose();
     };
   }, [
@@ -1418,6 +1422,29 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     terminalSettings,
   ]);
 
+  function handleCopyTerminalSelection() {
+    if (selectedTerminalText) {
+      void navigator.clipboard?.writeText(selectedTerminalText);
+    }
+  }
+
+  function handleSendSelectionToAssistant() {
+    const text = normalizeAssistantContextText(selectedTerminalText);
+    if (!text) {
+      return;
+    }
+
+    const sourceLabel = pane.connection
+      ? `${pane.connection.name} terminal selection`
+      : `${pane.title} terminal selection`;
+    setAssistantContextSnippet({
+      id: `terminal-selection-${Date.now()}`,
+      sourceLabel,
+      text,
+      capturedAt: new Date().toISOString(),
+    });
+  }
+
   return (
     <article className="terminal-pane">
       <header>
@@ -1425,7 +1452,29 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
           <Circle size={9} fill="currentColor" />
           {pane.title}
         </span>
-        <small>{pane.cwd}</small>
+        <div className="terminal-pane-actions">
+          <small>{pane.cwd}</small>
+          <button
+            className="terminal-pane-action"
+            aria-label="Copy terminal selection"
+            disabled={!selectedTerminalText}
+            onClick={handleCopyTerminalSelection}
+            title="Copy terminal selection"
+            type="button"
+          >
+            <Copy size={13} />
+          </button>
+          <button
+            className="terminal-pane-action"
+            aria-label="Send selection to command assist"
+            disabled={!selectedTerminalText}
+            onClick={handleSendSelectionToAssistant}
+            title="Send selection to command assist"
+            type="button"
+          >
+            <Bot size={13} />
+          </button>
+        </div>
       </header>
       {pane.connection ? (
         <div className="xterm-host" ref={terminalElementRef} />
@@ -1440,6 +1489,15 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
 
 function isMultilinePaste(data: string) {
   return data.split(/\r\n|\r|\n/).filter((line) => line.length > 0).length > 1;
+}
+
+function normalizeAssistantContextText(text: string) {
+  const normalized = text.trim();
+  if (normalized.length <= ASSISTANT_CONTEXT_MAX_CHARS) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, ASSISTANT_CONTEXT_MAX_CHARS)}\n[Selection truncated before adding to command assist context.]`;
 }
 
 function usesNativeSshHostKeyVerification(connection: Connection) {
@@ -2325,6 +2383,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
       enabled: form.get("aiProviderEnabled") === "on",
       baseUrl: String(form.get("aiProviderBaseUrl") ?? "").trim(),
       model: String(form.get("aiProviderModel") ?? "").trim(),
+      cliExecutionPolicy: "suggestOnly",
       claudeCliPath: String(form.get("claudeCliPath") ?? "").trim() || undefined,
       codexCliPath: String(form.get("codexCliPath") ?? "").trim() || undefined,
     };
@@ -2583,6 +2642,17 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
               />
             </label>
           </div>
+          <label>
+            <span>CLI adapter policy</span>
+            <input
+              name="cliExecutionPolicy"
+              readOnly
+              value="Suggest-only"
+            />
+            <small className="field-hint">
+              CLI adapters may draft commands, but AdminDeck still requires approval before use.
+            </small>
+          </label>
           <div className="settings-toggles compact">
             <label>
               <input
@@ -2615,6 +2685,10 @@ function AssistantPanel() {
   const activeTab = useWorkspaceStore((state) =>
     state.tabs.find((tab) => tab.id === state.activeTabId),
   );
+  const assistantContextSnippet = useWorkspaceStore((state) => state.assistantContextSnippet);
+  const clearAssistantContextSnippet = useWorkspaceStore(
+    (state) => state.clearAssistantContextSnippet,
+  );
   const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const [selectedSuggestion, setSelectedSuggestion] = useState(aiSuggestions[0].id);
@@ -2646,6 +2720,7 @@ function AssistantPanel() {
       command: suggestion.command,
       reason: suggestion.reason,
       contextLabel,
+      selectedOutput: assistantContextSnippet?.text,
     };
 
     try {
@@ -2661,6 +2736,7 @@ function AssistantPanel() {
         command: plan.command,
         reason: plan.reason,
         contextLabel: plan.contextLabel,
+        selectedOutput: assistantContextSnippet?.text,
         extraConfirmationRequired: plan.extraConfirmationRequired,
         safetyNotes: plan.safetyNotes,
         status: "pending",
@@ -2693,6 +2769,26 @@ function AssistantPanel() {
           <small>{connectionLabel}</small>
         </span>
       </div>
+
+      {assistantContextSnippet ? (
+        <section className="assistant-selection-context">
+          <header>
+            <span>{assistantContextSnippet.sourceLabel}</span>
+            <button
+              className="row-action"
+              aria-label="Clear selected output context"
+              onClick={clearAssistantContextSnippet}
+              title="Clear selected output context"
+              type="button"
+            >
+              <X size={13} />
+            </button>
+          </header>
+          <pre>
+            <code>{assistantContextSnippet.text}</code>
+          </pre>
+        </section>
+      ) : null}
 
       <label className="assistant-composer">
         <span>Request</span>
@@ -2740,6 +2836,14 @@ function AssistantPanel() {
             </pre>
             <strong className="risk-label">{draft.risk}</strong>
             <p>{draft.reason}</p>
+            {draft.selectedOutput ? (
+              <details className="proposal-context-details">
+                <summary>Selected output context</summary>
+                <pre>
+                  <code>{draft.selectedOutput}</code>
+                </pre>
+              </details>
+            ) : null}
             <ul className="safety-notes">
               {draft.safetyNotes.map((note) => (
                 <li key={note}>{note}</li>
@@ -2821,7 +2925,7 @@ function formatProviderHost(baseUrl: string) {
 
 function formatCliIntegrationStatus(settings: AiProviderSettings) {
   const configuredCount = [settings.claudeCliPath, settings.codexCliPath].filter(Boolean).length;
-  return configuredCount > 0 ? `${configuredCount} configured` : "Not configured";
+  return configuredCount > 0 ? `${configuredCount} suggest-only` : "Not configured";
 }
 
 function planCommandProposalLocally(request: {
@@ -2829,6 +2933,7 @@ function planCommandProposalLocally(request: {
   command: string;
   reason: string;
   contextLabel: string;
+  selectedOutput?: string;
 }): CommandProposalPlan {
   const command = request.command.trim();
   if (!command) {
@@ -2859,6 +2964,9 @@ function planCommandProposalLocally(request: {
     approvalRequired: true,
     extraConfirmationRequired,
     safetyNotes: [
+      ...(request.selectedOutput?.trim()
+        ? ["Selected terminal output is included in the assistant context for this proposal."]
+        : []),
       extraConfirmationRequired
         ? "May change system state or touch sensitive material."
         : "Read-only or low-impact intent was detected, but approval is still required.",

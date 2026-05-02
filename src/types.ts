@@ -104,6 +104,7 @@ export interface AiProviderSettings {
   enabled: boolean;
   baseUrl: string;
   model: string;
+  cliExecutionPolicy: "suggestOnly";
   claudeCliPath?: string;
   codexCliPath?: string;
 }
@@ -151,4 +152,11 @@ export interface StoreSecretRequest extends SecretReferenceRequest {
 
 export interface SecretPresence {
   exists: boolean;
+}
+
+export interface AssistantContextSnippet {
+  id: string;
+  sourceLabel: string;
+  text: string;
+  capturedAt: string;
 }

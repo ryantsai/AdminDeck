@@ -83,6 +83,8 @@ pub struct AiProviderSettings {
     base_url: String,
     #[serde(default = "default_ai_model")]
     model: String,
+    #[serde(default = "default_ai_cli_execution_policy")]
+    cli_execution_policy: String,
     #[serde(default)]
     claude_cli_path: Option<String>,
     #[serde(default)]
@@ -1270,6 +1272,7 @@ fn default_ai_provider_settings() -> AiProviderSettings {
         enabled: false,
         base_url: "https://api.openai.com/v1".to_string(),
         model: default_ai_model(),
+        cli_execution_policy: default_ai_cli_execution_policy(),
         claude_cli_path: None,
         codex_cli_path: None,
     }
@@ -1277,6 +1280,10 @@ fn default_ai_provider_settings() -> AiProviderSettings {
 
 fn default_ai_model() -> String {
     "gpt-5-mini".to_string()
+}
+
+fn default_ai_cli_execution_policy() -> String {
+    "suggestOnly".to_string()
 }
 
 fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<TerminalSettings, String> {
@@ -1330,6 +1337,15 @@ fn validate_ai_provider_settings(
     settings.base_url = required_field("OpenAI-compatible endpoint", settings.base_url)?;
     settings.base_url = settings.base_url.trim_end_matches('/').to_string();
     settings.model = required_field("AI model", settings.model)?;
+    settings.cli_execution_policy = match settings.cli_execution_policy.trim() {
+        "" | "suggestOnly" | "suggest-only" | "suggest_only" => "suggestOnly".to_string(),
+        _ => {
+            return Err(
+                "CLI adapter policy must remain suggest-only for approval-based execution"
+                    .to_string(),
+            )
+        }
+    };
     settings.claude_cli_path = trim_optional(settings.claude_cli_path);
     settings.codex_cli_path = trim_optional(settings.codex_cli_path);
 
@@ -1806,12 +1822,14 @@ mod tests {
         assert!(!defaults.enabled);
         assert_eq!(defaults.base_url, "https://api.openai.com/v1");
         assert_eq!(defaults.model, "gpt-5-mini");
+        assert_eq!(defaults.cli_execution_policy, "suggestOnly");
 
         let updated = storage
             .update_ai_provider_settings(AiProviderSettings {
                 enabled: true,
                 base_url: "  https://llm-gateway.internal/v1/  ".to_string(),
                 model: " gpt-5 ".to_string(),
+                cli_execution_policy: "suggest-only".to_string(),
                 claude_cli_path: Some("  C:\\Tools\\claude.exe  ".to_string()),
                 codex_cli_path: Some("  codex  ".to_string()),
             })
@@ -1820,6 +1838,7 @@ mod tests {
         assert!(updated.enabled);
         assert_eq!(updated.base_url, "https://llm-gateway.internal/v1");
         assert_eq!(updated.model, "gpt-5");
+        assert_eq!(updated.cli_execution_policy, "suggestOnly");
         assert_eq!(
             updated.claude_cli_path.as_deref(),
             Some("C:\\Tools\\claude.exe")
@@ -1842,6 +1861,7 @@ mod tests {
                 enabled: true,
                 base_url: "api.openai.com/v1".to_string(),
                 model: "gpt-5-mini".to_string(),
+                cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
             })
@@ -1863,12 +1883,34 @@ mod tests {
                 enabled: true,
                 base_url: "https://api.openai.com/v1".to_string(),
                 model: "   ".to_string(),
+                cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
             })
             .expect_err("blank model is rejected");
 
         assert_eq!(error, "AI model is required");
+    }
+
+    #[test]
+    fn ai_provider_settings_keep_cli_policy_suggest_only() {
+        let storage = Storage::open(temp_db_path("ai-provider-cli-policy")).expect("storage opens");
+
+        let error = storage
+            .update_ai_provider_settings(AiProviderSettings {
+                enabled: true,
+                base_url: "https://api.openai.com/v1".to_string(),
+                model: "gpt-5-mini".to_string(),
+                cli_execution_policy: "executeAutomatically".to_string(),
+                claude_cli_path: Some("claude".to_string()),
+                codex_cli_path: Some("codex".to_string()),
+            })
+            .expect_err("auto-execution policy is rejected");
+
+        assert_eq!(
+            error,
+            "CLI adapter policy must remain suggest-only for approval-based execution"
+        );
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

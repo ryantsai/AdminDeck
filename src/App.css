@@ -613,8 +613,42 @@ kbd + kbd {
   font-size: 11px;
 }
 
+.terminal-pane-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.terminal-pane-actions small {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-pane-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #95a7bb;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.terminal-pane-action:disabled {
+  color: #536174;
+  cursor: default;
+  opacity: 0.55;
+}
+
 .terminal-pane pre,
-.approval-card pre {
+.approval-card pre,
+.assistant-selection-context pre,
+.proposal-context-details pre {
   margin: 0;
   overflow: auto;
   font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
@@ -830,6 +864,25 @@ progress {
   line-height: 1.45;
 }
 
+.assistant-selection-context {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.assistant-selection-context header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .assistant-context span,
 .assistant-composer {
   display: grid;
@@ -929,9 +982,30 @@ progress {
   border-radius: 6px;
 }
 
+.assistant-selection-context pre,
+.proposal-context-details pre {
+  max-height: 126px;
+  padding: 9px;
+  color: #dce7f5;
+  background: var(--terminal);
+  border-radius: 6px;
+}
+
 .approval-card p {
   margin: 0;
   line-height: 1.45;
+}
+
+.proposal-context-details {
+  display: grid;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.proposal-context-details summary {
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .risk-label {
