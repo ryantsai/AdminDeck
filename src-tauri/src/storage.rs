@@ -2,7 +2,7 @@ use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
-const MIGRATION_001: &str = r#"
+const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS connections (
     port INTEGER,
     key_path TEXT,
     proxy_jump TEXT,
-    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'sftp')),
+    auth_method TEXT NOT NULL DEFAULT 'keyFile',
+    local_shell TEXT,
+    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
 );
@@ -210,8 +212,7 @@ impl Storage {
             db_path,
             connection: Mutex::new(connection),
         };
-        storage.migrate()?;
-        storage.seed_starter_connections()?;
+        storage.initialize_schema()?;
         Ok(storage)
     }
 
@@ -381,81 +382,10 @@ impl Storage {
         Ok(settings)
     }
 
-    fn migrate(&self) -> Result<(), String> {
+    fn initialize_schema(&self) -> Result<(), String> {
         let connection = self.lock()?;
         connection
-            .execute_batch(MIGRATION_001)
-            .map_err(to_storage_error)?;
-        add_optional_column(
-            &connection,
-            "ALTER TABLE connections ADD COLUMN port INTEGER",
-        )?;
-        add_optional_column(
-            &connection,
-            "ALTER TABLE connections ADD COLUMN key_path TEXT",
-        )?;
-        add_optional_column(
-            &connection,
-            "ALTER TABLE connections ADD COLUMN proxy_jump TEXT",
-        )?;
-        add_optional_column(
-            &connection,
-            "ALTER TABLE connections ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'keyFile'",
-        )?;
-        add_optional_column(
-            &connection,
-            "ALTER TABLE connections ADD COLUMN local_shell TEXT",
-        )?;
-        add_optional_column(
-            &connection,
-            "ALTER TABLE connection_folders ADD COLUMN parent_folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE",
-        )?;
-        connection
-            .execute_batch(
-                "CREATE INDEX IF NOT EXISTS idx_connection_folders_parent_sort
-                    ON connection_folders(parent_folder_id, sort_order);",
-            )
-            .map_err(to_storage_error)?;
-        ensure_connections_allow_root_folder(&connection)?;
-        connection
-            .execute(
-                "UPDATE connections
-                 SET folder_id = NULL
-                 WHERE connection_type = 'local'
-                   AND folder_id = 'local'",
-                [],
-            )
-            .map_err(to_storage_error)?;
-        connection
-            .execute(
-                "DELETE FROM connection_folders
-                 WHERE id = 'local'
-                   AND NOT EXISTS (
-                       SELECT 1 FROM connections WHERE folder_id = 'local'
-                   )
-                   AND NOT EXISTS (
-                       SELECT 1 FROM connection_folders WHERE parent_folder_id = 'local'
-                   )",
-                [],
-            )
-            .map_err(to_storage_error)?;
-        connection
-            .execute(
-                "UPDATE connections
-                 SET connection_type = 'ssh'
-                 WHERE connection_type = 'sftp'",
-                [],
-            )
-            .map_err(to_storage_error)?;
-        connection
-            .execute(
-                "UPDATE connections
-                 SET auth_method = 'agent'
-                 WHERE connection_type = 'ssh'
-                   AND auth_method = 'keyFile'
-                   AND (key_path IS NULL OR TRIM(key_path) = '')",
-                [],
-            )
+            .execute_batch(CURRENT_SCHEMA)
             .map_err(to_storage_error)?;
         Ok(())
     }
@@ -836,91 +766,6 @@ impl Storage {
         self.list_connection_tree()
     }
 
-    fn seed_starter_connections(&self) -> Result<(), String> {
-        let mut connection = self.lock()?;
-        let existing_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM connection_folders", [], |row| {
-                row.get(0)
-            })
-            .map_err(to_storage_error)?;
-
-        if existing_count > 0 {
-            return Ok(());
-        }
-
-        let transaction = connection.transaction().map_err(to_storage_error)?;
-
-        seed_folder(&transaction, "production", "Production", None, 0)?;
-        seed_folder(&transaction, "staging", "Staging", None, 1)?;
-
-        seed_connection(
-            &transaction,
-            NewConnection {
-                id: "local-pwsh",
-                folder_id: None,
-                name: "PowerShell",
-                host: "localhost",
-                username: "ryan",
-                local_shell: Some("powershell.exe"),
-                connection_type: "local",
-                auth_method: "keyFile",
-                status: "idle",
-                sort_order: 0,
-                tags: &[],
-            },
-        )?;
-        seed_connection(
-            &transaction,
-            NewConnection {
-                id: "local-wsl",
-                folder_id: None,
-                name: "WSL",
-                host: "localhost",
-                username: "ryan",
-                local_shell: Some("wsl.exe"),
-                connection_type: "local",
-                auth_method: "keyFile",
-                status: "idle",
-                sort_order: 1,
-                tags: &[],
-            },
-        )?;
-        seed_connection(
-            &transaction,
-            NewConnection {
-                id: "bastion-east",
-                folder_id: Some("production"),
-                name: "Bastion East",
-                host: "bastion-east.internal",
-                username: "admin",
-                local_shell: None,
-                connection_type: "ssh",
-                auth_method: "agent",
-                status: "idle",
-                sort_order: 0,
-                tags: &[],
-            },
-        )?;
-        seed_connection(
-            &transaction,
-            NewConnection {
-                id: "api-stage",
-                folder_id: Some("staging"),
-                name: "API Stage",
-                host: "api-stage.internal",
-                username: "ops",
-                local_shell: None,
-                connection_type: "ssh",
-                auth_method: "agent",
-                status: "idle",
-                sort_order: 0,
-                tags: &[],
-            },
-        )?;
-
-        transaction.commit().map_err(to_storage_error)
-    }
-
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, SqliteConnection>, String> {
         self.connection
             .lock()
@@ -1265,7 +1110,7 @@ fn list_tags(connection: &SqliteConnection, connection_id: &str) -> Result<Vec<S
         .map_err(to_storage_error)
 }
 
-fn seed_folder(
+fn insert_folder(
     connection: &SqliteConnection,
     id: &str,
     name: &str,
@@ -1281,156 +1126,8 @@ fn seed_folder(
         .map_err(to_storage_error)
 }
 
-struct NewConnection<'a> {
-    id: &'a str,
-    folder_id: Option<&'a str>,
-    name: &'a str,
-    host: &'a str,
-    username: &'a str,
-    local_shell: Option<&'a str>,
-    connection_type: &'a str,
-    auth_method: &'a str,
-    status: &'a str,
-    sort_order: i64,
-    tags: &'a [&'a str],
-}
-
-fn seed_connection(
-    connection: &SqliteConnection,
-    new_connection: NewConnection<'_>,
-) -> Result<(), String> {
-    connection
-        .execute(
-            "INSERT INTO connections (
-                id, folder_id, name, host, username, auth_method, local_shell, connection_type, status, sort_order
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-            params![
-                new_connection.id,
-                new_connection.folder_id,
-                new_connection.name,
-                new_connection.host,
-                new_connection.username,
-                new_connection.auth_method,
-                new_connection.local_shell,
-                new_connection.connection_type,
-                new_connection.status,
-                new_connection.sort_order
-            ],
-        )
-        .map_err(to_storage_error)?;
-
-    for (index, tag) in new_connection.tags.iter().enumerate() {
-        connection
-            .execute(
-                "INSERT INTO connection_tags (connection_id, tag, sort_order)
-                 VALUES (?1, ?2, ?3)",
-                params![new_connection.id, tag, index as i64],
-            )
-            .map_err(to_storage_error)?;
-    }
-
-    Ok(())
-}
-
 fn to_storage_error(error: rusqlite::Error) -> String {
     format!("SQLite storage error: {error}")
-}
-
-fn add_optional_column(connection: &SqliteConnection, sql: &str) -> Result<(), String> {
-    match connection.execute(sql, []) {
-        Ok(_) => Ok(()),
-        Err(rusqlite::Error::SqliteFailure(_, Some(message)))
-            if message.contains("duplicate column name") =>
-        {
-            Ok(())
-        }
-        Err(error) => Err(to_storage_error(error)),
-    }
-}
-
-fn ensure_connections_allow_root_folder(connection: &SqliteConnection) -> Result<(), String> {
-    let mut statement = connection
-        .prepare("PRAGMA table_info(connections)")
-        .map_err(to_storage_error)?;
-    let columns = statement
-        .query_map([], |row| {
-            Ok((row.get::<_, String>(1)?, row.get::<_, i64>(3)?))
-        })
-        .map_err(to_storage_error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(to_storage_error)?;
-
-    let folder_id_is_not_null = columns
-        .iter()
-        .any(|(name, not_null)| name == "folder_id" && *not_null == 1);
-    if !folder_id_is_not_null {
-        return Ok(());
-    }
-
-    connection
-        .execute_batch(
-            r#"
-            PRAGMA foreign_keys = OFF;
-
-            CREATE TABLE connections_new (
-                id TEXT PRIMARY KEY,
-                folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                host TEXT NOT NULL,
-                username TEXT NOT NULL,
-                port INTEGER,
-                key_path TEXT,
-                proxy_jump TEXT,
-                auth_method TEXT NOT NULL DEFAULT 'keyFile',
-                local_shell TEXT,
-                connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'sftp')),
-                status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
-                sort_order INTEGER NOT NULL
-            );
-
-            INSERT INTO connections_new (
-                id, folder_id, name, host, username, port, key_path, proxy_jump,
-                auth_method, local_shell, connection_type, status, sort_order
-            )
-            SELECT
-                id, folder_id, name, host, username, port, key_path, proxy_jump,
-                auth_method, local_shell, connection_type, status, sort_order
-            FROM connections;
-
-            CREATE TABLE connection_tags_new (
-                connection_id TEXT NOT NULL,
-                tag TEXT NOT NULL,
-                sort_order INTEGER NOT NULL,
-                PRIMARY KEY (connection_id, tag)
-            );
-
-            INSERT INTO connection_tags_new (connection_id, tag, sort_order)
-            SELECT connection_id, tag, sort_order FROM connection_tags;
-
-            DROP TABLE connection_tags;
-            DROP TABLE connections;
-            ALTER TABLE connections_new RENAME TO connections;
-
-            CREATE TABLE connection_tags (
-                connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
-                tag TEXT NOT NULL,
-                sort_order INTEGER NOT NULL,
-                PRIMARY KEY (connection_id, tag)
-            );
-
-            INSERT INTO connection_tags (connection_id, tag, sort_order)
-            SELECT connection_id, tag, sort_order FROM connection_tags_new;
-            DROP TABLE connection_tags_new;
-
-            CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
-                ON connections(folder_id, sort_order);
-            CREATE INDEX IF NOT EXISTS idx_connection_tags_connection_sort
-                ON connection_tags(connection_id, sort_order);
-
-            PRAGMA foreign_keys = ON;
-            "#,
-        )
-        .map_err(to_storage_error)
 }
 
 fn ensure_folder_exists(
@@ -1451,7 +1148,7 @@ fn ensure_folder_exists(
     }
 
     let next_sort_order = next_folder_sort_order(connection, None)?;
-    seed_folder(connection, id, fallback_name, None, next_sort_order)
+    insert_folder(connection, id, fallback_name, None, next_sort_order)
 }
 
 fn normalize_connection_type(value: &str) -> Result<String, String> {
@@ -1759,28 +1456,59 @@ mod tests {
         )
     }
 
+    fn create_test_ssh_connection(
+        storage: &Storage,
+        name: &str,
+        host: &str,
+        folder_id: Option<String>,
+    ) -> SavedConnection {
+        storage
+            .create_connection(CreateConnectionRequest {
+                name: name.to_string(),
+                host: host.to_string(),
+                user: "admin".to_string(),
+                connection_type: "ssh".to_string(),
+                folder_id,
+                port: None,
+                key_path: None,
+                proxy_jump: None,
+                auth_method: Some("agent".to_string()),
+                local_shell: None,
+            })
+            .expect("SSH connection is created")
+    }
+
+    fn create_test_local_connection(storage: &Storage, name: &str, shell: &str) -> SavedConnection {
+        storage
+            .create_connection(CreateConnectionRequest {
+                name: name.to_string(),
+                host: "localhost".to_string(),
+                user: "local".to_string(),
+                connection_type: "local".to_string(),
+                folder_id: None,
+                port: None,
+                key_path: None,
+                proxy_jump: None,
+                auth_method: Some("keyFile".to_string()),
+                local_shell: Some(shell.to_string()),
+            })
+            .expect("local connection is created")
+    }
+
     #[test]
-    fn migrations_seed_the_starter_connection_tree() {
-        let storage = Storage::open(temp_db_path("seed")).expect("storage opens");
+    fn schema_initializes_an_empty_connection_tree() {
+        let storage = Storage::open(temp_db_path("empty")).expect("storage opens");
 
         let tree = storage
             .list_connection_tree()
             .expect("connection tree loads");
 
-        assert_eq!(tree.connections.len(), 2);
-        assert_eq!(tree.folders.len(), 2);
-        assert_eq!(tree.folders[0].id, "production");
-        assert_eq!(tree.connections[0].name, "PowerShell");
-        assert_eq!(
-            tree.connections[0].local_shell.as_deref(),
-            Some("powershell.exe")
-        );
-        assert_eq!(tree.folders[0].connections[0].tags, Vec::<String>::new());
-        assert!(all_connections(&tree).all(|connection| connection.status == "idle"));
+        assert!(tree.connections.is_empty());
+        assert!(tree.folders.is_empty());
     }
 
     #[test]
-    fn migrations_do_not_duplicate_seed_data() {
+    fn schema_initialization_is_idempotent_without_initial_data() {
         let db_path = temp_db_path("idempotent");
         let storage = Storage::open(db_path.clone()).expect("first open succeeds");
         drop(storage);
@@ -1791,7 +1519,8 @@ mod tests {
             .expect("connection tree loads");
         let connection_count = all_connections(&tree).count();
 
-        assert_eq!(connection_count, 4);
+        assert_eq!(connection_count, 0);
+        assert!(tree.folders.is_empty());
     }
 
     #[test]
@@ -1833,21 +1562,33 @@ mod tests {
     #[test]
     fn rename_connection_updates_durable_connection_name() {
         let storage = Storage::open(temp_db_path("rename")).expect("storage opens");
+        let staging = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Staging".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("staging folder is created");
+        let connection = create_test_ssh_connection(
+            &storage,
+            "API Stage",
+            "api-stage.internal",
+            Some(staging.id.clone()),
+        );
 
         let renamed = storage
             .rename_connection(RenameConnectionRequest {
-                id: "api-stage".to_string(),
+                id: connection.id.clone(),
                 name: "API Stage Blue".to_string(),
             })
             .expect("connection is renamed");
 
-        assert_eq!(renamed.id, "api-stage");
+        assert_eq!(renamed.id, connection.id);
         assert_eq!(renamed.name, "API Stage Blue");
 
         let tree = storage
             .list_connection_tree()
             .expect("connection tree loads");
-        let staging = find_folder(&tree.folders, "staging").expect("staging folder exists");
+        let staging = find_folder(&tree.folders, &staging.id).expect("staging folder exists");
 
         assert_eq!(staging.connections[0].name, "API Stage Blue");
     }
@@ -1855,16 +1596,28 @@ mod tests {
     #[test]
     fn delete_connection_removes_connection_and_tags() {
         let storage = Storage::open(temp_db_path("delete")).expect("storage opens");
+        let production = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Production".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("production folder is created");
+        let connection = create_test_ssh_connection(
+            &storage,
+            "Bastion East",
+            "bastion-east.internal",
+            Some(production.id.clone()),
+        );
 
         storage
-            .delete_connection("bastion-east".to_string())
+            .delete_connection(connection.id)
             .expect("connection is deleted");
 
         let tree = storage
             .list_connection_tree()
             .expect("connection tree loads");
         let production =
-            find_folder(&tree.folders, "production").expect("production folder exists");
+            find_folder(&tree.folders, &production.id).expect("production folder exists");
 
         assert!(production.connections.is_empty());
     }
@@ -1872,15 +1625,27 @@ mod tests {
     #[test]
     fn duplicate_connection_copies_non_secret_connection_data() {
         let storage = Storage::open(temp_db_path("duplicate")).expect("storage opens");
+        let production = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Production".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("production folder is created");
+        let connection = create_test_ssh_connection(
+            &storage,
+            "Bastion East",
+            "bastion-east.internal",
+            Some(production.id.clone()),
+        );
 
         let duplicated = storage
             .duplicate_connection(DuplicateConnectionRequest {
-                id: "bastion-east".to_string(),
+                id: connection.id.clone(),
                 name: Some("Bastion East Copy".to_string()),
             })
             .expect("connection is duplicated");
 
-        assert_ne!(duplicated.id, "bastion-east");
+        assert_ne!(duplicated.id, connection.id);
         assert_eq!(duplicated.name, "Bastion East Copy");
         assert_eq!(duplicated.host, "bastion-east.internal");
         assert_eq!(duplicated.user, "admin");
@@ -1891,7 +1656,7 @@ mod tests {
             .list_connection_tree()
             .expect("connection tree loads");
         let production =
-            find_folder(&tree.folders, "production").expect("production folder exists");
+            find_folder(&tree.folders, &production.id).expect("production folder exists");
 
         assert_eq!(production.connections.len(), 2);
         assert_eq!(production.connections[1].id, duplicated.id);
@@ -1991,42 +1756,78 @@ mod tests {
     #[test]
     fn move_connection_folder_updates_durable_root_folder_order() {
         let storage = Storage::open(temp_db_path("folder-move")).expect("storage opens");
+        let production = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Production".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("production folder is created");
+        let staging = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Staging".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("staging folder is created");
 
         let tree = storage
             .move_connection_folder(MoveConnectionFolderRequest {
-                id: "staging".to_string(),
+                id: staging.id.clone(),
                 parent_folder_id: None,
                 target_index: 0,
             })
             .expect("folder is moved");
 
-        assert_eq!(tree.folders[0].id, "staging");
-        assert_eq!(tree.folders[1].id, "production");
+        assert_eq!(tree.folders[0].id, staging.id);
+        assert_eq!(tree.folders[1].id, production.id);
 
         let reloaded = storage
             .list_connection_tree()
             .expect("connection tree reloads");
-        assert_eq!(reloaded.folders[0].id, "staging");
+        assert_eq!(reloaded.folders[0].id, staging.id);
     }
 
     #[test]
     fn move_connection_reorders_within_target_folder() {
         let storage = Storage::open(temp_db_path("connection-move")).expect("storage opens");
+        let production = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Production".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("production folder is created");
+        let staging = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Staging".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("staging folder is created");
+        create_test_ssh_connection(
+            &storage,
+            "Bastion East",
+            "bastion-east.internal",
+            Some(production.id.clone()),
+        );
+        let api_stage = create_test_ssh_connection(
+            &storage,
+            "API Stage",
+            "api-stage.internal",
+            Some(staging.id.clone()),
+        );
 
         let tree = storage
             .move_connection(MoveConnectionRequest {
-                id: "api-stage".to_string(),
-                folder_id: Some("production".to_string()),
+                id: api_stage.id.clone(),
+                folder_id: Some(production.id.clone()),
                 target_index: 1,
             })
             .expect("connection is moved");
 
         let production =
-            find_folder(&tree.folders, "production").expect("production folder exists");
-        assert_eq!(production.connections[1].id, "api-stage");
+            find_folder(&tree.folders, &production.id).expect("production folder exists");
+        assert_eq!(production.connections[1].id, api_stage.id);
         assert_eq!(production.connections.len(), 2);
 
-        let staging = find_folder(&tree.folders, "staging").expect("staging folder exists");
+        let staging = find_folder(&tree.folders, &staging.id).expect("staging folder exists");
         assert!(staging.connections.is_empty());
     }
 
@@ -2034,17 +1835,19 @@ mod tests {
     fn move_connection_before_later_connection_in_root() {
         let storage =
             Storage::open(temp_db_path("connection-move-same-folder")).expect("storage opens");
+        let powershell = create_test_local_connection(&storage, "PowerShell", "powershell.exe");
+        let wsl = create_test_local_connection(&storage, "WSL", "wsl.exe");
 
         let tree = storage
             .move_connection(MoveConnectionRequest {
-                id: "local-wsl".to_string(),
+                id: wsl.id.clone(),
                 folder_id: None,
                 target_index: 0,
             })
             .expect("connection order is normalized");
 
-        assert_eq!(tree.connections[0].id, "local-wsl");
-        assert_eq!(tree.connections[1].id, "local-pwsh");
+        assert_eq!(tree.connections[0].id, wsl.id);
+        assert_eq!(tree.connections[1].id, powershell.id);
     }
 
     #[test]

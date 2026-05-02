@@ -1158,7 +1158,7 @@ function ConnectionDialog({
           <>
             <label>
               <span>Name</span>
-              <input name="name" placeholder="Bastion East" />
+              <input name="name" placeholder="Connection name" />
             </label>
 
             <label>
@@ -4045,7 +4045,7 @@ function AssistantPanel() {
   );
   const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
-  const [selectedSuggestion, setSelectedSuggestion] = useState(aiSuggestions[0].id);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(aiSuggestions[0]?.id ?? "");
   const [prompt, setPrompt] = useState("");
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
   const [proposalError, setProposalError] = useState("");
@@ -4068,6 +4068,11 @@ function AssistantPanel() {
   }
 
   async function handleDraftProposal() {
+    if (!suggestion) {
+      setProposalError("No command suggestion is selected.");
+      return;
+    }
+
     const normalizedPrompt = prompt.trim();
     const request = {
       prompt: normalizedPrompt || suggestion.title,
@@ -4155,7 +4160,7 @@ function AssistantPanel() {
       </label>
       <button
         className="approve-button"
-        disabled={!activeTab || planningProposal}
+        disabled={!activeTab || !suggestion || planningProposal}
         onClick={handleDraftProposal}
         type="button"
       >
