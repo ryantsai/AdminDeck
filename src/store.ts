@@ -22,6 +22,7 @@ interface WorkspaceState {
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
+  openTerminalHere: (connection: Connection, remotePath: string) => void;
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
   markConnectionSessionStarted: (connectionId: string) => void;
@@ -86,6 +87,31 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               },
             ],
           };
+
+    set((state) => ({
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
+    }));
+  },
+  openTerminalHere: (connection, remotePath) => {
+    const normalizedPath = remotePath.trim() || ".";
+    const tabId = `tab-${connection.id}-terminal-${Date.now()}`;
+    const tab: WorkspaceTab = {
+      id: tabId,
+      title: `${connection.name} terminal`,
+      subtitle: `${connection.user}@${connection.host}:${normalizedPath}`,
+      kind: "terminal",
+      panes: [
+        {
+          id: `pane-${connection.id}-terminal-${Date.now()}`,
+          title: "ssh",
+          cwd: normalizedPath,
+          buffer: "",
+          connection,
+        },
+      ],
+      connection,
+    };
 
     set((state) => ({
       tabs: [...state.tabs, tab],

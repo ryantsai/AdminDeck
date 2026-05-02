@@ -31,6 +31,7 @@ export interface StartTerminalSessionRequest {
   authMethod?: "keyFile" | "password" | "agent";
   secretOwnerId?: string;
   shell?: string;
+  initialDirectory?: string;
   cols?: number;
   rows?: number;
 }

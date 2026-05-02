@@ -49,6 +49,7 @@ pub struct NativeSshTerminalRequest {
     pub known_hosts_path: PathBuf,
     pub cols: u16,
     pub rows: u16,
+    pub initial_directory: Option<String>,
 }
 
 #[derive(Clone)]
@@ -221,6 +222,7 @@ pub fn start_native_terminal(
         known_hosts_path: request.known_hosts_path,
         cols: request.cols,
         rows: request.rows,
+        initial_directory: request.initial_directory,
     };
     let (control_tx, control_rx) = mpsc::unbounded_channel();
     let (ready_tx, ready_rx) = std_mpsc::sync_channel(1);
@@ -416,6 +418,13 @@ async fn run_native_terminal(
         .request_shell(false)
         .await
         .map_err(|error| format!("failed to start SSH shell: {error}"))?;
+    if let Some(directory) = initial_directory_for(&request) {
+        let command = format!("cd -- {}\r", shell_single_quote(&directory));
+        channel
+            .data(command.as_bytes())
+            .await
+            .map_err(|error| format!("failed to set SSH initial directory: {error}"))?;
+    }
 
     let _ = ready_tx.send(Ok(()));
 
@@ -473,6 +482,19 @@ fn emit_terminal_output(app: &AppHandle, session_id: &str, data: String) {
             data,
         },
     );
+}
+
+fn initial_directory_for(request: &NativeSshTerminalRequest) -> Option<String> {
+    request
+        .initial_directory
+        .as_deref()
+        .map(str::trim)
+        .filter(|directory| !directory.is_empty() && *directory != "~")
+        .map(str::to_string)
+}
+
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 #[derive(Debug, PartialEq, Eq)]

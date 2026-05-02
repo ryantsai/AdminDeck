@@ -1249,7 +1249,8 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
     terminal.open(element);
     fitAddon.fit();
     terminal.focus();
-    terminal.writeln(`Starting ${connection.type} session for ${connection.name}...`);
+    const terminalSessionType = connection.type === "local" ? "local" : "ssh";
+    terminal.writeln(`Starting ${terminalSessionType} session for ${connection.name}...`);
 
     if (!isTauriRuntime()) {
       terminal.writeln("Terminal sessions require the Tauri desktop runtime.");
@@ -1339,6 +1340,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
             authMethod: connection.authMethod,
             secretOwnerId: connection.id,
             shell: connection.type === "local" ? terminalSettings.defaultShell : undefined,
+            initialDirectory: connection.type === "local" ? undefined : pane.cwd.trim() || undefined,
             cols: terminal.cols,
             rows: terminal.rows,
           },
@@ -1448,6 +1450,7 @@ async function confirmTrustedSshHostKey(preview: SshHostKeyPreview) {
 
 function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
   const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
+  const openTerminalHere = useWorkspaceStore((state) => state.openTerminalHere);
   const connection = tab.connection;
   const [localPath, setLocalPath] = useState("");
   const [localFiles, setLocalFiles] = useState<FileEntry[]>([]);
@@ -1925,6 +1928,14 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
     }
   };
 
+  const handleOpenTerminalHere = () => {
+    if (!connection || !isConnected) {
+      return;
+    }
+
+    openTerminalHere(connection, remotePath);
+  };
+
   const isConnected = status === "Connected" && Boolean(sessionIdRef.current);
   const isTransferring = transfers.some((transfer) => transfer.state === "active");
   const activeTransferCount = transfers.filter((transfer) => transfer.state === "active").length;
@@ -1954,6 +1965,15 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
           >
             <Download size={15} />
             Download
+          </button>
+          <button
+            className="toolbar-button"
+            disabled={!isConnected}
+            onClick={handleOpenTerminalHere}
+            type="button"
+          >
+            <Terminal size={15} />
+            Terminal
           </button>
         </div>
       </div>

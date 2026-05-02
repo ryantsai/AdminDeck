@@ -3,6 +3,7 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    ffi::OsString,
     io::{Read, Write},
     sync::Mutex,
     thread,
@@ -42,6 +43,7 @@ pub struct StartTerminalSessionRequest {
     pub auth_method: Option<String>,
     pub secret_owner_id: Option<String>,
     pub shell: Option<String>,
+    pub initial_directory: Option<String>,
     pub cols: Option<u16>,
     pub rows: Option<u16>,
 }
@@ -107,6 +109,7 @@ impl SessionManager {
                     known_hosts_path,
                     cols: request.cols.unwrap_or(80),
                     rows: request.rows.unwrap_or(24),
+                    initial_directory: request.initial_directory.clone(),
                 },
             )?;
             self.sessions
@@ -370,7 +373,11 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
                         std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
                     }
                 });
-            Ok(CommandBuilder::new(program))
+            let mut command = CommandBuilder::new(program);
+            if let Some(directory) = initial_directory_for(request) {
+                command.cwd(OsString::from(directory));
+            }
+            Ok(command)
         }
         "ssh" => {
             let host = request.host.trim();
@@ -402,12 +409,35 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
                 user => format!("{user}@{host}"),
             };
             command.arg(target);
+            if let Some(directory) = initial_directory_for(request) {
+                command.arg(remote_shell_command_for_initial_directory(&directory));
+            }
             Ok(command)
         }
         other => Err(format!(
             "{other} sessions do not have a terminal transport yet"
         )),
     }
+}
+
+fn initial_directory_for(request: &StartTerminalSessionRequest) -> Option<String> {
+    request
+        .initial_directory
+        .as_deref()
+        .map(str::trim)
+        .filter(|directory| !directory.is_empty() && *directory != "~")
+        .map(str::to_string)
+}
+
+fn remote_shell_command_for_initial_directory(directory: &str) -> String {
+    format!(
+        "cd -- {} && exec \"${{SHELL:-sh}}\" -i",
+        shell_single_quote(directory)
+    )
+}
+
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 fn make_session_id(title: &str) -> String {
@@ -483,8 +513,21 @@ mod tests {
             auth_method: None,
             secret_owner_id: None,
             shell: None,
+            initial_directory: None,
             cols: None,
             rows: None,
         }
+    }
+
+    #[test]
+    fn remote_initial_directory_command_quotes_shell_path() {
+        assert_eq!(
+            remote_shell_command_for_initial_directory("/srv/releases"),
+            "cd -- '/srv/releases' && exec \"${SHELL:-sh}\" -i"
+        );
+        assert_eq!(
+            remote_shell_command_for_initial_directory("/srv/app's current"),
+            "cd -- '/srv/app'\\''s current' && exec \"${SHELL:-sh}\" -i"
+        );
     }
 }
