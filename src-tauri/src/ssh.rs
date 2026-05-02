@@ -506,11 +506,29 @@ async fn run_native_terminal(
         }
     }
 
-    session
-        .disconnect(Disconnect::ByApplication, "", "en")
-        .await
-        .map_err(|error| format!("failed to disconnect SSH session: {error}"))?;
+    disconnect_ssh_session(session, "").await?;
     Ok(())
+}
+
+async fn disconnect_ssh_session(
+    session: client::Handle<VerifyingClient>,
+    reason: &str,
+) -> Result<(), String> {
+    match session
+        .disconnect(Disconnect::ByApplication, reason, "en")
+        .await
+    {
+        Ok(()) => Ok(()),
+        Err(error) if is_benign_ssh_disconnect_error(&error) => Ok(()),
+        Err(error) => Err(format!("failed to disconnect SSH session: {error}")),
+    }
+}
+
+fn is_benign_ssh_disconnect_error(error: &russh::Error) -> bool {
+    matches!(
+        error,
+        russh::Error::SendError | russh::Error::HUP | russh::Error::Disconnect
+    )
 }
 
 fn emit_terminal_output(app: &AppHandle, session_id: &str, data: String) {
@@ -953,6 +971,23 @@ mod tests {
     }
 
     #[test]
+    fn disconnect_send_error_is_benign_after_remote_close() {
+        assert!(is_benign_ssh_disconnect_error(&russh::Error::SendError));
+        assert!(is_benign_ssh_disconnect_error(&russh::Error::HUP));
+        assert!(is_benign_ssh_disconnect_error(&russh::Error::Disconnect));
+    }
+
+    #[test]
+    fn non_shutdown_ssh_errors_still_surface() {
+        assert!(!is_benign_ssh_disconnect_error(
+            &russh::Error::ConnectionTimeout
+        ));
+        assert!(!is_benign_ssh_disconnect_error(
+            &russh::Error::RequestDenied
+        ));
+    }
+
+    #[test]
     #[ignore = "requires a trusted SSH server and credentials in ADMINDECK_SSH_* environment variables"]
     fn measure_native_ssh_terminal_readiness_after_auth() {
         let config =
@@ -1084,10 +1119,7 @@ mod tests {
 
         let _ = channel.eof().await;
         let _ = channel.close().await;
-        session
-            .disconnect(Disconnect::ByApplication, "readiness measured", "en")
-            .await
-            .map_err(|error| format!("failed to disconnect SSH session: {error}"))?;
+        disconnect_ssh_session(session, "readiness measured").await?;
         Ok(terminal_ready_ms)
     }
 

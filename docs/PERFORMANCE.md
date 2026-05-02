@@ -75,7 +75,7 @@ This run meets every measured performance budget. SSH readiness remains the only
 
 ## Terminal Compatibility Checklist
 
-Run this checklist in a local terminal and, where practical, in a native SSH terminal. Keep terminal output private unless a user explicitly chooses to include selected text in diagnostics.
+The detailed manual checklist lives in `docs/TERMINAL_COMPATIBILITY_CHECKLIST.md`. Run it in a local terminal and, where practical, in a native SSH terminal. Keep terminal output private unless a user explicitly chooses to include selected text in diagnostics.
 
 | Scenario | Expected Result |
 | --- | --- |
