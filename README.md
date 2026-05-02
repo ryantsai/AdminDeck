@@ -49,6 +49,14 @@ cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+Build a Windows portable ZIP:
+
+```bash
+npm run package:portable
+```
+
+The package is written to `artifacts/` with a `.sha256` checksum file.
+
 Performance and terminal compatibility checks are documented in
 [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 

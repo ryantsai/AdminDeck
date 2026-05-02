@@ -33,10 +33,25 @@ The bundle intentionally excludes by default:
 
 Users should review the generated files before sharing them. Future diagnostics work may add opt-in selected terminal output or redacted database summaries, but those must remain explicit user actions.
 
+## Windows Portable ZIP
+
+Create the v0.1 portable package with:
+
+```bash
+npm run package:portable
+```
+
+The script builds the frontend and release executable, stages `admin-deck.exe`, license/readme files, release/performance docs, a portable package manifest, and a local-only portable readme, then writes:
+
+- `artifacts/admin-deck-<version>-windows-x64-portable.zip`
+- `artifacts/admin-deck-<version>-windows-x64-portable.zip.sha256`
+
+Portable ZIP installs are intentionally manual and do not self-update. The v0.2 updater scope is limited to normal forward updates for installed Windows builds.
+
 ## Known Limitations
 
 - Windows is the only v0.1 acceptance platform.
-- Packaging still needs a successful Windows installer or portable ZIP build and smoke test before release.
+- Packaging still needs a successful Windows installer build and smoke test before release.
 - SSH readiness performance is instrumented for native post-auth terminal setup, but the latest documented run still lacks a measured value because it requires a trusted non-`ProxyJump` SSH Connection with valid auth in the measurement environment.
 - Native SSH and SFTP do not support `ProxyJump`; those sessions use the system `ssh` fallback/debug path where available.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.

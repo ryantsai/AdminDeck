@@ -12,7 +12,9 @@ Milestone D has a right-side AI assistant panel that scopes requests to the acti
 
 Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, local terminal Session start timing, native SSH post-auth terminal readiness timing, Windows process working set, and budget status in the app chrome without adding telemetry or logging terminal contents. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink and scrollback-search support, keeps terminal behavior configured through stored terminal settings, propagates cell and pixel terminal geometry to local PTYs and native SSH channels, and has backend tests covering performance snapshot basics. Manual performance and terminal compatibility checks now live in `docs/PERFORMANCE.md`.
 
-Latest validation on May 2, 2026: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after the terminal geometry hardening batch. The frontend production build still reports Vite's existing chunk-size warning.
+Milestone F has started with a repeatable Windows portable ZIP packaging flow that builds the release executable, stages release/privacy documentation, writes a package manifest, and emits a SHA-256 checksum under `artifacts/`.
+
+Latest validation on May 2, 2026: `npm run package:portable`, `npm run check`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after the portable ZIP packaging batch. `npm run package:portable` includes `npm run build`. The frontend production build still reports Vite's existing chunk-size warning.
 
 ## Milestone 0: Project Foundation
 
@@ -96,7 +98,7 @@ Latest validation on May 2, 2026: `npm run check`, `npm run build`, `cargo check
 ## Milestone F: Packaging and v0.1 Release
 
 - [ ] Build Windows .msi or .exe installer.
-- [ ] Build Windows portable ZIP.
+- [x] Build Windows portable ZIP.
 - [ ] Smoke test installer.
 - [ ] Publish GitHub Release.
 - [x] Document no-telemetry posture.
