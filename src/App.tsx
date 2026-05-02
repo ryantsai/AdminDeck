@@ -13,7 +13,6 @@ import {
   FileCode2,
   Folder,
   FolderPlus,
-  GripVertical,
   HardDrive,
   KeyRound,
   Laptop,
@@ -40,9 +39,9 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChangeEvent,
-  DragEvent,
   FormEvent,
   KeyboardEvent,
+  MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
 import "@xterm/xterm/css/xterm.css";
@@ -264,7 +263,6 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
   const [treeError, setTreeError] = useState("");
-  const [draggedItem, setDraggedItem] = useState<DraggedTreeItem | null>(null);
   const [dropTarget, setDropTarget] = useState("");
   const draggedItemRef = useRef<DraggedTreeItem | null>(null);
   const pointerDragTargetRef = useRef<TreeDropTarget | null>(null);
@@ -272,6 +270,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
     move: (event: PointerEvent) => void;
     stop: (event: PointerEvent) => void;
   } | null>(null);
+  const suppressTreeClickRef = useRef(false);
 
   useEffect(() => {
     void reloadConnectionGroups();
@@ -530,33 +529,20 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   }, [groupsWithLiveStatuses, query]);
   const isTreeFiltered = query.trim().length > 0;
 
-  function handleDragStart(event: DragEvent, item: DraggedTreeItem) {
-    if (isTreeFiltered) {
-      event.preventDefault();
-      return;
-    }
-
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-admindeck-tree-item", JSON.stringify(item));
-    draggedItemRef.current = item;
-    setDraggedItem(item);
+  function handleDragEnd() {
+    draggedItemRef.current = null;
+    pointerDragTargetRef.current = null;
+    setDropTarget("");
   }
 
-  function handleDragOver(event: DragEvent, targetId: string) {
-    if (isTreeFiltered || !draggedItem) {
+  function handleTreeClickCapture(event: ReactMouseEvent) {
+    if (!suppressTreeClickRef.current) {
       return;
     }
 
     event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDropTarget(targetId);
-  }
-
-  function handleDragEnd() {
-    draggedItemRef.current = null;
-    pointerDragTargetRef.current = null;
-    setDraggedItem(null);
-    setDropTarget("");
+    event.stopPropagation();
+    suppressTreeClickRef.current = false;
   }
 
   function completeTreeDrop(item: DraggedTreeItem, target: TreeDropTarget) {
@@ -571,15 +557,6 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       }
 
       void handleMoveConnection(item.connectionId, target.folderId, target.targetIndex);
-    }
-  }
-
-  function dropDraggedItem(event: DragEvent, target: TreeDropTarget) {
-    event.preventDefault();
-    const item = draggedItemRef.current ?? draggedItem;
-    handleDragEnd();
-    if (item) {
-      completeTreeDrop(item, target);
     }
   }
 
@@ -637,27 +614,46 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   }
 
   function handlePointerDragStart(
-    event: ReactPointerEvent<HTMLButtonElement>,
+    event: ReactPointerEvent<HTMLElement>,
     item: DraggedTreeItem,
   ) {
     if (isTreeFiltered || event.button !== 0) {
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
     removePointerDragListeners();
-    draggedItemRef.current = item;
-    pointerDragTargetRef.current = null;
-    setDraggedItem(item);
-    setDropTarget("");
-
+    const startX = event.clientX;
+    const startY = event.clientY;
     const pointerId = event.pointerId;
+    let dragStarted = false;
+    pointerDragTargetRef.current = null;
+
+    const startDrag = () => {
+      if (dragStarted) {
+        return;
+      }
+
+      dragStarted = true;
+      draggedItemRef.current = item;
+      suppressTreeClickRef.current = true;
+      setDropTarget("");
+    };
     const move = (pointerEvent: PointerEvent) => {
       if (pointerEvent.pointerId !== pointerId) {
         return;
       }
 
+      if (!dragStarted) {
+        const xMovement = Math.abs(pointerEvent.clientX - startX);
+        const yMovement = Math.abs(pointerEvent.clientY - startY);
+        if (xMovement < 4 && yMovement < 4) {
+          return;
+        }
+
+        startDrag();
+      }
+
+      pointerEvent.preventDefault();
       const target = treeDropTargetFromElement(
         document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY),
         item,
@@ -670,6 +666,12 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
         return;
       }
 
+      if (!dragStarted) {
+        removePointerDragListeners();
+        return;
+      }
+
+      pointerEvent.preventDefault();
       const target = pointerDragTargetRef.current;
       const dragged = draggedItemRef.current;
       removePointerDragListeners();
@@ -677,6 +679,9 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
       if (target && dragged) {
         completeTreeDrop(dragged, target);
       }
+      window.setTimeout(() => {
+        suppressTreeClickRef.current = false;
+      }, 0);
     };
 
     pointerDragListenersRef.current = { move, stop };
@@ -731,41 +736,18 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
         {filteredGroups.map((group, groupIndex) => (
           <section className="tree-group" key={group.id}>
             <div
-              className={`tree-folder-row ${dropTarget === `folder-${group.id}` ? "drop-target" : ""}`}
+              className={`tree-folder-row ${isTreeFiltered ? "" : "can-drag"} ${
+                dropTarget === `folder-${group.id}` ? "drop-target" : ""
+              }`}
               data-connection-count={group.connections.length}
               data-folder-id={group.id}
               data-folder-index={groupIndex}
               data-tree-drop-kind="folder"
-              draggable={!isTreeFiltered}
-              onDragEnd={handleDragEnd}
-              onDragOver={(event) => handleDragOver(event, `folder-${group.id}`)}
-              onDragStart={(event) =>
-                handleDragStart(event, { kind: "folder", folderId: group.id })
-              }
-              onDrop={(event) =>
-                dropDraggedItem(event, {
-                  kind: "folder",
-                  folderId: group.id,
-                  targetIndex:
-                    draggedItem?.kind === "connection"
-                      ? group.connections.length
-                      : groupIndex,
-                })
+              onClickCapture={handleTreeClickCapture}
+              onPointerDown={(event) =>
+                handlePointerDragStart(event, { kind: "folder", folderId: group.id })
               }
             >
-              <button
-                className="drag-handle"
-                type="button"
-                aria-label={`Move folder ${group.name}`}
-                title="Move folder"
-                draggable={false}
-                disabled={isTreeFiltered}
-                onPointerDown={(event) =>
-                  handlePointerDragStart(event, { kind: "folder", folderId: group.id })
-                }
-              >
-                <GripVertical size={14} />
-              </button>
               <button className="tree-folder">
                 <ChevronDown size={14} />
                 <Folder size={15} />
@@ -797,24 +779,9 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
                 connectionIndex={connectionIndex}
                 dragDisabled={isTreeFiltered}
                 isDropTarget={dropTarget === `connection-${connection.id}`}
+                onClickCapture={handleTreeClickCapture}
                 onDelete={() => void handleDeleteConnection(connection)}
                 onDuplicate={() => void handleDuplicateConnection(connection)}
-                onDragEnd={handleDragEnd}
-                onDragOver={(event) => handleDragOver(event, `connection-${connection.id}`)}
-                onDragStart={(event) =>
-                  handleDragStart(event, {
-                    kind: "connection",
-                    connectionId: connection.id,
-                  })
-                }
-                onDrop={(event) =>
-                  dropDraggedItem(event, {
-                    kind: "connection",
-                    folderId: group.id,
-                    connectionId: connection.id,
-                    targetIndex: connectionIndex,
-                  })
-                }
                 onOpen={() => openConnection(connection)}
                 onPointerDragStart={(event) =>
                   handlePointerDragStart(event, {
@@ -1055,10 +1022,7 @@ function ConnectionRow({
   isDropTarget,
   onDelete,
   onDuplicate,
-  onDragEnd,
-  onDragOver,
-  onDragStart,
-  onDrop,
+  onClickCapture,
   onOpen,
   onPointerDragStart,
   onRename,
@@ -1070,40 +1034,25 @@ function ConnectionRow({
   isDropTarget: boolean;
   onDelete: () => void;
   onDuplicate: () => void;
-  onDragEnd: () => void;
-  onDragOver: (event: DragEvent) => void;
-  onDragStart: (event: DragEvent) => void;
-  onDrop: (event: DragEvent) => void;
+  onClickCapture: (event: ReactMouseEvent) => void;
   onOpen: () => void;
-  onPointerDragStart: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerDragStart: (event: ReactPointerEvent<HTMLElement>) => void;
   onRename: () => void;
 }) {
   const Icon = connection.type === "local" ? Laptop : connection.type === "sftp" ? Columns2 : Server;
 
   return (
     <div
-      className={isDropTarget ? "connection-row drop-target" : "connection-row"}
+      className={`connection-row ${dragDisabled ? "" : "can-drag"} ${
+        isDropTarget ? "drop-target" : ""
+      }`}
       data-connection-id={connection.id}
       data-connection-index={connectionIndex}
       data-folder-id={folderId}
       data-tree-drop-kind="connection"
-      draggable={!dragDisabled}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDragStart={onDragStart}
-      onDrop={onDrop}
+      onClickCapture={onClickCapture}
+      onPointerDown={onPointerDragStart}
     >
-      <button
-        className="drag-handle"
-        type="button"
-        aria-label={`Move ${connection.name}`}
-        title="Move connection"
-        draggable={false}
-        disabled={dragDisabled}
-        onPointerDown={onPointerDragStart}
-      >
-        <GripVertical size={14} />
-      </button>
       <button className="connection-open" onClick={onOpen}>
         <Icon size={15} />
         <span className="connection-main">
