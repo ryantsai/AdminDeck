@@ -55,6 +55,8 @@ pub struct NativeSshTerminalRequest {
     pub auth: NativeSshAuth,
     pub known_hosts_path: PathBuf,
     pub cols: u16,
+    pub pixel_height: u16,
+    pub pixel_width: u16,
     pub rows: u16,
     pub initial_directory: Option<String>,
 }
@@ -103,7 +105,12 @@ pub struct SshHostKeyPreview {
 
 enum SshTerminalControl {
     Input(Vec<u8>),
-    Resize { cols: u16, rows: u16 },
+    Resize {
+        cols: u16,
+        pixel_height: u16,
+        pixel_width: u16,
+        rows: u16,
+    },
     Close,
 }
 
@@ -228,6 +235,8 @@ pub fn start_native_terminal(
         auth,
         known_hosts_path: request.known_hosts_path,
         cols: request.cols,
+        pixel_height: request.pixel_height,
+        pixel_width: request.pixel_width,
         rows: request.rows,
         initial_directory: request.initial_directory,
     };
@@ -358,9 +367,20 @@ impl NativeSshTerminal {
             .map_err(|_| "native SSH session is closed".to_string())
     }
 
-    pub fn resize(&self, cols: u16, rows: u16) -> Result<(), String> {
+    pub fn resize(
+        &self,
+        cols: u16,
+        rows: u16,
+        pixel_width: u16,
+        pixel_height: u16,
+    ) -> Result<(), String> {
         self.control
-            .send(SshTerminalControl::Resize { cols, rows })
+            .send(SshTerminalControl::Resize {
+                cols,
+                pixel_height,
+                pixel_width,
+                rows,
+            })
             .map_err(|_| "native SSH session is closed".to_string())
     }
 
@@ -417,8 +437,8 @@ async fn run_native_terminal(
             "xterm-256color",
             request.cols.into(),
             request.rows.into(),
-            0,
-            0,
+            request.pixel_width.into(),
+            request.pixel_height.into(),
             &[],
         )
         .await
@@ -447,9 +467,19 @@ async fn run_native_terminal(
                             .await
                             .map_err(|error| format!("failed to write SSH terminal input: {error}"))?;
                     }
-                    Some(SshTerminalControl::Resize { cols, rows }) => {
+                    Some(SshTerminalControl::Resize {
+                        cols,
+                        pixel_height,
+                        pixel_width,
+                        rows,
+                    }) => {
                         channel
-                            .window_change(cols.into(), rows.into(), 0, 0)
+                            .window_change(
+                                cols.into(),
+                                rows.into(),
+                                pixel_width.into(),
+                                pixel_height.into(),
+                            )
                             .await
                             .map_err(|error| format!("failed to resize SSH terminal: {error}"))?;
                     }

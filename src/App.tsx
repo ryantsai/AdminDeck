@@ -1379,7 +1379,13 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
       const sessionId = sessionIdRef.current;
       if (sessionId) {
         void invokeCommand("resize_terminal", {
-          request: { sessionId, cols: dimensions.cols, rows: dimensions.rows },
+          request: {
+            sessionId,
+            cols: dimensions.cols,
+            pixelHeight: dimensions.pixelHeight,
+            pixelWidth: dimensions.pixelWidth,
+            rows: dimensions.rows,
+          },
         });
       }
     });
@@ -1410,6 +1416,7 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
         }
 
         const terminalStartAt = performance.now();
+        const terminalDimensions = terminal.dimensions;
         const result = await invokeCommand("start_terminal_session", {
           request: {
             sessionId: requestedSessionId,
@@ -1424,8 +1431,10 @@ function TerminalPaneView({ pane }: { pane: TerminalPane }) {
             secretOwnerId: connection.id,
             shell: connection.type === "local" ? terminalSettings.defaultShell : undefined,
             initialDirectory: connection.type === "local" ? undefined : pane.cwd.trim() || undefined,
-            cols: terminal.dimensions.cols,
-            rows: terminal.dimensions.rows,
+            cols: terminalDimensions.cols,
+            pixelHeight: terminalDimensions.pixelHeight,
+            pixelWidth: terminalDimensions.pixelWidth,
+            rows: terminalDimensions.rows,
           },
         });
         if (disposed) {

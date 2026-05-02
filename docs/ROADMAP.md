@@ -10,9 +10,9 @@ Milestone C has started with native `russh-sftp` sessions that reuse stored SFTP
 
 Milestone D has a right-side AI assistant panel that scopes requests to the active workspace Tab, captures explicitly selected terminal output into assistant context, stages command proposals, keeps approval or rejection explicit without executing commands, persists non-secret OpenAI-compatible provider settings including model and CLI adapter paths, stores AI API keys in the OS keychain, constrains CLI adapters to suggest-only policy, and runs command-planning safety classification before a proposal is staged.
 
-Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, local terminal Session start timing, native SSH post-auth terminal readiness timing, Windows process working set, and budget status in the app chrome without adding telemetry or logging terminal contents. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink and scrollback-search support, keeps terminal behavior configured through stored terminal settings, and has backend tests covering performance snapshot basics. Manual performance and terminal compatibility checks now live in `docs/PERFORMANCE.md`.
+Milestone E has started with local-only performance instrumentation that surfaces frontend ready time, local terminal Session start timing, native SSH post-auth terminal readiness timing, Windows process working set, and budget status in the app chrome without adding telemetry or logging terminal contents. The current xterm terminal renderer now sits behind a small renderer-neutral interface, loads hyperlink and scrollback-search support, keeps terminal behavior configured through stored terminal settings, propagates cell and pixel terminal geometry to local PTYs and native SSH channels, and has backend tests covering performance snapshot basics. Manual performance and terminal compatibility checks now live in `docs/PERFORMANCE.md`.
 
-Latest validation on May 2, 2026: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after the terminal scrollback-search batch. The frontend production build still reports Vite's existing chunk-size warning.
+Latest validation on May 2, 2026: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after the terminal geometry hardening batch. The frontend production build still reports Vite's existing chunk-size warning.
 
 ## Milestone 0: Project Foundation
 
@@ -90,7 +90,7 @@ Latest validation on May 2, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Measure SSH terminal readiness after auth.
 - [x] Measure idle memory.
 - [ ] Run manual compatibility checklist: vim, tmux, htop/btop, git, npm, cargo, and pane scrollback search.
-- [ ] Harden terminal bracketed paste, mouse support, and alternate screen behavior against the manual compatibility checklist.
+- [x] Harden terminal bracketed paste, mouse support, and alternate screen behavior against the manual compatibility checklist.
 - [ ] Start WGPU renderer prototype if Milestone A terminal integration limits are clear.
 
 ## Milestone F: Packaging and v0.1 Release

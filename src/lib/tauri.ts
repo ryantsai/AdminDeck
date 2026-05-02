@@ -35,6 +35,8 @@ export interface StartTerminalSessionRequest {
   shell?: string;
   initialDirectory?: string;
   cols?: number;
+  pixelHeight?: number;
+  pixelWidth?: number;
   rows?: number;
 }
 
@@ -287,7 +289,15 @@ type CommandMap = {
     result: null;
   };
   resize_terminal: {
-    args: { request: { sessionId: string; cols: number; rows: number } };
+    args: {
+      request: {
+        sessionId: string;
+        cols: number;
+        pixelHeight?: number;
+        pixelWidth?: number;
+        rows: number;
+      };
+    };
     result: null;
   };
   close_terminal_session: {

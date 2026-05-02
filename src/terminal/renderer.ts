@@ -26,6 +26,8 @@ export type TerminalRendererCapability =
 
 export interface TerminalDimensions {
   cols: number;
+  pixelHeight: number;
+  pixelWidth: number;
   rows: number;
 }
 
@@ -78,6 +80,7 @@ class XtermTerminalRenderer implements TerminalRenderer {
   readonly backend = "xterm";
   readonly capabilities = XTERM_CAPABILITIES;
   private readonly fitAddon = new FitAddon();
+  private hostElement: HTMLElement | null = null;
   private readonly searchAddon = new SearchAddon({ highlightLimit: 500 });
   private readonly terminal: XtermTerminal;
 
@@ -89,13 +92,17 @@ class XtermTerminalRenderer implements TerminalRenderer {
   }
 
   get dimensions() {
+    const pixels = pixelDimensionsFor(this.hostElement);
     return {
       cols: this.terminal.cols,
+      pixelHeight: pixels.pixelHeight,
+      pixelWidth: pixels.pixelWidth,
       rows: this.terminal.rows,
     };
   }
 
   dispose() {
+    this.hostElement = null;
     this.terminal.dispose();
   }
 
@@ -153,6 +160,7 @@ class XtermTerminalRenderer implements TerminalRenderer {
   }
 
   open(element: HTMLElement) {
+    this.hostElement = element;
     this.terminal.open(element);
   }
 
@@ -163,6 +171,13 @@ class XtermTerminalRenderer implements TerminalRenderer {
   writeln(data: string) {
     this.terminal.writeln(data);
   }
+}
+
+function pixelDimensionsFor(element: HTMLElement | null) {
+  return {
+    pixelHeight: Math.max(0, Math.round(element?.clientHeight ?? 0)),
+    pixelWidth: Math.max(0, Math.round(element?.clientWidth ?? 0)),
+  };
 }
 
 function terminalOptionsFor(settings: TerminalSettings): ITerminalOptions {

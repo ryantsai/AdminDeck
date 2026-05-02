@@ -45,6 +45,8 @@ pub struct StartTerminalSessionRequest {
     pub shell: Option<String>,
     pub initial_directory: Option<String>,
     pub cols: Option<u16>,
+    pub pixel_height: Option<u16>,
+    pub pixel_width: Option<u16>,
     pub rows: Option<u16>,
 }
 
@@ -75,6 +77,8 @@ pub struct TerminalInputRequest {
 pub struct ResizeTerminalRequest {
     session_id: String,
     cols: u16,
+    pixel_height: Option<u16>,
+    pixel_width: Option<u16>,
     rows: u16,
 }
 
@@ -110,6 +114,8 @@ impl SessionManager {
                     auth,
                     known_hosts_path,
                     cols: request.cols.unwrap_or(80),
+                    pixel_height: request.pixel_height.unwrap_or(0),
+                    pixel_width: request.pixel_width.unwrap_or(0),
                     rows: request.rows.unwrap_or(24),
                     initial_directory: request.initial_directory.clone(),
                 },
@@ -132,12 +138,7 @@ impl SessionManager {
 
         let pty_system = native_pty_system();
         let pair = pty_system
-            .openpty(PtySize {
-                rows: request.rows.unwrap_or(24),
-                cols: request.cols.unwrap_or(80),
-                pixel_width: 0,
-                pixel_height: 0,
-            })
+            .openpty(pty_size_for(&request))
             .map_err(|error| format!("failed to open PTY: {error}"))?;
 
         let command = command_for(&request)?;
@@ -234,14 +235,14 @@ impl SessionManager {
             .ok_or_else(|| "terminal session was not found".to_string())?;
         match &session.transport {
             TerminalTransport::Pty { master, .. } => master
-                .resize(PtySize {
-                    rows: request.rows,
-                    cols: request.cols,
-                    pixel_width: 0,
-                    pixel_height: 0,
-                })
+                .resize(resize_pty_size(&request))
                 .map_err(|error| format!("failed to resize terminal: {error}")),
-            TerminalTransport::NativeSsh(session) => session.resize(request.cols, request.rows),
+            TerminalTransport::NativeSsh(session) => session.resize(
+                request.cols,
+                request.rows,
+                request.pixel_width.unwrap_or(0),
+                request.pixel_height.unwrap_or(0),
+            ),
         }
     }
 
@@ -260,6 +261,24 @@ impl SessionManager {
             }
         }
         Ok(())
+    }
+}
+
+fn pty_size_for(request: &StartTerminalSessionRequest) -> PtySize {
+    PtySize {
+        rows: request.rows.unwrap_or(24),
+        cols: request.cols.unwrap_or(80),
+        pixel_width: request.pixel_width.unwrap_or(0),
+        pixel_height: request.pixel_height.unwrap_or(0),
+    }
+}
+
+fn resize_pty_size(request: &ResizeTerminalRequest) -> PtySize {
+    PtySize {
+        rows: request.rows,
+        cols: request.cols,
+        pixel_width: request.pixel_width.unwrap_or(0),
+        pixel_height: request.pixel_height.unwrap_or(0),
     }
 }
 
@@ -531,6 +550,8 @@ mod tests {
             shell: None,
             initial_directory: None,
             cols: None,
+            pixel_height: None,
+            pixel_width: None,
             rows: None,
         }
     }
@@ -562,5 +583,21 @@ mod tests {
                 .and_then(|value| value.to_str()),
             Some("truecolor")
         );
+    }
+
+    #[test]
+    fn terminal_pty_size_preserves_pixel_dimensions() {
+        let mut request = ssh_request();
+        request.cols = Some(132);
+        request.rows = Some(43);
+        request.pixel_width = Some(1200);
+        request.pixel_height = Some(720);
+
+        let size = pty_size_for(&request);
+
+        assert_eq!(size.cols, 132);
+        assert_eq!(size.rows, 43);
+        assert_eq!(size.pixel_width, 1200);
+        assert_eq!(size.pixel_height, 720);
     }
 }
