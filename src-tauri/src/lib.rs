@@ -143,6 +143,21 @@ fn update_ssh_settings(
 }
 
 #[tauri::command]
+fn get_sftp_settings(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::SftpSettings, String> {
+    storage.sftp_settings()
+}
+
+#[tauri::command]
+fn update_sftp_settings(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::SftpSettings,
+) -> Result<storage::SftpSettings, String> {
+    storage.update_sftp_settings(request)
+}
+
+#[tauri::command]
 fn keychain_status(secrets: tauri::State<'_, secrets::Secrets>) -> secrets::KeychainStatus {
     secrets.status()
 }
@@ -353,6 +368,8 @@ pub fn run() {
             update_terminal_settings,
             get_ssh_settings,
             update_ssh_settings,
+            get_sftp_settings,
+            update_sftp_settings,
             keychain_status,
             ssh_transport_plan,
             import_ssh_config,

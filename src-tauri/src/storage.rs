@@ -70,6 +70,12 @@ pub struct SshSettings {
     default_proxy_jump: Option<String>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SftpSettings {
+    overwrite_behavior: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionGroup {
@@ -279,6 +285,41 @@ impl Storage {
             .execute(
                 "INSERT INTO settings (key, value, updated_at)
                  VALUES ('ssh', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
+    }
+
+    pub fn sftp_settings(&self) -> Result<SftpSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row("SELECT value FROM settings WHERE key = 'sftp'", [], |row| {
+                row.get::<_, String>(0)
+            })
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_sftp_settings)
+                .map_err(|error| format!("SFTP settings are invalid: {error}"))?,
+            None => Ok(default_sftp_settings()),
+        }
+    }
+
+    pub fn update_sftp_settings(&self, request: SftpSettings) -> Result<SftpSettings, String> {
+        let settings = validate_sftp_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize SFTP settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('sftp', ?1, CURRENT_TIMESTAMP)
                  ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value,
                     updated_at = CURRENT_TIMESTAMP",
@@ -1165,6 +1206,12 @@ fn default_ssh_settings() -> SshSettings {
     }
 }
 
+fn default_sftp_settings() -> SftpSettings {
+    SftpSettings {
+        overwrite_behavior: "fail".to_string(),
+    }
+}
+
 fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<TerminalSettings, String> {
     settings.font_family = required_field("font family", settings.font_family)?;
     settings.default_shell = required_field("default shell", settings.default_shell)?;
@@ -1198,6 +1245,15 @@ fn validate_ssh_settings(mut settings: SshSettings) -> Result<SshSettings, Strin
 
     settings.default_key_path = trim_optional(settings.default_key_path);
     settings.default_proxy_jump = trim_optional(settings.default_proxy_jump);
+    Ok(settings)
+}
+
+fn validate_sftp_settings(mut settings: SftpSettings) -> Result<SftpSettings, String> {
+    settings.overwrite_behavior = match settings.overwrite_behavior.trim().to_lowercase().as_str() {
+        "fail" | "error" | "never" => "fail".to_string(),
+        "overwrite" | "replace" => "overwrite".to_string(),
+        _ => return Err("SFTP overwrite behavior must be fail or overwrite".to_string()),
+    };
     Ok(settings)
 }
 
@@ -1622,6 +1678,25 @@ mod tests {
             reloaded.default_proxy_jump.as_deref(),
             Some("bastion.internal")
         );
+    }
+
+    #[test]
+    fn sftp_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("sftp-settings")).expect("storage opens");
+
+        let defaults = storage.sftp_settings().expect("default SFTP settings load");
+        assert_eq!(defaults.overwrite_behavior, "fail");
+
+        let updated = storage
+            .update_sftp_settings(SftpSettings {
+                overwrite_behavior: "  REPLACE  ".to_string(),
+            })
+            .expect("SFTP settings update");
+
+        assert_eq!(updated.overwrite_behavior, "overwrite");
+
+        let reloaded = storage.sftp_settings().expect("SFTP settings reload");
+        assert_eq!(reloaded.overwrite_behavior, "overwrite");
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

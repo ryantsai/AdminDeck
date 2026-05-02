@@ -13,6 +13,7 @@ import type {
   RenameConnectionRequest,
   SecretPresence,
   SecretReferenceRequest,
+  SftpSettings,
   SshSettings,
   StoreSecretRequest,
   TerminalSettings,
@@ -188,6 +189,14 @@ type CommandMap = {
     args: { request: SshSettings };
     result: SshSettings;
   };
+  get_sftp_settings: {
+    args: undefined;
+    result: SftpSettings;
+  };
+  update_sftp_settings: {
+    args: { request: SftpSettings };
+    result: SftpSettings;
+  };
   keychain_status: {
     args: undefined;
     result: KeychainStatus;
@@ -250,13 +259,25 @@ type CommandMap = {
   };
   upload_sftp_path: {
     args: {
-      request: { sessionId: string; transferId: string; localPath: string; remoteDirectory: string };
+      request: {
+        sessionId: string;
+        transferId: string;
+        localPath: string;
+        remoteDirectory: string;
+        overwriteBehavior: SftpSettings["overwriteBehavior"];
+      };
     };
     result: SftpTransferResult;
   };
   download_sftp_path: {
     args: {
-      request: { sessionId: string; transferId: string; remotePath: string; localDirectory: string };
+      request: {
+        sessionId: string;
+        transferId: string;
+        remotePath: string;
+        localDirectory: string;
+        overwriteBehavior: SftpSettings["overwriteBehavior"];
+      };
     };
     result: SftpTransferResult;
   };

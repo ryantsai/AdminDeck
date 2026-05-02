@@ -59,6 +59,7 @@ import type {
   ConnectionType,
   CreateConnectionRequest,
   FileEntry,
+  SftpSettings,
   SshSettings,
   TerminalPane,
   TerminalSettings,
@@ -80,6 +81,7 @@ type TransferRecord = {
   state: "queued" | "active" | "done" | "failed" | "canceled";
   progress: number;
   detail: string;
+  overwriteBehavior: SftpSettings["overwriteBehavior"];
   localPath?: string;
   remoteDirectory?: string;
   remotePath?: string;
@@ -92,6 +94,7 @@ function App() {
   const [connectionRefreshToken, setConnectionRefreshToken] = useState(0);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
+  const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
 
   useEffect(() => {
     invokeCommand("app_bootstrap")
@@ -114,6 +117,12 @@ function App() {
       .then(setSshSettings)
       .catch(() => undefined);
   }, [setSshSettings]);
+
+  useEffect(() => {
+    invokeCommand("get_sftp_settings")
+      .then(setSftpSettings)
+      .catch(() => undefined);
+  }, [setSftpSettings]);
 
   return (
     <div className="app-shell">
@@ -1438,6 +1447,7 @@ async function confirmTrustedSshHostKey(preview: SshHostKeyPreview) {
 }
 
 function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
+  const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
   const connection = tab.connection;
   const [localPath, setLocalPath] = useState("");
   const [localFiles, setLocalFiles] = useState<FileEntry[]>([]);
@@ -1689,6 +1699,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
                 transferId: transfer.id,
                 localPath: transfer.localPath ?? "",
                 remoteDirectory: transfer.remoteDirectory ?? remotePath,
+                overwriteBehavior: transfer.overwriteBehavior,
               },
             })
           : await invokeCommand("download_sftp_path", {
@@ -1697,6 +1708,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
                 transferId: transfer.id,
                 remotePath: transfer.remotePath ?? "",
                 localDirectory: transfer.localDirectory ?? localPath,
+                overwriteBehavior: transfer.overwriteBehavior,
               },
             });
 
@@ -1757,6 +1769,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
       state: "queued",
       progress: 0,
       detail: "Waiting",
+      overwriteBehavior: sftpSettings.overwriteBehavior,
       localPath: joinLocalPath(localPath, selected.name),
       remoteDirectory: remotePath,
     });
@@ -1777,6 +1790,7 @@ function SftpWorkspace({ tab }: { tab: WorkspaceTab }) {
       state: "queued",
       progress: 0,
       detail: "Waiting",
+      overwriteBehavior: sftpSettings.overwriteBehavior,
       remotePath: joinRemotePath(remotePath, selected.name),
       localDirectory: localPath,
     });
@@ -2219,6 +2233,8 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
+  const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
+  const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
   const [error, setError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -2240,22 +2256,30 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
       defaultKeyPath: String(form.get("defaultKeyPath") ?? "").trim() || undefined,
       defaultProxyJump: String(form.get("defaultProxyJump") ?? "").trim() || undefined,
     };
+    const sftpRequest: SftpSettings = {
+      overwriteBehavior: String(
+        form.get("overwriteBehavior") ?? "fail",
+      ) as SftpSettings["overwriteBehavior"],
+    };
 
     try {
       setError("");
       if (!isTauriRuntime()) {
         setTerminalSettings(request);
         setSshSettings(sshRequest);
+        setSftpSettings(sftpRequest);
         onClose();
         return;
       }
 
-      const [updatedTerminalSettings, updatedSshSettings] = await Promise.all([
+      const [updatedTerminalSettings, updatedSshSettings, updatedSftpSettings] = await Promise.all([
         invokeCommand("update_terminal_settings", { request }),
         invokeCommand("update_ssh_settings", { request: sshRequest }),
+        invokeCommand("update_sftp_settings", { request: sftpRequest }),
       ]);
       setTerminalSettings(updatedTerminalSettings);
       setSshSettings(updatedSshSettings);
+      setSftpSettings(updatedSftpSettings);
       onClose();
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
@@ -2268,7 +2292,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         <header>
           <div>
             <p className="panel-label">Settings</p>
-            <h2>Terminal and SSH defaults</h2>
+            <h2>Terminal, SSH, and SFTP defaults</h2>
           </div>
           <button className="icon-button" type="button" aria-label="Close" onClick={onClose}>
             <X size={15} />
@@ -2385,6 +2409,19 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
               defaultValue={sshSettings.defaultProxyJump ?? ""}
               placeholder="jump.internal"
             />
+          </label>
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <span>SFTP defaults</span>
+          </div>
+          <label>
+            <span>Existing destination</span>
+            <select name="overwriteBehavior" defaultValue={sftpSettings.overwriteBehavior}>
+              <option value="fail">Stop transfer</option>
+              <option value="overwrite">Overwrite files</option>
+            </select>
           </label>
         </section>
 

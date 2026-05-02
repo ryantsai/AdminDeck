@@ -1,6 +1,7 @@
 import type {
   ConnectionGroup,
   FileEntry,
+  SftpSettings,
   SshSettings,
   TerminalSettings,
   WorkspaceTab,
@@ -93,6 +94,10 @@ export const defaultSshSettings: SshSettings = {
   defaultPort: 22,
   defaultKeyPath: "C:\\Users\\ryan\\.ssh\\id_ed25519",
   defaultProxyJump: "",
+};
+
+export const defaultSftpSettings: SftpSettings = {
+  overwriteBehavior: "fail",
 };
 
 export const localFiles: FileEntry[] = [

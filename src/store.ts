@@ -1,6 +1,11 @@
 import { create } from "zustand";
-import { defaultSshSettings, defaultTerminalSettings, initialTabs } from "./sample-data";
-import type { Connection, SshSettings, TerminalSettings, WorkspaceTab } from "./types";
+import {
+  defaultSftpSettings,
+  defaultSshSettings,
+  defaultTerminalSettings,
+  initialTabs,
+} from "./sample-data";
+import type { Connection, SftpSettings, SshSettings, TerminalSettings, WorkspaceTab } from "./types";
 
 interface WorkspaceState {
   query: string;
@@ -8,10 +13,12 @@ interface WorkspaceState {
   activeTabId: string;
   terminalSettings: TerminalSettings;
   sshSettings: SshSettings;
+  sftpSettings: SftpSettings;
   activeSessionCounts: Record<string, number>;
   setQuery: (query: string) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
   setSshSettings: (settings: SshSettings) => void;
+  setSftpSettings: (settings: SftpSettings) => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -27,10 +34,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeTabId: initialTabs[0]?.id ?? "",
   terminalSettings: defaultTerminalSettings,
   sshSettings: defaultSshSettings,
+  sftpSettings: defaultSftpSettings,
   activeSessionCounts: {},
   setQuery: (query) => set({ query }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
   setSshSettings: (sshSettings) => set({ sshSettings }),
+  setSftpSettings: (sftpSettings) => set({ sftpSettings }),
   activateTab: (tabId) => set({ activeTabId: tabId }),
   closeTab: (tabId) => {
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);

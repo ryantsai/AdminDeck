@@ -94,6 +94,12 @@ export interface SshSettings {
   defaultProxyJump?: string;
 }
 
+export type SftpOverwriteBehavior = "fail" | "overwrite";
+
+export interface SftpSettings {
+  overwriteBehavior: SftpOverwriteBehavior;
+}
+
 export interface WorkspaceTab {
   id: string;
   title: string;

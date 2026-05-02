@@ -71,6 +71,7 @@ pub struct UploadSftpPathRequest {
     transfer_id: String,
     local_path: String,
     remote_directory: String,
+    overwrite_behavior: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -80,6 +81,7 @@ pub struct DownloadSftpPathRequest {
     transfer_id: String,
     remote_path: String,
     local_directory: String,
+    overwrite_behavior: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -175,6 +177,17 @@ enum SftpAuthMethod {
     KeyFile,
     Password,
     Agent,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SftpOverwriteBehavior {
+    Fail,
+    Overwrite,
+}
+
+struct RemoteUploadTarget {
+    flags: OpenFlags,
+    existed: bool,
 }
 
 impl SftpSessionManager {
@@ -295,12 +308,15 @@ impl SftpSessionManager {
         let session = sessions
             .get(&request.session_id)
             .ok_or_else(|| "SFTP session was not found".to_string())?;
+        let overwrite_behavior =
+            normalize_sftp_overwrite_behavior(request.overwrite_behavior.as_deref())?;
         let cancellation = self.register_transfer(&request.transfer_id)?;
         let result = session.runtime.block_on(upload_path(
             &session.sftp,
             app,
             &request.transfer_id,
             cancellation,
+            overwrite_behavior,
             &request.local_path,
             &request.remote_directory,
         ));
@@ -320,12 +336,15 @@ impl SftpSessionManager {
         let session = sessions
             .get(&request.session_id)
             .ok_or_else(|| "SFTP session was not found".to_string())?;
+        let overwrite_behavior =
+            normalize_sftp_overwrite_behavior(request.overwrite_behavior.as_deref())?;
         let cancellation = self.register_transfer(&request.transfer_id)?;
         let result = session.runtime.block_on(download_path(
             &session.sftp,
             app,
             &request.transfer_id,
             cancellation,
+            overwrite_behavior,
             &request.remote_path,
             &request.local_directory,
         ));
@@ -430,6 +449,7 @@ async fn upload_path(
     app: AppHandle,
     transfer_id: &str,
     cancellation: Arc<AtomicBool>,
+    overwrite_behavior: SftpOverwriteBehavior,
     local_path: &str,
     remote_directory: &str,
 ) -> Result<SftpTransferResult, String> {
@@ -437,7 +457,6 @@ async fn upload_path(
         .map_err(|error| format!("failed to resolve local source: {error}"))?;
     let name = local_path_name(&source)?;
     let remote_target = join_remote_path(remote_directory, &name);
-    ensure_remote_missing(sftp, &remote_target).await?;
     let total_bytes = local_transfer_size(&source)?;
     let mut progress = TransferProgress::new(app, transfer_id, cancellation, total_bytes);
     progress.emit();
@@ -446,7 +465,15 @@ async fn upload_path(
         name,
         ..TransferSummary::default()
     };
-    upload_local_entry(sftp, &source, &remote_target, &mut summary, &mut progress).await?;
+    upload_local_entry(
+        sftp,
+        &source,
+        &remote_target,
+        overwrite_behavior,
+        &mut summary,
+        &mut progress,
+    )
+    .await?;
     Ok(summary.into_result())
 }
 
@@ -455,6 +482,7 @@ async fn download_path(
     app: AppHandle,
     transfer_id: &str,
     cancellation: Arc<AtomicBool>,
+    overwrite_behavior: SftpOverwriteBehavior,
     remote_path: &str,
     local_directory: &str,
 ) -> Result<SftpTransferResult, String> {
@@ -462,7 +490,6 @@ async fn download_path(
     let remote_path = normalize_path(remote_path);
     let name = remote_path_name(&remote_path)?;
     let local_target = local_directory.join(&name);
-    ensure_local_missing(&local_target)?;
     let total_bytes = remote_transfer_size(sftp, &remote_path).await?;
     let mut progress = TransferProgress::new(app, transfer_id, cancellation, total_bytes);
     progress.emit();
@@ -471,7 +498,15 @@ async fn download_path(
         name,
         ..TransferSummary::default()
     };
-    download_remote_entry(sftp, &remote_path, &local_target, &mut summary, &mut progress).await?;
+    download_remote_entry(
+        sftp,
+        &remote_path,
+        &local_target,
+        overwrite_behavior,
+        &mut summary,
+        &mut progress,
+    )
+    .await?;
     Ok(summary.into_result())
 }
 
@@ -532,6 +567,7 @@ fn upload_local_entry<'a>(
     sftp: &'a SftpSession,
     local_path: &'a Path,
     remote_path: &'a str,
+    overwrite_behavior: SftpOverwriteBehavior,
     summary: &'a mut TransferSummary,
     progress: &'a mut TransferProgress,
 ) -> Pin<Box<dyn Future<Output = Result<(), String>> + 'a>> {
@@ -540,7 +576,7 @@ fn upload_local_entry<'a>(
         let metadata = fs::metadata(local_path)
             .map_err(|error| format!("failed to inspect local source: {error}"))?;
         if metadata.is_dir() {
-            create_remote_dir_if_missing(sftp, remote_path).await?;
+            prepare_remote_upload_directory(sftp, remote_path, overwrite_behavior).await?;
             summary.folders += 1;
             let mut children = fs::read_dir(local_path)
                 .map_err(|error| format!("failed to read local folder: {error}"))?
@@ -551,8 +587,15 @@ fn upload_local_entry<'a>(
                 let child_name = child.file_name().to_string_lossy().to_string();
                 let child_path = child.path();
                 let child_remote_path = join_remote_path(remote_path, &child_name);
-                upload_local_entry(sftp, &child_path, &child_remote_path, summary, progress)
-                    .await?;
+                upload_local_entry(
+                    sftp,
+                    &child_path,
+                    &child_remote_path,
+                    overwrite_behavior,
+                    summary,
+                    progress,
+                )
+                .await?;
             }
             return Ok(());
         }
@@ -561,12 +604,9 @@ fn upload_local_entry<'a>(
             return Err("only local files and folders can be uploaded".to_string());
         }
 
-        ensure_remote_missing(sftp, remote_path).await?;
+        let target = remote_upload_target(sftp, remote_path, overwrite_behavior).await?;
         let mut file = sftp
-            .open_with_flags(
-                remote_path.to_string(),
-                OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE,
-            )
+            .open_with_flags(remote_path.to_string(), target.flags)
             .await
             .map_err(|error| format!("failed to create remote file: {error}"))?;
         let upload_result =
@@ -576,7 +616,9 @@ fn upload_local_entry<'a>(
             .is_err_and(|error| is_transfer_canceled(error))
         {
             let _ = file.shutdown().await;
-            let _ = sftp.remove_file(remote_path.to_string()).await;
+            if !target.existed {
+                let _ = sftp.remove_file(remote_path.to_string()).await;
+            }
             return upload_result;
         }
         upload_result?;
@@ -592,8 +634,8 @@ async fn upload_file_chunks(
     summary: &mut TransferSummary,
     progress: &mut TransferProgress,
 ) -> Result<(), String> {
-    let mut local_file =
-        fs::File::open(local_path).map_err(|error| format!("failed to read local file: {error}"))?;
+    let mut local_file = fs::File::open(local_path)
+        .map_err(|error| format!("failed to read local file: {error}"))?;
     let mut buffer = vec![0; TRANSFER_CHUNK_SIZE];
     loop {
         progress.check_cancelled()?;
@@ -624,6 +666,7 @@ fn download_remote_entry<'a>(
     sftp: &'a SftpSession,
     remote_path: &'a str,
     local_path: &'a Path,
+    overwrite_behavior: SftpOverwriteBehavior,
     summary: &'a mut TransferSummary,
     progress: &'a mut TransferProgress,
 ) -> Pin<Box<dyn Future<Output = Result<(), String>> + 'a>> {
@@ -635,9 +678,7 @@ fn download_remote_entry<'a>(
             .map_err(|error| format!("failed to inspect remote source: {error}"))?;
         match metadata.file_type() {
             FileType::Dir => {
-                ensure_local_missing(local_path)?;
-                fs::create_dir(local_path)
-                    .map_err(|error| format!("failed to create local folder: {error}"))?;
+                prepare_local_download_directory(local_path, overwrite_behavior)?;
                 summary.folders += 1;
                 let mut entries = sftp
                     .read_dir(remote_path.to_string())
@@ -654,6 +695,7 @@ fn download_remote_entry<'a>(
                         sftp,
                         &child_remote_path,
                         &child_local_path,
+                        overwrite_behavior,
                         summary,
                         progress,
                     )
@@ -662,19 +704,27 @@ fn download_remote_entry<'a>(
                 Ok(())
             }
             FileType::File => {
-                ensure_local_missing(local_path)?;
+                let target_existed = prepare_local_download_file(local_path, overwrite_behavior)?;
                 let mut remote_file = sftp
                     .open(remote_path.to_string())
                     .await
                     .map_err(|error| format!("failed to download remote file: {error}"))?;
-                let download_result =
-                    download_file_chunks(&mut remote_file, local_path, summary, progress).await;
+                let download_result = download_file_chunks(
+                    &mut remote_file,
+                    local_path,
+                    overwrite_behavior,
+                    summary,
+                    progress,
+                )
+                .await;
                 if download_result
                     .as_ref()
                     .is_err_and(|error| is_transfer_canceled(error))
                 {
                     let _ = remote_file.shutdown().await;
-                    let _ = fs::remove_file(local_path);
+                    if !target_existed {
+                        let _ = fs::remove_file(local_path);
+                    }
                     return download_result;
                 }
                 download_result?;
@@ -689,12 +739,18 @@ fn download_remote_entry<'a>(
 async fn download_file_chunks(
     remote_file: &mut russh_sftp::client::fs::File,
     local_path: &Path,
+    overwrite_behavior: SftpOverwriteBehavior,
     summary: &mut TransferSummary,
     progress: &mut TransferProgress,
 ) -> Result<(), String> {
-    let mut local_file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
+    let mut open_options = fs::OpenOptions::new();
+    open_options.write(true);
+    if overwrite_behavior == SftpOverwriteBehavior::Overwrite {
+        open_options.create(true).truncate(true);
+    } else {
+        open_options.create_new(true);
+    }
+    let mut local_file = open_options
         .open(local_path)
         .map_err(|error| format!("failed to create local file: {error}"))?;
     let mut buffer = vec![0; TRANSFER_CHUNK_SIZE];
@@ -965,6 +1021,112 @@ async fn ensure_remote_missing(sftp: &SftpSession, path: &str) -> Result<(), Str
     Ok(())
 }
 
+async fn prepare_remote_upload_directory(
+    sftp: &SftpSession,
+    path: &str,
+    overwrite_behavior: SftpOverwriteBehavior,
+) -> Result<(), String> {
+    if overwrite_behavior == SftpOverwriteBehavior::Fail {
+        return create_remote_dir_if_missing(sftp, path).await;
+    }
+
+    if !sftp
+        .try_exists(path.to_string())
+        .await
+        .map_err(|error| format!("failed to inspect remote folder: {error}"))?
+    {
+        return sftp
+            .create_dir(path.to_string())
+            .await
+            .map_err(|error| format!("failed to create remote folder: {error}"));
+    }
+
+    let metadata = sftp
+        .metadata(path.to_string())
+        .await
+        .map_err(|error| format!("failed to inspect remote folder: {error}"))?;
+    if metadata.file_type() == FileType::Dir {
+        Ok(())
+    } else {
+        Err(format!("remote destination is not a folder: {path}"))
+    }
+}
+
+async fn remote_upload_target(
+    sftp: &SftpSession,
+    path: &str,
+    overwrite_behavior: SftpOverwriteBehavior,
+) -> Result<RemoteUploadTarget, String> {
+    if overwrite_behavior == SftpOverwriteBehavior::Fail {
+        ensure_remote_missing(sftp, path).await?;
+        return Ok(RemoteUploadTarget {
+            flags: OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE,
+            existed: false,
+        });
+    }
+
+    let existed = sftp
+        .try_exists(path.to_string())
+        .await
+        .map_err(|error| format!("failed to inspect remote destination: {error}"))?;
+    if existed {
+        let metadata = sftp
+            .metadata(path.to_string())
+            .await
+            .map_err(|error| format!("failed to inspect remote destination: {error}"))?;
+        if metadata.file_type() == FileType::Dir {
+            return Err(format!("remote destination is a folder: {path}"));
+        }
+    }
+
+    Ok(RemoteUploadTarget {
+        flags: OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
+        existed,
+    })
+}
+
+fn prepare_local_download_directory(
+    path: &Path,
+    overwrite_behavior: SftpOverwriteBehavior,
+) -> Result<(), String> {
+    if overwrite_behavior == SftpOverwriteBehavior::Fail {
+        ensure_local_missing(path)?;
+        return fs::create_dir(path)
+            .map_err(|error| format!("failed to create local folder: {error}"));
+    }
+
+    if path.exists() {
+        if path.is_dir() {
+            Ok(())
+        } else {
+            Err(format!(
+                "local destination is not a folder: {}",
+                display_local_path(path)
+            ))
+        }
+    } else {
+        fs::create_dir(path).map_err(|error| format!("failed to create local folder: {error}"))
+    }
+}
+
+fn prepare_local_download_file(
+    path: &Path,
+    overwrite_behavior: SftpOverwriteBehavior,
+) -> Result<bool, String> {
+    if overwrite_behavior == SftpOverwriteBehavior::Fail {
+        ensure_local_missing(path)?;
+        return Ok(false);
+    }
+
+    if path.is_dir() {
+        return Err(format!(
+            "local destination is a folder: {}",
+            display_local_path(path)
+        ));
+    }
+    Ok(path.exists())
+}
+
 fn local_transfer_size(path: &Path) -> Result<u64, String> {
     let metadata = fs::metadata(path)
         .map_err(|error| format!("failed to inspect local transfer size: {error}"))?;
@@ -1176,6 +1338,20 @@ fn is_transfer_canceled(error: &str) -> bool {
     error == TRANSFER_CANCELED
 }
 
+fn normalize_sftp_overwrite_behavior(value: Option<&str>) -> Result<SftpOverwriteBehavior, String> {
+    match value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("fail")
+        .to_lowercase()
+        .as_str()
+    {
+        "fail" | "error" | "never" => Ok(SftpOverwriteBehavior::Fail),
+        "overwrite" | "replace" => Ok(SftpOverwriteBehavior::Overwrite),
+        _ => Err("SFTP overwrite behavior must be fail or overwrite".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1289,6 +1465,19 @@ mod tests {
         assert_eq!(transfer_progress_percent(0, 0), 0);
         assert_eq!(transfer_progress_percent(50, 200), 25);
         assert_eq!(transfer_progress_percent(250, 200), 100);
+    }
+
+    #[test]
+    fn sftp_overwrite_behavior_defaults_to_fail_and_normalizes_aliases() {
+        assert!(matches!(
+            normalize_sftp_overwrite_behavior(None),
+            Ok(SftpOverwriteBehavior::Fail)
+        ));
+        assert!(matches!(
+            normalize_sftp_overwrite_behavior(Some(" replace ")),
+            Ok(SftpOverwriteBehavior::Overwrite)
+        ));
+        assert!(normalize_sftp_overwrite_behavior(Some("skip")).is_err());
     }
 
     fn sftp_request() -> StartSftpSessionRequest {
