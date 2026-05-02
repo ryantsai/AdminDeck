@@ -115,11 +115,63 @@ type ConnectionDialogRequest = CreateConnectionRequest & {
 
 const AI_PROVIDER_SECRET_OWNER_ID = "openai-compatible-provider";
 const ASSISTANT_CONTEXT_MAX_CHARS = 4000;
-const LOCAL_SHELL_OPTIONS = [
+const RECENT_CONNECTION_STORAGE_KEY = "admin-deck.recentConnectionIds";
+const RECENT_CONNECTION_LIMIT = 5;
+const WINDOWS_LOCAL_SHELL_OPTIONS = [
   { label: "PowerShell", value: "powershell.exe" },
   { label: "Command Prompt", value: "cmd.exe" },
   { label: "WSL", value: "wsl.exe" },
 ];
+
+type LocalShellOption = {
+  label: string;
+  value?: string;
+};
+
+function isWindowsPlatform() {
+  if (typeof navigator === "undefined") {
+    return true;
+  }
+
+  return /windows/i.test(`${navigator.userAgent} ${navigator.platform}`);
+}
+
+function localShellOptionsForPlatform(): LocalShellOption[] {
+  if (!isWindowsPlatform()) {
+    return [{ label: "Terminal" }];
+  }
+
+  return [
+    { label: "Command Prompt", value: "cmd.exe" },
+    ...WINDOWS_LOCAL_SHELL_OPTIONS.filter((option) => option.value !== "cmd.exe"),
+  ];
+}
+
+function loadRecentConnectionIds() {
+  if (typeof localStorage === "undefined") {
+    return [];
+  }
+
+  try {
+    const storedIds = JSON.parse(localStorage.getItem(RECENT_CONNECTION_STORAGE_KEY) ?? "[]");
+    return Array.isArray(storedIds)
+      ? storedIds.filter((connectionId): connectionId is string => typeof connectionId === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentConnectionIds(connectionIds: string[]) {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(
+    RECENT_CONNECTION_STORAGE_KEY,
+    JSON.stringify(connectionIds.slice(0, RECENT_CONNECTION_LIMIT)),
+  );
+}
 
 function uniqueRuntimeId(prefix: string) {
   const randomId =
@@ -324,9 +376,12 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
   const [treeError, setTreeError] = useState("");
+  const [quickConnectMenuOpen, setQuickConnectMenuOpen] = useState(false);
+  const [recentConnectionIds, setRecentConnectionIds] = useState(loadRecentConnectionIds);
   const [dropTarget, setDropTarget] = useState("");
   const [dragPreview, setDragPreview] = useState<TreeDragPreview | null>(null);
   const [draggedSourceId, setDraggedSourceId] = useState("");
+  const quickConnectRef = useRef<HTMLDivElement | null>(null);
   const draggedItemRef = useRef<DraggedTreeItem | null>(null);
   const pointerDragTargetRef = useRef<TreeDropTarget | null>(null);
   const pointerDragListenersRef = useRef<{
@@ -338,6 +393,32 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
   useEffect(() => {
     void reloadConnectionGroups();
   }, [refreshToken]);
+
+  useEffect(() => {
+    if (!quickConnectMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const node = quickConnectRef.current;
+      if (node && !node.contains(event.target as Node)) {
+        setQuickConnectMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setQuickConnectMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [quickConnectMenuOpen]);
 
   useEffect(
     () => () => {
@@ -356,10 +437,41 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
 
   function handleConnectionReady(connection: Connection) {
     setTree((currentTree) => upsertRootConnection(currentTree, connection));
+    rememberConnection(connection);
     openConnection(connection);
     setFormMode(null);
     setFormError("");
     setTreeError("");
+  }
+
+  function rememberConnection(connection: Connection) {
+    setRecentConnectionIds((currentIds) => {
+      const nextIds = [
+        connection.id,
+        ...currentIds.filter((connectionId) => connectionId !== connection.id),
+      ].slice(0, RECENT_CONNECTION_LIMIT);
+      saveRecentConnectionIds(nextIds);
+      return nextIds;
+    });
+  }
+
+  function handleOpenConnection(connection: Connection) {
+    rememberConnection(connection);
+    openConnection(connection);
+  }
+
+  function handleQuickLocalShell(option: LocalShellOption) {
+    setQuickConnectMenuOpen(false);
+    const connection: Connection = {
+      id: uniqueRuntimeId("quick"),
+      name: option.label,
+      host: "localhost",
+      user: "local",
+      type: "local",
+      localShell: option.value,
+      status: "idle",
+    };
+    openConnection(connection);
   }
 
   async function storeConnectionPassword(connectionId: string, password: string) {
@@ -569,6 +681,16 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
 
     return filterConnectionTree(treeWithLiveStatuses, normalizedQuery);
   }, [query, treeWithLiveStatuses]);
+  const quickConnectShellOptions = useMemo(() => localShellOptionsForPlatform(), []);
+  const recentConnections = useMemo(() => {
+    const connectionsById = new Map(
+      flattenConnections(treeWithLiveStatuses).map((connection) => [connection.id, connection]),
+    );
+    return recentConnectionIds
+      .map((connectionId) => connectionsById.get(connectionId))
+      .filter((connection): connection is Connection => Boolean(connection))
+      .slice(0, RECENT_CONNECTION_LIMIT);
+  }, [recentConnectionIds, treeWithLiveStatuses]);
   const isTreeFiltered = query.trim().length > 0;
 
   function handleDragEnd() {
@@ -825,10 +947,28 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
         />
       </label>
 
-      <button className="quick-connect" onClick={() => setFormMode("quick")}>
-        <Play size={15} />
-        Quick connect
-      </button>
+      <div className="quick-connect-anchor" ref={quickConnectRef}>
+        <button
+          aria-expanded={quickConnectMenuOpen}
+          aria-haspopup="menu"
+          className="quick-connect"
+          onClick={() => setQuickConnectMenuOpen((isOpen) => !isOpen)}
+        >
+          <Play size={15} />
+          Quick connect
+        </button>
+        {quickConnectMenuOpen ? (
+          <QuickConnectMenu
+            recentConnections={recentConnections}
+            shellOptions={quickConnectShellOptions}
+            onOpenConnection={(connection) => {
+              setQuickConnectMenuOpen(false);
+              handleOpenConnection(connection);
+            }}
+            onOpenLocalShell={handleQuickLocalShell}
+          />
+        ) : null}
+      </div>
       {treeError ? <p className="form-error tree-error">{treeError}</p> : null}
 
       <div
@@ -849,7 +989,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
             onClickCapture={handleTreeClickCapture}
             onDelete={() => void handleDeleteConnection(connection)}
             onDuplicate={() => void handleDuplicateConnection(connection)}
-            onOpen={() => openConnection(connection)}
+            onOpen={() => handleOpenConnection(connection)}
             onPointerDragStart={(event) =>
               handlePointerDragStart(
                 event,
@@ -879,7 +1019,7 @@ function ConnectionSidebar({ refreshToken }: { refreshToken: number }) {
             onDeleteConnection={handleDeleteConnection}
             onDeleteFolder={handleDeleteFolder}
             onDuplicateConnection={handleDuplicateConnection}
-            onOpenConnection={openConnection}
+            onOpenConnection={handleOpenConnection}
             onPointerDragStart={handlePointerDragStart}
             onRenameConnection={handleRenameConnection}
             onRenameFolder={handleRenameFolder}
@@ -1049,6 +1189,60 @@ function ConnectionFolderNode({
   );
 }
 
+function QuickConnectMenu({
+  recentConnections,
+  shellOptions,
+  onOpenConnection,
+  onOpenLocalShell,
+}: {
+  recentConnections: Connection[];
+  shellOptions: LocalShellOption[];
+  onOpenConnection: (connection: Connection) => void;
+  onOpenLocalShell: (option: LocalShellOption) => void;
+}) {
+  return (
+    <div className="quick-connect-menu" role="menu" aria-label="Quick connect">
+      {shellOptions.map((option) => (
+        <button
+          key={option.value ?? option.label}
+          onClick={() => onOpenLocalShell(option)}
+          role="menuitem"
+          type="button"
+        >
+          <Terminal size={15} />
+          <span>{option.label}</span>
+        </button>
+      ))}
+      <div className="quick-connect-menu-separator" role="separator" />
+      {recentConnections.length > 0 ? (
+        recentConnections.map((connection) => {
+          const Icon = connection.type === "local" ? Laptop : Server;
+          return (
+            <button
+              key={connection.id}
+              onClick={() => onOpenConnection(connection)}
+              role="menuitem"
+              type="button"
+            >
+              <Icon size={15} />
+              <span className="connection-main">
+                <strong>{connection.name}</strong>
+                <small>{connection.type === "local" ? connection.host : `${connection.user}@${connection.host}`}</small>
+              </span>
+              <span className={`status-dot ${connection.status}`} />
+            </button>
+          );
+        })
+      ) : (
+        <button disabled role="menuitem" type="button">
+          <Server size={15} />
+          <span>No recent connections</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ConnectionDialog({
   error,
   tree,
@@ -1068,13 +1262,14 @@ function ConnectionDialog({
   const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
   const usesSshDefaults = connectionType === "ssh";
   const folderOptions = useMemo(() => flattenFolders(tree.folders), [tree.folders]);
+  const localShellOptions = useMemo(() => localShellOptionsForPlatform(), []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const selectedLocalShell = String(form.get("localShell") ?? LOCAL_SHELL_OPTIONS[0].value);
+    const selectedLocalShell = String(form.get("localShell") ?? localShellOptions[0]?.value ?? "");
     const selectedLocalShellLabel =
-      LOCAL_SHELL_OPTIONS.find((option) => option.value === selectedLocalShell)?.label ??
+      localShellOptions.find((option) => (option.value ?? "") === selectedLocalShell)?.label ??
       "Local terminal";
     const host = connectionType === "local" ? "localhost" : String(form.get("host") ?? "").trim();
     const name =
@@ -1099,7 +1294,7 @@ function ConnectionDialog({
       keyPath: usesSshDefaults && authMethod === "keyFile" ? keyPath || undefined : undefined,
       proxyJump: proxyJump || undefined,
       authMethod: usesSshDefaults ? authMethod : undefined,
-      localShell: connectionType === "local" ? selectedLocalShell : undefined,
+      localShell: connectionType === "local" ? selectedLocalShell || undefined : undefined,
       password: usesSshDefaults && authMethod === "password" ? password : undefined,
     });
   }
@@ -1146,9 +1341,9 @@ function ConnectionDialog({
         {connectionType === "local" ? (
           <label>
             <span>Shell</span>
-            <select name="localShell" defaultValue={LOCAL_SHELL_OPTIONS[0].value}>
-              {LOCAL_SHELL_OPTIONS.map((option) => (
-                <option value={option.value} key={option.value}>
+            <select name="localShell" defaultValue={localShellOptions[0]?.value ?? ""}>
+              {localShellOptions.map((option) => (
+                <option value={option.value ?? ""} key={option.value ?? option.label}>
                   {option.label}
                 </option>
               ))}
@@ -1457,6 +1652,20 @@ function connectionMatchesQuery(connection: Connection, normalizedQuery: string)
     .join(" ")
     .toLowerCase()
     .includes(normalizedQuery);
+}
+
+function flattenConnections(tree: ConnectionTree): Connection[] {
+  return [
+    ...tree.connections,
+    ...tree.folders.flatMap((folder) => flattenFolderConnections(folder)),
+  ];
+}
+
+function flattenFolderConnections(folder: ConnectionFolder): Connection[] {
+  return [
+    ...folder.connections,
+    ...folder.folders.flatMap((childFolder) => flattenFolderConnections(childFolder)),
+  ];
 }
 
 function flattenFolders(

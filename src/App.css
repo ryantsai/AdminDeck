@@ -241,11 +241,63 @@ h2 {
   font-weight: 700;
 }
 
+.quick-connect-anchor {
+  position: relative;
+  margin-bottom: 14px;
+}
+
 .quick-connect {
   width: 100%;
-  margin-bottom: 14px;
   color: #ffffff;
   background: var(--accent);
+}
+
+.quick-connect-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 45;
+  display: grid;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  box-shadow: var(--shadow);
+}
+
+.quick-connect-menu button {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 34px;
+  min-width: 0;
+  padding: 7px 10px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quick-connect-menu button:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.quick-connect-menu button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.quick-connect-menu .connection-main {
+  flex: 1 1 auto;
+}
+
+.quick-connect-menu-separator {
+  height: 1px;
+  background: var(--border);
 }
 
 .toolbar-button {
