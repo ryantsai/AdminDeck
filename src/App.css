@@ -934,6 +934,27 @@ progress {
   line-height: 1.45;
 }
 
+.risk-label {
+  width: fit-content;
+  padding: 3px 7px;
+  color: var(--amber);
+  background: #fff6df;
+  border: 1px solid #f0cf85;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.safety-notes {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .approval-card-approved header strong {
   color: var(--green);
 }

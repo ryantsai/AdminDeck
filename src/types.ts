@@ -103,6 +103,9 @@ export interface SftpSettings {
 export interface AiProviderSettings {
   enabled: boolean;
   baseUrl: string;
+  model: string;
+  claudeCliPath?: string;
+  codexCliPath?: string;
 }
 
 export interface WorkspaceTab {

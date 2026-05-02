@@ -104,6 +104,9 @@ export const defaultSftpSettings: SftpSettings = {
 export const defaultAiProviderSettings: AiProviderSettings = {
   enabled: false,
   baseUrl: "https://api.openai.com/v1",
+  model: "gpt-5-mini",
+  claudeCliPath: "",
+  codexCliPath: "",
 };
 
 export const localFiles: FileEntry[] = [

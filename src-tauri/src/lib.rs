@@ -1,3 +1,4 @@
+mod ai;
 mod logging;
 mod secrets;
 mod sessions;
@@ -170,6 +171,13 @@ fn update_ai_provider_settings(
     request: storage::AiProviderSettings,
 ) -> Result<storage::AiProviderSettings, String> {
     storage.update_ai_provider_settings(request)
+}
+
+#[tauri::command]
+fn plan_command_proposal(
+    request: ai::CommandProposalRequest,
+) -> Result<ai::CommandProposalPlan, String> {
+    ai::plan_command_proposal(request)
 }
 
 #[tauri::command]
@@ -387,6 +395,7 @@ pub fn run() {
             update_sftp_settings,
             get_ai_provider_settings,
             update_ai_provider_settings,
+            plan_command_proposal,
             keychain_status,
             ssh_transport_plan,
             import_ssh_config,

@@ -49,6 +49,7 @@ import {
   type SftpTransferResult,
   type SshConfigImportPreview,
   type SshHostKeyPreview,
+  type CommandProposalPlan,
   type TerminalOutput,
 } from "./lib/tauri";
 import { aiSuggestions, connectionGroups } from "./sample-data";
@@ -99,6 +100,8 @@ type AssistantDraft = {
   command: string;
   reason: string;
   contextLabel: string;
+  extraConfirmationRequired: boolean;
+  safetyNotes: string[];
   status: "pending" | "approved" | "rejected";
 };
 
@@ -2321,6 +2324,9 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
     const aiProviderRequest: AiProviderSettings = {
       enabled: form.get("aiProviderEnabled") === "on",
       baseUrl: String(form.get("aiProviderBaseUrl") ?? "").trim(),
+      model: String(form.get("aiProviderModel") ?? "").trim(),
+      claudeCliPath: String(form.get("claudeCliPath") ?? "").trim() || undefined,
+      codexCliPath: String(form.get("codexCliPath") ?? "").trim() || undefined,
     };
     const aiProviderApiKey = String(form.get("aiProviderApiKey") ?? "").trim();
 
@@ -2528,6 +2534,22 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
             />
           </label>
           <label>
+            <span>Model</span>
+            <input
+              defaultValue={aiProviderSettings.model}
+              list="ai-model-options"
+              name="aiProviderModel"
+              placeholder="gpt-5-mini"
+              required
+            />
+            <datalist id="ai-model-options">
+              <option value="gpt-5-mini" />
+              <option value="gpt-5" />
+              <option value="gpt-4.1-mini" />
+              <option value="gpt-4o-mini" />
+            </datalist>
+          </label>
+          <label>
             <span>API key</span>
             <input
               autoComplete="off"
@@ -2543,6 +2565,24 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
                 : "Saved only to the OS keychain."}
             </small>
           </label>
+          <div className="form-grid">
+            <label>
+              <span>Claude Code CLI path</span>
+              <input
+                name="claudeCliPath"
+                defaultValue={aiProviderSettings.claudeCliPath ?? ""}
+                placeholder="claude"
+              />
+            </label>
+            <label>
+              <span>Codex CLI path</span>
+              <input
+                name="codexCliPath"
+                defaultValue={aiProviderSettings.codexCliPath ?? ""}
+                placeholder="codex"
+              />
+            </label>
+          </div>
           <div className="settings-toggles compact">
             <label>
               <input
@@ -2580,6 +2620,8 @@ function AssistantPanel() {
   const [selectedSuggestion, setSelectedSuggestion] = useState(aiSuggestions[0].id);
   const [prompt, setPrompt] = useState("");
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
+  const [proposalError, setProposalError] = useState("");
+  const [planningProposal, setPlanningProposal] = useState(false);
   const suggestion = aiSuggestions.find((item) => item.id === selectedSuggestion) ?? aiSuggestions[0];
   const contextLabel = activeTab
     ? `${activeTab.title} - ${activeTab.kind === "sftp" ? "SFTP browser" : "Terminal"}`
@@ -2597,17 +2639,37 @@ function AssistantPanel() {
     }
   }
 
-  function handleDraftProposal() {
+  async function handleDraftProposal() {
     const normalizedPrompt = prompt.trim();
-    setDraft({
-      id: `${suggestion.id}-${Date.now()}`,
-      title: normalizedPrompt || suggestion.title,
-      risk: suggestion.risk,
+    const request = {
+      prompt: normalizedPrompt || suggestion.title,
       command: suggestion.command,
       reason: suggestion.reason,
       contextLabel,
-      status: "pending",
-    });
+    };
+
+    try {
+      setProposalError("");
+      setPlanningProposal(true);
+      const plan = isTauriRuntime()
+        ? await invokeCommand("plan_command_proposal", { request })
+        : planCommandProposalLocally(request);
+      setDraft({
+        id: `${suggestion.id}-${Date.now()}`,
+        title: plan.prompt,
+        risk: plan.riskLabel,
+        command: plan.command,
+        reason: plan.reason,
+        contextLabel: plan.contextLabel,
+        extraConfirmationRequired: plan.extraConfirmationRequired,
+        safetyNotes: plan.safetyNotes,
+        status: "pending",
+      });
+    } catch (error) {
+      setProposalError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPlanningProposal(false);
+    }
   }
 
   function handleCopyCommand(command: string) {
@@ -2643,13 +2705,14 @@ function AssistantPanel() {
       </label>
       <button
         className="approve-button"
-        disabled={!activeTab}
+        disabled={!activeTab || planningProposal}
         onClick={handleDraftProposal}
         type="button"
       >
         <SendHorizontal size={15} />
-        Draft proposal
+        {planningProposal ? "Planning" : "Draft proposal"}
       </button>
+      {proposalError ? <p className="form-error">{proposalError}</p> : null}
 
       <div className="suggestion-list">
         {aiSuggestions.map((item) => (
@@ -2675,7 +2738,13 @@ function AssistantPanel() {
             <pre>
               <code>{draft.command}</code>
             </pre>
+            <strong className="risk-label">{draft.risk}</strong>
             <p>{draft.reason}</p>
+            <ul className="safety-notes">
+              {draft.safetyNotes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
           </>
         ) : (
           <p className="approval-empty">No proposal staged.</p>
@@ -2706,7 +2775,7 @@ function AssistantPanel() {
             type="button"
           >
             <Check size={15} />
-            Approve
+            {draft?.extraConfirmationRequired ? "Confirm" : "Approve"}
           </button>
         </div>
       </section>
@@ -2727,6 +2796,16 @@ function AssistantPanel() {
           <span>{providerHost}</span>
           <strong>{aiProviderSettings.enabled ? "Enabled" : "Disabled"}</strong>
         </div>
+        <div>
+          <Bot size={15} />
+          <span>{aiProviderSettings.model}</span>
+          <strong>Model</strong>
+        </div>
+        <div>
+          <Command size={15} />
+          <span>CLI agents</span>
+          <strong>{formatCliIntegrationStatus(aiProviderSettings)}</strong>
+        </div>
       </section>
     </aside>
   );
@@ -2738,6 +2817,53 @@ function formatProviderHost(baseUrl: string) {
   } catch {
     return "OpenAI-compatible endpoint";
   }
+}
+
+function formatCliIntegrationStatus(settings: AiProviderSettings) {
+  const configuredCount = [settings.claudeCliPath, settings.codexCliPath].filter(Boolean).length;
+  return configuredCount > 0 ? `${configuredCount} configured` : "Not configured";
+}
+
+function planCommandProposalLocally(request: {
+  prompt: string;
+  command: string;
+  reason: string;
+  contextLabel: string;
+}): CommandProposalPlan {
+  const command = request.command.trim();
+  if (!command) {
+    throw new Error("proposed command is required");
+  }
+
+  const normalized = command.toLowerCase();
+  const extraConfirmationRequired = [
+    "rm -rf",
+    "remove-item",
+    "systemctl restart",
+    "restart-service",
+    "kubectl delete",
+    "password",
+    "secret",
+    "token",
+    "id_rsa",
+    "id_ed25519",
+    ".ssh",
+  ].some((needle) => normalized.includes(needle));
+
+  return {
+    prompt: request.prompt.trim() || "Draft command",
+    command,
+    reason: request.reason.trim(),
+    contextLabel: request.contextLabel.trim(),
+    riskLabel: extraConfirmationRequired ? "Extra confirmation" : "Approval required",
+    approvalRequired: true,
+    extraConfirmationRequired,
+    safetyNotes: [
+      extraConfirmationRequired
+        ? "May change system state or touch sensitive material."
+        : "Read-only or low-impact intent was detected, but approval is still required.",
+    ],
+  };
 }
 
 function StatusBar() {

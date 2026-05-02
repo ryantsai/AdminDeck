@@ -81,6 +81,12 @@ pub struct SftpSettings {
 pub struct AiProviderSettings {
     enabled: bool,
     base_url: String,
+    #[serde(default = "default_ai_model")]
+    model: String,
+    #[serde(default)]
+    claude_cli_path: Option<String>,
+    #[serde(default)]
+    codex_cli_path: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1263,7 +1269,14 @@ fn default_ai_provider_settings() -> AiProviderSettings {
     AiProviderSettings {
         enabled: false,
         base_url: "https://api.openai.com/v1".to_string(),
+        model: default_ai_model(),
+        claude_cli_path: None,
+        codex_cli_path: None,
     }
+}
+
+fn default_ai_model() -> String {
+    "gpt-5-mini".to_string()
 }
 
 fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<TerminalSettings, String> {
@@ -1316,6 +1329,9 @@ fn validate_ai_provider_settings(
 ) -> Result<AiProviderSettings, String> {
     settings.base_url = required_field("OpenAI-compatible endpoint", settings.base_url)?;
     settings.base_url = settings.base_url.trim_end_matches('/').to_string();
+    settings.model = required_field("AI model", settings.model)?;
+    settings.claude_cli_path = trim_optional(settings.claude_cli_path);
+    settings.codex_cli_path = trim_optional(settings.codex_cli_path);
 
     if !(settings.base_url.starts_with("https://") || settings.base_url.starts_with("http://")) {
         return Err("OpenAI-compatible endpoint must start with https:// or http://".to_string());
@@ -1329,6 +1345,10 @@ fn validate_ai_provider_settings(
         return Err(
             "OpenAI-compatible endpoint must be a base URL without query or fragment".to_string(),
         );
+    }
+
+    if settings.model.chars().any(char::is_whitespace) {
+        return Err("AI model cannot contain whitespace".to_string());
     }
 
     Ok(settings)
@@ -1785,21 +1805,32 @@ mod tests {
             .expect("default AI provider settings load");
         assert!(!defaults.enabled);
         assert_eq!(defaults.base_url, "https://api.openai.com/v1");
+        assert_eq!(defaults.model, "gpt-5-mini");
 
         let updated = storage
             .update_ai_provider_settings(AiProviderSettings {
                 enabled: true,
                 base_url: "  https://llm-gateway.internal/v1/  ".to_string(),
+                model: " gpt-5 ".to_string(),
+                claude_cli_path: Some("  C:\\Tools\\claude.exe  ".to_string()),
+                codex_cli_path: Some("  codex  ".to_string()),
             })
             .expect("AI provider settings update");
 
         assert!(updated.enabled);
         assert_eq!(updated.base_url, "https://llm-gateway.internal/v1");
+        assert_eq!(updated.model, "gpt-5");
+        assert_eq!(
+            updated.claude_cli_path.as_deref(),
+            Some("C:\\Tools\\claude.exe")
+        );
+        assert_eq!(updated.codex_cli_path.as_deref(), Some("codex"));
 
         let reloaded = storage
             .ai_provider_settings()
             .expect("AI provider settings reload");
         assert_eq!(reloaded.base_url, "https://llm-gateway.internal/v1");
+        assert_eq!(reloaded.model, "gpt-5");
     }
 
     #[test]
@@ -1810,6 +1841,9 @@ mod tests {
             .update_ai_provider_settings(AiProviderSettings {
                 enabled: true,
                 base_url: "api.openai.com/v1".to_string(),
+                model: "gpt-5-mini".to_string(),
+                claude_cli_path: None,
+                codex_cli_path: None,
             })
             .expect_err("scheme-less endpoint is rejected");
 
@@ -1817,6 +1851,24 @@ mod tests {
             error,
             "OpenAI-compatible endpoint must start with https:// or http://"
         );
+    }
+
+    #[test]
+    fn ai_provider_settings_reject_blank_model() {
+        let storage =
+            Storage::open(temp_db_path("ai-provider-blank-model")).expect("storage opens");
+
+        let error = storage
+            .update_ai_provider_settings(AiProviderSettings {
+                enabled: true,
+                base_url: "https://api.openai.com/v1".to_string(),
+                model: "   ".to_string(),
+                claude_cli_path: None,
+                codex_cli_path: None,
+            })
+            .expect_err("blank model is rejected");
+
+        assert_eq!(error, "AI model is required");
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

@@ -130,6 +130,17 @@ export interface SshHostKeyPreview {
   status: "trusted" | "unknown" | "changed";
 }
 
+export interface CommandProposalPlan {
+  prompt: string;
+  command: string;
+  reason: string;
+  contextLabel: string;
+  riskLabel: string;
+  approvalRequired: boolean;
+  extraConfirmationRequired: boolean;
+  safetyNotes: string[];
+}
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -206,6 +217,17 @@ type CommandMap = {
   update_ai_provider_settings: {
     args: { request: AiProviderSettings };
     result: AiProviderSettings;
+  };
+  plan_command_proposal: {
+    args: {
+      request: {
+        prompt: string;
+        command: string;
+        reason: string;
+        contextLabel: string;
+      };
+    };
+    result: CommandProposalPlan;
   };
   keychain_status: {
     args: undefined;
