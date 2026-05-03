@@ -326,6 +326,25 @@ type AssistantDraft = {
   status: "pending" | "approved" | "rejected";
 };
 
+async function writeToClipboard(text: string) {
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall through to execCommand fallback
+    }
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
@@ -3046,6 +3065,16 @@ function TerminalPaneView({
     terminal.open(element);
     terminal.fit();
     terminal.focus();
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type === "keydown" && event.ctrlKey && event.shiftKey && event.key === "C") {
+        const selection = terminal.getSelection();
+        if (selection) {
+          void writeToClipboard(selection);
+        }
+        return false;
+      }
+      return true;
+    });
     registerPaneRenderer(pane.id, terminal);
     const focusDisposable = terminal.onFocus(() => {
       onFocusRef.current();
@@ -3295,8 +3324,9 @@ function TerminalPaneView({
   }, [searchOpen, searchTerm]);
 
   function handleCopyTerminalSelection() {
-    if (selectedTerminalText) {
-      void navigator.clipboard?.writeText(selectedTerminalText);
+    const text = terminalRendererRef.current?.getSelection() || selectedTerminalText;
+    if (text) {
+      void writeToClipboard(text);
     }
   }
 
@@ -3404,8 +3434,9 @@ function TerminalPaneView({
             className="terminal-pane-action"
             aria-label="Copy terminal selection"
             disabled={!selectedTerminalText}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleCopyTerminalSelection}
-            title="Copy terminal selection"
+            title="Copy terminal selection (Ctrl+Shift+C)"
             type="button"
           >
             <Copy size={13} />
@@ -3414,6 +3445,7 @@ function TerminalPaneView({
             className="terminal-pane-action"
             aria-label="Send selection to command assist"
             disabled={!selectedTerminalText}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleSendSelectionToAssistant}
             title="Send selection to command assist"
             type="button"

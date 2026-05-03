@@ -42,6 +42,7 @@ export interface TerminalRenderer {
   findNext: (term: string) => boolean;
   findPrevious: (term: string) => boolean;
   focus: () => void;
+  attachCustomKeyEventHandler: (handler: (event: KeyboardEvent) => boolean) => void;
   getSelection: () => string;
   onData: (handler: (data: string) => void) => IDisposable;
   onSearchResultsChange: (handler: (result: ISearchResultChangeEvent) => void) => IDisposable;
@@ -149,6 +150,10 @@ class XtermTerminalRenderer implements TerminalRenderer {
 
   focus() {
     this.terminal.focus();
+  }
+
+  attachCustomKeyEventHandler(handler: (event: KeyboardEvent) => boolean) {
+    this.terminal.attachCustomKeyEventHandler(handler);
   }
 
   getSelection() {
@@ -313,6 +318,7 @@ function terminalOptionsFor(settings: TerminalSettings): ITerminalOptions {
       foreground: "#d9e2ef",
       cursor: "#d9e2ef",
       selectionBackground: "#305f95",
+      selectionInactiveBackground: "#1e3a5f",
     },
   };
 }
