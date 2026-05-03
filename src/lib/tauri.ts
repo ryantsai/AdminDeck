@@ -442,6 +442,21 @@ type CommandMap = {
     };
     result: null;
   };
+  capture_tmux_pane: {
+    args: {
+      request: {
+        host: string;
+        user: string;
+        port?: number;
+        keyPath?: string;
+        proxyJump?: string;
+        authMethod?: "keyFile" | "password" | "agent";
+        secretOwnerId?: string;
+        tmuxSessionId: string;
+      };
+    };
+    result: string;
+  };
   launch_elevated_terminal: {
     args: { request: { shell: string } };
     result: null;

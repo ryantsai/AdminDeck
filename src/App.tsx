@@ -2548,10 +2548,18 @@ function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspac
     if (!renderer) {
       return;
     }
-    const text = renderer.getBufferText();
     const defaultFilename = formatBufferLogFilename(targetPane?.title ?? tab.title);
 
     try {
+      const text =
+        targetPane?.connection?.type === "ssh" && targetPane.tmuxSessionId
+          ? await invokeCommand("capture_tmux_pane", {
+              request: {
+                ...tmuxConnectionRequest(targetPane.connection),
+                tmuxSessionId: targetPane.tmuxSessionId,
+              },
+            })
+          : renderer.getBufferText();
       await saveTextFile(defaultFilename, text);
     } catch (error) {
       window.alert(

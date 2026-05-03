@@ -73,6 +73,14 @@ pub struct CloseTmuxSessionRequest {
     pub tmux_session_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureTmuxPaneRequest {
+    #[serde(flatten)]
+    pub connection: TmuxConnectionRequest,
+    pub tmux_session_id: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TmuxSession {
@@ -275,6 +283,21 @@ impl SessionManager {
             tmux_close_command(&tmux_session_id),
         )?;
         Ok(())
+    }
+
+    pub fn capture_tmux_pane(
+        &self,
+        app: AppHandle,
+        secrets: &secrets::Secrets,
+        request: CaptureTmuxPaneRequest,
+    ) -> Result<String, String> {
+        let tmux_session_id = required_tmux_session_id(request.tmux_session_id)?;
+        run_tmux_command(
+            app,
+            secrets,
+            &request.connection,
+            tmux_capture_pane_command(&tmux_session_id),
+        )
     }
 
     pub fn write_terminal_input(&self, request: TerminalInputRequest) -> Result<(), String> {
@@ -611,6 +634,13 @@ fn tmux_close_command(tmux_session_id: &str) -> String {
     )
 }
 
+fn tmux_capture_pane_command(tmux_session_id: &str) -> String {
+    format!(
+        "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S - -t {}:",
+        shell_single_quote(tmux_session_id)
+    )
+}
+
 fn required_tmux_session_id(value: String) -> Result<String, String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -886,5 +916,21 @@ mod tests {
         assert_eq!(size.rows, 43);
         assert_eq!(size.pixel_width, 1200);
         assert_eq!(size.pixel_height, 720);
+    }
+
+    #[test]
+    fn tmux_capture_pane_command_targets_session_history() {
+        assert_eq!(
+            tmux_capture_pane_command("admindeck-test"),
+            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S - -t 'admindeck-test':"
+        );
+    }
+
+    #[test]
+    fn tmux_capture_pane_command_quotes_session_id() {
+        assert_eq!(
+            tmux_capture_pane_command("admindeck-test'quoted"),
+            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S - -t 'admindeck-test'\\''quoted':"
+        );
     }
 }

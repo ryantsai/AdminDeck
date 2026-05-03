@@ -338,6 +338,16 @@ fn close_tmux_session(
 }
 
 #[tauri::command]
+fn capture_tmux_pane(
+    app: tauri::AppHandle,
+    sessions: tauri::State<'_, sessions::SessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: sessions::CaptureTmuxPaneRequest,
+) -> Result<String, String> {
+    sessions.capture_tmux_pane(app, &secrets, request)
+}
+
+#[tauri::command]
 fn launch_elevated_terminal(
     request: sessions::LaunchElevatedTerminalRequest,
 ) -> Result<(), String> {
@@ -593,6 +603,7 @@ pub fn run() {
             close_terminal_session,
             list_tmux_sessions,
             close_tmux_session,
+            capture_tmux_pane,
             launch_elevated_terminal,
             start_sftp_session,
             list_sftp_directory,
