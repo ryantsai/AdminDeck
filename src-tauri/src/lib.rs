@@ -102,6 +102,14 @@ fn rename_connection(
 }
 
 #[tauri::command]
+fn update_connection(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::UpdateConnectionRequest,
+) -> Result<storage::SavedConnection, String> {
+    storage.update_connection(request)
+}
+
+#[tauri::command]
 fn delete_connection(
     storage: tauri::State<'_, storage::Storage>,
     connection_id: String,
@@ -649,6 +657,7 @@ pub fn run() {
             rename_connection_folder,
             delete_connection_folder,
             rename_connection,
+            update_connection,
             delete_connection,
             duplicate_connection,
             move_connection_folder,

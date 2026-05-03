@@ -22,6 +22,7 @@ import type {
   SshSettings,
   StoreSecretRequest,
   TerminalSettings,
+  UpdateConnectionRequest,
 } from "../types";
 
 type BrowserFileHandle = {
@@ -337,6 +338,10 @@ type CommandMap = {
   };
   rename_connection: {
     args: { request: RenameConnectionRequest };
+    result: Connection;
+  };
+  update_connection: {
+    args: { request: UpdateConnectionRequest };
     result: Connection;
   };
   delete_connection: {

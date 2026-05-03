@@ -47,9 +47,16 @@ import {
   X,
 } from "lucide-react";
 import {
+  AddComputer as IconParkAddComputer,
+  CollapseTextInput as IconParkCollapseTextInput,
   DataScreen as IconParkDataScreen,
+  Delete as IconParkDelete,
+  Edit as IconParkEdit,
+  ExpandTextInput as IconParkExpandTextInput,
+  FolderPlus as IconParkFolderPlus,
   LaptopComputer as IconParkLaptopComputer,
   Server as IconParkServer,
+  Setting as IconParkSetting,
   Terminal as IconParkTerminal,
 } from "@icon-park/react";
 import { listen } from "@tauri-apps/api/event";
@@ -154,6 +161,7 @@ import type {
   TerminalCursorStyle,
   TerminalPane,
   TerminalSettings,
+  UpdateConnectionRequest,
   WorkspaceTab,
 } from "./types";
 
@@ -183,6 +191,35 @@ type TreeDragPreview = {
   offsetX: number;
   offsetY: number;
   width: number;
+};
+
+type PendingFolderDraft = {
+  parentFolderId?: string;
+};
+
+type TreeContextMenuState =
+  | {
+      kind: "tree";
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "folder";
+      folder: ConnectionFolder;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "connection";
+      connection: Connection;
+      folderId?: string;
+      x: number;
+      y: number;
+    };
+
+type EditConnectionState = {
+  connection: Connection;
+  folderId?: string;
 };
 
 type ConnectionDialogRequest = CreateConnectionRequest & {
@@ -852,6 +889,17 @@ function App() {
       .catch(() => undefined);
   }, [setAiProviderHasApiKey]);
 
+  useEffect(() => {
+    const preventDefaultContextMenu = (event: globalThis.MouseEvent) => {
+      event.preventDefault();
+    };
+
+    window.addEventListener("contextmenu", preventDefaultContextMenu, { capture: true });
+    return () => {
+      window.removeEventListener("contextmenu", preventDefaultContextMenu, { capture: true });
+    };
+  }, []);
+
   return (
     <div
       className={`app-shell ${activePage === "settings" ? "settings-mode" : ""} ${
@@ -1053,6 +1101,10 @@ function ConnectionSidebar({
   const [dropTarget, setDropTarget] = useState("");
   const [dragPreview, setDragPreview] = useState<TreeDragPreview | null>(null);
   const [draggedSourceId, setDraggedSourceId] = useState("");
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(() => new Set());
+  const [pendingFolderDraft, setPendingFolderDraft] = useState<PendingFolderDraft | null>(null);
+  const [treeContextMenu, setTreeContextMenu] = useState<TreeContextMenuState | null>(null);
+  const [editConnection, setEditConnection] = useState<EditConnectionState | null>(null);
   const quickConnectRef = useRef<HTMLDivElement | null>(null);
   const draggedItemRef = useRef<DraggedTreeItem | null>(null);
   const pointerDragTargetRef = useRef<TreeDropTarget | null>(null);
@@ -1285,8 +1337,67 @@ function ConnectionSidebar({
     }
   }
 
-  async function handleCreateFolder(parentFolderId?: string) {
-    const name = window.prompt("New folder name")?.trim();
+  async function handleConnectionUpdate(request: ConnectionDialogRequest) {
+    if (!editConnection) {
+      return;
+    }
+
+    setFormError("");
+    const { password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
+    const updateRequest: UpdateConnectionRequest = {
+      ...connectionRequest,
+      id: editConnection.connection.id,
+      type: editConnection.connection.type,
+    };
+
+    try {
+      const connection = await invokeCommand("update_connection", {
+        request: updateRequest,
+      });
+      if (password) {
+        await storeConnectionPassword(connection.id, password);
+      }
+      if (connection.type === "url" && urlPassword) {
+        await storeUrlPassword(connection.id, urlPassword);
+      }
+      if (connection.type === "url" && urlCredentialUsername) {
+        await upsertUrlCredential(connection.id, urlCredentialUsername);
+      }
+      await reloadConnectionGroups();
+      setEditConnection(null);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function handleCreateFolder(parentFolderId?: string) {
+    setTreeError("");
+    if (parentFolderId) {
+      setCollapsedFolderIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(parentFolderId);
+        return nextIds;
+      });
+    }
+    setPendingFolderDraft({ parentFolderId });
+  }
+
+  function handleCancelPendingFolder() {
+    setPendingFolderDraft(null);
+  }
+
+  async function handleCommitPendingFolder(name: string, parentFolderId?: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      handleCancelPendingFolder();
+      return;
+    }
+
+    setPendingFolderDraft(null);
+    await createFolder(trimmedName, parentFolderId);
+  }
+
+  async function createFolder(name: string, parentFolderId?: string) {
     if (!name) {
       return;
     }
@@ -1353,18 +1464,6 @@ function ConnectionSidebar({
       setTreeError("");
       await invokeCommand("rename_connection", {
         request: { id: connection.id, name },
-      });
-      await reloadConnectionGroups();
-    } catch (error) {
-      setTreeError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleDuplicateConnection(connection: Connection) {
-    try {
-      setTreeError("");
-      await invokeCommand("duplicate_connection", {
-        request: { id: connection.id },
       });
       await reloadConnectionGroups();
     } catch (error) {
@@ -1463,6 +1562,65 @@ function ConnectionSidebar({
     event.preventDefault();
     event.stopPropagation();
     suppressTreeClickRef.current = false;
+  }
+
+  function handleTreeContextMenu(event: ReactMouseEvent<HTMLElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setTreeContextMenu({
+      kind: "tree",
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
+  function handleConnectionContextMenu(
+    connection: Connection,
+    folderId: string | undefined,
+    event: ReactMouseEvent<HTMLElement>,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setTreeContextMenu({
+      kind: "connection",
+      connection,
+      folderId,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
+  function handleFolderContextMenu(folder: ConnectionFolder, event: ReactMouseEvent<HTMLElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setTreeContextMenu({
+      kind: "folder",
+      folder,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
+  function handleToggleFolder(folderId: string) {
+    setCollapsedFolderIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (nextIds.has(folderId)) {
+        nextIds.delete(folderId);
+      } else {
+        nextIds.add(folderId);
+      }
+      return nextIds;
+    });
+  }
+
+  function handleExpandAllFolders() {
+    setCollapsedFolderIds(new Set());
+    setTreeContextMenu(null);
+  }
+
+  function handleCollapseAllFolders() {
+    setCollapsedFolderIds(new Set(collectConnectionFolderIds(treeWithLiveStatuses.folders)));
+    setTreeContextMenu(null);
   }
 
   function completeTreeDrop(item: DraggedTreeItem, target: TreeDropTarget) {
@@ -1740,6 +1898,7 @@ function ConnectionSidebar({
         data-connection-count={filteredTree.connections.length}
         data-folder-count={filteredTree.folders.length}
         data-tree-drop-kind="root"
+        onContextMenu={handleTreeContextMenu}
       >
         {filteredTree.connections.map((connection, connectionIndex) => (
           <ConnectionRow
@@ -1750,9 +1909,8 @@ function ConnectionSidebar({
             isDraggingSource={draggedSourceId === `connection-${connection.id}`}
             isDropTarget={dropTarget === `connection-${connection.id}`}
             onClickCapture={handleTreeClickCapture}
-            onDelete={() => void handleDeleteConnection(connection)}
-            onDuplicate={() => void handleDuplicateConnection(connection)}
             onOpen={() => handleOpenConnection(connection)}
+            onContextMenu={(event) => handleConnectionContextMenu(connection, undefined, event)}
             onPointerDragStart={(event) =>
               handlePointerDragStart(
                 event,
@@ -1766,29 +1924,80 @@ function ConnectionSidebar({
                 },
               )
             }
-            onRename={() => void handleRenameConnection(connection)}
           />
         ))}
+        {pendingFolderDraft && !pendingFolderDraft.parentFolderId ? (
+          <NewFolderDraftRow
+            level={0}
+            onCancel={handleCancelPendingFolder}
+            onCommit={(name) => void handleCommitPendingFolder(name)}
+          />
+        ) : null}
         {filteredTree.folders.map((folder) => (
           <ConnectionFolderNode
             dragDisabled={isTreeFiltered}
             draggedSourceId={draggedSourceId}
             dropTarget={dropTarget}
             folder={folder}
+            collapsedFolderIds={collapsedFolderIds}
             key={folder.id}
             level={0}
             onClickCapture={handleTreeClickCapture}
+            pendingFolderDraft={pendingFolderDraft}
+            onCancelPendingFolder={handleCancelPendingFolder}
+            onCommitPendingFolder={handleCommitPendingFolder}
+            onContextMenu={handleFolderContextMenu}
+            onConnectionContextMenu={handleConnectionContextMenu}
             onCreateFolder={handleCreateFolder}
-            onDeleteConnection={handleDeleteConnection}
-            onDeleteFolder={handleDeleteFolder}
-            onDuplicateConnection={handleDuplicateConnection}
             onOpenConnection={handleOpenConnection}
             onPointerDragStart={handlePointerDragStart}
-            onRenameConnection={handleRenameConnection}
-            onRenameFolder={handleRenameFolder}
+            onToggleFolder={handleToggleFolder}
           />
         ))}
       </div>
+
+      {treeContextMenu ? (
+        <TreeContextMenu
+          menu={treeContextMenu}
+          onClose={() => setTreeContextMenu(null)}
+          onCollapseAll={handleCollapseAllFolders}
+          onCreateConnection={() => {
+            setTreeContextMenu(null);
+            setFormMode("save");
+          }}
+          onCreateFolder={() => {
+            setTreeContextMenu(null);
+            handleCreateFolder();
+          }}
+          onDelete={() => {
+            const menu = treeContextMenu;
+            setTreeContextMenu(null);
+            if (menu.kind === "connection") {
+              void handleDeleteConnection(menu.connection);
+            } else if (menu.kind === "folder") {
+              void handleDeleteFolder(menu.folder);
+            }
+          }}
+          onExpandAll={handleExpandAllFolders}
+          onProperties={() => {
+            const menu = treeContextMenu;
+            setTreeContextMenu(null);
+            if (menu.kind === "connection") {
+              setFormError("");
+              setEditConnection({ connection: menu.connection, folderId: menu.folderId });
+            }
+          }}
+          onRename={() => {
+            const menu = treeContextMenu;
+            setTreeContextMenu(null);
+            if (menu.kind === "connection") {
+              void handleRenameConnection(menu.connection);
+            } else if (menu.kind === "folder") {
+              void handleRenameFolder(menu.folder);
+            }
+          }}
+        />
+      ) : null}
 
       {dragPreview ? <TreeDragPreview preview={dragPreview} /> : null}
 
@@ -1805,11 +2014,27 @@ function ConnectionSidebar({
           onSubmit={handleConnectionSubmit}
         />
       ) : null}
+      {editConnection ? (
+        <ConnectionDialog
+          error={formError}
+          initialConnection={editConnection.connection}
+          initialFolderId={editConnection.folderId}
+          tree={tree}
+          mode="edit"
+          sshSettings={sshSettings}
+          onCancel={() => {
+            setEditConnection(null);
+            setFormError("");
+          }}
+          onSubmit={handleConnectionUpdate}
+        />
+      ) : null}
     </aside>
   );
 }
 
 function ConnectionFolderNode({
+  collapsedFolderIds,
   dragDisabled,
   draggedSourceId,
   dropTarget,
@@ -1817,14 +2042,16 @@ function ConnectionFolderNode({
   level,
   onClickCapture,
   onCreateFolder,
-  onDeleteConnection,
-  onDeleteFolder,
-  onDuplicateConnection,
   onOpenConnection,
   onPointerDragStart,
-  onRenameConnection,
-  onRenameFolder,
+  onToggleFolder,
+  onCancelPendingFolder,
+  onCommitPendingFolder,
+  onConnectionContextMenu,
+  onContextMenu,
+  pendingFolderDraft,
 }: {
+  collapsedFolderIds: Set<string>;
   dragDisabled: boolean;
   draggedSourceId: string;
   dropTarget: string;
@@ -1832,20 +2059,26 @@ function ConnectionFolderNode({
   level: number;
   onClickCapture: (event: ReactMouseEvent) => void;
   onCreateFolder: (parentFolderId?: string) => void | Promise<void>;
-  onDeleteConnection: (connection: Connection) => void | Promise<void>;
-  onDeleteFolder: (folder: ConnectionFolder) => void | Promise<void>;
-  onDuplicateConnection: (connection: Connection) => void | Promise<void>;
   onOpenConnection: (connection: Connection) => void;
   onPointerDragStart: (
     event: ReactPointerEvent<HTMLElement>,
     item: DraggedTreeItem,
     preview: Omit<TreeDragPreview, "x" | "y" | "offsetX" | "offsetY" | "width">,
   ) => void;
-  onRenameConnection: (connection: Connection) => void | Promise<void>;
-  onRenameFolder: (folder: ConnectionFolder) => void | Promise<void>;
+  onToggleFolder: (folderId: string) => void;
+  onCancelPendingFolder: () => void;
+  onCommitPendingFolder: (name: string, parentFolderId?: string) => void | Promise<void>;
+  onConnectionContextMenu: (
+    connection: Connection,
+    folderId: string | undefined,
+    event: ReactMouseEvent<HTMLElement>,
+  ) => void;
+  onContextMenu: (folder: ConnectionFolder, event: ReactMouseEvent<HTMLElement>) => void;
+  pendingFolderDraft: PendingFolderDraft | null;
 }) {
   const connectionCount = countConnections(folder);
   const folderCount = countFolders(folder.folders);
+  const isCollapsed = collapsedFolderIds.has(folder.id);
 
   return (
     <section className="tree-group" style={{ paddingLeft: level * 14 } as CSSProperties}>
@@ -1858,6 +2091,7 @@ function ConnectionFolderNode({
         data-folder-id={folder.id}
         data-tree-drop-kind="folder"
         onClickCapture={onClickCapture}
+        onContextMenu={(event) => onContextMenu(folder, event)}
         onPointerDown={(event) =>
           onPointerDragStart(
             event,
@@ -1870,12 +2104,26 @@ function ConnectionFolderNode({
           )
         }
       >
-        <button className="tree-folder">
-          <ChevronDown size={14} />
+        <div className="tree-folder">
+          <button
+            aria-expanded={!isCollapsed}
+            aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${folder.name}`}
+            className="tree-disclosure"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onToggleFolder(folder.id);
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            title={isCollapsed ? "Expand folder" : "Collapse folder"}
+            type="button"
+          >
+            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          </button>
           <Folder size={15} />
           <span>{folder.name}</span>
           <small>{connectionCount + folderCount}</small>
-        </button>
+        </div>
         <span className="folder-actions">
           <button
             className="row-action"
@@ -1884,71 +2132,229 @@ function ConnectionFolderNode({
           >
             <FolderPlus size={13} />
           </button>
-          <button
-            className="row-action"
-            aria-label={`Rename folder ${folder.name}`}
-            onClick={() => void onRenameFolder(folder)}
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            className="row-action danger"
-            aria-label={`Delete folder ${folder.name}`}
-            onClick={() => void onDeleteFolder(folder)}
-          >
-            <Trash2 size={13} />
-          </button>
         </span>
       </div>
-      {folder.connections.map((connection, connectionIndex) => (
-        <ConnectionRow
-          connection={connection}
-          connectionIndex={connectionIndex}
-          dragDisabled={dragDisabled}
-          folderId={folder.id}
-          isDraggingSource={draggedSourceId === `connection-${connection.id}`}
-          isDropTarget={dropTarget === `connection-${connection.id}`}
-          key={connection.id}
-          onClickCapture={onClickCapture}
-          onDelete={() => void onDeleteConnection(connection)}
-          onDuplicate={() => void onDuplicateConnection(connection)}
-          onOpen={() => onOpenConnection(connection)}
-          onPointerDragStart={(event) =>
-            onPointerDragStart(
-              event,
-              { kind: "connection", connectionId: connection.id },
-              {
-                kind: "connection",
-                title: connection.name,
-                subtitle: connection.host,
-                connectionType: connection.type,
-                connectionStatus: connection.status,
-              },
-            )
-          }
-          onRename={() => void onRenameConnection(connection)}
-        />
-      ))}
-      {folder.folders.map((childFolder) => (
-        <ConnectionFolderNode
-          dragDisabled={dragDisabled}
-          draggedSourceId={draggedSourceId}
-          dropTarget={dropTarget}
-          folder={childFolder}
-          key={childFolder.id}
-          level={level + 1}
-          onClickCapture={onClickCapture}
-          onCreateFolder={onCreateFolder}
-          onDeleteConnection={onDeleteConnection}
-          onDeleteFolder={onDeleteFolder}
-          onDuplicateConnection={onDuplicateConnection}
-          onOpenConnection={onOpenConnection}
-          onPointerDragStart={onPointerDragStart}
-          onRenameConnection={onRenameConnection}
-          onRenameFolder={onRenameFolder}
-        />
-      ))}
+      {!isCollapsed ? (
+        <>
+          {folder.connections.map((connection, connectionIndex) => (
+            <ConnectionRow
+              connection={connection}
+              connectionIndex={connectionIndex}
+              dragDisabled={dragDisabled}
+              folderId={folder.id}
+              isDraggingSource={draggedSourceId === `connection-${connection.id}`}
+              isDropTarget={dropTarget === `connection-${connection.id}`}
+              key={connection.id}
+              onClickCapture={onClickCapture}
+              onOpen={() => onOpenConnection(connection)}
+              onContextMenu={(event) => onConnectionContextMenu(connection, folder.id, event)}
+              onPointerDragStart={(event) =>
+                onPointerDragStart(
+                  event,
+                  { kind: "connection", connectionId: connection.id },
+                  {
+                    kind: "connection",
+                    title: connection.name,
+                    subtitle: connection.host,
+                    connectionType: connection.type,
+                    connectionStatus: connection.status,
+                  },
+                )
+              }
+            />
+          ))}
+          {pendingFolderDraft?.parentFolderId === folder.id ? (
+            <NewFolderDraftRow
+              level={level + 1}
+              onCancel={onCancelPendingFolder}
+              onCommit={(name) => void onCommitPendingFolder(name, folder.id)}
+            />
+          ) : null}
+          {folder.folders.map((childFolder) => (
+            <ConnectionFolderNode
+              collapsedFolderIds={collapsedFolderIds}
+              dragDisabled={dragDisabled}
+              draggedSourceId={draggedSourceId}
+              dropTarget={dropTarget}
+              folder={childFolder}
+              key={childFolder.id}
+              level={level + 1}
+              onClickCapture={onClickCapture}
+              pendingFolderDraft={pendingFolderDraft}
+              onCancelPendingFolder={onCancelPendingFolder}
+              onCommitPendingFolder={onCommitPendingFolder}
+              onConnectionContextMenu={onConnectionContextMenu}
+              onContextMenu={onContextMenu}
+              onCreateFolder={onCreateFolder}
+              onOpenConnection={onOpenConnection}
+              onPointerDragStart={onPointerDragStart}
+              onToggleFolder={onToggleFolder}
+            />
+          ))}
+        </>
+      ) : null}
     </section>
+  );
+}
+
+function NewFolderDraftRow({
+  level,
+  onCancel,
+  onCommit,
+}: {
+  level: number;
+  onCancel: () => void;
+  onCommit: (name: string) => void | Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isSettledRef = useRef(false);
+
+  useLayoutEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const settle = (name: string) => {
+    if (isSettledRef.current) {
+      return;
+    }
+
+    isSettledRef.current = true;
+    if (!name.trim()) {
+      onCancel();
+      return;
+    }
+
+    void onCommit(name);
+  };
+
+  return (
+    <div className="tree-group pending-folder-group" style={{ paddingLeft: level * 14 } as CSSProperties}>
+      <div className="tree-folder-row pending-folder-row">
+        <div className="tree-folder pending-folder">
+          <ChevronDown size={14} />
+          <Folder size={15} />
+          <input
+            aria-label="New folder name"
+            className="pending-folder-input"
+            onBlur={(event) => settle(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                settle(event.currentTarget.value);
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                isSettledRef.current = true;
+                onCancel();
+              }
+            }}
+            ref={inputRef}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TreeContextMenu({
+  menu,
+  onClose,
+  onCollapseAll,
+  onCreateConnection,
+  onCreateFolder,
+  onDelete,
+  onExpandAll,
+  onProperties,
+  onRename,
+}: {
+  menu: TreeContextMenuState;
+  onClose: () => void;
+  onCollapseAll: () => void;
+  onCreateConnection: () => void;
+  onCreateFolder: () => void;
+  onDelete: () => void;
+  onExpandAll: () => void;
+  onProperties: () => void;
+  onRename: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handlePointerDown = () => onClose();
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  useLayoutEffect(() => {
+    const node = menuRef.current;
+    if (!node) {
+      return;
+    }
+
+    const bounds = node.getBoundingClientRect();
+    const left = Math.min(menu.x, window.innerWidth - bounds.width - 8);
+    const top = Math.min(menu.y, window.innerHeight - bounds.height - 8);
+    node.style.left = `${Math.max(8, left)}px`;
+    node.style.top = `${Math.max(8, top)}px`;
+  }, [menu.x, menu.y]);
+
+  return (
+    <div
+      className="tree-context-menu"
+      onContextMenu={(event) => event.preventDefault()}
+      onPointerDown={(event) => event.stopPropagation()}
+      ref={menuRef}
+      role="menu"
+    >
+      {menu.kind === "tree" ? (
+        <>
+          <button onClick={onCreateConnection} role="menuitem" type="button">
+            <IconParkAddComputer className="menu-item-icon" size={15} />
+            <span>New Connection</span>
+          </button>
+          <button onClick={onCreateFolder} role="menuitem" type="button">
+            <IconParkFolderPlus className="menu-item-icon" size={15} />
+            <span>New Folder</span>
+          </button>
+        </>
+      ) : null}
+      <button onClick={onExpandAll} role="menuitem" type="button">
+        <IconParkExpandTextInput className="menu-item-icon" size={15} />
+        <span>Expand All</span>
+      </button>
+      <button onClick={onCollapseAll} role="menuitem" type="button">
+        <IconParkCollapseTextInput className="menu-item-icon" size={15} />
+        <span>Collapse All</span>
+      </button>
+      {menu.kind !== "tree" ? (
+        <>
+          <button onClick={onRename} role="menuitem" type="button">
+            <IconParkEdit className="menu-item-icon" size={15} />
+            <span>Rename</span>
+          </button>
+          <button onClick={onDelete} role="menuitem" type="button">
+            <IconParkDelete className="menu-item-icon" size={15} />
+            <span>Delete</span>
+          </button>
+        </>
+      ) : null}
+      {menu.kind === "connection" ? (
+        <button onClick={onProperties} role="menuitem" type="button">
+          <IconParkSetting className="menu-item-icon" size={15} />
+          <span>Properties</span>
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -2108,6 +2514,8 @@ function ConnectionGlyph({
 
 function ConnectionDialog({
   error,
+  initialConnection,
+  initialFolderId,
   tree,
   mode,
   sshSettings,
@@ -2115,21 +2523,31 @@ function ConnectionDialog({
   onSubmit,
 }: {
   error: string;
+  initialConnection?: Connection;
+  initialFolderId?: string;
   tree: ConnectionTree;
-  mode: "save" | "quick";
+  mode: "save" | "quick" | "edit";
   sshSettings: SshSettings;
   onCancel: () => void;
   onSubmit: (request: ConnectionDialogRequest) => void | Promise<void>;
 }) {
-  const [connectionType, setConnectionType] = useState<ConnectionTileType | "">("");
-  const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
-  const [keyPath, setKeyPath] = useState(sshSettings.defaultKeyPath ?? "");
+  const [connectionType, setConnectionType] = useState<ConnectionType | "">(
+    initialConnection?.type ?? "",
+  );
+  const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">(
+    initialConnection?.authMethod ?? "keyFile",
+  );
+  const [keyPath, setKeyPath] = useState(
+    initialConnection?.keyPath ?? sshSettings.defaultKeyPath ?? "",
+  );
   const usesSshDefaults = connectionType === "ssh";
   const usesRemoteDesktopFields = connectionType
     ? isRemoteDesktopConnectionType(connectionType)
     : false;
   const folderOptions = useMemo(() => flattenFolders(tree.folders), [tree.folders]);
   const localShellOptions = useMemo(() => localShellOptionsForPlatform(), []);
+  const isEditMode = mode === "edit";
+  const isUrlConnection = connectionType === "url";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2137,14 +2555,22 @@ function ConnectionDialog({
       return;
     }
     const form = new FormData(event.currentTarget);
-    const selectedLocalShell = String(form.get("localShell") ?? localShellOptions[0]?.value ?? "");
+    const selectedLocalShell = String(
+      form.get("localShell") ??
+        initialConnection?.localShell ??
+        localShellOptions[0]?.value ??
+        "",
+    );
     const selectedLocalShellLabel =
       localShellOptions.find((option) => (option.value ?? "") === selectedLocalShell)?.label ??
       "Local terminal";
+    const rawUrl = String(form.get("url") ?? "").trim();
     const host =
       connectionType === "local"
         ? "localhost"
-        : String(form.get("host") ?? "").trim();
+        : connectionType === "url"
+          ? rawUrl
+          : String(form.get("host") ?? "").trim();
     const requestedName = String(form.get("name") ?? "").trim();
     const name =
       connectionType === "local"
@@ -2162,7 +2588,9 @@ function ConnectionDialog({
       user:
         connectionType === "local"
           ? "local"
-          : String(form.get("user") ?? "").trim(),
+          : connectionType === "url"
+            ? initialConnection?.user ?? "web"
+            : String(form.get("user") ?? "").trim(),
       type: connectionType,
       folderId: String(form.get("folderId") ?? "").trim() || undefined,
       port: portValue ? Number(portValue) : undefined,
@@ -2171,16 +2599,22 @@ function ConnectionDialog({
       authMethod: usesSshDefaults ? authMethod : undefined,
       useTmuxSessions: usesSshDefaults ? useTmuxSessions : undefined,
       localShell: connectionType === "local" ? selectedLocalShell || undefined : undefined,
-      url: undefined,
-      dataPartition: undefined,
+      url: connectionType === "url" ? rawUrl : undefined,
+      dataPartition:
+        connectionType === "url"
+          ? String(form.get("dataPartition") ?? "").trim() || undefined
+          : undefined,
       password:
         usesSshDefaults && authMethod === "password"
           ? password
           : usesRemoteDesktopFields
             ? password || undefined
             : undefined,
-      urlCredentialUsername: undefined,
-      urlPassword: undefined,
+      urlCredentialUsername:
+        connectionType === "url"
+          ? String(form.get("urlCredentialUsername") ?? "").trim() || undefined
+          : undefined,
+      urlPassword: connectionType === "url" ? String(form.get("urlPassword") ?? "") || undefined : undefined,
     });
   }
 
@@ -2195,10 +2629,12 @@ function ConnectionDialog({
     <div className="dialog-backdrop" role="presentation">
       <form className="connection-dialog" onSubmit={handleSubmit}>
         <header
-          className={mode === "save" ? "connection-dialog-header compact" : "connection-dialog-header"}
+          className={mode === "quick" ? "connection-dialog-header" : "connection-dialog-header compact"}
         >
           <div>
-            <p className="panel-label">{mode === "save" ? "New connection" : "Quick connect"}</p>
+            <p className="panel-label">
+              {mode === "edit" ? "Connection properties" : mode === "save" ? "New connection" : "Quick connect"}
+            </p>
             {mode === "quick" ? <h2>Open one-off session</h2> : null}
           </div>
           {mode === "quick" ? (
@@ -2208,36 +2644,46 @@ function ConnectionDialog({
           ) : null}
         </header>
 
-        <fieldset className="connection-type-picker">
-          <legend>Type*</legend>
-          <div className="connection-type-grid">
-            {CONNECTION_TYPE_TILES.map((tile) => (
-              <button
-                aria-pressed={connectionType === tile.type}
-                className={`connection-type-tile ${connectionType === tile.type ? "selected" : ""}`}
-                key={tile.type}
-                onClick={() => setConnectionType(tile.type)}
-                style={{ "--tile-accent": tile.accent } as CSSProperties}
-                type="button"
-              >
-                <span className="connection-type-icon">
-                  <ConnectionTypeGlyph type={tile.type} size={32} />
-                </span>
-                <span className="connection-type-copy">
-                  <strong>{tile.title}</strong>
-                  <small>{tile.description}</small>
-                </span>
-              </button>
-            ))}
+        {isEditMode && initialConnection ? (
+          <div className="connection-type-summary">
+            <ConnectionGlyph size={20} type={initialConnection.type} />
+            <span>
+              <strong>{connectionTypeLabel(initialConnection.type)}</strong>
+              <small>{connectionSubtitle(initialConnection)}</small>
+            </span>
           </div>
-        </fieldset>
+        ) : (
+          <fieldset className="connection-type-picker">
+            <legend>Type*</legend>
+            <div className="connection-type-grid">
+              {CONNECTION_TYPE_TILES.map((tile) => (
+                <button
+                  aria-pressed={connectionType === tile.type}
+                  className={`connection-type-tile ${connectionType === tile.type ? "selected" : ""}`}
+                  key={tile.type}
+                  onClick={() => setConnectionType(tile.type)}
+                  style={{ "--tile-accent": tile.accent } as CSSProperties}
+                  type="button"
+                >
+                  <span className="connection-type-icon">
+                    <ConnectionTypeGlyph type={tile.type} size={32} />
+                  </span>
+                  <span className="connection-type-copy">
+                    <strong>{tile.title}</strong>
+                    <small>{tile.description}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         {connectionType ? (
           <div className="connection-dialog-fields">
-            {mode === "save" ? (
+            {mode === "save" || mode === "edit" ? (
               <label>
                 <span>Folder</span>
-                <select name="folderId" defaultValue="">
+                <select name="folderId" defaultValue={initialFolderId ?? ""}>
                   <option value="">Root</option>
                   {folderOptions.map((option) => (
                     <option value={option.folder.id} key={option.folder.id}>
@@ -2253,11 +2699,14 @@ function ConnectionDialog({
               <>
                 <label>
                   <span>Name(Optional)</span>
-                  <input name="name" placeholder="Connection name" />
+                  <input name="name" defaultValue={initialConnection?.name ?? ""} placeholder="Connection name" />
                 </label>
                 <label>
                   <span>Shell</span>
-                  <select name="localShell" defaultValue={localShellOptions[0]?.value ?? ""}>
+                  <select
+                    name="localShell"
+                    defaultValue={initialConnection?.localShell ?? localShellOptions[0]?.value ?? ""}
+                  >
                     {localShellOptions.map((option) => (
                       <option value={option.value ?? ""} key={option.value ?? option.label}>
                         {option.label}
@@ -2266,16 +2715,59 @@ function ConnectionDialog({
                   </select>
                 </label>
               </>
+            ) : isUrlConnection ? (
+              <>
+                <label>
+                  <span>Name(Optional)</span>
+                  <input name="name" defaultValue={initialConnection?.name ?? ""} placeholder="Connection name" />
+                </label>
+                <label>
+                  <span>URL*</span>
+                  <input name="url" defaultValue={initialConnection?.url ?? ""} placeholder="https://example.com" required />
+                </label>
+                <div className="form-grid">
+                  <label>
+                    <span>Data partition</span>
+                    <input
+                      name="dataPartition"
+                      defaultValue={initialConnection?.dataPartition ?? ""}
+                      placeholder="Default"
+                    />
+                  </label>
+                  <label>
+                    <span>Credential user</span>
+                    <input
+                      name="urlCredentialUsername"
+                      defaultValue={initialConnection?.urlCredentialUsername ?? ""}
+                      placeholder="Optional username"
+                    />
+                  </label>
+                </div>
+                <label>
+                  <span>Password</span>
+                  <input
+                    autoComplete="current-password"
+                    name="urlPassword"
+                    placeholder={isEditMode ? "Leave blank to keep stored password" : "Stored in OS keychain"}
+                    type="password"
+                  />
+                </label>
+              </>
             ) : (
               <>
                 <label>
                   <span>Name(Optional)</span>
-                  <input name="name" placeholder="Connection name" />
+                  <input name="name" defaultValue={initialConnection?.name ?? ""} placeholder="Connection name" />
                 </label>
 
                 <label>
                   <span>Host*</span>
-                  <input name="host" placeholder="example.internal" required />
+                  <input
+                    name="host"
+                    defaultValue={initialConnection?.host ?? ""}
+                    placeholder="example.internal"
+                    required
+                  />
                 </label>
 
                 <div className="form-grid">
@@ -2284,7 +2776,10 @@ function ConnectionDialog({
                     <input
                       key={`user-${connectionType}`}
                       name="user"
-                      defaultValue={connectionType === "ssh" ? sshSettings.defaultUser : ""}
+                      defaultValue={
+                        initialConnection?.user ??
+                        (connectionType === "ssh" ? sshSettings.defaultUser : "")
+                      }
                       placeholder={
                         connectionType === "rdp"
                           ? "DOMAIN\\admin"
@@ -2300,7 +2795,9 @@ function ConnectionDialog({
                     <input
                       key={`port-${connectionType}`}
                       name="port"
-                      defaultValue={defaultPortForConnectionType(connectionType, sshSettings)}
+                      defaultValue={
+                        initialConnection?.port ?? defaultPortForConnectionType(connectionType, sshSettings)
+                      }
                       inputMode="numeric"
                       min="1"
                       max="65535"
@@ -2318,7 +2815,7 @@ function ConnectionDialog({
                 <input
                   autoComplete="current-password"
                   name="password"
-                  placeholder="Stored in OS keychain"
+                  placeholder={isEditMode ? "Leave blank to keep stored password" : "Stored in OS keychain"}
                   type="password"
                 />
               </label>
@@ -2346,7 +2843,7 @@ function ConnectionDialog({
                     <span>Proxy jump</span>
                     <input
                       name="proxyJump"
-                      defaultValue={sshSettings.defaultProxyJump ?? ""}
+                      defaultValue={initialConnection?.proxyJump ?? sshSettings.defaultProxyJump ?? ""}
                       placeholder="jump.internal"
                     />
                   </label>
@@ -2357,8 +2854,8 @@ function ConnectionDialog({
                     <span>Password*</span>
                     <input
                       name="password"
-                      placeholder="Stored in OS keychain"
-                      required
+                      placeholder={isEditMode ? "Leave blank to keep stored password" : "Stored in OS keychain"}
+                      required={!isEditMode || !initialConnection?.hasPassword}
                       type="password"
                     />
                   </label>
@@ -2379,7 +2876,11 @@ function ConnectionDialog({
                   </label>
                 ) : null}
                 <label className="checkbox-row">
-                  <input name="useTmuxSessions" type="checkbox" defaultChecked />
+                  <input
+                    name="useTmuxSessions"
+                    type="checkbox"
+                    defaultChecked={initialConnection?.useTmuxSessions ?? true}
+                  />
                   <span>Use tmux sessions</span>
                 </label>
               </>
@@ -2391,8 +2892,8 @@ function ConnectionDialog({
 
         <div className="dialog-actions">
           <button className="approve-button" disabled={!connectionType} type="submit">
-            {mode === "save" ? <Save size={15} /> : <Play size={15} />}
-            {mode === "save" ? "Save" : "Connect"}
+            {mode === "quick" ? <Play size={15} /> : <Save size={15} />}
+            {mode === "quick" ? "Connect" : "Save"}
           </button>
           <button className="toolbar-button" type="button" onClick={onCancel}>
             Cancel
@@ -2444,12 +2945,10 @@ function ConnectionRow({
   folderId,
   isDraggingSource,
   isDropTarget,
-  onDelete,
-  onDuplicate,
   onClickCapture,
+  onContextMenu,
   onOpen,
   onPointerDragStart,
-  onRename,
 }: {
   connection: Connection;
   connectionIndex: number;
@@ -2457,12 +2956,10 @@ function ConnectionRow({
   folderId?: string;
   isDraggingSource: boolean;
   isDropTarget: boolean;
-  onDelete: () => void;
-  onDuplicate: () => void;
   onClickCapture: (event: ReactMouseEvent) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
   onOpen: () => void;
   onPointerDragStart: (event: ReactPointerEvent<HTMLElement>) => void;
-  onRename: () => void;
 }) {
   return (
     <div
@@ -2475,6 +2972,7 @@ function ConnectionRow({
       data-folder-id={folderId ?? ""}
       data-tree-drop-kind="connection"
       onClickCapture={onClickCapture}
+      onContextMenu={onContextMenu}
       onPointerDown={onPointerDragStart}
     >
       <button className="connection-open" onClick={onOpen}>
@@ -2485,17 +2983,6 @@ function ConnectionRow({
         </span>
       </button>
       <span className={`status-dot ${connection.status}`} />
-      <span className="connection-actions">
-        <button className="row-action" aria-label={`Rename ${connection.name}`} onClick={onRename}>
-          <Pencil size={13} />
-        </button>
-        <button className="row-action" aria-label={`Duplicate ${connection.name}`} onClick={onDuplicate}>
-          <Copy size={13} />
-        </button>
-        <button className="row-action danger" aria-label={`Delete ${connection.name}`} onClick={onDelete}>
-          <Trash2 size={13} />
-        </button>
-      </span>
     </div>
   );
 }
@@ -2620,6 +3107,10 @@ function flattenFolders(
     { folder, level },
     ...flattenFolders(folder.folders, level + 1),
   ]);
+}
+
+function collectConnectionFolderIds(folders: ConnectionFolder[]): string[] {
+  return folders.flatMap((folder) => [folder.id, ...collectConnectionFolderIds(folder.folders)]);
 }
 
 function countConnections(folder: ConnectionFolder): number {

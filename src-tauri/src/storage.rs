@@ -175,6 +175,28 @@ pub struct CreateConnectionRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateConnectionRequest {
+    id: String,
+    name: String,
+    #[serde(default)]
+    host: String,
+    #[serde(default)]
+    user: String,
+    #[serde(rename = "type")]
+    connection_type: String,
+    folder_id: Option<String>,
+    port: Option<u16>,
+    key_path: Option<String>,
+    proxy_jump: Option<String>,
+    auth_method: Option<String>,
+    local_shell: Option<String>,
+    url: Option<String>,
+    data_partition: Option<String>,
+    use_tmux_sessions: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateConnectionFolderRequest {
     name: String,
     parent_folder_id: Option<String>,
@@ -520,6 +542,121 @@ impl Storage {
             tags,
             status: "idle".to_string(),
         })
+    }
+
+    pub fn update_connection(
+        &self,
+        request: UpdateConnectionRequest,
+    ) -> Result<SavedConnection, String> {
+        let id = required_field("connection id", request.id)?;
+        let connection_type = normalize_connection_type(&request.connection_type)?;
+        let name = required_field("name", request.name)?;
+        let url = normalize_url_field(request.url, &connection_type)?;
+        let host = if connection_type == "url" {
+            url.as_deref()
+                .and_then(|value| extract_url_host(value))
+                .unwrap_or_default()
+        } else {
+            required_field("host", request.host)?
+        };
+        let user = normalize_connection_user(request.user, &connection_type)?;
+        let target_folder_id = normalize_optional_id(request.folder_id);
+        let key_path = normalize_ssh_optional_field(request.key_path, &connection_type);
+        let proxy_jump = normalize_ssh_optional_field(request.proxy_jump, &connection_type);
+        let auth_method = normalize_auth_method(request.auth_method, &connection_type, &key_path)?;
+        let local_shell = normalize_local_shell(request.local_shell, &connection_type)?;
+        let data_partition = normalize_data_partition(request.data_partition, &connection_type)?;
+        let use_tmux_sessions =
+            normalize_use_tmux_sessions(request.use_tmux_sessions, &connection_type);
+
+        let mut connection = self.lock()?;
+        let transaction = connection.transaction().map_err(to_storage_error)?;
+        let existing = transaction
+            .query_row(
+                "SELECT folder_id, connection_type, tmux_connection_id FROM connections WHERE id = ?1",
+                params![&id],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(to_storage_error)?
+            .ok_or_else(|| "connection was not found".to_string())?;
+
+        let (source_folder_id, existing_connection_type, existing_tmux_connection_id) = existing;
+        if existing_connection_type != connection_type {
+            return Err("connection type cannot be changed".to_string());
+        }
+        if let Some(folder_id) = target_folder_id.as_deref() {
+            ensure_folder_exists(&transaction, folder_id, folder_name_for(folder_id))?;
+        }
+
+        let tmux_connection_id = if use_tmux_sessions && connection_type == "ssh" {
+            Some(existing_tmux_connection_id.unwrap_or_else(|| make_tmux_connection_id(&id)))
+        } else {
+            None
+        };
+        let sort_order = if source_folder_id == target_folder_id {
+            transaction
+                .query_row(
+                    "SELECT sort_order FROM connections WHERE id = ?1",
+                    params![&id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(to_storage_error)?
+        } else {
+            next_connection_sort_order(&transaction, target_folder_id.as_deref())?
+        };
+
+        transaction
+            .execute(
+                "UPDATE connections
+                 SET folder_id = ?1,
+                     name = ?2,
+                     host = ?3,
+                     username = ?4,
+                     port = ?5,
+                     key_path = ?6,
+                     proxy_jump = ?7,
+                     auth_method = ?8,
+                     local_shell = ?9,
+                     url = ?10,
+                     data_partition = ?11,
+                     use_tmux_sessions = ?12,
+                     tmux_connection_id = ?13,
+                     sort_order = ?14
+                 WHERE id = ?15",
+                params![
+                    target_folder_id,
+                    name,
+                    host,
+                    user,
+                    request.port,
+                    key_path,
+                    proxy_jump,
+                    auth_method,
+                    local_shell,
+                    url,
+                    data_partition,
+                    use_tmux_sessions,
+                    tmux_connection_id,
+                    sort_order,
+                    &id
+                ],
+            )
+            .map_err(to_storage_error)?;
+
+        if source_folder_id != target_folder_id {
+            reorder_connection_ids(&transaction, source_folder_id.as_deref(), None)?;
+            reorder_connection_ids(&transaction, target_folder_id.as_deref(), None)?;
+        }
+
+        transaction.commit().map_err(to_storage_error)?;
+        get_connection_by_id(&connection, &id)
     }
 
     pub fn upsert_url_credential(
@@ -2124,8 +2261,7 @@ mod tests {
 
     #[test]
     fn create_connection_can_persist_remote_desktop_connections() {
-        let storage =
-            Storage::open(temp_db_path("remote-desktop-create")).expect("storage opens");
+        let storage = Storage::open(temp_db_path("remote-desktop-create")).expect("storage opens");
 
         let rdp = storage
             .create_connection(CreateConnectionRequest {
@@ -2271,6 +2407,73 @@ mod tests {
         let staging = find_folder(&tree.folders, &staging.id).expect("staging folder exists");
 
         assert_eq!(staging.connections[0].name, "API Stage Blue");
+    }
+
+    #[test]
+    fn update_connection_edits_fields_and_moves_folder() {
+        let storage = Storage::open(temp_db_path("update")).expect("storage opens");
+        let staging = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Staging".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("staging folder is created");
+        let production = storage
+            .create_connection_folder(CreateConnectionFolderRequest {
+                name: "Production".to_string(),
+                parent_folder_id: None,
+            })
+            .expect("production folder is created");
+        let connection = create_test_ssh_connection(
+            &storage,
+            "API Stage",
+            "api-stage.internal",
+            Some(staging.id.clone()),
+        );
+
+        let updated = storage
+            .update_connection(UpdateConnectionRequest {
+                id: connection.id.clone(),
+                name: "API Production".to_string(),
+                host: "api-prod.internal".to_string(),
+                user: "deploy".to_string(),
+                connection_type: "ssh".to_string(),
+                folder_id: Some(production.id.clone()),
+                port: Some(2222),
+                key_path: Some("C:\\Users\\ryan\\.ssh\\prod".to_string()),
+                proxy_jump: Some("jump.internal".to_string()),
+                auth_method: Some("keyFile".to_string()),
+                local_shell: None,
+                url: None,
+                data_partition: None,
+                use_tmux_sessions: Some(false),
+            })
+            .expect("connection is updated");
+
+        assert_eq!(updated.id, connection.id);
+        assert_eq!(updated.name, "API Production");
+        assert_eq!(updated.host, "api-prod.internal");
+        assert_eq!(updated.user, "deploy");
+        assert_eq!(updated.port, Some(2222));
+        assert_eq!(
+            updated.key_path.as_deref(),
+            Some("C:\\Users\\ryan\\.ssh\\prod")
+        );
+        assert_eq!(updated.proxy_jump.as_deref(), Some("jump.internal"));
+        assert_eq!(updated.auth_method, "keyFile");
+        assert!(!updated.use_tmux_sessions);
+        assert!(updated.tmux_connection_id.is_none());
+
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let staging = find_folder(&tree.folders, &staging.id).expect("staging folder exists");
+        let production =
+            find_folder(&tree.folders, &production.id).expect("production folder exists");
+
+        assert!(staging.connections.is_empty());
+        assert_eq!(production.connections[0].id, connection.id);
+        assert_eq!(production.connections[0].name, "API Production");
     }
 
     #[test]

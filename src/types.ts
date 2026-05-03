@@ -66,6 +66,10 @@ export interface RenameConnectionRequest {
   name: string;
 }
 
+export interface UpdateConnectionRequest extends CreateConnectionRequest {
+  id: string;
+}
+
 export interface DuplicateConnectionRequest {
   id: string;
   name?: string;
