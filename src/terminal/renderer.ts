@@ -5,6 +5,7 @@ import {
   type ISearchResultChangeEvent,
 } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { WebglAddon } from "@xterm/addon-webgl";
 import {
   Terminal as XtermTerminal,
   type IDisposable,
@@ -83,6 +84,8 @@ class XtermTerminalRenderer implements TerminalRenderer {
   private hostElement: HTMLElement | null = null;
   private readonly searchAddon = new SearchAddon({ highlightLimit: 500 });
   private readonly terminal: XtermTerminal;
+  private webglAddon: WebglAddon | null = null;
+  private webglContextLossDisposable: IDisposable | null = null;
 
   constructor(settings: TerminalSettings) {
     this.terminal = new XtermTerminal(terminalOptionsFor(settings));
@@ -103,6 +106,7 @@ class XtermTerminalRenderer implements TerminalRenderer {
 
   dispose() {
     this.hostElement = null;
+    this.disposeWebglAddon();
     this.terminal.dispose();
   }
 
@@ -162,6 +166,42 @@ class XtermTerminalRenderer implements TerminalRenderer {
   open(element: HTMLElement) {
     this.hostElement = element;
     this.terminal.open(element);
+    this.tryEnableWebglRenderer();
+  }
+
+  private tryEnableWebglRenderer() {
+    if (this.webglAddon) {
+      return;
+    }
+
+    let addon: WebglAddon;
+    try {
+      addon = new WebglAddon();
+    } catch {
+      // WebGL2 unavailable (driver, headless RDP, blocklist) — stay on DOM.
+      return;
+    }
+
+    try {
+      this.terminal.loadAddon(addon);
+    } catch {
+      addon.dispose();
+      return;
+    }
+
+    this.webglContextLossDisposable = addon.onContextLoss(() => {
+      // GPU context evicted (sleep/wake, GPU reset). Drop the addon and let
+      // xterm fall back to its DOM renderer for subsequent frames.
+      this.disposeWebglAddon();
+    });
+    this.webglAddon = addon;
+  }
+
+  private disposeWebglAddon() {
+    this.webglContextLossDisposable?.dispose();
+    this.webglContextLossDisposable = null;
+    this.webglAddon?.dispose();
+    this.webglAddon = null;
   }
 
   write(data: string) {

@@ -73,6 +73,18 @@ Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `sr
 
 This run meets every measured performance budget. SSH readiness remains the only documented performance budget not validated by this run.
 
+## Terminal Glyph Renderer
+
+Terminal panes use `xterm.js` with the `@xterm/addon-webgl` GPU glyph renderer attached opportunistically. The addon is loaded after `Terminal.open()` in `src/terminal/renderer.ts`; if WebGL2 is unavailable (driver blocklist, headless RDP, virtualized GPU) the renderer silently stays on the xterm DOM renderer. On `onContextLoss` (sleep/wake, GPU reset) the addon is disposed and xterm falls back to the DOM renderer for subsequent frames without tearing down the Session.
+
+WebGL is the expected fast path on the supported hardware. Validate it during a release-like measurement run by:
+
+1. Open a local terminal Session.
+2. In DevTools (or a temporary debug build), confirm the pane host element contains a child `<canvas>` rendered by the WebGL addon.
+3. Run a noisy command such as `for /l %i in (1,1,200000) do @echo %i` (cmd) or `seq 1 200000` (Unix shell over SSH) and verify the pane stays responsive and CPU on the renderer process stays well below the DOM-renderer baseline.
+
+If WebGL is not active, record this in the run notes; the budgets in this document apply to the DOM-renderer fallback as well, and no budget is loosened by the absence of GPU rendering.
+
 ## Terminal Compatibility Checklist
 
 The detailed manual checklist lives in `docs/TERMINAL_COMPATIBILITY_CHECKLIST.md`. Run it in a local terminal and, where practical, in a native SSH terminal. Keep terminal output private unless a user explicitly chooses to include selected text in diagnostics.

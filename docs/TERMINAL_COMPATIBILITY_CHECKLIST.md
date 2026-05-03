@@ -20,6 +20,7 @@ Record these values with the completed checklist:
 | SSH transport, if used | Native non-ProxyJump / system ssh fallback |
 | Terminal font and size | |
 | Scrollback setting | |
+| Glyph renderer in use | WebGL / DOM fallback (inspect pane host element for an addon `<canvas>` child) |
 
 ## Pass Criteria
 
