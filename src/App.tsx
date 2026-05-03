@@ -16,12 +16,14 @@ import {
   Download,
   Folder,
   FolderPlus,
+  Globe2,
   HardDrive,
   KeyRound,
   Languages,
   Laptop,
   LayoutDashboard,
   Menu,
+  Monitor,
   PanelRight,
   Palette,
   Pencil,
@@ -1418,7 +1420,7 @@ function QuickConnectMenu({
       <div className="quick-connect-menu-separator" role="separator" />
       {recentConnections.length > 0 ? (
         recentConnections.map((connection) => {
-          const Icon = connection.type === "local" ? Laptop : Server;
+          const Icon = connectionIconForType(connection.type);
           return (
             <button
               key={connection.id}
@@ -1429,7 +1431,7 @@ function QuickConnectMenu({
               <Icon size={15} />
               <span className="connection-main">
                 <strong>{connection.name}</strong>
-                <small>{connection.type === "local" ? connection.host : `${connection.user}@${connection.host}`}</small>
+                <small>{connectionSubtitle(connection)}</small>
               </span>
               <span className={`status-dot ${connection.status}`} />
             </button>
@@ -1463,6 +1465,7 @@ function ConnectionDialog({
   const [connectionType, setConnectionType] = useState<ConnectionType>("ssh");
   const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
   const usesSshDefaults = connectionType === "ssh";
+  const usesRemoteDesktopFields = isRemoteDesktopConnectionType(connectionType);
   const folderOptions = useMemo(() => flattenFolders(tree.folders), [tree.folders]);
   const localShellOptions = useMemo(() => localShellOptionsForPlatform(), []);
 
@@ -1517,7 +1520,12 @@ function ConnectionDialog({
       localShell: connectionType === "local" ? selectedLocalShell || undefined : undefined,
       url: connectionType === "url" ? url : undefined,
       dataPartition: connectionType === "url" ? dataPartition || undefined : undefined,
-      password: usesSshDefaults && authMethod === "password" ? password : undefined,
+      password:
+        usesSshDefaults && authMethod === "password"
+          ? password
+          : usesRemoteDesktopFields
+            ? password || undefined
+            : undefined,
       urlCredentialUsername:
         connectionType === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
       urlPassword: connectionType === "url" && urlCredentialUsername ? urlPassword : undefined,
@@ -1546,6 +1554,8 @@ function ConnectionDialog({
             <option value="ssh">SSH terminal</option>
             <option value="local">Local terminal</option>
             <option value="url">URL (embedded browser)</option>
+            <option value="rdp">RDP remote desktop</option>
+            <option value="vnc">VNC remote desktop</option>
           </select>
         </label>
 
@@ -1635,9 +1645,15 @@ function ConnectionDialog({
                 <input
                   key={`user-${connectionType}`}
                   name="user"
-                  defaultValue={sshSettings.defaultUser}
-                  placeholder="admin"
-                  required
+                  defaultValue={connectionType === "ssh" ? sshSettings.defaultUser : ""}
+                  placeholder={
+                    connectionType === "rdp"
+                      ? "DOMAIN\\admin"
+                      : connectionType === "vnc"
+                        ? "Optional username"
+                        : "admin"
+                  }
+                  required={connectionType !== "vnc"}
                 />
               </label>
               <label>
@@ -1645,17 +1661,29 @@ function ConnectionDialog({
                 <input
                   key={`port-${connectionType}`}
                   name="port"
-                  defaultValue={sshSettings.defaultPort}
+                  defaultValue={defaultPortForConnectionType(connectionType, sshSettings)}
                   inputMode="numeric"
                   min="1"
                   max="65535"
                   type="number"
-                  placeholder="22"
+                  placeholder={String(defaultPortForConnectionType(connectionType, sshSettings))}
                 />
               </label>
             </div>
           </>
         )}
+
+        {usesRemoteDesktopFields ? (
+          <label>
+            <span>Password</span>
+            <input
+              autoComplete="current-password"
+              name="password"
+              placeholder="Stored in OS keychain"
+              type="password"
+            />
+          </label>
+        ) : null}
 
         {usesSshDefaults ? (
           <>
@@ -1732,9 +1760,7 @@ function TreeDragPreview({ preview }: { preview: TreeDragPreview }) {
   const Icon =
     preview.kind === "folder"
       ? Folder
-      : preview.connectionType === "local"
-        ? Laptop
-        : Server;
+      : connectionIconForType(preview.connectionType ?? "ssh");
 
   useLayoutEffect(() => {
     const node = previewRef.current;
@@ -1790,7 +1816,7 @@ function ConnectionRow({
   onPointerDragStart: (event: ReactPointerEvent<HTMLElement>) => void;
   onRename: () => void;
 }) {
-  const Icon = connection.type === "local" ? Laptop : Server;
+  const Icon = connectionIconForType(connection.type);
 
   return (
     <div
@@ -1809,7 +1835,7 @@ function ConnectionRow({
         <Icon size={15} />
         <span className="connection-main">
           <strong>{connection.name}</strong>
-          <small>{connection.host}</small>
+          <small>{connectionSubtitle(connection)}</small>
         </span>
       </button>
       <span className={`status-dot ${connection.status}`} />
@@ -1971,6 +1997,90 @@ function liveConnectionStatus(
   return activeSessionCounts[connectionId] ? "connected" : "idle";
 }
 
+function isRemoteDesktopConnectionType(type: ConnectionType) {
+  return type === "rdp" || type === "vnc";
+}
+
+function defaultPortForConnectionType(type: ConnectionType, sshSettings: SshSettings) {
+  if (type === "rdp") {
+    return 3389;
+  }
+  if (type === "vnc") {
+    return 5900;
+  }
+  return sshSettings.defaultPort;
+}
+
+function connectionTypeLabel(type: ConnectionType) {
+  switch (type) {
+    case "local":
+      return "Local terminal";
+    case "ssh":
+      return "SSH terminal";
+    case "url":
+      return "URL";
+    case "rdp":
+      return "RDP";
+    case "vnc":
+      return "VNC";
+  }
+}
+
+function connectionSubtitle(connection: Connection) {
+  if (connection.type === "local") {
+    return connection.host;
+  }
+  if (connection.type === "url") {
+    return connection.url ?? connection.host;
+  }
+  const address = connection.port ? `${connection.host}:${connection.port}` : connection.host;
+  if (connection.user) {
+    return `${connection.user}@${address}`;
+  }
+  return address;
+}
+
+function connectionIconForType(type: ConnectionType) {
+  switch (type) {
+    case "local":
+      return Laptop;
+    case "url":
+      return Globe2;
+    case "rdp":
+      return Monitor;
+    case "vnc":
+      return Mouse;
+    case "ssh":
+      return Server;
+  }
+}
+
+function tabIconFor(tab: WorkspaceTab) {
+  if (tab.kind === "sftp") {
+    return Columns2;
+  }
+  if (tab.kind === "webview") {
+    return Globe2;
+  }
+  if (tab.kind === "remoteDesktop") {
+    return connectionIconForType(tab.connection?.type ?? "rdp");
+  }
+  return Terminal;
+}
+
+function workspaceKindLabel(tab: WorkspaceTab) {
+  switch (tab.kind) {
+    case "sftp":
+      return "SFTP browser";
+    case "webview":
+      return "Webview";
+    case "remoteDesktop":
+      return `${connectionTypeLabel(tab.connection?.type ?? "rdp")} connection`;
+    case "terminal":
+      return "Terminal";
+  }
+}
+
 function TabStrip() {
   const tabs = useWorkspaceStore((state) => state.tabs);
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
@@ -1981,12 +2091,12 @@ function TabStrip() {
   return (
     <div className="tab-strip" aria-label="Workspace tabs">
       {tabs.map((tab) => (
-        <div
-          className={tab.id === activeTabId ? "tab active" : "tab"}
-          key={tab.id}
-        >
+        <div className={tab.id === activeTabId ? "tab active" : "tab"} key={tab.id}>
           <button className="tab-button" onClick={() => activateTab(tab.id)} type="button">
-            {tab.kind === "sftp" ? <Columns2 size={14} /> : <Terminal size={14} />}
+            {(() => {
+              const Icon = tabIconFor(tab);
+              return <Icon size={14} />;
+            })()}
             <span>{tab.title}</span>
           </button>
           <button
@@ -2025,7 +2135,7 @@ function WorkspaceCanvas() {
         <section className="empty-workspace">
           <Terminal size={28} />
           <h2>No active session</h2>
-          <p>Open a local terminal or SSH connection from the tree.</p>
+          <p>Open a Connection from the tree.</p>
         </section>
       </div>
     );
@@ -2039,6 +2149,11 @@ function WorkspaceCanvas() {
         }
         if (tab.kind === "webview") {
           return <WebViewWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
+        }
+        if (tab.kind === "remoteDesktop") {
+          return (
+            <RemoteDesktopWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />
+          );
         }
         return <TerminalWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
       })}
@@ -2512,6 +2627,37 @@ function formatWebviewSubtitle(url: string) {
   } catch {
     return url;
   }
+}
+
+function RemoteDesktopWorkspace({
+  isActive,
+  tab,
+}: {
+  isActive: boolean;
+  tab: WorkspaceTab;
+}) {
+  const connection = tab.connection;
+  const typeLabel = connection ? connectionTypeLabel(connection.type) : "Remote desktop";
+  const Icon = connection ? connectionIconForType(connection.type) : Monitor;
+
+  return (
+    <section className={isActive ? "terminal-workspace active" : "terminal-workspace"}>
+      <div className="workspace-toolbar">
+        <div>
+          <strong>{tab.title}</strong>
+          <span>{tab.subtitle}</span>
+        </div>
+      </div>
+      <div className="remote-desktop-workspace">
+        <div className="remote-desktop-placeholder">
+          <Icon size={34} />
+          <h2>{connection?.name ?? typeLabel}</h2>
+          <p>{connection ? `${typeLabel} ${connectionSubtitle(connection)}` : typeLabel}</p>
+          <small>Transport implementation pending for v0.2.</small>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function normalizeFilenamePart(value: string) {
@@ -5975,7 +6121,7 @@ function AssistantPanel() {
   const [planningProposal, setPlanningProposal] = useState(false);
   const suggestion = aiSuggestions.find((item) => item.id === selectedSuggestion) ?? aiSuggestions[0];
   const contextLabel = activeTab
-    ? `${activeTab.title} - ${activeTab.kind === "sftp" ? "SFTP browser" : "Terminal"}`
+    ? `${activeTab.title} - ${workspaceKindLabel(activeTab)}`
     : "No active session";
   const connectionLabel = activeTab?.connection
     ? `${activeTab.connection.user}@${activeTab.connection.host}`

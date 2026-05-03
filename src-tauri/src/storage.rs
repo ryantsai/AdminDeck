@@ -2,7 +2,7 @@ use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
-const SCHEMA_USER_VERSION: i32 = 3;
+const SCHEMA_USER_VERSION: i32 = 4;
 
 const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS connections (
     data_partition TEXT,
     use_tmux_sessions INTEGER NOT NULL DEFAULT 1,
     tmux_connection_id TEXT,
-    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url')),
+    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url', 'rdp', 'vnc')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
 );
@@ -438,20 +438,10 @@ impl Storage {
         } else {
             required_field("host", request.host)?
         };
-        let user = if connection_type == "url" {
-            String::new()
-        } else {
-            required_field("user", request.user)?
-        };
+        let user = normalize_connection_user(request.user, &connection_type)?;
         let folder_id = normalize_optional_id(request.folder_id);
-        let key_path = request.key_path.and_then(|value| {
-            let trimmed = value.trim().to_string();
-            (!trimmed.is_empty()).then_some(trimmed)
-        });
-        let proxy_jump = request.proxy_jump.and_then(|value| {
-            let trimmed = value.trim().to_string();
-            (!trimmed.is_empty()).then_some(trimmed)
-        });
+        let key_path = normalize_ssh_optional_field(request.key_path, &connection_type);
+        let proxy_jump = normalize_ssh_optional_field(request.proxy_jump, &connection_type);
         let auth_method = normalize_auth_method(request.auth_method, &connection_type, &key_path)?;
         let local_shell = normalize_local_shell(request.local_shell, &connection_type)?;
         let data_partition = normalize_data_partition(request.data_partition, &connection_type)?;
@@ -1281,6 +1271,10 @@ fn run_migrations(connection: &mut SqliteConnection) -> Result<(), String> {
         ensure_tmux_connection_columns(connection)?;
     }
 
+    if current < 4 {
+        rebuild_connections_for_remote_desktop_kinds(connection)?;
+    }
+
     connection
         .execute_batch(&format!("PRAGMA user_version = {SCHEMA_USER_VERSION}"))
         .map_err(to_storage_error)?;
@@ -1338,6 +1332,78 @@ fn rebuild_connections_for_url_kind(connection: &mut SqliteConnection) -> Result
 
             CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
                 ON connections(folder_id, sort_order);
+            "#,
+        )
+        .map_err(to_storage_error)?;
+    transaction.commit().map_err(to_storage_error)?;
+    Ok(())
+}
+
+// SQLite cannot ALTER a CHECK constraint in place. v4 expands the durable
+// Connection kind set to include remote desktop drafts.
+fn rebuild_connections_for_remote_desktop_kinds(
+    connection: &mut SqliteConnection,
+) -> Result<(), String> {
+    let transaction = connection.transaction().map_err(to_storage_error)?;
+    transaction
+        .execute_batch(
+            r#"
+            DROP TABLE IF EXISTS temp.url_credentials_backup;
+            DROP TABLE IF EXISTS temp.connection_tags_backup;
+
+            CREATE TEMP TABLE url_credentials_backup AS
+                SELECT connection_id, username, updated_at FROM url_credentials;
+
+            CREATE TEMP TABLE connection_tags_backup AS
+                SELECT connection_id, tag, sort_order FROM connection_tags;
+
+            CREATE TABLE connections_new (
+                id TEXT PRIMARY KEY,
+                folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                host TEXT NOT NULL,
+                username TEXT NOT NULL,
+                port INTEGER,
+                key_path TEXT,
+                proxy_jump TEXT,
+                auth_method TEXT NOT NULL DEFAULT 'keyFile',
+                local_shell TEXT,
+                url TEXT,
+                data_partition TEXT,
+                use_tmux_sessions INTEGER NOT NULL DEFAULT 1,
+                tmux_connection_id TEXT,
+                connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url', 'rdp', 'vnc')),
+                status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
+                sort_order INTEGER NOT NULL
+            );
+
+            INSERT INTO connections_new (
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
+            )
+            SELECT
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
+            FROM connections;
+
+            DROP TABLE connections;
+            ALTER TABLE connections_new RENAME TO connections;
+
+            CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
+                ON connections(folder_id, sort_order);
+
+            INSERT OR REPLACE INTO url_credentials (connection_id, username, updated_at)
+            SELECT backup.connection_id, backup.username, backup.updated_at
+            FROM url_credentials_backup backup
+            INNER JOIN connections ON connections.id = backup.connection_id;
+
+            INSERT OR REPLACE INTO connection_tags (connection_id, tag, sort_order)
+            SELECT backup.connection_id, backup.tag, backup.sort_order
+            FROM connection_tags_backup backup
+            INNER JOIN connections ON connections.id = backup.connection_id;
+
+            DROP TABLE url_credentials_backup;
+            DROP TABLE connection_tags_backup;
             "#,
         )
         .map_err(to_storage_error)?;
@@ -1444,8 +1510,8 @@ fn ensure_folder_exists(
 
 fn normalize_connection_type(value: &str) -> Result<String, String> {
     match value.trim().to_lowercase().as_str() {
-        "local" | "ssh" | "url" => Ok(value.trim().to_lowercase()),
-        _ => Err("connection type must be local, ssh, or url".to_string()),
+        "local" | "ssh" | "url" | "rdp" | "vnc" => Ok(value.trim().to_lowercase()),
+        _ => Err("connection type must be local, ssh, url, rdp, or vnc".to_string()),
     }
 }
 
@@ -1458,7 +1524,7 @@ fn normalize_url_field(
         .filter(|value| !value.is_empty());
 
     if connection_type != "url" {
-        return Ok(trimmed);
+        return Ok(None);
     }
 
     let raw = trimmed.ok_or_else(|| "URL is required for URL connections".to_string())?;
@@ -1479,6 +1545,24 @@ fn extract_url_host(value: &str) -> Option<String> {
     url::Url::parse(value)
         .ok()
         .and_then(|parsed| parsed.host_str().map(|host| host.to_string()))
+}
+
+fn normalize_connection_user(value: String, connection_type: &str) -> Result<String, String> {
+    match connection_type {
+        "url" => Ok(String::new()),
+        "vnc" => Ok(value.trim().to_string()),
+        _ => required_field("user", value),
+    }
+}
+
+fn normalize_ssh_optional_field(value: Option<String>, connection_type: &str) -> Option<String> {
+    if connection_type != "ssh" {
+        return None;
+    }
+
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn normalize_data_partition(
@@ -1541,7 +1625,7 @@ fn normalize_auth_method(
     connection_type: &str,
     key_path: &Option<String>,
 ) -> Result<String, String> {
-    if connection_type == "local" || connection_type == "url" {
+    if connection_type != "ssh" {
         return Ok("keyFile".to_string());
     }
 
@@ -1891,6 +1975,115 @@ mod tests {
     }
 
     #[test]
+    fn v4_migration_preserves_connection_children() {
+        let db_path = temp_db_path("v4-migration-children");
+        {
+            let connection = SqliteConnection::open(&db_path).expect("legacy database opens");
+            connection
+                .execute_batch(
+                    r#"
+                    PRAGMA foreign_keys = ON;
+
+                    CREATE TABLE connection_folders (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        parent_folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
+                        sort_order INTEGER NOT NULL
+                    );
+
+                    CREATE TABLE connections (
+                        id TEXT PRIMARY KEY,
+                        folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
+                        name TEXT NOT NULL,
+                        host TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        port INTEGER,
+                        key_path TEXT,
+                        proxy_jump TEXT,
+                        auth_method TEXT NOT NULL DEFAULT 'keyFile',
+                        local_shell TEXT,
+                        url TEXT,
+                        data_partition TEXT,
+                        use_tmux_sessions INTEGER NOT NULL DEFAULT 1,
+                        tmux_connection_id TEXT,
+                        connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url')),
+                        status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
+                        sort_order INTEGER NOT NULL
+                    );
+
+                    CREATE TABLE connection_tags (
+                        connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+                        tag TEXT NOT NULL,
+                        sort_order INTEGER NOT NULL,
+                        PRIMARY KEY (connection_id, tag)
+                    );
+
+                    CREATE TABLE url_credentials (
+                        connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE,
+                        username TEXT NOT NULL,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    INSERT INTO connections (
+                        id, folder_id, name, host, username, port, key_path, proxy_jump,
+                        auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
+                    ) VALUES (
+                        'router-ui', NULL, 'Router UI', 'router.internal', '', NULL, NULL, NULL,
+                        'keyFile', NULL, 'https://router.internal/', 'ops', 0, NULL, 'url', 'idle', 0
+                    );
+
+                    INSERT INTO connection_tags (connection_id, tag, sort_order)
+                    VALUES ('router-ui', 'network', 0);
+
+                    INSERT INTO url_credentials (connection_id, username)
+                    VALUES ('router-ui', 'admin');
+
+                    PRAGMA user_version = 3;
+                    "#,
+                )
+                .expect("legacy schema is created");
+        }
+
+        let storage = Storage::open(db_path).expect("legacy database migrates");
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads after migration");
+        let migrated = tree
+            .connections
+            .iter()
+            .find(|connection| connection.id == "router-ui")
+            .expect("existing URL connection remains");
+
+        assert_eq!(migrated.tags, vec!["network".to_string()]);
+        assert!(migrated.has_url_credential);
+        assert_eq!(migrated.url_credential_username.as_deref(), Some("admin"));
+
+        storage
+            .create_connection(CreateConnectionRequest {
+                name: "Migrated RDP".to_string(),
+                host: "jumpbox.internal".to_string(),
+                user: "admin".to_string(),
+                connection_type: "rdp".to_string(),
+                folder_id: None,
+                port: Some(3389),
+                key_path: None,
+                proxy_jump: None,
+                auth_method: None,
+                local_shell: None,
+                url: None,
+                data_partition: None,
+                use_tmux_sessions: None,
+            })
+            .expect("migrated database accepts RDP connections");
+    }
+
+    #[test]
     fn create_connection_can_persist_root_ssh_connection() {
         let storage = Storage::open(temp_db_path("create")).expect("storage opens");
 
@@ -1927,6 +2120,60 @@ mod tests {
 
         assert_eq!(root_connection.name, "Lab Host");
         assert_eq!(root_connection.tags, Vec::<String>::new());
+    }
+
+    #[test]
+    fn create_connection_can_persist_remote_desktop_connections() {
+        let storage =
+            Storage::open(temp_db_path("remote-desktop-create")).expect("storage opens");
+
+        let rdp = storage
+            .create_connection(CreateConnectionRequest {
+                name: "Jump Box".to_string(),
+                host: "jumpbox.internal".to_string(),
+                user: "DOMAIN\\admin".to_string(),
+                connection_type: "rdp".to_string(),
+                folder_id: None,
+                port: Some(3389),
+                key_path: Some("C:\\ignored\\id_ed25519".to_string()),
+                proxy_jump: Some("ignored.internal".to_string()),
+                auth_method: Some("password".to_string()),
+                local_shell: None,
+                url: None,
+                data_partition: None,
+                use_tmux_sessions: Some(true),
+            })
+            .expect("RDP connection is created");
+
+        assert_eq!(rdp.connection_type, "rdp");
+        assert_eq!(rdp.host, "jumpbox.internal");
+        assert_eq!(rdp.user, "DOMAIN\\admin");
+        assert_eq!(rdp.port, Some(3389));
+        assert!(rdp.key_path.is_none());
+        assert!(rdp.proxy_jump.is_none());
+        assert!(!rdp.use_tmux_sessions);
+
+        let vnc = storage
+            .create_connection(CreateConnectionRequest {
+                name: "Console VNC".to_string(),
+                host: "console.internal".to_string(),
+                user: "   ".to_string(),
+                connection_type: "vnc".to_string(),
+                folder_id: None,
+                port: Some(5900),
+                key_path: None,
+                proxy_jump: None,
+                auth_method: None,
+                local_shell: None,
+                url: None,
+                data_partition: None,
+                use_tmux_sessions: None,
+            })
+            .expect("VNC connection is created");
+
+        assert_eq!(vnc.connection_type, "vnc");
+        assert_eq!(vnc.user, "");
+        assert_eq!(vnc.port, Some(5900));
     }
 
     #[test]

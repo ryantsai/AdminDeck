@@ -1,4 +1,4 @@
-export type ConnectionType = "local" | "ssh" | "url";
+export type ConnectionType = "local" | "ssh" | "url" | "rdp" | "vnc";
 export type ConnectionStatus = "connected" | "idle" | "offline";
 export type SshAuthMethod = "keyFile" | "password" | "agent";
 
@@ -147,7 +147,7 @@ export interface WorkspaceTab {
   id: string;
   title: string;
   subtitle: string;
-  kind: "terminal" | "sftp" | "webview";
+  kind: "terminal" | "sftp" | "webview" | "remoteDesktop";
   panes: TerminalPane[];
   layout?: LayoutNode;
   focusedPaneId?: string;

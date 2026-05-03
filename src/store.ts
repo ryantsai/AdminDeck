@@ -200,6 +200,10 @@ function connectionUsesTmux(connection: Connection) {
   return connection.type === "ssh" && connection.useTmuxSessions !== false;
 }
 
+function isRemoteDesktopConnection(connection: Connection) {
+  return connection.type === "rdp" || connection.type === "vnc";
+}
+
 function tmuxSessionIdsForConnection(connection: Connection, count: number) {
   if (!connectionUsesTmux(connection)) {
     return [];
@@ -303,6 +307,7 @@ interface WorkspaceState {
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
   openUrlConnection: (connection: Connection) => void;
+  openRemoteDesktopConnection: (connection: Connection) => void;
   openSftpBrowser: (connection: Connection) => void;
   openTerminalHere: (connection: Connection, remotePath: string) => void;
   openLocalTerminal: () => void;
@@ -404,6 +409,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().openUrlConnection(connection);
       return;
     }
+    if (isRemoteDesktopConnection(connection)) {
+      get().openRemoteDesktopConnection(connection);
+      return;
+    }
 
     const existingTab = get().tabs.find((tab) => tab.id === `tab-${connection.id}`);
     if (existingTab) {
@@ -427,6 +436,32 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       panes,
       layout,
       focusedPaneId: panes[0]?.id,
+      connection,
+    };
+
+    set((state) => ({
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
+    }));
+  },
+  openRemoteDesktopConnection: (connection) => {
+    if (!isRemoteDesktopConnection(connection)) {
+      return;
+    }
+
+    const existingTab = get().tabs.find((tab) => tab.id === `tab-${connection.id}`);
+    if (existingTab) {
+      set({ activeTabId: existingTab.id });
+      return;
+    }
+
+    const address = formatConnectionAddress(connection);
+    const tab: WorkspaceTab = {
+      id: `tab-${connection.id}`,
+      title: connection.name,
+      subtitle: `${connection.type.toUpperCase()} ${address}`,
+      kind: "remoteDesktop",
+      panes: [],
       connection,
     };
 
@@ -719,3 +754,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
   },
 }));
+
+function formatConnectionAddress(connection: Connection) {
+  return connection.port ? `${connection.host}:${connection.port}` : connection.host;
+}

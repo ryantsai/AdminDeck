@@ -8,7 +8,7 @@ Before changing product behavior or terminology, read `CONTEXT.md` and preserve 
 
 ## Domain Language
 
-- **Connection**: durable, stored in SQLite. Supported kinds are local terminal, SSH terminal, and URL (embedded WebView2). SFTP is opened from an SSH Connection.
+- **Connection**: durable, stored in SQLite. Supported kinds are local terminal, SSH terminal, URL (embedded WebView2), RDP, and VNC. SFTP is opened from an SSH Connection.
 - **Quick Connect**: creates an unsaved one-off connection draft, then starts a session.
 - **Session**: live process/channel/SFTP browser/webview state, not the saved profile itself.
 - **Tab**: frontend workspace container, not a backend domain object.

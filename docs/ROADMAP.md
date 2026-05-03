@@ -115,7 +115,7 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [x] Build Windows .msi or .exe installer.
 - [x] Build Windows portable ZIP.
 - [x] Smoke test installer.
-- [ ] Publish GitHub Release.
+- [x] Publish GitHub Release.
 - [x] Document no-telemetry posture.
 - [x] Document diagnostics bundle flow.
 - [x] Document known limitations.
@@ -152,8 +152,10 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Add Linux packaging with AppImage/deb/rpm where reasonable.
 - [ ] Add WGPU terminal renderer replacement if not already complete.
 - [ ] Add lightweight webview tab.
-- [ ] Add RDP connection type.
-- [ ] Add VNC connection type.
+- [x] Add durable RDP connection type.
+- [x] Add durable VNC connection type.
+- [ ] Implement RDP session transport.
+- [ ] Implement VNC session transport.
 - [ ] Add MobaXterm/RDCMan import.
 - [ ] Add SFTP folder sync/diff/resume.
 
