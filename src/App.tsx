@@ -636,6 +636,215 @@ type AssistantChatMessage = {
   content: string;
 };
 
+const ASSISTANT_WAITING_PHRASES = [
+  "Fixing phaser cannon",
+  "Opening the hatch",
+  "Charging the jump drive",
+  "Aligning the star map",
+  "Spinning up the ion fan",
+  "Polishing the command deck",
+  "Tuning the warp kettle",
+  "Rebooting the moon router",
+  "Counting spare photons",
+  "Warming the flux capacitor",
+  "Calibrating laser spoons",
+  "Priming the nebula pump",
+  "Negotiating with the airlock",
+  "Filing asteroid paperwork",
+  "Dusting the antimatter shelf",
+  "Reticulating space splines",
+  "Checking helmet vibes",
+  "Defragging the cargo bay",
+  "Unjamming the holo button",
+  "Balancing the plasma tray",
+  "Finding the left thruster",
+  "Tickling the debug console",
+  "Restarting orbital coffee",
+  "Inflating backup gravity",
+  "Rewiring the tiny reactor",
+  "Tapping the starboard gauge",
+  "Loading cosmic duct tape",
+  "Convincing the nav computer",
+  "Sequencing hatch confetti",
+  "Indexing comet receipts",
+  "Greasing the wormhole hinge",
+  "Ping-testing Mars",
+  "Sorting the photon drawer",
+  "Cooling the laser noodles",
+  "Tightening gravity bolts",
+  "Priming the escape kazoo",
+  "Painting racing stripes",
+  "Untangling sensor cables",
+  "Waking the sleep module",
+  "Auditing stardust inventory",
+  "Shaking the quantum snowglobe",
+  "Finding north in space",
+  "Folding the solar sail",
+  "Loading backup starlight",
+  "Rehearsing airlock manners",
+  "Baking a moon packet",
+  "Charging the sarcasm shield",
+  "Buffing the docking clamp",
+  "Sharpening the laser pointer",
+  "Priming the thought engine",
+  "Warming up the command chair",
+  "Asking the dashboard nicely",
+  "Cycling the photon valves",
+  "Refreshing the orbit cache",
+  "Rebalancing the holo grid",
+  "Tuning the antenna eyebrows",
+  "Opening a tiny wormhole",
+  "Calming the fusion toaster",
+  "Tapping the reactor glass",
+  "Checking the space odometer",
+  "Stirring the data soup",
+  "Filling the oxygen spreadsheet",
+  "Aligning satellite socks",
+  "Charging the blaster dial",
+  "Plotting a snack trajectory",
+  "Washing the sensor array",
+  "Summoning auxiliary pixels",
+  "Scanning for loose commas",
+  "Decrypting the captain's doodle",
+  "Inventorying laser batteries",
+  "Priming the turbo clipboard",
+  "Tightening the console latch",
+  "Reheating the star chart",
+  "Cycling the space windshield",
+  "Repacking the toolkit",
+  "Testing zero-g cupholders",
+  "Stabilizing the time drawer",
+  "Loading orbital elevator music",
+  "Finding the backup button",
+  "Recharging the idea cannon",
+  "Adjusting the moon mirror",
+  "Flossing the fiber uplink",
+  "Polishing the escape pod",
+  "Resetting the drama dampener",
+  "Opening channel banana",
+  "Patching the astro modem",
+  "Checking the warp warranty",
+  "Sorting the asteroid queue",
+  "Measuring the cosmic shrug",
+  "Sealing the vacuum zipper",
+  "Cycling the launch chime",
+  "Rebooting the gravity fan",
+  "Massaging the matrix",
+  "Tuning the ion kazoo",
+  "Refilling the star ink",
+  "Aligning the blink lights",
+  "Priming the orbit blender",
+  "Counting laser freckles",
+  "Unlocking the science drawer",
+  "Greasing the docking rails",
+  "Pinging the command moon",
+  "Refactoring the hyperspace",
+  "Starting the tiny supernova",
+  "Scanning for friendly qubits",
+  "Tapping the fusion meter",
+  "Loading the patience module",
+  "Dialing the photon desk",
+  "Rotating the starboard waffle",
+  "Checking the captain's checklist",
+  "Balancing the antenna fork",
+  "Rewinding the time cassette",
+  "Powering the polite thruster",
+  "Tuning the orbit guitar",
+  "Loading the moon compiler",
+  "Untying the data knot",
+  "Calibrating the comet broom",
+  "Charging the signal lantern",
+  "Rebooting the hatch bell",
+  "Flipping the plasma pancake",
+  "Opening the auxiliary curtain",
+  "Testing the vacuum whistle",
+  "Priming the starboard toaster",
+  "Buffing the quantum knob",
+  "Refreshing the nebula cache",
+  "Warming the rocket socks",
+  "Assembling the space sandwich",
+  "Aligning the laser stapler",
+  "Checking the orbit invoice",
+  "Tuning the warp harmonica",
+  "Feeding the command queue",
+  "Stacking spare timelines",
+  "Cleaning the photon lens",
+  "Patching the hatch firmware",
+  "Loading the console confetti",
+  "Rehearsing the docking wink",
+  "Starting the plasma metronome",
+  "Counting backup universes",
+  "Tightening the starlight jar",
+  "Polishing the telemetry spoon",
+  "Resetting the orbital toaster",
+  "Opening the moon drawer",
+  "Charging the debug beacon",
+  "Tuning the static hammock",
+  "Repacking the nebula toolbox",
+  "Scanning for lost semicolons",
+  "Priming the turbo antenna",
+  "Adjusting the time zipper",
+  "Loading the starboard playlist",
+  "Checking the gravity receipt",
+  "Dusting the launch button",
+  "Rebooting the comet scheduler",
+  "Finding the cosmic clipboard",
+  "Balancing the sensor teacup",
+  "Tapping the hatch twice",
+  "Folding the wormhole napkin",
+  "Charging the orbital lantern",
+  "Polishing the warp sprocket",
+  "Refreshing the photon pantry",
+  "Checking the space calendar",
+  "Tuning the navigation kazoo",
+  "Loading the answer thrusters",
+  "Rewiring the stardust modem",
+  "Opening the cargo fortune",
+  "Measuring the launch grin",
+  "Unclogging the plasma funnel",
+  "Counting the quiet beeps",
+  "Calibrating the quantum teapot",
+  "Priming the orbit stapler",
+  "Fixing the dashboard wobble",
+  "Testing the starboard wink",
+  "Recharging the thought lantern",
+  "Sorting hyperspace coupons",
+  "Polishing the signal mirror",
+  "Loading the hatch password",
+  "Cycling the antimatter fan",
+  "Checking the moon gasket",
+  "Tuning the sensor marimba",
+  "Launching the tiny checklist",
+  "Aligning the nebula ruler",
+  "Rebooting the captain's chair",
+  "Packing spare photons",
+  "Opening the diagnostics pantry",
+  "Priming the laser accordion",
+  "Untangling the orbit spaghetti",
+  "Charging the polite laser",
+  "Checking the fusion cup",
+  "Defrosting the comet tray",
+  "Retuning the space banjo",
+  "Loading the answer cartridge",
+  "Patching the moon socket",
+  "Counting celestial paperclips",
+  "Stabilizing the blinkenlights",
+  "Warming the response engine",
+  "Rebalancing the starboard vibes",
+  "Opening the tiny airlock",
+  "Testing the hyperspace zipper",
+  "Refreshing the command buffer",
+  "Calibrating the orbit spoon",
+  "Charging the answer beacon",
+  "Checking the last hatch",
+] as const;
+
+function randomAssistantWaitingPhrase() {
+  return ASSISTANT_WAITING_PHRASES[
+    Math.floor(Math.random() * ASSISTANT_WAITING_PHRASES.length)
+  ];
+}
+
 type PanelLayoutState = {
   collapsed: boolean;
   width: number;
@@ -8170,6 +8379,7 @@ function AssistantPanel({
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [chatError, setChatError] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
+  const [waitingPhrase, setWaitingPhrase] = useState("");
   const [terminalSendStatus, setTerminalSendStatus] = useState("");
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const contextLabel = activeTab
@@ -8233,6 +8443,7 @@ function AssistantPanel({
     setMessages((current) => [...current, userMessage]);
     setPrompt("");
     setChatError("");
+    setWaitingPhrase(randomAssistantWaitingPhrase());
     setIsSendingPrompt(true);
     try {
       const response = await invokeCommand("run_ai_agent", {
@@ -8262,6 +8473,7 @@ function AssistantPanel({
       ]);
     } finally {
       setIsSendingPrompt(false);
+      setWaitingPhrase("");
     }
   }
 
@@ -8380,6 +8592,12 @@ function AssistantPanel({
             <MarkdownContent content={message.content} onSendCode={handleSendCodeToTerminal} />
           </article>
         ))}
+        {isSendingPrompt ? (
+          <article className="assistant-message assistant-waiting" aria-live="polite">
+            <span className="assistant-spinner" aria-hidden="true" />
+            <span>{waitingPhrase || "Charging the answer beacon"}</span>
+          </article>
+        ) : null}
       </div>
 
       {terminalSendStatus ? <p className="assistant-send-status">{terminalSendStatus}</p> : null}
