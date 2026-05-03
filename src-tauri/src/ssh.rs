@@ -722,7 +722,7 @@ pub(crate) fn remote_tmux_resume_command(
         .map(|directory| format!("cd -- {} && ", shell_single_quote(directory)))
         .unwrap_or_default();
     format!(
-        "if command -v tmux >/dev/null 2>&1; then {cd_command}exec tmux new-session -A -s {}; else {cd_command}printf '\\r\\n[AdminDeck: tmux not found, using normal shell]\\r\\n'; exec \"${{SHELL:-sh}}\" -i; fi",
+        "if command -v tmux >/dev/null 2>&1; then {cd_command}exec tmux new-session -A -s {} \\; set-option mouse off; else {cd_command}printf '\\r\\n[AdminDeck: tmux not found, using normal shell]\\r\\n'; exec \"${{SHELL:-sh}}\" -i; fi",
         shell_single_quote(session_id)
     )
 }
@@ -1172,6 +1172,24 @@ mod tests {
 
         assert!(error.contains("test SSH agent"));
         assert!(error.contains("failed to list SSH agent identities"));
+    }
+
+    #[test]
+    fn tmux_resume_command_disables_mouse_mode_for_selection() {
+        let cmd = remote_tmux_resume_command(None, "admindeck-test");
+        assert!(
+            cmd.contains("\\; set-option mouse off"),
+            "command must disable tmux mouse mode so xterm can handle text selection: {cmd}"
+        );
+    }
+
+    #[test]
+    fn tmux_resume_command_disables_mouse_mode_with_initial_directory() {
+        let cmd = remote_tmux_resume_command(Some("/home/user"), "admindeck-test");
+        assert!(
+            cmd.contains("\\; set-option mouse off"),
+            "command must disable tmux mouse mode even with initial directory: {cmd}"
+        );
     }
 
     #[test]

@@ -81,6 +81,15 @@ pub struct CaptureTmuxPaneRequest {
     pub tmux_session_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTmuxSessionMouseRequest {
+    #[serde(flatten)]
+    pub connection: TmuxConnectionRequest,
+    pub tmux_session_id: String,
+    pub enabled: bool,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TmuxSession {
@@ -281,6 +290,27 @@ impl SessionManager {
             secrets,
             &request.connection,
             tmux_close_command(&tmux_session_id),
+        )?;
+        Ok(())
+    }
+
+    pub fn set_tmux_session_mouse(
+        &self,
+        app: AppHandle,
+        secrets: &secrets::Secrets,
+        request: SetTmuxSessionMouseRequest,
+    ) -> Result<(), String> {
+        let tmux_session_id = required_tmux_session_id(request.tmux_session_id)?;
+        let mouse_value = if request.enabled { "on" } else { "off" };
+        run_tmux_command(
+            app,
+            secrets,
+            &request.connection,
+            format!(
+                "tmux set-option -t {} mouse {}",
+                shell_single_quote(&tmux_session_id),
+                mouse_value
+            ),
         )?;
         Ok(())
     }

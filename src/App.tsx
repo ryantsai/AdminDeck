@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUp,
   Bot,
+  Mouse,
   Check,
   ChevronDown,
   ChevronRight,
@@ -133,6 +134,7 @@ import type {
   FileEntry,
   LayoutNode,
   SftpSettings,
+  SplitDirection,
   SshSettings,
   TerminalPane,
   WorkspaceTab,
@@ -2800,6 +2802,7 @@ function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspac
         {layout ? (
           <TerminalLayoutView
             isActive={isActive}
+            tabId={tab.id}
             layout={layout}
             panes={tab.panes}
             focusedPaneId={focusedPaneId}
@@ -2813,12 +2816,14 @@ function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspac
 
 function TerminalLayoutView({
   isActive,
+  tabId,
   layout,
   panes,
   focusedPaneId,
   onFocusPane,
 }: {
   isActive: boolean;
+  tabId: string;
   layout: LayoutNode;
   panes: TerminalPane[];
   focusedPaneId: string | undefined;
@@ -2833,6 +2838,7 @@ function TerminalLayoutView({
       <div className="terminal-layout-leaf">
         <TerminalPaneView
           isActive={isActive}
+          tabId={tabId}
           pane={pane}
           isFocused={pane.id === focusedPaneId}
           onFocus={() => onFocusPane(pane.id)}
@@ -2852,6 +2858,7 @@ function TerminalLayoutView({
         <TerminalLayoutView
           key={child.type === "leaf" ? child.paneId : `split-${index}`}
           isActive={isActive}
+          tabId={tabId}
           layout={child}
           panes={panes}
           focusedPaneId={focusedPaneId}
@@ -2862,12 +2869,27 @@ function TerminalLayoutView({
   );
 }
 
-function TmuxSessionTag({ connection, sessionId }: { connection: Connection; sessionId?: string }) {
+function TmuxSessionTag({
+  connection,
+  sessionId,
+  tabId,
+}: {
+  connection: Connection;
+  sessionId?: string;
+  tabId: string;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState<TmuxSession[]>([]);
   const [error, setError] = useState("");
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const [mouseEnabledIds, setMouseEnabledIds] = useState<Set<string>>(new Set());
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const tabs = useWorkspaceStore((state) => state.tabs);
+  const activateTab = useWorkspaceStore((state) => state.activateTab);
+  const setFocusedPane = useWorkspaceStore((state) => state.setFocusedPane);
+  const openTmuxSessionInPane = useWorkspaceStore((state) => state.openTmuxSessionInPane);
 
   const enabled = connection.type === "ssh" && connection.useTmuxSessions !== false && sessionId;
 
@@ -2886,6 +2908,18 @@ function TmuxSessionTag({ connection, sessionId }: { connection: Connection; ses
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
+
+  function findSessionPane(tmuxSessionId: string): { tabId: string; paneId: string } | null {
+    for (const tab of tabs) {
+      if (tab.kind !== "terminal") continue;
+      for (const pane of tab.panes) {
+        if (pane.tmuxSessionId === tmuxSessionId) {
+          return { tabId: tab.id, paneId: pane.id };
+        }
+      }
+    }
+    return null;
+  }
 
   async function loadSessions() {
     if (!enabled || !isTauriRuntime()) {
@@ -2911,6 +2945,7 @@ function TmuxSessionTag({ connection, sessionId }: { connection: Connection; ses
   async function handleToggle() {
     const nextOpen = !open;
     setOpen(nextOpen);
+    setExpandedSessionId(null);
     if (nextOpen) {
       await loadSessions();
     }
@@ -2926,12 +2961,57 @@ function TmuxSessionTag({ connection, sessionId }: { connection: Connection; ses
           tmuxSessionId: targetSessionId,
         },
       });
+      setMouseEnabledIds((prev) => {
+        const next = new Set(prev);
+        next.delete(targetSessionId);
+        return next;
+      });
       await loadSessions();
     } catch (closeError) {
       setError(closeError instanceof Error ? closeError.message : String(closeError));
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleToggleMouse(targetSessionId: string) {
+    const nextEnabled = !mouseEnabledIds.has(targetSessionId);
+    try {
+      await invokeCommand("set_tmux_mouse", {
+        request: {
+          ...tmuxConnectionRequest(connection),
+          tmuxSessionId: targetSessionId,
+          enabled: nextEnabled,
+        },
+      });
+      setMouseEnabledIds((prev) => {
+        const next = new Set(prev);
+        if (nextEnabled) {
+          next.add(targetSessionId);
+        } else {
+          next.delete(targetSessionId);
+        }
+        return next;
+      });
+    } catch (mouseError) {
+      setError(mouseError instanceof Error ? mouseError.message : String(mouseError));
+    }
+  }
+
+  function handleSessionRowClick(session: TmuxSession) {
+    const location = findSessionPane(session.id);
+    if (location) {
+      activateTab(location.tabId);
+      setFocusedPane(location.tabId, location.paneId);
+      setOpen(false);
+    } else {
+      setExpandedSessionId((current) => (current === session.id ? null : session.id));
+    }
+  }
+
+  function handleOpenInDirection(session: TmuxSession, direction: SplitDirection) {
+    openTmuxSessionInPane(tabId, connection, session.id, direction);
+    setOpen(false);
   }
 
   if (!enabled) {
@@ -2942,7 +3022,7 @@ function TmuxSessionTag({ connection, sessionId }: { connection: Connection; ses
     <div className="tmux-session-wrapper" ref={menuRef}>
       <button
         className="tmux-session-tag"
-        aria-expanded={open ? "true" : "false"}
+        aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => void handleToggle()}
         title="Show tmux sessions"
@@ -2968,24 +3048,87 @@ function TmuxSessionTag({ connection, sessionId }: { connection: Connection; ses
           {error ? <p className="form-error">{error}</p> : null}
           {!loading && !error && sessions.length === 0 ? <p>No tmux sessions.</p> : null}
           <div className="tmux-session-list">
-            {sessions.map((session) => (
-              <div className="tmux-session-row" key={session.id}>
-                <span>
-                  <strong>{session.id}</strong>
-                  <small>{session.attached ? "attached" : "detached"}</small>
-                </span>
-                <small>{session.windows}w</small>
-                <button
-                  className="terminal-pane-action"
-                  aria-label={`Close tmux session ${session.id}`}
-                  onClick={() => void handleCloseSession(session.id)}
-                  title="Close tmux session"
-                  type="button"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
+            {sessions.map((session) => {
+              const location = findSessionPane(session.id);
+              const isInApp = location !== null;
+              const isExpanded = expandedSessionId === session.id;
+              const mouseOn = mouseEnabledIds.has(session.id);
+
+              return (
+                <div className="tmux-session-row" key={session.id}>
+                  <div className="tmux-session-row-main">
+                    <button
+                      className={`tmux-session-row-info${isInApp ? " in-app" : ""}`}
+                      onClick={() => handleSessionRowClick(session)}
+                      title={isInApp ? "Focus pane" : "Open in pane"}
+                      type="button"
+                    >
+                      <strong>{session.id}</strong>
+                      <small>
+                        {isInApp ? "open" : session.attached ? "attached" : "detached"}
+                        {" · "}
+                        {session.windows}w
+                      </small>
+                    </button>
+                    <button
+                      className={`tmux-mouse-toggle${mouseOn ? " active" : ""}`}
+                      aria-label={`${mouseOn ? "Disable" : "Enable"} mouse for ${session.id}`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => void handleToggleMouse(session.id)}
+                      title={`Mouse: ${mouseOn ? "on" : "off"}`}
+                      type="button"
+                    >
+                      <Mouse size={11} />
+                    </button>
+                    <button
+                      className="terminal-pane-action"
+                      aria-label={`Close tmux session ${session.id}`}
+                      onClick={() => void handleCloseSession(session.id)}
+                      title="Close tmux session"
+                      type="button"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  {!isInApp && isExpanded ? (
+                    <div className="tmux-session-directions">
+                      <button
+                        className="tmux-direction-btn"
+                        onClick={() => handleOpenInDirection(session, "left")}
+                        title="Open left"
+                        type="button"
+                      >
+                        <ArrowLeft size={12} />
+                      </button>
+                      <button
+                        className="tmux-direction-btn"
+                        onClick={() => handleOpenInDirection(session, "up")}
+                        title="Open above"
+                        type="button"
+                      >
+                        <ArrowUp size={12} />
+                      </button>
+                      <button
+                        className="tmux-direction-btn"
+                        onClick={() => handleOpenInDirection(session, "down")}
+                        title="Open below"
+                        type="button"
+                      >
+                        <ArrowDown size={12} />
+                      </button>
+                      <button
+                        className="tmux-direction-btn"
+                        onClick={() => handleOpenInDirection(session, "right")}
+                        title="Open right"
+                        type="button"
+                      >
+                        <ArrowRight size={12} />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -3007,11 +3150,13 @@ function tmuxConnectionRequest(connection: Connection) {
 
 function TerminalPaneView({
   isActive,
+  tabId,
   pane,
   isFocused,
   onFocus,
 }: {
   isActive: boolean;
+  tabId: string;
   pane: TerminalPane;
   isFocused: boolean;
   onFocus: () => void;
@@ -3418,7 +3563,7 @@ function TerminalPaneView({
         </span>
         <div className="terminal-pane-actions">
           {pane.connection ? (
-            <TmuxSessionTag connection={pane.connection} sessionId={pane.tmuxSessionId} />
+            <TmuxSessionTag connection={pane.connection} sessionId={pane.tmuxSessionId} tabId={tabId} />
           ) : null}
           <small>{pane.cwd}</small>
           <button

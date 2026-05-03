@@ -427,6 +427,22 @@ type CommandMap = {
     };
     result: TmuxSession[];
   };
+  set_tmux_mouse: {
+    args: {
+      request: {
+        host: string;
+        user: string;
+        port?: number;
+        keyPath?: string;
+        proxyJump?: string;
+        authMethod?: "keyFile" | "password" | "agent";
+        secretOwnerId?: string;
+        tmuxSessionId: string;
+        enabled: boolean;
+      };
+    };
+    result: null;
+  };
   close_tmux_session: {
     args: {
       request: {

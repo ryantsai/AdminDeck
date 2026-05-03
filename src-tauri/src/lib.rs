@@ -338,6 +338,16 @@ fn close_tmux_session(
 }
 
 #[tauri::command]
+fn set_tmux_mouse(
+    app: tauri::AppHandle,
+    sessions: tauri::State<'_, sessions::SessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: sessions::SetTmuxSessionMouseRequest,
+) -> Result<(), String> {
+    sessions.set_tmux_session_mouse(app, &secrets, request)
+}
+
+#[tauri::command]
 fn capture_tmux_pane(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
@@ -603,6 +613,7 @@ pub fn run() {
             close_terminal_session,
             list_tmux_sessions,
             close_tmux_session,
+            set_tmux_mouse,
             capture_tmux_pane,
             launch_elevated_terminal,
             start_sftp_session,

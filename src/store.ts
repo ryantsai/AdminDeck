@@ -308,6 +308,7 @@ interface WorkspaceState {
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
   splitTerminalPaneDirected: (tabId: string, direction: SplitDirection) => void;
+  openTmuxSessionInPane: (tabId: string, connection: Connection, tmuxSessionId: string, direction: SplitDirection) => void;
   setFocusedPane: (tabId: string, paneId: string) => void;
   saveTabLayout: (tabId: string) => void;
   resetTabLayout: (tabId: string) => void;
@@ -556,6 +557,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           buffer: "",
           connection,
           tmuxSessionId: appendTmuxSessionId(connection),
+        };
+
+        const nextPanes = [...tab.panes, newPane];
+        const baseLayout = ensureLayout(tab.layout, tab.panes);
+        const nextLayout = splitLayout(
+          baseLayout,
+          focusedPane.id,
+          direction,
+          newPane.id,
+          tab.panes.map((pane) => pane.id),
+        );
+
+        return {
+          ...tab,
+          panes: nextPanes,
+          layout: nextLayout,
+          focusedPaneId: newPane.id,
+        };
+      }),
+    }));
+  },
+  openTmuxSessionInPane: (tabId, connection, tmuxSessionId, direction) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.id !== tabId || tab.kind !== "terminal") {
+          return tab;
+        }
+
+        const focusedPane =
+          tab.panes.find((pane) => pane.id === tab.focusedPaneId) ?? tab.panes[0];
+        if (!focusedPane) {
+          return tab;
+        }
+
+        const newPane: TerminalPane = {
+          id: `pane-${connection.id}-${Date.now()}`,
+          title: tmuxSessionId,
+          cwd: focusedPane.cwd,
+          buffer: "",
+          connection,
+          tmuxSessionId,
         };
 
         const nextPanes = [...tab.panes, newPane];
