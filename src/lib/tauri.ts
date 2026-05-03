@@ -199,6 +199,24 @@ export interface CommandProposalPlan {
   safetyNotes: string[];
 }
 
+export interface AgentChatMessage {
+  role: "assistant" | "user";
+  content: string;
+}
+
+export interface AgentRunRequest {
+  prompt: string;
+  contextLabel: string;
+  selectedOutput?: string;
+  messages: AgentChatMessage[];
+}
+
+export interface AgentRunResponse {
+  providerKind: string;
+  model: string;
+  content: string;
+}
+
 export interface DiagnosticsBundle {
   path: string;
   files: string[];
@@ -407,6 +425,10 @@ type CommandMap = {
       };
     };
     result: CommandProposalPlan;
+  };
+  run_ai_agent: {
+    args: { request: AgentRunRequest };
+    result: AgentRunResponse;
   };
   keychain_status: {
     args: undefined;

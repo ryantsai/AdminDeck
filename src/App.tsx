@@ -8169,6 +8169,7 @@ function AssistantPanel({
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [chatError, setChatError] = useState("");
+  const [isSendingPrompt, setIsSendingPrompt] = useState(false);
   const [terminalSendStatus, setTerminalSendStatus] = useState("");
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const contextLabel = activeTab
@@ -8198,12 +8199,12 @@ function AssistantPanel({
 
   function handleChatSubmit(event: FormEvent) {
     event.preventDefault();
-    submitAssistantPrompt();
+    void submitAssistantPrompt();
   }
 
-  function submitAssistantPrompt() {
+  async function submitAssistantPrompt() {
     const normalizedPrompt = prompt.trim();
-    if (!normalizedPrompt) {
+    if (!normalizedPrompt || isSendingPrompt) {
       return;
     }
     const userMessage: AssistantChatMessage = {
@@ -8225,19 +8226,43 @@ function AssistantPanel({
       return;
     }
 
-    const assistantMessage: AssistantChatMessage = {
-      id: `assistant-${Date.now()}`,
-      role: "assistant",
-      content: [
-        `Provider **${providerDefinition.label}** is configured with \`${aiProviderSettings.model}\`.`,
-        `Reasoning effort: **${formatReasoningEffort(aiProviderSettings.reasoningEffort)}**.`,
-        "",
-        "The chat transport is ready to wire into the upcoming agent runner. Code blocks rendered here can already be sent to the focused terminal.",
-      ].join("\n"),
-    };
-    setMessages((current) => [...current, userMessage, assistantMessage]);
+    const history = messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+    setMessages((current) => [...current, userMessage]);
     setPrompt("");
     setChatError("");
+    setIsSendingPrompt(true);
+    try {
+      const response = await invokeCommand("run_ai_agent", {
+        request: {
+          prompt: normalizedPrompt,
+          contextLabel,
+          selectedOutput: assistantContextSnippet?.text,
+          messages: history,
+        },
+      });
+      const assistantMessage: AssistantChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: response.content,
+      };
+      setMessages((current) => [...current, assistantMessage]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setChatError(message);
+      setMessages((current) => [
+        ...current,
+        {
+          id: `assistant-error-${Date.now()}`,
+          role: "assistant",
+          content: `AI assistant error: ${message}`,
+        },
+      ]);
+    } finally {
+      setIsSendingPrompt(false);
+    }
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -8264,7 +8289,7 @@ function AssistantPanel({
     }
 
     event.preventDefault();
-    submitAssistantPrompt();
+    void submitAssistantPrompt();
   }
 
   return (
@@ -8365,6 +8390,7 @@ function AssistantPanel({
           ref={composerTextareaRef}
           onKeyDown={handleComposerKeyDown}
           onChange={(event) => setPrompt(event.currentTarget.value)}
+          disabled={isSendingPrompt}
           placeholder="Ask AI Assistant anything."
           rows={3}
           value={prompt}
@@ -8377,7 +8403,7 @@ function AssistantPanel({
           <button
             aria-label="Send message"
             className="assistant-send-button"
-            disabled={!prompt.trim()}
+            disabled={!prompt.trim() || isSendingPrompt}
             type="submit"
           >
             <SendHorizontal size={18} />

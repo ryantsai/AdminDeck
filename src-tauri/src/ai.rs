@@ -1,4 +1,7 @@
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
+
+use crate::storage::AiProviderSettings;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -172,6 +175,288 @@ fn trim_required(label: &str, value: String) -> Result<String, String> {
     }
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentChatMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRunRequest {
+    prompt: String,
+    context_label: String,
+    selected_output: Option<String>,
+    messages: Vec<AgentChatMessage>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRunResponse {
+    provider_kind: String,
+    model: String,
+    content: String,
+}
+
+pub async fn run_agent(
+    settings: AiProviderSettings,
+    api_key: Option<String>,
+    request: AgentRunRequest,
+) -> Result<AgentRunResponse, String> {
+    let provider = provider_for(settings.provider_kind())?;
+    provider.run(settings, api_key, request).await
+}
+
+trait AgentProvider {
+    async fn run(
+        &self,
+        settings: AiProviderSettings,
+        api_key: Option<String>,
+        request: AgentRunRequest,
+    ) -> Result<AgentRunResponse, String>;
+}
+
+struct OpenAiCompatibleProvider {
+    provider_kind: &'static str,
+    label: &'static str,
+    requires_api_key: bool,
+}
+
+fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
+    match kind {
+        "deepseek" => Ok(OpenAiCompatibleProvider {
+            provider_kind: "deepseek",
+            label: "DeepSeek",
+            requires_api_key: true,
+        }),
+        "openai" => Ok(OpenAiCompatibleProvider {
+            provider_kind: "openai",
+            label: "OpenAI",
+            requires_api_key: true,
+        }),
+        "openrouter" => Ok(OpenAiCompatibleProvider {
+            provider_kind: "openrouter",
+            label: "OpenRouter",
+            requires_api_key: true,
+        }),
+        "ollama" => Ok(OpenAiCompatibleProvider {
+            provider_kind: "ollama",
+            label: "Ollama",
+            requires_api_key: false,
+        }),
+        "nvidia" => Ok(OpenAiCompatibleProvider {
+            provider_kind: "nvidia",
+            label: "NVIDIA",
+            requires_api_key: true,
+        }),
+        "openai-compatible" => Ok(OpenAiCompatibleProvider {
+            provider_kind: "openai-compatible",
+            label: "OpenAI compatible",
+            requires_api_key: true,
+        }),
+        "anthropic" => Err(
+            "Anthropic support needs a provider adapter; DeepSeek and OpenAI-compatible providers are wired first."
+                .to_string(),
+        ),
+        _ => Err("AI provider is not supported by the agent runner".to_string()),
+    }
+}
+
+impl AgentProvider for OpenAiCompatibleProvider {
+    async fn run(
+        &self,
+        settings: AiProviderSettings,
+        api_key: Option<String>,
+        request: AgentRunRequest,
+    ) -> Result<AgentRunResponse, String> {
+        let prompt = trim_required("assistant prompt", request.prompt)?;
+        let context_label = trim_required("assistant context", request.context_label)?;
+        let api_key = api_key
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        if self.requires_api_key && api_key.is_none() {
+            return Err(format!(
+                "{} needs an API key before AI Assistant can chat.",
+                self.label
+            ));
+        }
+
+        let endpoint = chat_completions_endpoint(settings.base_url())?;
+        let messages = build_agent_messages(
+            prompt,
+            context_label,
+            settings.reasoning_effort().to_string(),
+            request.selected_output,
+            request.messages,
+        );
+        let client = reqwest::Client::new();
+        let response = client
+            .post(endpoint)
+            .headers(openai_compatible_headers(api_key.as_deref())?)
+            .json(&OpenAiCompatibleChatRequest {
+                model: settings.model().to_string(),
+                messages,
+                stream: false,
+            })
+            .send()
+            .await
+            .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
+
+        let status = response.status();
+        let response_text = response
+            .text()
+            .await
+            .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+
+        if !status.is_success() {
+            return Err(format!(
+                "{} returned HTTP {}: {}",
+                self.label,
+                status.as_u16(),
+                truncate_error_body(&response_text)
+            ));
+        }
+
+        let completion: OpenAiCompatibleChatResponse = serde_json::from_str(&response_text)
+            .map_err(|error| format!("failed to parse {} response: {error}", self.label))?;
+        let content = completion
+            .choices
+            .into_iter()
+            .find_map(|choice| {
+                let content = choice.message.content.trim().to_string();
+                (!content.is_empty()).then_some(content)
+            })
+            .ok_or_else(|| format!("{} response did not include assistant content", self.label))?;
+
+        Ok(AgentRunResponse {
+            provider_kind: self.provider_kind.to_string(),
+            model: settings.model().to_string(),
+            content,
+        })
+    }
+}
+
+#[derive(Serialize)]
+struct OpenAiCompatibleChatRequest {
+    model: String,
+    messages: Vec<OpenAiCompatibleMessage>,
+    stream: bool,
+}
+
+#[derive(Serialize)]
+struct OpenAiCompatibleMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct OpenAiCompatibleChatResponse {
+    choices: Vec<OpenAiCompatibleChoice>,
+}
+
+#[derive(Deserialize)]
+struct OpenAiCompatibleChoice {
+    message: OpenAiCompatibleResponseMessage,
+}
+
+#[derive(Deserialize)]
+struct OpenAiCompatibleResponseMessage {
+    content: String,
+}
+
+fn build_agent_messages(
+    prompt: String,
+    context_label: String,
+    reasoning_effort: String,
+    selected_output: Option<String>,
+    history: Vec<AgentChatMessage>,
+) -> Vec<OpenAiCompatibleMessage> {
+    let mut messages = vec![OpenAiCompatibleMessage {
+        role: "system".to_string(),
+        content: [
+            "You are AdminDeck's AI Assistant for local-first administration workflows.",
+            "Help with terminal, SSH, SFTP, URL, RDP, and VNC operational tasks.",
+            "When suggesting commands, explain intent and prefer commands the user can review before running.",
+            "Do not claim to have executed commands or observed live session state unless it is in the provided context.",
+        ]
+        .join(" "),
+    }];
+
+    messages.extend(
+        history
+            .into_iter()
+            .filter_map(to_openai_compatible_history_message),
+    );
+
+    let mut user_content = format!(
+        "Active context: {context_label}\nReasoning effort: {reasoning_effort}\n\nUser request:\n{prompt}"
+    );
+    if let Some(selected_output) = selected_output
+        .map(|output| output.trim().to_string())
+        .filter(|output| !output.is_empty())
+    {
+        user_content.push_str("\n\nSelected terminal output:\n```text\n");
+        user_content.push_str(&selected_output);
+        user_content.push_str("\n```");
+    }
+    messages.push(OpenAiCompatibleMessage {
+        role: "user".to_string(),
+        content: user_content,
+    });
+    messages
+}
+
+fn to_openai_compatible_history_message(
+    message: AgentChatMessage,
+) -> Option<OpenAiCompatibleMessage> {
+    let role = match message.role.trim() {
+        "assistant" => "assistant",
+        "user" => "user",
+        _ => return None,
+    };
+    let content = message.content.trim().to_string();
+    if content.is_empty() {
+        return None;
+    }
+    Some(OpenAiCompatibleMessage {
+        role: role.to_string(),
+        content,
+    })
+}
+
+fn chat_completions_endpoint(base_url: &str) -> Result<String, String> {
+    let base_url = trim_required("AI provider endpoint", base_url.to_string())?;
+    let base_url = base_url.trim_end_matches('/');
+    if base_url.ends_with("/chat/completions") {
+        Ok(base_url.to_string())
+    } else {
+        Ok(format!("{base_url}/chat/completions"))
+    }
+}
+
+fn openai_compatible_headers(api_key: Option<&str>) -> Result<HeaderMap, String> {
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    if let Some(api_key) = api_key {
+        let header_value = HeaderValue::from_str(&format!("Bearer {api_key}")).map_err(|_| {
+            "AI API key contains characters that cannot be sent in an HTTP header".to_string()
+        })?;
+        headers.insert(AUTHORIZATION, header_value);
+    }
+    Ok(headers)
+}
+
+fn truncate_error_body(value: &str) -> String {
+    const MAX_ERROR_BODY_CHARS: usize = 600;
+    let trimmed = value.trim();
+    if trimmed.chars().count() <= MAX_ERROR_BODY_CHARS {
+        return trimmed.to_string();
+    }
+    let truncated: String = trimmed.chars().take(MAX_ERROR_BODY_CHARS).collect();
+    format!("{truncated}...")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,5 +559,67 @@ mod tests {
             .safety_notes
             .iter()
             .any(|note| note.contains("Selected output may contain credentials")));
+    }
+
+    #[test]
+    fn chat_endpoint_uses_openai_compatible_path_once() {
+        assert_eq!(
+            chat_completions_endpoint("https://api.deepseek.com/v1").expect("endpoint builds"),
+            "https://api.deepseek.com/v1/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_endpoint("https://api.deepseek.com/v1/chat/completions")
+                .expect("endpoint is kept"),
+            "https://api.deepseek.com/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn agent_messages_include_history_context_and_selected_output() {
+        let messages = build_agent_messages(
+            "What failed?".to_string(),
+            "Bastion - Terminal".to_string(),
+            "high".to_string(),
+            Some("ERROR service unavailable".to_string()),
+            vec![
+                AgentChatMessage {
+                    role: "user".to_string(),
+                    content: "Earlier question".to_string(),
+                },
+                AgentChatMessage {
+                    role: "ignored".to_string(),
+                    content: "skip me".to_string(),
+                },
+            ],
+        );
+
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[0].role, "system");
+        assert_eq!(messages[1].role, "user");
+        assert!(messages[2].content.contains("Bastion - Terminal"));
+        assert!(messages[2].content.contains("Reasoning effort: high"));
+        assert!(messages[2].content.contains("ERROR service unavailable"));
+    }
+
+    #[test]
+    fn deepseek_provider_uses_openai_compatible_adapter() {
+        let provider = provider_for("deepseek").expect("DeepSeek provider is wired");
+
+        assert_eq!(provider.provider_kind, "deepseek");
+        assert!(provider.requires_api_key);
+    }
+
+    #[test]
+    fn openai_compatible_headers_include_bearer_key_when_present() {
+        let headers = openai_compatible_headers(Some("sk-test")).expect("headers build");
+
+        assert_eq!(
+            headers
+                .get(AUTHORIZATION)
+                .expect("authorization header exists")
+                .to_str()
+                .expect("header is valid"),
+            "Bearer sk-test"
+        );
     }
 }
