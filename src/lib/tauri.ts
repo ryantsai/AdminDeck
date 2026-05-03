@@ -204,6 +204,13 @@ export interface DiagnosticsBundle {
   warnings: string[];
 }
 
+export interface CaptureScreenshotRequest {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface StartWebviewSessionRequest {
   sessionId: string;
   url: string;
@@ -401,6 +408,10 @@ type CommandMap = {
   create_diagnostics_bundle: {
     args: undefined;
     result: DiagnosticsBundle;
+  };
+  capture_screenshot_to_clipboard: {
+    args: { request: CaptureScreenshotRequest };
+    result: null;
   };
   ssh_transport_plan: {
     args: undefined;

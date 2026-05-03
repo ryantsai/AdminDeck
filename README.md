@@ -16,6 +16,7 @@ This repository currently contains the v0.1 foundation:
 - xterm-based local terminal Sessions over `portable-pty`
 - Live workspace-derived connection status badges
 - SSH-launched SFTP workspace with dual-pane local/remote browsing, drag/drop transfer, overwrite prompts, clearable transfer history, remote properties, chmod, and chown
+- Screenshot capture to clipboard for terminal Panes and non-terminal workspace surfaces, with Region and Entire Window/Panel choices
 - SSH config import command/parser with unsupported directive reporting; the visible import entry point is currently deferred from the simplified chrome
 - Local logging bootstrap
 - Settings placeholder surface for Language (i18n) and Color Scheme

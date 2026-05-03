@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUp,
   Bot,
+  Camera,
   Mouse,
   Check,
   ChevronDown,
@@ -52,6 +53,7 @@ import type {
   KeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
+  RefObject,
 } from "react";
 import "@xterm/xterm/css/xterm.css";
 import "./App.css";
@@ -102,6 +104,7 @@ import {
   invokeCommand,
   isTauriRuntime,
   saveTextFile,
+  type CaptureScreenshotRequest,
   type LocalDirectoryEntry,
   type SftpDirectoryEntry,
   type SftpPathProperties,
@@ -217,6 +220,251 @@ type LocalShellOption = {
   label: string;
   value?: string;
 };
+
+type ScreenshotRect = CaptureScreenshotRequest;
+
+type ScreenshotRegionState = {
+  bounds: DOMRect;
+  pointerId?: number;
+  start?: { x: number; y: number };
+  current?: { x: number; y: number };
+};
+
+function ScreenshotMenu({
+  buttonClassName = "icon-button",
+  targetRef,
+}: {
+  buttonClassName?: string;
+  targetRef: RefObject<HTMLElement | null>;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [regionState, setRegionState] = useState<ScreenshotRegionState | null>(null);
+  const [copiedStatus, setCopiedStatus] = useState("");
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (menuRef.current && target && !menuRef.current.contains(target)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [menuOpen]);
+
+  async function captureRect(rect: ScreenshotRect) {
+    if (!isTauriRuntime()) {
+      window.alert("Screenshots require the Tauri desktop runtime.");
+      return;
+    }
+
+    try {
+      await waitForScreenshotSurface();
+      await invokeCommand("capture_screenshot_to_clipboard", { request: rect });
+      setCopiedStatus("Copied");
+      window.setTimeout(() => setCopiedStatus(""), 1600);
+    } catch (error) {
+      window.alert(
+        `Could not copy screenshot: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  function targetBounds() {
+    const target = targetRef.current;
+    if (!target) {
+      return null;
+    }
+    const bounds = target.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      return null;
+    }
+    return bounds;
+  }
+
+  function handleEntirePanel() {
+    setMenuOpen(false);
+    const bounds = targetBounds();
+    if (!bounds) {
+      return;
+    }
+    void captureRect(rectFromBounds(bounds));
+  }
+
+  function handleRegion() {
+    setMenuOpen(false);
+    const bounds = targetBounds();
+    if (!bounds) {
+      return;
+    }
+    setRegionState({ bounds });
+  }
+
+  function handleRegionPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!regionState || !pointInBounds(event.clientX, event.clientY, regionState.bounds)) {
+      return;
+    }
+    const point = clampPointToBounds(event.clientX, event.clientY, regionState.bounds);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setRegionState({
+      ...regionState,
+      pointerId: event.pointerId,
+      start: point,
+      current: point,
+    });
+  }
+
+  function handleRegionPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!regionState?.start || regionState.pointerId !== event.pointerId) {
+      return;
+    }
+    setRegionState({
+      ...regionState,
+      current: clampPointToBounds(event.clientX, event.clientY, regionState.bounds),
+    });
+  }
+
+  function handleRegionPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!regionState?.start || regionState.pointerId !== event.pointerId) {
+      return;
+    }
+    const current = clampPointToBounds(event.clientX, event.clientY, regionState.bounds);
+    const rect = rectFromPoints(regionState.start, current);
+    setRegionState(null);
+
+    if (rect.width < 4 || rect.height < 4) {
+      return;
+    }
+    void captureRect(rect);
+  }
+
+  function handleRegionKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setRegionState(null);
+    }
+  }
+
+  const selectionRect =
+    regionState?.start && regionState.current
+      ? rectFromPoints(regionState.start, regionState.current)
+      : null;
+
+  return (
+    <>
+      <div className="terminal-menu-wrapper screenshot-menu-wrapper" ref={menuRef}>
+        <button
+          aria-label="Take screenshot"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen ? "true" : "false"}
+          className={buttonClassName}
+          onClick={() => setMenuOpen((open) => !open)}
+          title={copiedStatus || "Take screenshot"}
+          type="button"
+        >
+          <Camera size={13} />
+        </button>
+        {menuOpen ? (
+          <div className="terminal-menu screenshot-menu" role="menu">
+            <button
+              className="terminal-menu-item"
+              onClick={handleRegion}
+              role="menuitem"
+              type="button"
+            >
+              Region
+            </button>
+            <button
+              className="terminal-menu-item"
+              onClick={handleEntirePanel}
+              role="menuitem"
+              type="button"
+            >
+              Entire Window/Panel
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {regionState ? (
+        <div
+          aria-label="Select screenshot region"
+          className="screenshot-region-overlay"
+          onKeyDown={handleRegionKeyDown}
+          onPointerDown={handleRegionPointerDown}
+          onPointerMove={handleRegionPointerMove}
+          onPointerUp={handleRegionPointerUp}
+          role="application"
+          tabIndex={-1}
+        >
+          <div
+            className="screenshot-region-target"
+            style={{
+              height: regionState.bounds.height,
+              left: regionState.bounds.left,
+              top: regionState.bounds.top,
+              width: regionState.bounds.width,
+            }}
+          />
+          {selectionRect ? (
+            <div
+              className="screenshot-region-selection"
+              style={{
+                height: selectionRect.height,
+                left: selectionRect.x,
+                top: selectionRect.y,
+                width: selectionRect.width,
+              }}
+            />
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function rectFromBounds(bounds: DOMRect): ScreenshotRect {
+  return {
+    x: Math.max(0, Math.round(bounds.left)),
+    y: Math.max(0, Math.round(bounds.top)),
+    width: Math.max(1, Math.round(bounds.width)),
+    height: Math.max(1, Math.round(bounds.height)),
+  };
+}
+
+function rectFromPoints(
+  start: { x: number; y: number },
+  current: { x: number; y: number },
+): ScreenshotRect {
+  const x = Math.min(start.x, current.x);
+  const y = Math.min(start.y, current.y);
+  return {
+    x: Math.max(0, Math.round(x)),
+    y: Math.max(0, Math.round(y)),
+    width: Math.max(1, Math.round(Math.abs(current.x - start.x))),
+    height: Math.max(1, Math.round(Math.abs(current.y - start.y))),
+  };
+}
+
+function pointInBounds(x: number, y: number, bounds: DOMRect) {
+  return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+}
+
+function clampPointToBounds(x: number, y: number, bounds: DOMRect) {
+  return {
+    x: Math.min(Math.max(x, bounds.left), bounds.right),
+    y: Math.min(Math.max(y, bounds.top), bounds.bottom),
+  };
+}
+
+async function waitForScreenshotSurface() {
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 90));
+}
 
 function isWindowsPlatform() {
   if (typeof navigator === "undefined") {
@@ -2239,6 +2487,7 @@ function releaseWebviewSession(sessionId: string) {
 
 function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
   const updateWebviewTabMetadata = useWorkspaceStore((state) => state.updateWebviewTabMetadata);
+  const workspaceRef = useRef<HTMLElement | null>(null);
   const placeholderRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(false);
   const sessionStartingRef = useRef(false);
@@ -2542,7 +2791,10 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
   }
 
   return (
-    <section className={isActive ? "terminal-workspace active" : "terminal-workspace"}>
+    <section
+      className={isActive ? "terminal-workspace active" : "terminal-workspace"}
+      ref={workspaceRef}
+    >
       <div className="workspace-toolbar">
         <div>
           <strong>{tab.title}</strong>
@@ -2595,6 +2847,7 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
             <KeyRound size={15} />
             Fill
           </button>
+          <ScreenshotMenu targetRef={workspaceRef} />
           {fillStatus ? <span className="webview-toolbar-status">{fillStatus}</span> : null}
         </div>
       </div>
@@ -2616,7 +2869,7 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
 function documentHasWebviewOverlay() {
   return Boolean(
     document.querySelector(
-      ".dialog-backdrop, .quick-connect-menu, .sftp-context-menu, .sftp-properties-popover",
+      ".dialog-backdrop, .quick-connect-menu, .sftp-context-menu, .sftp-properties-popover, .screenshot-menu, .screenshot-region-overlay",
     ),
   );
 }
@@ -2639,6 +2892,7 @@ function RemoteDesktopWorkspace({
   const connection = tab.connection;
   const typeLabel = connection ? connectionTypeLabel(connection.type) : "Remote desktop";
   const Icon = connection ? connectionIconForType(connection.type) : Monitor;
+  const workspaceRef = useRef<HTMLElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(false);
   const sessionStartingRef = useRef(false);
@@ -2843,13 +3097,19 @@ function RemoteDesktopWorkspace({
   }, [canStartRdp, isActive, suppressed]);
 
   return (
-    <section className={isActive ? "terminal-workspace active" : "terminal-workspace"}>
+    <section
+      className={isActive ? "terminal-workspace active" : "terminal-workspace"}
+      ref={workspaceRef}
+    >
       <div className="workspace-toolbar">
         <div>
           <strong>{tab.title}</strong>
           <span>{tab.subtitle}</span>
         </div>
-        {rdpStatus ? <span className="webview-toolbar-status">{rdpStatus}</span> : null}
+        <div className="toolbar-cluster">
+          {rdpStatus ? <span className="webview-toolbar-status">{rdpStatus}</span> : null}
+          <ScreenshotMenu targetRef={workspaceRef} />
+        </div>
       </div>
       <div className="remote-desktop-workspace" ref={hostRef}>
         <div className="remote-desktop-placeholder">
@@ -3541,6 +3801,7 @@ function TerminalPaneView({
   isFocused: boolean;
   onFocus: () => void;
 }) {
+  const paneRef = useRef<HTMLElement | null>(null);
   const terminalElementRef = useRef<HTMLDivElement | null>(null);
   const terminalRendererRef = useRef<TerminalRenderer | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -3936,6 +4197,7 @@ function TerminalPaneView({
         .filter(Boolean)
         .join(" ")}
       onMouseDown={() => onFocus()}
+      ref={paneRef}
     >
       <header>
         <span>
@@ -3967,6 +4229,7 @@ function TerminalPaneView({
           >
             <Copy size={13} />
           </button>
+          <ScreenshotMenu buttonClassName="terminal-pane-action" targetRef={paneRef} />
           <button
             className="terminal-pane-action"
             aria-label="Send selection to command assist"
@@ -4113,6 +4376,7 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
   const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
   const openTerminalHere = useWorkspaceStore((state) => state.openTerminalHere);
   const connection = tab.connection;
+  const workspaceRef = useRef<HTMLElement | null>(null);
   const [localPath, setLocalPath] = useState("");
   const [localFiles, setLocalFiles] = useState<FileEntry[]>([]);
   const [remotePath, setRemotePath] = useState(".");
@@ -4891,6 +5155,7 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
   return (
     <section
       className={isActive ? "sftp-workspace active" : "sftp-workspace"}
+      ref={workspaceRef}
     >
       <div className="workspace-toolbar">
         <div>
@@ -4925,6 +5190,7 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
             <Terminal size={15} />
             Terminal
           </button>
+          <ScreenshotMenu targetRef={workspaceRef} />
         </div>
       </div>
 

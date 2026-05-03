@@ -839,6 +839,39 @@ h2 {
   display: grid;
 }
 
+.screenshot-menu-wrapper {
+  flex-shrink: 0;
+}
+
+.screenshot-region-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  cursor: crosshair;
+  background: rgba(10, 15, 22, 0.22);
+}
+
+.screenshot-region-target,
+.screenshot-region-selection {
+  position: fixed;
+  pointer-events: none;
+}
+
+.screenshot-region-target {
+  border: 1px solid rgba(86, 166, 255, 0.8);
+  box-shadow:
+    0 0 0 9999px rgba(4, 8, 14, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.18) inset;
+}
+
+.screenshot-region-selection {
+  background: rgba(86, 166, 255, 0.18);
+  border: 1px solid #56a6ff;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.45) inset,
+    0 8px 26px rgba(0, 0, 0, 0.22);
+}
+
 .terminal-pane {
   display: grid;
   grid-template-rows: 34px minmax(0, 1fr);

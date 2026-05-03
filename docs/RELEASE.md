@@ -79,6 +79,7 @@ The smoke test verifies the release artifact checksum, silently installs into a 
 - Native SSH-launched SFTP does not support `ProxyJump`; SSH terminal sessions with `ProxyJump` use the system `ssh` fallback/debug path where available.
 - SSH config import support exists behind the local command boundary, but the current simplified chrome does not expose a user-facing import action.
 - SFTP supports recursive file and folder transfer, multi-select drag/drop, overwrite prompts with overwrite-all handling, clearable finished transfer history, remote properties, chmod, and chown, but folder sync, diff/compare, transfer resume, archive/extract, and remote file editing remain deferred.
+- Screenshot capture is available from terminal Pane toolbars and non-terminal workspace top toolbars. Region and Entire Window/Panel captures are copied to the system clipboard; sending screenshots to the AI assistant remains deferred until an explicit image-analysis flow exists.
 - RDP, VNC, webview tabs, sync, team sharing, and portable encrypted credential vaults are deferred.
 - AI command assistance stages proposals only; it does not autonomously execute commands.
 - The current Settings surface only shows Language (i18n) and Color Scheme placeholders; diagnostics, terminal, SSH, SFTP, AI provider, update, and keybinding controls are not exposed there yet.

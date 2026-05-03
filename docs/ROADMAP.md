@@ -14,7 +14,7 @@ Milestone E has started with local-only performance instrumentation that surface
 
 Milestone F has started with a repeatable Windows portable ZIP packaging flow that builds the release executable, stages release/privacy documentation, writes a package manifest, and emits a SHA-256 checksum under `artifacts/`. It now also has a repeatable unsigned Windows NSIS setup executable packaging flow that copies the installer into `artifacts/` with a SHA-256 checksum, plus a repeatable installer smoke test that verifies the checksum, silently installs to a temporary directory, confirms the installed executable, and silently uninstalls.
 
-Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after terminal padding geometry, bounded SSH tmux reattach, and native SSH idle-timeout fixes. `npm run build` still reports Vite's existing chunk-size warning. Previous May 2, 2026 packaging validation passed for `npm run package:portable`, `npm run package:installer`, and `npm run smoke:installer`.
+Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` passed after adding Windows screenshot capture to clipboard for terminal Panes and top-level workspace surfaces, terminal padding geometry, bounded SSH tmux reattach, and native SSH idle-timeout fixes. `npm run build` still reports Vite's existing chunk-size warning. Previous May 2, 2026 packaging validation passed for `npm run package:portable`, `npm run package:installer`, and `npm run smoke:installer`.
 
 ## Milestone 0: Project Foundation
 
@@ -124,8 +124,8 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 
 ### Assistant Context and Automation
 
-- [ ] Add screenshot capture for the active connection window.
-- [ ] Add partial-area screenshot capture from a terminal pane, SFTP view, or other workspace surface.
+- [x] Add screenshot capture for the active connection window/workspace surface, copied to the system clipboard.
+- [x] Add partial-area screenshot capture from a terminal Pane, SFTP view, URL view, RDP view, VNC shell, or other workspace surface.
 - [ ] Send captured screenshots to the AI assistant for analysis with explicit user action.
 - [ ] Support asking the AI assistant to create extensions.
 - [ ] Keep extension-generation flows approval-based before installing or running generated code.

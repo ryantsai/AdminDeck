@@ -117,6 +117,12 @@ Evaluate `russh` first. Evaluate `ssh2` if `russh` does not meet v0.1 needs.
 
 Owns SFTP sessions launched from SSH Connections, local/remote listing, multi-select upload/download by button or drag/drop, create folder, inline rename, delete, refresh, scoped context menu actions, remote properties, chmod/chown updates, transfer queue, progress, cancellation, finished-history clearing, overwrite conflict prompts, overwrite-all queue handling, and "open terminal here."
 
+### Screenshot Capture
+
+Owns explicit user-triggered screenshot capture for active workspace surfaces. Terminal Panes expose the screenshot action in the Pane toolbar; URL, SFTP, RDP, and VNC workspaces expose it in the top workspace toolbar. The frontend owns the menu and Region selection overlay, then calls the typed Tauri command with a client-area rectangle.
+
+On Windows, the Rust backend translates the requested rectangle into physical screen coordinates and uses GDI capture so native child surfaces such as WebView2 and the RDP ActiveX host are included. Captures are written directly to the system clipboard as image data. Screenshot capture does not persist image files, does not log terminal contents, and is separate from the future AI-assistant image-analysis flow, which must remain an explicit user action.
+
 ### SSH Config Importer
 
 Parses SSH config and creates draft connections. It should preserve supported directives and visibly report unsupported directives.
@@ -160,6 +166,7 @@ The primary UI is a dense desktop workspace:
 - main tabs/workspace
 - terminal split panes inside terminal tabs
 - tmux session tags and management popovers inside SSH terminal Pane toolbars
+- screenshot Region and Entire Window/Panel actions, shown in terminal Pane toolbars for terminal Sessions and top workspace toolbars for non-terminal surfaces
 - SFTP dual-pane view
 - right AI assistant panel
 - settings

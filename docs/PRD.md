@@ -8,7 +8,7 @@ AdminDeck is intended to be a fast, professional desktop workspace for personal/
 
 ## Solution
 
-AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions with optional tmux resume, SFTP dual-pane file management, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
+AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions with optional tmux resume, SFTP dual-pane file management, explicit screenshot capture to clipboard for workspace surfaces, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
 
 The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. Mobile, RDP, VNC, team vaults, and sync are explicitly later-stage work.
 
@@ -51,25 +51,26 @@ The product will be light chrome with dark terminal panes by default, optimized 
 35. As an SFTP user, I want a transfer queue with progress, cancellation, and clearable finished history, so that long operations are visible without old records piling up.
 36. As an SFTP user, I want an "open terminal here" action, so that I can jump from remote file navigation to shell work.
 37. As an SFTP user, I want overwrite prompts with an overwrite-all option, so that file transfer conflicts stay explicit without slowing down large batches.
-38. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
-39. As a user, I want a Settings entry point that clearly shows Language (i18n) and Color Scheme as planned areas, so that future customization work has an obvious home without implying unfinished controls work today.
-40. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
-41. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
-42. As a user, I want no telemetry by default, so that my terminal and host data remain private.
-43. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
-44. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
-45. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
-46. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
-47. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
-48. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
-49. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
-50. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
-51. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
-52. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
-53. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
-54. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
-55. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
-56. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
+38. As a user, I want to capture an entire active workspace surface or a selected Region to the clipboard, so that I can share visible terminal, SFTP, URL, RDP, or VNC context without saving files.
+39. As a user, I want light app chrome with dark terminal panes, so that the interface feels clear while terminals remain comfortable.
+40. As a user, I want a Settings entry point that clearly shows Language (i18n) and Color Scheme as planned areas, so that future customization work has an obvious home without implying unfinished controls work today.
+41. As a user, I want local SQLite storage for non-secret settings and connections, so that the app remains local-first and reliable.
+42. As a user, I want secrets stored in the OS keychain, so that passwords, passphrases, and API keys are not stored in plaintext config.
+43. As a user, I want no telemetry by default, so that my terminal and host data remain private.
+44. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
+45. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
+46. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
+47. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
+48. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
+49. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
+50. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
+51. As a contributor, I want an Apache-2.0 open-source project, so that licensing is clear and permissive.
+52. As a maintainer, I want dependencies compatible with Apache-2.0/MIT/BSD/MPL-style use, so that runtime licensing stays clean.
+53. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
+54. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
+55. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
+56. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
+57. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
 
 ## Implementation Decisions
 
@@ -106,6 +107,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
 - SSH tmux model: SSH Connections can opt into tmux session launch by default. Each SSH terminal Pane gets a generated friendly tmux session id like `admindeck-cockpit001`, starts or attaches with `tmux new-session -A`, falls back to a normal remote shell if `tmux` is missing, and exposes a Pane-toolbar tag that lists attached and detached remote tmux sessions with explicit close actions. Quiet native SSH Sessions should not disconnect because the app is idle or unfocused; tmux-backed native SSH terminal Sessions may silently make a small bounded attempt to reattach to the same Pane tmux id if the transport breaks.
 - SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
+- Screenshot model: explicit user action only. Terminal Panes expose screenshot capture in the Pane toolbar; SFTP, URL, RDP, and VNC workspaces expose it in the top toolbar. Region and Entire Window/Panel captures are copied to the system clipboard and are not persisted by AdminDeck.
 - Settings: current surface is intentionally limited to two to-be-implemented placeholders, Language (i18n) and Color Scheme. Deeper terminal, SSH, SFTP, AI provider, diagnostics, update, and keybinding controls should be reintroduced only when their UX is clear and backed by the existing local storage/keychain boundaries.
 - SSH config import: the parser and typed Tauri command remain in place, but the previous top chrome import button has been removed. A visible import entry point should return through the connection tree or Settings only when that flow has a clear home.
 - Privacy: no telemetry or automatic crash upload in v0.1.

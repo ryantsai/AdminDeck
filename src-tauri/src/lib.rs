@@ -3,6 +3,7 @@ mod diagnostics;
 mod logging;
 mod performance;
 mod rdp;
+mod screenshot;
 mod secrets;
 mod sessions;
 mod sftp;
@@ -225,6 +226,14 @@ fn create_diagnostics_bundle(
     performance: tauri::State<'_, performance::PerformanceMonitor>,
 ) -> Result<diagnostics::DiagnosticsBundle, String> {
     diagnostics::create_bundle(&app, &performance)
+}
+
+#[tauri::command]
+fn capture_screenshot_to_clipboard(
+    app: tauri::AppHandle,
+    request: screenshot::CaptureScreenshotRequest,
+) -> Result<(), String> {
+    screenshot::capture_rect_to_clipboard(&app, request)
 }
 
 #[tauri::command]
@@ -648,6 +657,7 @@ pub fn run() {
             keychain_status,
             get_performance_snapshot,
             create_diagnostics_bundle,
+            capture_screenshot_to_clipboard,
             ssh_transport_plan,
             import_ssh_config,
             inspect_ssh_host_key,
