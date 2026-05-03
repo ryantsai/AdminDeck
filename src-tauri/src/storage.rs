@@ -100,12 +100,15 @@ pub struct SftpSettings {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiProviderSettings {
+    #[serde(default)]
     enabled: bool,
     #[serde(default = "default_ai_provider_kind")]
     provider_kind: String,
     base_url: String,
     #[serde(default = "default_ai_model")]
     model: String,
+    #[serde(default = "default_ai_reasoning_effort")]
+    reasoning_effort: String,
     #[serde(default = "default_ai_cli_execution_policy")]
     cli_execution_policy: String,
     #[serde(default)]
@@ -1843,6 +1846,7 @@ fn default_ai_provider_settings() -> AiProviderSettings {
         provider_kind: default_ai_provider_kind(),
         base_url: "https://api.openai.com/v1".to_string(),
         model: default_ai_model(),
+        reasoning_effort: default_ai_reasoning_effort(),
         cli_execution_policy: default_ai_cli_execution_policy(),
         claude_cli_path: None,
         codex_cli_path: None,
@@ -1855,6 +1859,10 @@ fn default_ai_provider_kind() -> String {
 
 fn default_ai_model() -> String {
     "gpt-5.5".to_string()
+}
+
+fn default_ai_reasoning_effort() -> String {
+    "medium".to_string()
 }
 
 fn default_ai_cli_execution_policy() -> String {
@@ -1924,6 +1932,20 @@ fn validate_ai_provider_settings(
     settings.base_url = required_field("AI provider endpoint", settings.base_url)?;
     settings.base_url = settings.base_url.trim_end_matches('/').to_string();
     settings.model = required_field("AI model", settings.model)?;
+    settings.reasoning_effort = match settings.reasoning_effort.trim().to_lowercase().as_str() {
+        "" | "default" | "providerdefault" | "provider-default" | "provider_default" => {
+            "default".to_string()
+        }
+        "low" => "low".to_string(),
+        "medium" => "medium".to_string(),
+        "high" => "high".to_string(),
+        "max" | "maximum" | "xhigh" | "x-high" | "x_high" => "max".to_string(),
+        _ => {
+            return Err(
+                "AI reasoning effort must be default, low, medium, high, or max".to_string(),
+            )
+        }
+    };
     settings.cli_execution_policy = match settings.cli_execution_policy.trim() {
         "" | "suggestOnly" | "suggest-only" | "suggest_only" => "suggestOnly".to_string(),
         _ => {
@@ -2849,6 +2871,7 @@ mod tests {
         assert_eq!(defaults.provider_kind, "openai");
         assert_eq!(defaults.base_url, "https://api.openai.com/v1");
         assert_eq!(defaults.model, "gpt-5.5");
+        assert_eq!(defaults.reasoning_effort, "medium");
         assert_eq!(defaults.cli_execution_policy, "suggestOnly");
 
         let updated = storage
@@ -2857,6 +2880,7 @@ mod tests {
                 provider_kind: "  OpenRouter  ".to_string(),
                 base_url: "  https://llm-gateway.internal/v1/  ".to_string(),
                 model: " openai/gpt-5.5 ".to_string(),
+                reasoning_effort: " XHIGH ".to_string(),
                 cli_execution_policy: "suggest-only".to_string(),
                 claude_cli_path: Some("  C:\\Tools\\claude.exe  ".to_string()),
                 codex_cli_path: Some("  codex  ".to_string()),
@@ -2867,6 +2891,7 @@ mod tests {
         assert_eq!(updated.provider_kind, "openrouter");
         assert_eq!(updated.base_url, "https://llm-gateway.internal/v1");
         assert_eq!(updated.model, "openai/gpt-5.5");
+        assert_eq!(updated.reasoning_effort, "max");
         assert_eq!(updated.cli_execution_policy, "suggestOnly");
         assert_eq!(
             updated.claude_cli_path.as_deref(),
@@ -2879,6 +2904,7 @@ mod tests {
             .expect("AI provider settings reload");
         assert_eq!(reloaded.base_url, "https://llm-gateway.internal/v1");
         assert_eq!(reloaded.model, "openai/gpt-5.5");
+        assert_eq!(reloaded.reasoning_effort, "max");
     }
 
     #[test]
@@ -2891,6 +2917,7 @@ mod tests {
                 provider_kind: "openai".to_string(),
                 base_url: "api.openai.com/v1".to_string(),
                 model: "gpt-5.5".to_string(),
+                reasoning_effort: "medium".to_string(),
                 cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
@@ -2914,6 +2941,7 @@ mod tests {
                 provider_kind: "openai".to_string(),
                 base_url: "https://api.openai.com/v1".to_string(),
                 model: "   ".to_string(),
+                reasoning_effort: "medium".to_string(),
                 cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
@@ -2933,6 +2961,7 @@ mod tests {
                 provider_kind: "openai".to_string(),
                 base_url: "https://api.openai.com/v1".to_string(),
                 model: "gpt-5.5".to_string(),
+                reasoning_effort: "medium".to_string(),
                 cli_execution_policy: "executeAutomatically".to_string(),
                 claude_cli_path: Some("claude".to_string()),
                 codex_cli_path: Some("codex".to_string()),

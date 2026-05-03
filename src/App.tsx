@@ -134,7 +134,7 @@ import {
   getAiProviderDefinition,
   normalizeAiProviderDraft,
   providerDefaultsFor,
-  providerNeedsApiKey,
+  validateAiProviderForChat,
 } from "./ai/providers";
 import { aiSuggestions, connectionTree, defaultTerminalSettings } from "./sample-data";
 import { useWorkspaceStore } from "./store";
@@ -154,6 +154,7 @@ import {
 } from "./workspace/paneRegistry";
 import type {
   AiProviderKind,
+  AiReasoningEffort,
   Connection,
   ConnectionFolder,
   ConnectionStatus,
@@ -7585,9 +7586,7 @@ function SettingsPage({
     try {
       setAiError("");
       setAiStatus("");
-      const hasApiKeyAfterSave =
-        apiKeyDraft.trim().length > 0 || !providerNeedsApiKey(aiDraft) || aiProviderHasApiKey;
-      const nextSettings = normalizeAiProviderDraft(aiDraft, hasApiKeyAfterSave);
+      const nextSettings = normalizeAiProviderDraft(aiDraft);
 
       if (apiKeyDraft.trim()) {
         if (isTauriRuntime()) {
@@ -7601,8 +7600,6 @@ function SettingsPage({
         }
         setAiProviderHasApiKey(true);
         setApiKeyDraft("");
-      } else if (!providerNeedsApiKey(nextSettings)) {
-        setAiProviderHasApiKey(true);
       }
 
       const saved = isTauriRuntime()
@@ -7616,6 +7613,32 @@ function SettingsPage({
     }
   }
 
+  async function handleClearAiProviderSettings() {
+    try {
+      setAiError("");
+      setAiStatus("");
+      const defaults = providerDefaultsFor("openai");
+      if (isTauriRuntime()) {
+        await invokeCommand("delete_secret", {
+          request: {
+            kind: "aiApiKey",
+            ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+          },
+        });
+      }
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_ai_provider_settings", { request: defaults })
+        : defaults;
+      setAiProviderSettings(saved);
+      setAiDraft(saved);
+      setApiKeyDraft("");
+      setAiProviderHasApiKey(false);
+      setAiStatus("AI provider settings cleared.");
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   function handleAiProviderKindChange(providerKind: AiProviderKind) {
     const defaults = providerDefaultsFor(providerKind);
     setAiDraft((settings) => ({
@@ -7623,7 +7646,7 @@ function SettingsPage({
       providerKind,
       baseUrl: defaults.baseUrl,
       model: defaults.model,
-      enabled: providerKind === "ollama" ? true : settings.enabled,
+      reasoningEffort: defaults.reasoningEffort,
     }));
     setApiKeyDraft("");
     setAiStatus("");
@@ -7862,15 +7885,25 @@ function SettingsPage({
                 <p className="panel-label">AI Assist</p>
                 <h2>AI provider</h2>
               </div>
-              <button
-                className="toolbar-button"
-                disabled={!hasAiChanges}
-                onClick={() => void handleSaveAiProviderSettings()}
-                type="button"
-              >
-                <Save size={15} />
-                Save
-              </button>
+              <div className="settings-header-actions">
+                <button
+                  className="toolbar-button"
+                  disabled={!hasAiChanges}
+                  onClick={() => void handleSaveAiProviderSettings()}
+                  type="button"
+                >
+                  <Save size={15} />
+                  Save
+                </button>
+                <button
+                  className="toolbar-button"
+                  onClick={() => void handleClearAiProviderSettings()}
+                  type="button"
+                >
+                  <Trash2 size={15} />
+                  Clear All Settings
+                </button>
+              </div>
             </div>
 
             <div className="ai-provider-picker" role="group" aria-label="AI providers">
@@ -7911,12 +7944,13 @@ function SettingsPage({
                 <span>Model</span>
                 <input
                   list="ai-provider-model-options"
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const model = event.currentTarget.value;
                     setAiDraft((settings) => ({
                       ...settings,
-                      model: event.currentTarget.value,
-                    }))
-                  }
+                      model,
+                    }));
+                  }}
                   value={aiDraft.model}
                 />
                 <datalist id="ai-provider-model-options">
@@ -7928,18 +7962,22 @@ function SettingsPage({
                 </datalist>
               </label>
               <label>
-                <span>Status</span>
+                <span>Reasoning effort</span>
                 <select
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const reasoningEffort = event.currentTarget.value as AiReasoningEffort;
                     setAiDraft((settings) => ({
                       ...settings,
-                      enabled: event.currentTarget.value === "enabled",
-                    }))
-                  }
-                  value={aiDraft.enabled ? "enabled" : "disabled"}
+                      reasoningEffort,
+                    }));
+                  }}
+                  value={aiDraft.reasoningEffort}
                 >
-                  <option value="enabled">Enabled</option>
-                  <option value="disabled">Disabled</option>
+                  {aiProviderDefinition.reasoningEfforts.map((effort) => (
+                    <option key={effort} value={effort}>
+                      {formatReasoningEffort(effort)}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -7948,12 +7986,13 @@ function SettingsPage({
               <label>
                 <span>Endpoint</span>
                 <input
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const baseUrl = event.currentTarget.value;
                     setAiDraft((settings) => ({
                       ...settings,
-                      baseUrl: event.currentTarget.value,
-                    }))
-                  }
+                      baseUrl,
+                    }));
+                  }}
                   readOnly={!aiProviderDefinition.allowsCustomBaseUrl}
                   value={aiDraft.baseUrl}
                 />
@@ -7984,6 +8023,10 @@ function SettingsPage({
                 value={aiProviderDefinition.capabilities
                   .map(formatAiProviderCapability)
                   .join(", ")}
+              />
+              <SettingsSummary
+                label="Reasoning"
+                value={formatReasoningEffort(aiDraft.reasoningEffort)}
               />
             </div>
             {aiStatus ? <p className="settings-status success">{aiStatus}</p> : null}
@@ -8050,6 +8093,23 @@ function formatAiProviderCapability(capability: string) {
   }
 }
 
+function formatReasoningEffort(effort: AiReasoningEffort) {
+  switch (effort) {
+    case "default":
+      return "Provider default";
+    case "low":
+      return "Low";
+    case "medium":
+      return "Medium";
+    case "high":
+      return "High";
+    case "max":
+      return "Max";
+    default:
+      return effort;
+  }
+}
+
 function normalizeTerminalSettingsDraft(settings: TerminalSettings): TerminalSettings {
   if (!settings.fontFamily.trim()) {
     throw new Error("Font family is required.");
@@ -8110,11 +8170,6 @@ function AssistantPanel({
     ? `${activeTab.connection.user}@${activeTab.connection.host}`
     : "Workspace";
   const providerDefinition = getAiProviderDefinition(aiProviderSettings.providerKind);
-  const providerConfigured =
-    aiProviderSettings.enabled &&
-    Boolean(aiProviderSettings.baseUrl.trim()) &&
-    Boolean(aiProviderSettings.model.trim()) &&
-    (!providerDefinition.requiresApiKey || aiProviderHasApiKey);
   const activeTerminalPaneId =
     activeTab?.kind === "terminal" ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id : undefined;
 
@@ -8139,21 +8194,31 @@ function AssistantPanel({
     if (!normalizedPrompt) {
       return;
     }
-    if (!providerConfigured) {
-      setChatError("Set up an AI provider in Settings first.");
-      return;
-    }
-
     const userMessage: AssistantChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
       content: normalizedPrompt,
     };
+    try {
+      validateAiProviderForChat(aiProviderSettings, aiProviderHasApiKey);
+    } catch (error) {
+      const assistantMessage: AssistantChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: `AI provider settings error: ${error instanceof Error ? error.message : String(error)}`,
+      };
+      setMessages((current) => [...current, userMessage, assistantMessage]);
+      setPrompt("");
+      setChatError("");
+      return;
+    }
+
     const assistantMessage: AssistantChatMessage = {
       id: `assistant-${Date.now()}`,
       role: "assistant",
       content: [
         `Provider **${providerDefinition.label}** is configured with \`${aiProviderSettings.model}\`.`,
+        `Reasoning effort: **${formatReasoningEffort(aiProviderSettings.reasoningEffort)}**.`,
         "",
         "The chat transport is ready to wire into the upcoming agent runner. Code blocks rendered here can already be sent to the focused terminal.",
       ].join("\n"),
@@ -8225,16 +8290,6 @@ function AssistantPanel({
         )}
       </section>
 
-      {!providerConfigured ? (
-        <div className="assistant-setup-hint">
-          <KeyRound size={16} />
-          <span>
-            <strong>Set up AI provider first</strong>
-            <small>Settings &gt; AI Assist</small>
-          </span>
-        </div>
-      ) : null}
-
       {assistantContextSnippet ? (
         <section className="assistant-selection-context">
           <header>
@@ -8268,7 +8323,6 @@ function AssistantPanel({
 
       <form className="assistant-chat-composer" onSubmit={handleChatSubmit}>
         <textarea
-          disabled={!providerConfigured}
           onChange={(event) => setPrompt(event.currentTarget.value)}
           placeholder="Ask AI Assistant anything."
           rows={3}
@@ -8282,7 +8336,7 @@ function AssistantPanel({
           <button
             aria-label="Send message"
             className="assistant-send-button"
-            disabled={!providerConfigured || !prompt.trim()}
+            disabled={!prompt.trim()}
             type="submit"
           >
             <SendHorizontal size={18} />

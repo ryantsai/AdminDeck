@@ -147,11 +147,13 @@ export type AiProviderKind =
   | "nvidia"
   | "openai-compatible";
 
+export type AiReasoningEffort = "default" | "low" | "medium" | "high" | "max";
+
 export interface AiProviderSettings {
-  enabled: boolean;
   providerKind: AiProviderKind;
   baseUrl: string;
   model: string;
+  reasoningEffort: AiReasoningEffort;
   cliExecutionPolicy: "suggestOnly";
   claudeCliPath?: string;
   codexCliPath?: string;

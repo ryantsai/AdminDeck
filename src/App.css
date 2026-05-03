@@ -2696,6 +2696,14 @@ progress {
   min-width: 0;
 }
 
+.settings-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .settings-status {
   margin: 0;
   padding: 8px 10px;

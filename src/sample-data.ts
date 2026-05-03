@@ -37,10 +37,10 @@ export const defaultSftpSettings: SftpSettings = {
 };
 
 export const defaultAiProviderSettings: AiProviderSettings = {
-  enabled: false,
   providerKind: "openai",
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-5.5",
+  reasoningEffort: "medium",
   cliExecutionPolicy: "suggestOnly",
   claudeCliPath: "",
   codexCliPath: "",

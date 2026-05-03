@@ -1,4 +1,4 @@
-import type { AiProviderKind, AiProviderSettings } from "../types";
+import type { AiProviderKind, AiProviderSettings, AiReasoningEffort } from "../types";
 
 export type AiProviderCapability =
   | "chat"
@@ -19,6 +19,8 @@ export type AiProviderDefinition = {
   label: string;
   baseUrl: string;
   defaultModel: string;
+  defaultReasoningEffort: AiReasoningEffort;
+  reasoningEfforts: AiReasoningEffort[];
   requiresApiKey: boolean;
   allowsCustomBaseUrl: boolean;
   allowsCustomModel: boolean;
@@ -33,6 +35,8 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
     defaultModel: "gpt-5.5",
+    defaultReasoningEffort: "medium",
+    reasoningEfforts: ["default", "low", "medium", "high", "max"],
     requiresApiKey: true,
     allowsCustomBaseUrl: false,
     allowsCustomModel: true,
@@ -51,6 +55,8 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
     label: "Anthropic",
     baseUrl: "https://api.anthropic.com/v1",
     defaultModel: "claude-sonnet-4-6",
+    defaultReasoningEffort: "medium",
+    reasoningEfforts: ["default", "low", "medium", "high", "max"],
     requiresApiKey: true,
     allowsCustomBaseUrl: false,
     allowsCustomModel: true,
@@ -68,6 +74,8 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
     label: "OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
     defaultModel: "openai/gpt-5.5",
+    defaultReasoningEffort: "medium",
+    reasoningEfforts: ["default", "low", "medium", "high", "max"],
     requiresApiKey: true,
     allowsCustomBaseUrl: false,
     allowsCustomModel: true,
@@ -84,14 +92,16 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
     kind: "deepseek",
     label: "DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
-    defaultModel: "deepseek-chat",
+    defaultModel: "deepseek-v4-flash",
+    defaultReasoningEffort: "high",
+    reasoningEfforts: ["default", "high", "max"],
     requiresApiKey: true,
     allowsCustomBaseUrl: false,
     allowsCustomModel: true,
     apiKeyLabel: "DeepSeek API key",
     modelOptions: [
-      { id: "deepseek-chat", label: "DeepSeek Chat", note: "General coding" },
-      { id: "deepseek-reasoner", label: "DeepSeek Reasoner", note: "Reasoning" },
+      { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", note: "Default" },
+      { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", note: "Higher capability" },
     ],
     capabilities: ["chat", "streaming", "toolCalling", "openAiCompatible"],
   },
@@ -100,6 +110,8 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
     label: "Ollama",
     baseUrl: "http://localhost:11434/v1",
     defaultModel: "qwen3",
+    defaultReasoningEffort: "default",
+    reasoningEfforts: ["default", "low", "medium", "high", "max"],
     requiresApiKey: false,
     allowsCustomBaseUrl: true,
     allowsCustomModel: true,
@@ -117,6 +129,8 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
     label: "NVIDIA",
     baseUrl: "https://integrate.api.nvidia.com/v1",
     defaultModel: "bytedance/seed-oss-36b-instruct",
+    defaultReasoningEffort: "medium",
+    reasoningEfforts: ["default", "low", "medium", "high", "max"],
     requiresApiKey: true,
     allowsCustomBaseUrl: false,
     allowsCustomModel: true,
@@ -133,6 +147,8 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
     label: "OpenAI Compatible",
     baseUrl: "",
     defaultModel: "gpt-5.5",
+    defaultReasoningEffort: "medium",
+    reasoningEfforts: ["default", "low", "medium", "high", "max"],
     requiresApiKey: true,
     allowsCustomBaseUrl: true,
     allowsCustomModel: true,
@@ -156,23 +172,25 @@ export function getAiProviderDefinition(kind: AiProviderKind) {
 export function providerDefaultsFor(kind: AiProviderKind): AiProviderSettings {
   const definition = getAiProviderDefinition(kind);
   return {
-    enabled: false,
     providerKind: definition.kind,
     baseUrl: definition.baseUrl,
     model: definition.defaultModel,
+    reasoningEffort: definition.defaultReasoningEffort,
     cliExecutionPolicy: "suggestOnly",
     claudeCliPath: "",
     codexCliPath: "",
   };
 }
 
-export function normalizeAiProviderDraft(
-  draft: AiProviderSettings,
-  hasApiKey: boolean,
-): AiProviderSettings {
+export function normalizeAiProviderDraft(draft: AiProviderSettings): AiProviderSettings {
   const definition = getAiProviderDefinition(draft.providerKind);
   const baseUrl = (definition.allowsCustomBaseUrl ? draft.baseUrl : definition.baseUrl).trim();
   const model = draft.model.trim() || definition.defaultModel;
+  const reasoningEffort = normalizeReasoningEffort(
+    draft.reasoningEffort,
+    definition.reasoningEfforts,
+    definition.defaultReasoningEffort,
+  );
 
   if (!baseUrl) {
     throw new Error("Provider endpoint is required.");
@@ -180,15 +198,13 @@ export function normalizeAiProviderDraft(
   if (!model) {
     throw new Error("Model is required.");
   }
-  if (definition.requiresApiKey && draft.enabled && !hasApiKey) {
-    throw new Error(`${definition.label} needs an API key before AI Assist can be enabled.`);
-  }
 
   return {
     ...draft,
     providerKind: definition.kind,
     baseUrl: baseUrl.replace(/\/+$/, ""),
     model,
+    reasoningEffort,
     cliExecutionPolicy: "suggestOnly",
     claudeCliPath: draft.claudeCliPath?.trim() ?? "",
     codexCliPath: draft.codexCliPath?.trim() ?? "",
@@ -199,3 +215,23 @@ export function providerNeedsApiKey(settings: AiProviderSettings) {
   return getAiProviderDefinition(settings.providerKind).requiresApiKey;
 }
 
+export function validateAiProviderForChat(
+  settings: AiProviderSettings,
+  hasApiKey: boolean,
+): AiProviderSettings {
+  const normalized = normalizeAiProviderDraft(settings);
+  const definition = getAiProviderDefinition(normalized.providerKind);
+  if (definition.requiresApiKey && !hasApiKey) {
+    throw new Error(`${definition.label} needs an API key before AI Assistant can chat.`);
+  }
+  return normalized;
+}
+
+function normalizeReasoningEffort(
+  value: AiReasoningEffort | undefined,
+  supported: AiReasoningEffort[],
+  fallback: AiReasoningEffort,
+) {
+  const normalized = value ?? fallback;
+  return supported.includes(normalized) ? normalized : fallback;
+}
