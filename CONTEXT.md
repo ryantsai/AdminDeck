@@ -15,7 +15,7 @@ A Connection of kind `url`. It stores an http(s) URL plus an optional `dataParti
 _Avoid_: Web tab, browser bookmark, URL profile
 
 **RDP/VNC Connection**:
-A Connection of kind `rdp` or `vnc`. It stores host, optional port, and non-secret account metadata in SQLite; passwords stay in the OS keychain. The first v0.2 slice persists and displays these Connections without modeling a live remote-desktop transport as durable state.
+A Connection of kind `rdp` or `vnc`. It stores host, optional port, and non-secret account metadata in SQLite; passwords stay in the OS keychain. RDP Connections start Windows-native remote desktop Sessions through the Microsoft RDP ActiveX control in `mstscax.dll`. VNC transport is not implemented yet and currently opens a durable Connection shell without backend live session state.
 _Avoid_: Remote desktop session, screen profile, saved desktop
 
 **Quick Connect**:
@@ -41,7 +41,8 @@ Terminal Panes for tmux-enabled SSH Connections may carry a generated friendly t
 - A **Connection** may start zero or more **Sessions** over time.
 - An SSH **Connection** may start terminal **Sessions** and related SFTP browser **Sessions**.
 - A **URL Connection** starts a webview **Session** that owns one child WebView2 surface positioned over its **Tab**.
-- An **RDP/VNC Connection** starts a remote-desktop **Session** once the v0.2 transport is implemented. Until then, opening one presents the durable Connection shell in the workspace without creating backend live session state.
+- An **RDP Connection** starts a Windows-native remote-desktop **Session** hosted as a native child control over its **Tab**.
+- A **VNC Connection** presents the durable Connection shell until the v0.2 VNC transport is implemented.
 - A **Quick Connect** starts exactly one **Session** unless the user saves it as a **Connection**.
 - A **Session** may be presented by one **Tab**.
 - A terminal **Tab** may contain one or more **Panes**.

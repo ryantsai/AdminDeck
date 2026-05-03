@@ -2,6 +2,7 @@ mod ai;
 mod diagnostics;
 mod logging;
 mod performance;
+mod rdp;
 mod secrets;
 mod sessions;
 mod sftp;
@@ -549,6 +550,52 @@ fn close_webview_session(
     webviews.close_session(request)
 }
 
+#[tauri::command]
+fn start_rdp_session(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    mut request: rdp::StartRdpSessionRequest,
+) -> Result<rdp::RdpSessionStarted, String> {
+    if request.password().is_none() {
+        if let Some(owner_id) = request.secret_owner_id().map(str::to_string) {
+            request.set_password(
+                secrets
+                    .read_connection_password(owner_id)
+                    .map_err(|error| format!("failed to read RDP password: {error}"))?,
+            );
+        }
+    }
+    rdp_sessions.start_session(app, request)
+}
+
+#[tauri::command]
+fn update_rdp_bounds(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::UpdateRdpBoundsRequest,
+) -> Result<(), String> {
+    rdp_sessions.update_bounds(app, request)
+}
+
+#[tauri::command]
+fn set_rdp_visibility(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::SetRdpVisibilityRequest,
+) -> Result<(), String> {
+    rdp_sessions.set_visibility(app, request)
+}
+
+#[tauri::command]
+fn close_rdp_session(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::RdpSimpleRequest,
+) -> Result<(), String> {
+    rdp_sessions.close_session(app, request)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     logging::init();
@@ -572,6 +619,7 @@ pub fn run() {
             app.manage(sessions::SessionManager::new());
             app.manage(sftp::SftpSessionManager::new());
             app.manage(webview::WebviewSessionManager::new());
+            app.manage(rdp::RdpSessionManager::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -636,7 +684,11 @@ pub fn run() {
             webview_go_back,
             webview_go_forward,
             fill_webview_credential,
-            close_webview_session
+            close_webview_session,
+            start_rdp_session,
+            update_rdp_bounds,
+            set_rdp_visibility,
+            close_rdp_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running AdminDeck");

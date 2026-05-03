@@ -56,20 +56,19 @@ Optional future direction: a portable vault mode may add encrypted SQLite creden
 
 ### Connection Model
 
-Represents all openable resources as saved connections. v0.1 connection types:
+Represents all openable resources as saved connections. Current connection types:
 
 - Local Terminal
 - SSH Terminal
+- URL
+- RDP
+- VNC
 
 SFTP is a related workspace surface opened from an SSH Connection, not a standalone saved Connection type.
 
 SSH Connections may store a non-secret `useTmuxSessions` preference. This value describes how future terminal Sessions should launch; it does not represent a live remote process.
 
-Later connection types:
-
-- RDP Session
-- VNC Session
-- Web URL
+RDP Sessions are Windows-native child controls hosted through the Microsoft RDP ActiveX COM control in `mstscax.dll`. The Rust backend creates and drives the control from Tauri commands while the frontend owns Tab/workspace placement. VNC is durable Connection data only until its v0.2 transport is implemented.
 
 ### Connection Tree
 

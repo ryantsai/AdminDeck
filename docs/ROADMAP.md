@@ -154,7 +154,7 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Add lightweight webview tab.
 - [x] Add durable RDP connection type.
 - [x] Add durable VNC connection type.
-- [ ] Implement RDP session transport.
+- [x] Implement Windows-native RDP session transport with Microsoft RDP ActiveX COM hosting.
 - [ ] Implement VNC session transport.
 - [ ] Add MobaXterm/RDCMan import.
 - [ ] Add SFTP folder sync/diff/resume.

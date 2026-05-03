@@ -26,6 +26,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tokio",
  "url",
+ "windows 0.61.3",
  "windows-native-keyring-store",
  "windows-sys 0.59.0",
 ]

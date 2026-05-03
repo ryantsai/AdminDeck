@@ -252,6 +252,47 @@ export interface FillWebviewCredentialRequest {
   username: string;
 }
 
+export interface StartRdpSessionRequest {
+  sessionId: string;
+  host: string;
+  user: string;
+  port?: number;
+  secretOwnerId?: string;
+  password?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface RdpSessionStarted {
+  sessionId: string;
+  host: string;
+  port: number;
+  control: string;
+}
+
+export interface UpdateRdpBoundsRequest {
+  sessionId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SetRdpVisibilityRequest {
+  sessionId: string;
+  visible: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface RdpSimpleRequest {
+  sessionId: string;
+}
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -583,6 +624,22 @@ type CommandMap = {
   };
   close_webview_session: {
     args: { request: WebviewSimpleRequest };
+    result: null;
+  };
+  start_rdp_session: {
+    args: { request: StartRdpSessionRequest };
+    result: RdpSessionStarted;
+  };
+  update_rdp_bounds: {
+    args: { request: UpdateRdpBoundsRequest };
+    result: null;
+  };
+  set_rdp_visibility: {
+    args: { request: SetRdpVisibilityRequest };
+    result: null;
+  };
+  close_rdp_session: {
+    args: { request: RdpSimpleRequest };
     result: null;
   };
 };

@@ -1,0 +1,811 @@
+#[cfg(target_os = "windows")]
+mod platform {
+    use std::{
+        collections::HashMap,
+        ffi::c_void,
+        mem::ManuallyDrop,
+        sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock},
+    };
+
+    use serde::{Deserialize, Serialize};
+    use tauri::{AppHandle, Manager};
+    use windows::{
+        core::{BSTR, Interface, PCSTR, PCWSTR},
+        Win32::{
+            Foundation::{HWND, VARIANT_FALSE, VARIANT_TRUE},
+            System::{
+                Com::{DISPATCH_METHOD, DISPATCH_PROPERTYGET, DISPATCH_PROPERTYPUT, DISPPARAMS, IDispatch},
+                LibraryLoader::{GetProcAddress, LoadLibraryW},
+                Ole::{OleInitialize, DISPID_PROPERTYPUT},
+                Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_I4},
+            },
+            UI::WindowsAndMessaging::{
+                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, SW_HIDE, SW_SHOW,
+                SWP_NOZORDER, WINDOW_EX_STYLE, WS_CHILD,
+                WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_VISIBLE,
+            },
+        },
+    };
+
+    const HOST_WINDOW_LABEL: &str = "main";
+    const HIDDEN_RDP_POSITION: i32 = -32_000;
+    const LOCALE_USER_DEFAULT: u32 = 0x0400;
+    const RDP_PROGIDS: &[&str] = &[
+        "MsRdpClient11NotSafeForScripting",
+        "MsRdpClient10NotSafeForScripting",
+        "MsRdpClient9NotSafeForScripting",
+        "MsRdpClient8NotSafeForScripting",
+        "MsRdpClient7NotSafeForScripting",
+        "MsRdpClient6NotSafeForScripting",
+        "MsRdpClient5NotSafeForScripting",
+        "MsRdpClientNotSafeForScripting",
+    ];
+
+    type AtlAxWinInit = unsafe extern "system" fn() -> i32;
+    type AtlAxGetControl = unsafe extern "system" fn(HWND, *mut *mut c_void) -> windows::core::HRESULT;
+
+    struct AtlFunctions {
+        ax_win_init: AtlAxWinInit,
+        ax_get_control: AtlAxGetControl,
+    }
+
+    #[derive(Clone)]
+    pub struct RdpSessionManager {
+        sessions: Arc<Mutex<HashMap<String, RdpSession>>>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct StartRdpSessionRequest {
+        session_id: String,
+        host: String,
+        user: String,
+        port: Option<u16>,
+        secret_owner_id: Option<String>,
+        password: Option<String>,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpSessionStarted {
+        session_id: String,
+        host: String,
+        port: u16,
+        control: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct UpdateRdpBoundsRequest {
+        session_id: String,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SetRdpVisibilityRequest {
+        session_id: String,
+        visible: bool,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpSimpleRequest {
+        session_id: String,
+    }
+
+    struct RdpSession {
+        hwnd: HWND,
+        dispatch: IDispatch,
+    }
+
+    // These values are always created, used, and destroyed through closures
+    // dispatched onto Tauri's main thread. The marker lets the session map live
+    // behind app state while preserving that thread-affinity by convention.
+    unsafe impl Send for RdpSession {}
+
+    struct VariantArg(VARIANT);
+
+    impl RdpSessionManager {
+        pub fn new() -> Self {
+            Self {
+                sessions: Arc::new(Mutex::new(HashMap::new())),
+            }
+        }
+
+        pub fn start_session(
+            &self,
+            app: AppHandle,
+            request: StartRdpSessionRequest,
+        ) -> Result<RdpSessionStarted, String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread(app, move |app| start_session_on_main_thread(sessions, &app, request))
+        }
+
+        pub fn update_bounds(
+            &self,
+            app: AppHandle,
+            request: UpdateRdpBoundsRequest,
+        ) -> Result<(), String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread(app, move |_app| {
+                let sessions = lock_sessions(&sessions)?;
+                let session = sessions
+                    .get(&request.session_id)
+                    .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
+                show_rdp(session.hwnd, request.x, request.y, request.width, request.height)
+            })
+        }
+
+        pub fn set_visibility(
+            &self,
+            app: AppHandle,
+            request: SetRdpVisibilityRequest,
+        ) -> Result<(), String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread(app, move |_app| {
+                let sessions = lock_sessions(&sessions)?;
+                let session = sessions
+                    .get(&request.session_id)
+                    .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
+                if request.visible {
+                    for (other_session_id, other_session) in sessions.iter() {
+                        if other_session_id != &request.session_id {
+                            hide_rdp(other_session.hwnd)?;
+                        }
+                    }
+                    show_rdp(session.hwnd, request.x, request.y, request.width, request.height)
+                } else {
+                    hide_rdp(session.hwnd)
+                }
+            })
+        }
+
+        pub fn close_session(
+            &self,
+            app: AppHandle,
+            request: RdpSimpleRequest,
+        ) -> Result<(), String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread(app, move |_app| {
+                let mut sessions = lock_sessions(&sessions)?;
+                if let Some(session) = sessions.remove(&request.session_id) {
+                    let _ = invoke_method(&session.dispatch, "Disconnect");
+                    unsafe {
+                        DestroyWindow(session.hwnd)
+                            .map_err(|error| format!("failed to destroy RDP host window: {error}"))?;
+                    }
+                }
+                Ok(())
+            })
+        }
+    }
+
+    impl StartRdpSessionRequest {
+        pub(crate) fn secret_owner_id(&self) -> Option<&str> {
+            self.secret_owner_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        }
+
+        pub(crate) fn password(&self) -> Option<&str> {
+            self.password
+                .as_deref()
+                .filter(|value| !value.is_empty())
+        }
+
+        pub(crate) fn set_password(&mut self, password: Option<String>) {
+            self.password = password;
+        }
+    }
+
+    fn start_session_on_main_thread(
+        sessions: Arc<Mutex<HashMap<String, RdpSession>>>,
+        app: &AppHandle,
+        request: StartRdpSessionRequest,
+    ) -> Result<RdpSessionStarted, String> {
+        let session_id = required_id(request.session_id)?;
+        let host = required_field("RDP host", request.host)?;
+        let user = request.user.trim().to_string();
+        let port = request.port.unwrap_or(3389);
+        if port == 0 {
+            return Err("RDP port must be between 1 and 65535".to_string());
+        }
+
+        {
+            let sessions = lock_sessions(&sessions)?;
+            if sessions.contains_key(&session_id) {
+                return Err(format!("RDP session '{session_id}' is already running"));
+            }
+        }
+
+        let atl = atl_functions()?;
+        unsafe {
+            OleInitialize(None)
+                .map_err(|error| format!("failed to initialize OLE for RDP hosting: {error}"))?;
+            if (atl.ax_win_init)() == 0 {
+                return Err("failed to initialize ATL ActiveX hosting".to_string());
+            }
+        }
+
+        let host_window = app
+            .get_window(HOST_WINDOW_LABEL)
+            .ok_or_else(|| format!("host window '{HOST_WINDOW_LABEL}' is not available"))?;
+        let parent_hwnd = host_window
+            .hwnd()
+            .map_err(|error| format!("failed to get host window handle: {error}"))?;
+
+        let parent_hwnd = HWND(parent_hwnd.0);
+        let size = rounded_rect(request.x, request.y, request.width, request.height);
+        let (hwnd, dispatch, control) = create_rdp_control(parent_hwnd, size)?;
+
+        configure_rdp_control(
+            &dispatch,
+            &host,
+            &user,
+            port,
+            request.password.as_deref(),
+            size.2,
+            size.3,
+        )?;
+        invoke_method(&dispatch, "Connect")?;
+
+        let mut sessions = lock_sessions(&sessions)?;
+        sessions.insert(
+            session_id.clone(),
+            RdpSession {
+                hwnd,
+                dispatch,
+            },
+        );
+
+        Ok(RdpSessionStarted {
+            session_id,
+            host,
+            port,
+            control,
+        })
+    }
+
+    fn create_rdp_control(
+        parent_hwnd: HWND,
+        rect: (i32, i32, i32, i32),
+    ) -> Result<(HWND, IDispatch, String), String> {
+        let mut last_error = String::new();
+        for progid in RDP_PROGIDS {
+            let class_name = wide_null("AtlAxWin");
+            let control_name = wide_null(progid);
+            let hwnd = unsafe {
+                CreateWindowExW(
+                    WINDOW_EX_STYLE(0),
+                    PCWSTR(class_name.as_ptr()),
+                    PCWSTR(control_name.as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                    rect.0,
+                    rect.1,
+                    rect.2,
+                    rect.3,
+                    Some(parent_hwnd),
+                    Option::<HMENU>::None,
+                    None,
+                    None,
+                )
+            };
+
+            let hwnd = match hwnd {
+                Ok(hwnd) => hwnd,
+                Err(error) => {
+                    last_error = format!("{progid}: {error}");
+                    continue;
+                }
+            };
+
+            match control_dispatch(hwnd) {
+                Ok(dispatch) => return Ok((hwnd, dispatch, (*progid).to_string())),
+                Err(error) => {
+                    last_error = format!("{progid}: {error}");
+                    unsafe {
+                        let _ = DestroyWindow(hwnd);
+                    }
+                }
+            }
+        }
+
+        Err(format!(
+            "failed to create Microsoft RDP ActiveX control from mstscax.dll ({last_error})"
+        ))
+    }
+
+    fn control_dispatch(hwnd: HWND) -> Result<IDispatch, String> {
+        let mut unknown = std::ptr::null_mut();
+        let atl = atl_functions()?;
+        unsafe {
+            (atl.ax_get_control)(hwnd, &mut unknown)
+                .ok()
+                .map_err(|error| format!("failed to get RDP ActiveX control: {error}"))?;
+            let unknown = windows::core::IUnknown::from_raw(unknown);
+            unknown
+                .cast::<IDispatch>()
+                .map_err(|error| format!("RDP ActiveX control does not expose IDispatch: {error}"))
+        }
+    }
+
+    fn configure_rdp_control(
+        dispatch: &IDispatch,
+        host: &str,
+        user: &str,
+        port: u16,
+        password: Option<&str>,
+        desktop_width: i32,
+        desktop_height: i32,
+    ) -> Result<(), String> {
+        let (domain, username) = split_windows_user(user);
+        set_property_string(dispatch, "Server", host)?;
+        if !username.is_empty() {
+            set_property_string(dispatch, "UserName", &username)?;
+        }
+        if let Some(domain) = domain.as_deref() {
+            set_property_string(dispatch, "Domain", domain)?;
+        }
+        set_property_i32(dispatch, "ColorDepth", 32)?;
+        set_property_i32(dispatch, "DesktopWidth", desktop_width.max(640))?;
+        set_property_i32(dispatch, "DesktopHeight", desktop_height.max(480))?;
+        set_property_bool(dispatch, "AllowPromptingForCredentials", true)?;
+        set_property_bool(dispatch, "PromptForCredentials", password.is_none())?;
+        set_optional_property_string(dispatch, "ConnectingText", "Connecting to remote desktop")?;
+        set_optional_property_string(dispatch, "DisconnectedText", "Remote desktop disconnected")?;
+        if let Some(password) = password.filter(|value| !value.is_empty()) {
+            set_property_string(dispatch, "ClearTextPassword", password)?;
+        }
+
+        if let Ok(advanced) = get_dispatch_property(dispatch, "AdvancedSettings2")
+            .or_else(|_| get_dispatch_property(dispatch, "AdvancedSettings"))
+        {
+            let _ = set_property_i32(&advanced, "RDPPort", i32::from(port));
+            let _ = set_property_bool(&advanced, "EnableCredSspSupport", true);
+            let _ = set_property_bool(&advanced, "RedirectClipboard", true);
+            let _ = set_property_bool(&advanced, "SmartSizing", true);
+        }
+
+        Ok(())
+    }
+
+    fn split_windows_user(user: &str) -> (Option<String>, String) {
+        let trimmed = user.trim();
+        if let Some((domain, username)) = trimmed.split_once('\\') {
+            let domain = domain.trim();
+            let username = username.trim();
+            if !domain.is_empty() && !username.is_empty() {
+                return (Some(domain.to_string()), username.to_string());
+            }
+        }
+        (None, trimmed.to_string())
+    }
+
+    fn get_dispid(dispatch: &IDispatch, name: &str) -> Result<i32, String> {
+        let wide = wide_null(name);
+        let mut name_ptr = PCWSTR(wide.as_ptr());
+        let mut dispid = 0;
+        unsafe {
+            dispatch
+                .GetIDsOfNames(
+                    &windows::core::GUID::zeroed(),
+                    &mut name_ptr,
+                    1,
+                    LOCALE_USER_DEFAULT,
+                    &mut dispid,
+                )
+                .map_err(|error| format!("RDP ActiveX member '{name}' was not found: {error}"))?;
+        }
+        Ok(dispid)
+    }
+
+    fn set_property_string(dispatch: &IDispatch, name: &str, value: &str) -> Result<(), String> {
+        invoke_property_put(dispatch, name, VariantArg::bstr(value))
+    }
+
+    fn set_optional_property_string(
+        dispatch: &IDispatch,
+        name: &str,
+        value: &str,
+    ) -> Result<(), String> {
+        match set_property_string(dispatch, name, value) {
+            Ok(()) => Ok(()),
+            Err(_) => Ok(()),
+        }
+    }
+
+    fn set_property_i32(dispatch: &IDispatch, name: &str, value: i32) -> Result<(), String> {
+        invoke_property_put(dispatch, name, VariantArg::i4(value))
+    }
+
+    fn set_property_bool(dispatch: &IDispatch, name: &str, value: bool) -> Result<(), String> {
+        invoke_property_put(dispatch, name, VariantArg::bool(value))
+    }
+
+    fn invoke_property_put(
+        dispatch: &IDispatch,
+        name: &str,
+        mut arg: VariantArg,
+    ) -> Result<(), String> {
+        let dispid = get_dispid(dispatch, name)?;
+        let mut named_arg = DISPID_PROPERTYPUT;
+        let mut params = DISPPARAMS {
+            rgvarg: &mut arg.0,
+            rgdispidNamedArgs: &mut named_arg,
+            cArgs: 1,
+            cNamedArgs: 1,
+        };
+        unsafe {
+            dispatch
+                .Invoke(
+                    dispid,
+                    &windows::core::GUID::zeroed(),
+                    LOCALE_USER_DEFAULT,
+                    DISPATCH_PROPERTYPUT,
+                    &mut params,
+                    None,
+                    None,
+                    None,
+                )
+                .map_err(|error| format!("failed to set RDP ActiveX property '{name}': {error}"))
+        }
+    }
+
+    fn get_dispatch_property(dispatch: &IDispatch, name: &str) -> Result<IDispatch, String> {
+        let dispid = get_dispid(dispatch, name)?;
+        let mut result = VARIANT::default();
+        let params = DISPPARAMS::default();
+        unsafe {
+            dispatch
+                .Invoke(
+                    dispid,
+                    &windows::core::GUID::zeroed(),
+                    LOCALE_USER_DEFAULT,
+                    DISPATCH_PROPERTYGET,
+                    &params,
+                    Some(&mut result),
+                    None,
+                    None,
+                )
+                .map_err(|error| format!("failed to read RDP ActiveX property '{name}': {error}"))?;
+            let variant_data = &mut *result.Anonymous.Anonymous;
+            let dispatch = ManuallyDrop::take(&mut variant_data.Anonymous.pdispVal)
+                .ok_or_else(|| format!("RDP ActiveX property '{name}' did not return IDispatch"))?;
+            Ok(dispatch)
+        }
+    }
+
+    fn invoke_method(dispatch: &IDispatch, name: &str) -> Result<(), String> {
+        let dispid = get_dispid(dispatch, name)?;
+        let params = DISPPARAMS::default();
+        unsafe {
+            dispatch
+                .Invoke(
+                    dispid,
+                    &windows::core::GUID::zeroed(),
+                    LOCALE_USER_DEFAULT,
+                    DISPATCH_METHOD,
+                    &params,
+                    None,
+                    None,
+                    None,
+                )
+                .map_err(|error| format!("failed to invoke RDP ActiveX method '{name}': {error}"))
+        }
+    }
+
+    fn show_rdp(hwnd: HWND, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
+        let rect = rounded_rect(x, y, width, height);
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                None,
+                rect.0,
+                rect.1,
+                rect.2,
+                rect.3,
+                SWP_NOZORDER,
+            )
+            .map_err(|error| format!("failed to position RDP control: {error}"))?;
+            let _ = ShowWindow(hwnd, SW_SHOW);
+        }
+        Ok(())
+    }
+
+    fn hide_rdp(hwnd: HWND) -> Result<(), String> {
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                None,
+                HIDDEN_RDP_POSITION,
+                HIDDEN_RDP_POSITION,
+                1,
+                1,
+                SWP_NOZORDER,
+            )
+            .map_err(|error| format!("failed to hide RDP control: {error}"))?;
+            let _ = ShowWindow(hwnd, SW_HIDE);
+        }
+        Ok(())
+    }
+
+    fn rounded_rect(x: f64, y: f64, width: f64, height: f64) -> (i32, i32, i32, i32) {
+        (
+            x.max(0.0).round() as i32,
+            y.max(0.0).round() as i32,
+            width.max(1.0).round() as i32,
+            height.max(1.0).round() as i32,
+        )
+    }
+
+    fn run_on_main_thread<F, T>(app: AppHandle, f: F) -> Result<T, String>
+    where
+        F: FnOnce(AppHandle) -> Result<T, String> + Send + 'static,
+        T: Send + 'static,
+    {
+        let app_for_closure = app.clone();
+        let (sender, receiver) = mpsc::channel();
+        app.run_on_main_thread(move || {
+            let result = f(app_for_closure);
+            let _ = sender.send(result);
+        })
+        .map_err(|error| format!("failed to dispatch RDP work to main thread: {error}"))?;
+        receiver
+            .recv()
+            .map_err(|_| "RDP main-thread task did not return".to_string())?
+    }
+
+    fn atl_functions() -> Result<&'static AtlFunctions, String> {
+        static ATL_FUNCTIONS: OnceLock<Result<AtlFunctions, String>> = OnceLock::new();
+        ATL_FUNCTIONS
+            .get_or_init(load_atl_functions)
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    fn load_atl_functions() -> Result<AtlFunctions, String> {
+        let module = unsafe { LoadLibraryW(PCWSTR(wide_null("atl.dll").as_ptr())) }
+            .map_err(|error| format!("failed to load atl.dll for ActiveX hosting: {error}"))?;
+        let ax_win_init = unsafe { GetProcAddress(module, PCSTR(b"AtlAxWinInit\0".as_ptr())) }
+            .ok_or_else(|| "atl.dll does not export AtlAxWinInit".to_string())?;
+        let ax_get_control =
+            unsafe { GetProcAddress(module, PCSTR(b"AtlAxGetControl\0".as_ptr())) }
+                .ok_or_else(|| "atl.dll does not export AtlAxGetControl".to_string())?;
+        Ok(AtlFunctions {
+            ax_win_init: unsafe { std::mem::transmute::<_, AtlAxWinInit>(ax_win_init) },
+            ax_get_control: unsafe { std::mem::transmute::<_, AtlAxGetControl>(ax_get_control) },
+        })
+    }
+
+    fn lock_sessions(
+        sessions: &Arc<Mutex<HashMap<String, RdpSession>>>,
+    ) -> Result<MutexGuard<'_, HashMap<String, RdpSession>>, String> {
+        sessions
+            .lock()
+            .map_err(|_| "RDP session lock is poisoned".to_string())
+    }
+
+    fn required_id(value: String) -> Result<String, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("RDP session id is required".to_string());
+        }
+        if trimmed.len() > 96 {
+            return Err("RDP session id must be 96 characters or fewer".to_string());
+        }
+        if !trimmed
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+        {
+            return Err("RDP session id may only contain letters, digits, '-' or '_'".to_string());
+        }
+        Ok(trimmed.to_string())
+    }
+
+    fn required_field(label: &str, value: String) -> Result<String, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err(format!("{label} is required"));
+        }
+        Ok(trimmed.to_string())
+    }
+
+    fn wide_null(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    impl VariantArg {
+        fn bstr(value: &str) -> Self {
+            let mut variant = VARIANT::default();
+            unsafe {
+                let variant_data = &mut *variant.Anonymous.Anonymous;
+                variant_data.vt = VT_BSTR;
+                variant_data.Anonymous.bstrVal = ManuallyDrop::new(BSTR::from(value));
+            }
+            Self(variant)
+        }
+
+        fn i4(value: i32) -> Self {
+            let mut variant = VARIANT::default();
+            unsafe {
+                let variant_data = &mut *variant.Anonymous.Anonymous;
+                variant_data.vt = VT_I4;
+                variant_data.Anonymous.lVal = value;
+            }
+            Self(variant)
+        }
+
+        fn bool(value: bool) -> Self {
+            let mut variant = VARIANT::default();
+            unsafe {
+                let variant_data = &mut *variant.Anonymous.Anonymous;
+                variant_data.vt = VT_BOOL;
+                variant_data.Anonymous.boolVal = if value { VARIANT_TRUE } else { VARIANT_FALSE };
+            }
+            Self(variant)
+        }
+    }
+
+    impl Drop for VariantArg {
+        fn drop(&mut self) {
+            unsafe {
+                let _ = VariantClear(&mut self.0);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn splits_domain_qualified_windows_users() {
+            assert_eq!(
+                split_windows_user("DOMAIN\\admin"),
+                (Some("DOMAIN".to_string()), "admin".to_string())
+            );
+            assert_eq!(
+                split_windows_user("admin@example.com"),
+                (None, "admin@example.com".to_string())
+            );
+        }
+
+        #[test]
+        fn validates_session_ids_for_native_window_labels() {
+            assert_eq!(required_id("rdp-session_1".to_string()).as_deref(), Ok("rdp-session_1"));
+            assert!(required_id("bad/session".to_string()).is_err());
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+mod platform {
+    use serde::{Deserialize, Serialize};
+    use tauri::AppHandle;
+
+    #[derive(Clone)]
+    pub struct RdpSessionManager;
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct StartRdpSessionRequest {
+        pub session_id: String,
+        pub host: String,
+        pub user: String,
+        pub port: Option<u16>,
+        pub secret_owner_id: Option<String>,
+        pub password: Option<String>,
+        pub x: f64,
+        pub y: f64,
+        pub width: f64,
+        pub height: f64,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpSessionStarted {
+        session_id: String,
+        host: String,
+        port: u16,
+        control: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct UpdateRdpBoundsRequest {
+        pub session_id: String,
+        pub x: f64,
+        pub y: f64,
+        pub width: f64,
+        pub height: f64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SetRdpVisibilityRequest {
+        pub session_id: String,
+        pub visible: bool,
+        pub x: f64,
+        pub y: f64,
+        pub width: f64,
+        pub height: f64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpSimpleRequest {
+        pub session_id: String,
+    }
+
+    impl RdpSessionManager {
+        pub fn new() -> Self {
+            Self
+        }
+
+        pub fn start_session(
+            &self,
+            _app: AppHandle,
+            _request: StartRdpSessionRequest,
+        ) -> Result<RdpSessionStarted, String> {
+            Err("RDP sessions require Windows and the Microsoft RDP ActiveX control".to_string())
+        }
+
+        pub fn update_bounds(
+            &self,
+            _app: AppHandle,
+            _request: UpdateRdpBoundsRequest,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        pub fn set_visibility(
+            &self,
+            _app: AppHandle,
+            _request: SetRdpVisibilityRequest,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        pub fn close_session(
+            &self,
+            _app: AppHandle,
+            _request: RdpSimpleRequest,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    impl StartRdpSessionRequest {
+        pub(crate) fn secret_owner_id(&self) -> Option<&str> {
+            self.secret_owner_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        }
+
+        pub(crate) fn password(&self) -> Option<&str> {
+            self.password
+                .as_deref()
+                .filter(|value| !value.is_empty())
+        }
+
+        pub(crate) fn set_password(&mut self, password: Option<String>) {
+            self.password = password;
+        }
+    }
+}
+
+pub use platform::*;

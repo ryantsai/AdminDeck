@@ -2639,6 +2639,208 @@ function RemoteDesktopWorkspace({
   const connection = tab.connection;
   const typeLabel = connection ? connectionTypeLabel(connection.type) : "Remote desktop";
   const Icon = connection ? connectionIconForType(connection.type) : Monitor;
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const sessionStartedRef = useRef(false);
+  const sessionStartingRef = useRef(false);
+  const sessionIdRef = useRef<string>(`rdp-${tab.id}`);
+  const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const visibilityRef = useRef({ isActive, suppressed: false });
+  const markConnectionSessionStarted = useWorkspaceStore(
+    (state) => state.markConnectionSessionStarted,
+  );
+  const markConnectionSessionEnded = useWorkspaceStore((state) => state.markConnectionSessionEnded);
+  const [suppressed, setSuppressed] = useState(false);
+  const [rdpError, setRdpError] = useState("");
+  const [rdpStatus, setRdpStatus] = useState("");
+  const canStartRdp = connection?.type === "rdp";
+
+  const computeBounds = () => {
+    const node = hostRef.current;
+    if (!node) {
+      return null;
+    }
+    const rect = node.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.round(rect.left)),
+      y: Math.max(0, Math.round(rect.top)),
+      width: Math.max(1, Math.round(rect.width)),
+      height: Math.max(1, Math.round(rect.height)),
+    };
+  };
+
+  const pushRdpVisibility = () => {
+    if (!sessionStartedRef.current) {
+      return;
+    }
+    const bounds = computeBounds();
+    if (!bounds) {
+      return;
+    }
+    const visible = visibilityRef.current.isActive && !visibilityRef.current.suppressed;
+    void invokeCommand("set_rdp_visibility", {
+      request: { sessionId: sessionIdRef.current, visible, ...bounds },
+    }).catch((error) => {
+      setRdpError(error instanceof Error ? error.message : String(error));
+    });
+    if (visible) {
+      lastBoundsRef.current = bounds;
+    }
+  };
+
+  const scheduleBoundsPush = () => {
+    if (!sessionStartedRef.current) {
+      return;
+    }
+    if (rafRef.current !== null) {
+      return;
+    }
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = null;
+      const bounds = computeBounds();
+      if (!bounds) {
+        return;
+      }
+      if (!visibilityRef.current.isActive || visibilityRef.current.suppressed) {
+        void invokeCommand("set_rdp_visibility", {
+          request: { sessionId: sessionIdRef.current, visible: false, ...bounds },
+        }).catch((error) => {
+          setRdpError(error instanceof Error ? error.message : String(error));
+        });
+        return;
+      }
+      const previous = lastBoundsRef.current;
+      if (
+        previous &&
+        previous.x === bounds.x &&
+        previous.y === bounds.y &&
+        previous.width === bounds.width &&
+        previous.height === bounds.height
+      ) {
+        return;
+      }
+      lastBoundsRef.current = bounds;
+      void invokeCommand("update_rdp_bounds", {
+        request: { sessionId: sessionIdRef.current, ...bounds },
+      }).catch((error) => {
+        setRdpError(error instanceof Error ? error.message : String(error));
+      });
+    });
+  };
+
+  useEffect(() => {
+    if (!canStartRdp || !connection || !isTauriRuntime() || sessionStartedRef.current || sessionStartingRef.current) {
+      return;
+    }
+    const bounds = computeBounds();
+    if (!bounds) {
+      return;
+    }
+    let disposed = false;
+    const sessionId = sessionIdRef.current;
+    sessionStartingRef.current = true;
+    lastBoundsRef.current = bounds;
+    setRdpStatus("Connecting");
+    void invokeCommand("start_rdp_session", {
+      request: {
+        sessionId,
+        host: connection.host,
+        user: connection.user,
+        port: connection.port,
+        secretOwnerId: connection.id,
+        ...bounds,
+      },
+    })
+      .then((started) => {
+        sessionStartingRef.current = false;
+        if (disposed) {
+          void invokeCommand("close_rdp_session", { request: { sessionId: started.sessionId } });
+          return;
+        }
+        sessionStartedRef.current = true;
+        setRdpStatus(`Connected with ${started.control}`);
+        markConnectionSessionStarted(connection.id);
+        pushRdpVisibility();
+      })
+      .catch((error) => {
+        sessionStartingRef.current = false;
+        sessionStartedRef.current = false;
+        if (!disposed) {
+          setRdpStatus("");
+          setRdpError(error instanceof Error ? error.message : String(error));
+        }
+      });
+
+    return () => {
+      disposed = true;
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      const ownsSession = sessionStartingRef.current || sessionStartedRef.current;
+      sessionStartingRef.current = false;
+      const started = sessionStartedRef.current;
+      sessionStartedRef.current = false;
+      if (ownsSession) {
+        void invokeCommand("close_rdp_session", { request: { sessionId } });
+      }
+      if (started) {
+        markConnectionSessionEnded(connection.id);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    visibilityRef.current = { isActive, suppressed };
+  }, [isActive, suppressed]);
+
+  useEffect(() => {
+    if (!canStartRdp || !isTauriRuntime()) {
+      return;
+    }
+    const node = hostRef.current;
+    if (!node) {
+      return;
+    }
+    const observer = new ResizeObserver(() => scheduleBoundsPush());
+    observer.observe(node);
+    window.addEventListener("resize", scheduleBoundsPush);
+    window.addEventListener("scroll", scheduleBoundsPush, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleBoundsPush);
+      window.removeEventListener("scroll", scheduleBoundsPush, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canStartRdp]);
+
+  useEffect(() => {
+    if (!canStartRdp || !isTauriRuntime()) {
+      return;
+    }
+    const updateSuppression = () => {
+      setSuppressed(documentHasWebviewOverlay());
+    };
+    updateSuppression();
+    const observer = new MutationObserver(updateSuppression);
+    observer.observe(document.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+    return () => {
+      observer.disconnect();
+    };
+  }, [canStartRdp]);
+
+  useEffect(() => {
+    if (!canStartRdp || !isTauriRuntime() || !sessionStartedRef.current) {
+      return;
+    }
+    pushRdpVisibility();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canStartRdp, isActive, suppressed]);
 
   return (
     <section className={isActive ? "terminal-workspace active" : "terminal-workspace"}>
@@ -2647,13 +2849,24 @@ function RemoteDesktopWorkspace({
           <strong>{tab.title}</strong>
           <span>{tab.subtitle}</span>
         </div>
+        {rdpStatus ? <span className="webview-toolbar-status">{rdpStatus}</span> : null}
       </div>
-      <div className="remote-desktop-workspace">
+      <div className="remote-desktop-workspace" ref={hostRef}>
         <div className="remote-desktop-placeholder">
           <Icon size={34} />
           <h2>{connection?.name ?? typeLabel}</h2>
           <p>{connection ? `${typeLabel} ${connectionSubtitle(connection)}` : typeLabel}</p>
-          <small>Transport implementation pending for v0.2.</small>
+          {connection?.type === "rdp" ? (
+            !isTauriRuntime() ? (
+              <small>RDP uses the Windows desktop runtime.</small>
+            ) : rdpError ? (
+              <small className="form-error">{rdpError}</small>
+            ) : (
+              <small>Microsoft RDP ActiveX host is running in this workspace.</small>
+            )
+          ) : (
+            <small>VNC transport implementation pending for v0.2.</small>
+          )}
         </div>
       </div>
     </section>
