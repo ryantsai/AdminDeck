@@ -892,6 +892,82 @@ h2 {
   white-space: nowrap;
 }
 
+.tmux-session-wrapper {
+  position: relative;
+}
+
+.tmux-session-tag {
+  max-width: 220px;
+  height: 24px;
+  padding: 0 8px;
+  overflow: hidden;
+  color: #c9d4e2;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(86, 166, 255, 0.12);
+  border: 1px solid rgba(86, 166, 255, 0.28);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.tmux-session-menu {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  z-index: 20;
+  width: min(360px, 80vw);
+  max-height: 320px;
+  padding: 10px;
+  overflow: auto;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.tmux-session-menu header,
+.tmux-session-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tmux-session-menu p {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.tmux-session-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tmux-session-row {
+  min-width: 0;
+  padding: 7px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.tmux-session-row span {
+  display: grid;
+  min-width: 0;
+}
+
+.tmux-session-row strong,
+.tmux-session-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .terminal-pane-action {
   display: inline-flex;
   align-items: center;
@@ -1947,6 +2023,22 @@ progress {
 
 .form-grid.three-columns {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 128px;
+}
+
+.checkbox-row {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.checkbox-row input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
 }
 
 .form-error {

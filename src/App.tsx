@@ -107,6 +107,7 @@ import {
   type SshHostKeyPreview,
   type CommandProposalPlan,
   type TerminalOutput,
+  type TmuxSession,
 } from "./lib/tauri";
 import { aiSuggestions, connectionTree, defaultTerminalSettings } from "./sample-data";
 import { useWorkspaceStore } from "./store";
@@ -645,6 +646,11 @@ function ConnectionSidebar() {
       localShell: connectionRequest.localShell,
       url: connectionRequest.url,
       dataPartition: connectionRequest.dataPartition,
+      useTmuxSessions: connectionRequest.useTmuxSessions,
+      tmuxConnectionId:
+        connectionRequest.type === "ssh" && connectionRequest.useTmuxSessions !== false
+          ? uniqueRuntimeId("admindeck")
+          : undefined,
       urlCredentialUsername:
         connectionRequest.type === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
       hasUrlCredential: connectionRequest.type === "url" && Boolean(urlCredentialUsername && urlPassword),
@@ -1445,6 +1451,7 @@ function ConnectionDialog({
     const urlPassword = String(form.get("urlPassword") ?? "");
     const keyPath = String(form.get("keyPath") ?? "").trim();
     const proxyJump = String(form.get("proxyJump") ?? "").trim();
+    const useTmuxSessions = form.get("useTmuxSessions") === "on";
 
     void onSubmit({
       name,
@@ -1464,6 +1471,7 @@ function ConnectionDialog({
       keyPath: usesSshDefaults && authMethod === "keyFile" ? keyPath || undefined : undefined,
       proxyJump: proxyJump || undefined,
       authMethod: usesSshDefaults ? authMethod : undefined,
+      useTmuxSessions: usesSshDefaults ? useTmuxSessions : undefined,
       localShell: connectionType === "local" ? selectedLocalShell || undefined : undefined,
       url: connectionType === "url" ? url : undefined,
       dataPartition: connectionType === "url" ? dataPartition || undefined : undefined,
@@ -1654,6 +1662,10 @@ function ConnectionDialog({
                 />
               </label>
             ) : null}
+            <label className="checkbox-row">
+              <input name="useTmuxSessions" type="checkbox" defaultChecked />
+              <span>Use tmux sessions</span>
+            </label>
           </>
         ) : null}
 
@@ -2823,6 +2835,149 @@ function TerminalLayoutView({
   );
 }
 
+function TmuxSessionTag({ connection, sessionId }: { connection: Connection; sessionId?: string }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sessions, setSessions] = useState<TmuxSession[]>([]);
+  const [error, setError] = useState("");
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const enabled = connection.type === "ssh" && connection.useTmuxSessions !== false && sessionId;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (menuRef.current && target && !menuRef.current.contains(target)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  async function loadSessions() {
+    if (!enabled || !isTauriRuntime()) {
+      setSessions([]);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const result = await invokeCommand("list_tmux_sessions", {
+        request: tmuxConnectionRequest(connection),
+      });
+      setSessions(result);
+    } catch (loadError) {
+      setSessions([]);
+      setError(loadError instanceof Error ? loadError.message : String(loadError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleToggle() {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (nextOpen) {
+      await loadSessions();
+    }
+  }
+
+  async function handleCloseSession(targetSessionId: string) {
+    setLoading(true);
+    setError("");
+    try {
+      await invokeCommand("close_tmux_session", {
+        request: {
+          ...tmuxConnectionRequest(connection),
+          tmuxSessionId: targetSessionId,
+        },
+      });
+      await loadSessions();
+    } catch (closeError) {
+      setError(closeError instanceof Error ? closeError.message : String(closeError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!enabled) {
+    return null;
+  }
+
+  return (
+    <div className="tmux-session-wrapper" ref={menuRef}>
+      <button
+        className="tmux-session-tag"
+        aria-expanded={open ? "true" : "false"}
+        aria-haspopup="dialog"
+        onClick={() => void handleToggle()}
+        title="Show tmux sessions"
+        type="button"
+      >
+        tmux {sessionId}
+      </button>
+      {open ? (
+        <div className="tmux-session-menu" role="dialog" aria-label="tmux sessions">
+          <header>
+            <strong>tmux sessions</strong>
+            <button
+              className="terminal-pane-action"
+              aria-label="Refresh tmux sessions"
+              onClick={() => void loadSessions()}
+              title="Refresh tmux sessions"
+              type="button"
+            >
+              <RefreshCw size={13} />
+            </button>
+          </header>
+          {loading ? <p>Loading...</p> : null}
+          {error ? <p className="form-error">{error}</p> : null}
+          {!loading && !error && sessions.length === 0 ? <p>No tmux sessions.</p> : null}
+          <div className="tmux-session-list">
+            {sessions.map((session) => (
+              <div className="tmux-session-row" key={session.id}>
+                <span>
+                  <strong>{session.id}</strong>
+                  <small>{session.attached ? "attached" : "detached"}</small>
+                </span>
+                <small>{session.windows}w</small>
+                <button
+                  className="terminal-pane-action"
+                  aria-label={`Close tmux session ${session.id}`}
+                  onClick={() => void handleCloseSession(session.id)}
+                  title="Close tmux session"
+                  type="button"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function tmuxConnectionRequest(connection: Connection) {
+  return {
+    host: connection.host,
+    user: connection.user,
+    port: connection.port,
+    keyPath: connection.keyPath,
+    proxyJump: connection.proxyJump,
+    authMethod: connection.authMethod,
+    secretOwnerId: connection.id,
+  };
+}
+
 function TerminalPaneView({
   isActive,
   pane,
@@ -3015,6 +3170,8 @@ function TerminalPaneView({
             pixelHeight: terminalDimensions.pixelHeight,
             pixelWidth: terminalDimensions.pixelWidth,
             rows: terminalDimensions.rows,
+            useTmux: connection.type === "ssh" && connection.useTmuxSessions !== false,
+            tmuxSessionId: pane.tmuxSessionId,
           },
         });
         if (disposed) {
@@ -3077,6 +3234,7 @@ function TerminalPaneView({
     markConnectionSessionEnded,
     markConnectionSessionStarted,
     pane.connection,
+    pane.tmuxSessionId,
     recordTerminalStartMetric,
     terminalSettings,
   ]);
@@ -3221,6 +3379,9 @@ function TerminalPaneView({
           {pane.title}
         </span>
         <div className="terminal-pane-actions">
+          {pane.connection ? (
+            <TmuxSessionTag connection={pane.connection} sessionId={pane.tmuxSessionId} />
+          ) : null}
           <small>{pane.cwd}</small>
           <button
             className="terminal-pane-action"

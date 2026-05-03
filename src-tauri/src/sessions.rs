@@ -5,6 +5,7 @@ use std::{
     collections::HashMap,
     ffi::OsString,
     io::{Read, Write},
+    process::Command as ProcessCommand,
     sync::Mutex,
     thread,
     time::{SystemTime, UNIX_EPOCH},
@@ -48,6 +49,38 @@ pub struct StartTerminalSessionRequest {
     pub pixel_height: Option<u16>,
     pub pixel_width: Option<u16>,
     pub rows: Option<u16>,
+    pub use_tmux: Option<bool>,
+    pub tmux_session_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TmuxConnectionRequest {
+    pub host: String,
+    pub user: String,
+    pub port: Option<u16>,
+    pub key_path: Option<String>,
+    pub proxy_jump: Option<String>,
+    pub auth_method: Option<String>,
+    pub secret_owner_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloseTmuxSessionRequest {
+    #[serde(flatten)]
+    pub connection: TmuxConnectionRequest,
+    pub tmux_session_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TmuxSession {
+    pub id: String,
+    pub attached: bool,
+    pub windows: u32,
+    pub created: Option<u64>,
+    pub internal_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -130,6 +163,8 @@ impl SessionManager {
                     pixel_width: request.pixel_width.unwrap_or(0),
                     rows: request.rows.unwrap_or(24),
                     initial_directory: request.initial_directory.clone(),
+                    use_tmux: request.use_tmux.unwrap_or(false),
+                    tmux_session_id: request.tmux_session_id.clone(),
                 },
             )?;
             let terminal_ready_ms = session.terminal_ready_ms();
@@ -214,6 +249,32 @@ impl SessionManager {
             session_id,
             terminal_ready_ms: None,
         })
+    }
+
+    pub fn list_tmux_sessions(
+        &self,
+        app: AppHandle,
+        secrets: &secrets::Secrets,
+        request: TmuxConnectionRequest,
+    ) -> Result<Vec<TmuxSession>, String> {
+        let output = run_tmux_command(app, secrets, &request, tmux_list_command())?;
+        Ok(parse_tmux_sessions(&output))
+    }
+
+    pub fn close_tmux_session(
+        &self,
+        app: AppHandle,
+        secrets: &secrets::Secrets,
+        request: CloseTmuxSessionRequest,
+    ) -> Result<(), String> {
+        let tmux_session_id = required_tmux_session_id(request.tmux_session_id)?;
+        run_tmux_command(
+            app,
+            secrets,
+            &request.connection,
+            tmux_close_command(&tmux_session_id),
+        )?;
+        Ok(())
     }
 
     pub fn write_terminal_input(&self, request: TerminalInputRequest) -> Result<(), String> {
@@ -444,6 +505,157 @@ fn connection_password_for(
     })
 }
 
+fn run_tmux_command(
+    app: AppHandle,
+    secrets: &secrets::Secrets,
+    request: &TmuxConnectionRequest,
+    command: String,
+) -> Result<String, String> {
+    let terminal_request = terminal_request_for_tmux(request);
+    let password = connection_password_for(secrets, &terminal_request);
+    let auth_method = ssh_auth_method_for(&terminal_request, password.as_deref())?;
+    if uses_native_ssh(&terminal_request, password.as_deref(), &auth_method) {
+        return ssh::run_remote_command(ssh::NativeSshCommandRequest {
+            host: terminal_request.host.clone(),
+            user: terminal_request.user.clone(),
+            port: terminal_request.port.unwrap_or(22),
+            auth: native_ssh_auth_for(&terminal_request, password, &auth_method)?,
+            known_hosts_path: ssh::app_known_hosts_path(&app)?,
+            command,
+        });
+    }
+
+    run_system_ssh_command(&terminal_request, command)
+}
+
+fn terminal_request_for_tmux(request: &TmuxConnectionRequest) -> StartTerminalSessionRequest {
+    StartTerminalSessionRequest {
+        session_id: None,
+        title: "tmux".to_string(),
+        connection_type: "ssh".to_string(),
+        host: request.host.clone(),
+        user: request.user.clone(),
+        port: request.port,
+        key_path: request.key_path.clone(),
+        proxy_jump: request.proxy_jump.clone(),
+        auth_method: request.auth_method.clone(),
+        secret_owner_id: request.secret_owner_id.clone(),
+        shell: None,
+        initial_directory: None,
+        cols: None,
+        pixel_height: None,
+        pixel_width: None,
+        rows: None,
+        use_tmux: None,
+        tmux_session_id: None,
+    }
+}
+
+fn run_system_ssh_command(
+    request: &StartTerminalSessionRequest,
+    remote_command: String,
+) -> Result<String, String> {
+    let host = request.host.trim();
+    if host.is_empty() {
+        return Err("host is required for SSH sessions".to_string());
+    }
+
+    let mut command = ProcessCommand::new("ssh");
+    command.arg("-T");
+    command.arg("-o");
+    command.arg("BatchMode=yes");
+    if let Some(port) = request.port {
+        command.arg("-p");
+        command.arg(port.to_string());
+    }
+    if let Some(key_path) = request.key_path.as_ref().map(|value| value.trim()) {
+        if !key_path.is_empty() {
+            command.arg("-i");
+            command.arg(key_path);
+        }
+    }
+    if let Some(proxy_jump) = request.proxy_jump.as_ref().map(|value| value.trim()) {
+        if !proxy_jump.is_empty() {
+            command.arg("-J");
+            command.arg(proxy_jump);
+        }
+    }
+
+    let target = match request.user.trim() {
+        "" => host.to_string(),
+        user => format!("{user}@{host}"),
+    };
+    command.arg(target);
+    command.arg(remote_command);
+
+    let output = command
+        .output()
+        .map_err(|error| format!("failed to run system ssh: {error}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    if output.status.success() {
+        Ok(stdout)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("system ssh command failed: {stderr}"))
+    }
+}
+
+fn tmux_list_command() -> String {
+    "if command -v tmux >/dev/null 2>&1; then tmux list-sessions -F '#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_created}\t#{session_id}' 2>/dev/null || true; fi".to_string()
+}
+
+fn tmux_close_command(tmux_session_id: &str) -> String {
+    format!(
+        "if command -v tmux >/dev/null 2>&1; then tmux kill-session -t {}; fi",
+        shell_single_quote(tmux_session_id)
+    )
+}
+
+fn required_tmux_session_id(value: String) -> Result<String, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err("tmux session id is required".to_string());
+    }
+    if trimmed.chars().any(char::is_control) {
+        return Err("tmux session id cannot contain control characters".to_string());
+    }
+    Ok(trimmed.to_string())
+}
+
+fn parse_tmux_sessions(output: &str) -> Vec<TmuxSession> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split('\t');
+            let id = parts.next()?.trim().to_string();
+            if id.is_empty() {
+                return None;
+            }
+            let attached = parts
+                .next()
+                .and_then(|value| value.parse::<u32>().ok())
+                .is_some_and(|count| count > 0);
+            let windows = parts
+                .next()
+                .and_then(|value| value.parse::<u32>().ok())
+                .unwrap_or(0);
+            let created = parts.next().and_then(|value| value.parse::<u64>().ok());
+            let internal_id = parts
+                .next()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            Some(TmuxSession {
+                id,
+                attached,
+                windows,
+                created,
+                internal_id,
+            })
+        })
+        .collect()
+}
+
 fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, String> {
     match request.connection_type.trim().to_lowercase().as_str() {
         "local" => {
@@ -498,7 +710,21 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
                 user => format!("{user}@{host}"),
             };
             command.arg(target);
-            if let Some(directory) = initial_directory_for(request) {
+            if request.use_tmux.unwrap_or(false) {
+                if let Some(tmux_session_id) = request
+                    .tmux_session_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|session_id| !session_id.is_empty())
+                {
+                    command.arg(ssh::remote_tmux_resume_command(
+                        initial_directory_for(request).as_deref(),
+                        tmux_session_id,
+                    ));
+                } else if let Some(directory) = initial_directory_for(request) {
+                    command.arg(remote_shell_command_for_initial_directory(&directory));
+                }
+            } else if let Some(directory) = initial_directory_for(request) {
                 command.arg(remote_shell_command_for_initial_directory(&directory));
             }
             Ok(command)
@@ -612,6 +838,8 @@ mod tests {
             pixel_height: None,
             pixel_width: None,
             rows: None,
+            use_tmux: None,
+            tmux_session_id: None,
         }
     }
 

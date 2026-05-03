@@ -24,6 +24,25 @@ import type {
   TerminalSettings,
 } from "../types";
 
+type BrowserFileHandle = {
+  createWritable: () => Promise<{
+    close: () => Promise<void>;
+    write: (contents: string) => Promise<void>;
+  }>;
+};
+
+type BrowserSavePicker = (options: {
+  suggestedName: string;
+  types: Array<{
+    accept: Record<string, string[]>;
+    description: string;
+  }>;
+}) => Promise<BrowserFileHandle>;
+
+type WindowWithSavePicker = Window & {
+  showSaveFilePicker?: BrowserSavePicker;
+};
+
 export interface StartTerminalSessionRequest {
   sessionId?: string;
   title: string;
@@ -41,6 +60,8 @@ export interface StartTerminalSessionRequest {
   pixelHeight?: number;
   pixelWidth?: number;
   rows?: number;
+  useTmux?: boolean;
+  tmuxSessionId?: string;
 }
 
 export interface TerminalSessionStarted {
@@ -51,6 +72,14 @@ export interface TerminalSessionStarted {
 export interface TerminalOutput {
   sessionId: string;
   data: string;
+}
+
+export interface TmuxSession {
+  id: string;
+  attached: boolean;
+  windows: number;
+  created?: number;
+  internalId?: string;
 }
 
 export interface StartSftpSessionRequest {
@@ -384,6 +413,35 @@ type CommandMap = {
     args: { sessionId: string };
     result: null;
   };
+  list_tmux_sessions: {
+    args: {
+      request: {
+        host: string;
+        user: string;
+        port?: number;
+        keyPath?: string;
+        proxyJump?: string;
+        authMethod?: "keyFile" | "password" | "agent";
+        secretOwnerId?: string;
+      };
+    };
+    result: TmuxSession[];
+  };
+  close_tmux_session: {
+    args: {
+      request: {
+        host: string;
+        user: string;
+        port?: number;
+        keyPath?: string;
+        proxyJump?: string;
+        authMethod?: "keyFile" | "password" | "agent";
+        secretOwnerId?: string;
+        tmuxSessionId: string;
+      };
+    };
+    result: null;
+  };
   launch_elevated_terminal: {
     args: { request: { shell: string } };
     result: null;
@@ -510,25 +568,67 @@ export function invokeCommand<Name extends keyof CommandMap>(
 }
 
 export async function saveTextFile(defaultFilename: string, contents: string) {
-  if (!isTauriRuntime()) {
-    return Promise.reject(new Error("Tauri runtime unavailable"));
+  if (isTauriRuntime()) {
+    try {
+      const path = await saveDialog({
+        defaultPath: defaultFilename,
+        filters: [
+          { name: "Log files", extensions: ["log"] },
+          { name: "Text files", extensions: ["txt"] },
+        ],
+        title: "Save Buffer",
+      });
+
+      if (!path) {
+        return null;
+      }
+
+      await writeTextFile(path, contents);
+      return path;
+    } catch (error) {
+      if (!canUseBrowserSaveDialog()) {
+        throw error;
+      }
+    }
   }
 
-  const path = await saveDialog({
-    defaultPath: defaultFilename,
-    filters: [
-      { name: "Log files", extensions: ["log"] },
-      { name: "Text files", extensions: ["txt"] },
-    ],
-    title: "Save Buffer",
-  });
+  return saveTextFileWithBrowserPicker(defaultFilename, contents);
+}
 
-  if (!path) {
-    return null;
+async function saveTextFileWithBrowserPicker(defaultFilename: string, contents: string) {
+  const picker = (window as WindowWithSavePicker).showSaveFilePicker;
+  if (!picker) {
+    throw new Error("No save dialog is available in this runtime");
   }
 
-  await writeTextFile(path, contents);
-  return path;
+  try {
+    const handle = await picker({
+      suggestedName: defaultFilename,
+      types: [
+        {
+          accept: { "text/plain": [".log", ".txt"] },
+          description: "Log files",
+        },
+      ],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(contents);
+    await writable.close();
+    return defaultFilename;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function canUseBrowserSaveDialog() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return typeof (window as WindowWithSavePicker).showSaveFilePicker === "function";
 }
 
 export function isTauriRuntime() {

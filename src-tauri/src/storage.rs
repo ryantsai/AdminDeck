@@ -2,7 +2,7 @@ use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
-const SCHEMA_USER_VERSION: i32 = 2;
+const SCHEMA_USER_VERSION: i32 = 3;
 
 const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS connections (
     local_shell TEXT,
     url TEXT,
     data_partition TEXT,
+    use_tmux_sessions INTEGER NOT NULL DEFAULT 1,
+    tmux_connection_id TEXT,
     connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
@@ -140,6 +142,8 @@ pub struct SavedConnection {
     local_shell: Option<String>,
     url: Option<String>,
     data_partition: Option<String>,
+    use_tmux_sessions: bool,
+    tmux_connection_id: Option<String>,
     url_credential_username: Option<String>,
     has_url_credential: bool,
     #[serde(rename = "type")]
@@ -166,6 +170,7 @@ pub struct CreateConnectionRequest {
     local_shell: Option<String>,
     url: Option<String>,
     data_partition: Option<String>,
+    use_tmux_sessions: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -451,6 +456,13 @@ impl Storage {
         let local_shell = normalize_local_shell(request.local_shell, &connection_type)?;
         let data_partition = normalize_data_partition(request.data_partition, &connection_type)?;
         let id = make_connection_id(&name);
+        let use_tmux_sessions =
+            normalize_use_tmux_sessions(request.use_tmux_sessions, &connection_type);
+        let tmux_connection_id = if use_tmux_sessions {
+            Some(make_tmux_connection_id(&id))
+        } else {
+            None
+        };
         let tags = Vec::new();
 
         let mut connection = self.lock()?;
@@ -463,8 +475,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'idle', ?14)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 'idle', ?16)",
                 params![
                     id,
                     folder_id,
@@ -478,6 +490,8 @@ impl Storage {
                     local_shell,
                     url,
                     data_partition,
+                    use_tmux_sessions,
+                    tmux_connection_id,
                     connection_type,
                     next_sort_order
                 ],
@@ -508,6 +522,8 @@ impl Storage {
             local_shell,
             url,
             data_partition,
+            use_tmux_sessions,
+            tmux_connection_id,
             url_credential_username: None,
             has_url_credential: false,
             connection_type,
@@ -668,7 +684,7 @@ impl Storage {
 
         let source = transaction
             .query_row(
-                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type
+                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, connection_type
                  FROM connections
                  WHERE id = ?1",
                 params![source_id],
@@ -685,7 +701,8 @@ impl Storage {
                         row.get::<_, Option<String>>(8)?,
                         row.get::<_, Option<String>>(9)?,
                         row.get::<_, Option<String>>(10)?,
-                        row.get::<_, String>(11)?,
+                        row.get::<_, bool>(11)?,
+                        row.get::<_, String>(12)?,
                     ))
                 },
             )
@@ -704,6 +721,7 @@ impl Storage {
             local_shell,
             url,
             data_partition,
+            use_tmux_sessions,
             connection_type,
         ) = source;
         let duplicate_name = request
@@ -712,13 +730,18 @@ impl Storage {
             .filter(|name| !name.is_empty())
             .unwrap_or_else(|| format!("Copy of {source_name}"));
         let duplicate_id = make_connection_id(&duplicate_name);
+        let tmux_connection_id = if use_tmux_sessions && connection_type == "ssh" {
+            Some(make_tmux_connection_id(&duplicate_id))
+        } else {
+            None
+        };
         let next_sort_order = next_connection_sort_order(&transaction, folder_id.as_deref())?;
 
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'idle', ?14)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 'idle', ?16)",
                 params![
                     duplicate_id,
                     folder_id,
@@ -732,6 +755,8 @@ impl Storage {
                     local_shell,
                     url,
                     data_partition,
+                    use_tmux_sessions,
+                    tmux_connection_id,
                     connection_type,
                     next_sort_order
                 ],
@@ -871,7 +896,7 @@ fn list_connections_for_folder(
     };
     let mut statement = connection
         .prepare(&format!(
-            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type,
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type,
                     url_credentials.username
              FROM connections
              LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
@@ -1133,14 +1158,14 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, connection_type,
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type,
                     url_credentials.username
              FROM connections
              LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
              WHERE connections.id = ?1",
             params![connection_id],
             |row| {
-                let url_credential_username: Option<String> = row.get(12)?;
+                let url_credential_username: Option<String> = row.get(14)?;
                 Ok(SavedConnection {
                     id: row.get(0)?,
                     name: row.get(1)?,
@@ -1153,7 +1178,9 @@ fn get_connection_by_id(
                     local_shell: row.get(8)?,
                     url: row.get(9)?,
                     data_partition: row.get(10)?,
-                    connection_type: row.get(11)?,
+                    use_tmux_sessions: row.get(11)?,
+                    tmux_connection_id: row.get(12)?,
+                    connection_type: row.get(13)?,
                     url_credential_username: url_credential_username.clone(),
                     has_url_credential: url_credential_username.is_some(),
                     status: "idle".to_string(),
@@ -1172,7 +1199,7 @@ fn get_connection_by_id(
 }
 
 fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedConnection> {
-    let url_credential_username: Option<String> = row.get(12)?;
+    let url_credential_username: Option<String> = row.get(14)?;
     Ok(SavedConnection {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -1185,7 +1212,9 @@ fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedC
         local_shell: row.get(8)?,
         url: row.get(9)?,
         data_partition: row.get(10)?,
-        connection_type: row.get(11)?,
+        use_tmux_sessions: row.get(11)?,
+        tmux_connection_id: row.get(12)?,
+        connection_type: row.get(13)?,
         url_credential_username: url_credential_username.clone(),
         has_url_credential: url_credential_username.is_some(),
         status: "idle".to_string(),
@@ -1248,6 +1277,10 @@ fn run_migrations(connection: &mut SqliteConnection) -> Result<(), String> {
         ensure_url_credentials_table(connection)?;
     }
 
+    if current < 3 {
+        ensure_tmux_connection_columns(connection)?;
+    }
+
     connection
         .execute_batch(&format!("PRAGMA user_version = {SCHEMA_USER_VERSION}"))
         .map_err(to_storage_error)?;
@@ -1281,6 +1314,8 @@ fn rebuild_connections_for_url_kind(connection: &mut SqliteConnection) -> Result
                 local_shell TEXT,
                 url TEXT,
                 data_partition TEXT,
+                use_tmux_sessions INTEGER NOT NULL DEFAULT 1,
+                tmux_connection_id TEXT,
                 connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url')),
                 status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
                 sort_order INTEGER NOT NULL
@@ -1288,11 +1323,14 @@ fn rebuild_connections_for_url_kind(connection: &mut SqliteConnection) -> Result
 
             INSERT INTO connections_new (
                 id, folder_id, name, host, username, port, key_path, proxy_jump,
-                auth_method, local_shell, url, data_partition, connection_type, status, sort_order
+                auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
             )
             SELECT
                 id, folder_id, name, host, username, port, key_path, proxy_jump,
-                auth_method, local_shell, NULL, NULL, connection_type, status, sort_order
+                auth_method, local_shell, NULL, NULL,
+                CASE WHEN connection_type = 'ssh' THEN 1 ELSE 0 END,
+                CASE WHEN connection_type = 'ssh' THEN 'admindeck-' || lower(hex(randomblob(5))) ELSE NULL END,
+                connection_type, status, sort_order
             FROM connections;
 
             DROP TABLE connections;
@@ -1319,6 +1357,47 @@ fn ensure_url_credentials_table(connection: &mut SqliteConnection) -> Result<(),
 
             CREATE INDEX IF NOT EXISTS idx_url_credentials_connection
                 ON url_credentials(connection_id);
+            "#,
+        )
+        .map_err(to_storage_error)
+}
+
+fn ensure_tmux_connection_columns(connection: &mut SqliteConnection) -> Result<(), String> {
+    if column_missing(connection, "connections", "use_tmux_sessions")? {
+        connection
+            .execute_batch(
+                r#"
+                ALTER TABLE connections
+                    ADD COLUMN use_tmux_sessions INTEGER NOT NULL DEFAULT 1;
+                "#,
+            )
+            .map_err(to_storage_error)?;
+    }
+
+    if column_missing(connection, "connections", "tmux_connection_id")? {
+        connection
+            .execute_batch(
+                r#"
+                ALTER TABLE connections
+                    ADD COLUMN tmux_connection_id TEXT;
+                "#,
+            )
+            .map_err(to_storage_error)?;
+    }
+
+    connection
+        .execute_batch(
+            r#"
+            UPDATE connections
+            SET use_tmux_sessions = CASE WHEN connection_type = 'ssh' THEN use_tmux_sessions ELSE 0 END,
+                tmux_connection_id = CASE
+                    WHEN connection_type = 'ssh'
+                         AND use_tmux_sessions = 1
+                         AND (tmux_connection_id IS NULL OR trim(tmux_connection_id) = '')
+                    THEN 'admindeck-' || lower(hex(randomblob(5)))
+                    WHEN connection_type = 'ssh' THEN tmux_connection_id
+                    ELSE NULL
+                END;
             "#,
         )
         .map_err(to_storage_error)
@@ -1430,6 +1509,10 @@ fn normalize_data_partition(
     }
 
     Ok(trimmed)
+}
+
+fn normalize_use_tmux_sessions(value: Option<bool>, connection_type: &str) -> bool {
+    connection_type == "ssh" && value.unwrap_or(true)
 }
 
 fn normalize_local_shell(
@@ -1662,6 +1745,10 @@ fn make_folder_id(name: &str) -> String {
     make_unique_id("folder", name)
 }
 
+fn make_tmux_connection_id(connection_id: &str) -> String {
+    make_unique_id("admindeck", connection_id)
+}
+
 fn make_unique_id(fallback: &str, name: &str) -> String {
     let slug = name
         .chars()
@@ -1750,6 +1837,7 @@ mod tests {
                 local_shell: None,
                 url: None,
                 data_partition: None,
+                use_tmux_sessions: None,
             })
             .expect("SSH connection is created")
     }
@@ -1769,6 +1857,7 @@ mod tests {
                 local_shell: Some(shell.to_string()),
                 url: None,
                 data_partition: None,
+                use_tmux_sessions: None,
             })
             .expect("local connection is created")
     }
@@ -1819,6 +1908,7 @@ mod tests {
                 local_shell: None,
                 url: None,
                 data_partition: None,
+                use_tmux_sessions: None,
             })
             .expect("connection is created");
 
@@ -1856,6 +1946,7 @@ mod tests {
                 local_shell: None,
                 url: Some("router.internal".to_string()),
                 data_partition: Some("ops".to_string()),
+                use_tmux_sessions: None,
             })
             .expect("URL connection is created");
 
@@ -2084,6 +2175,7 @@ mod tests {
                 local_shell: None,
                 url: None,
                 data_partition: None,
+                use_tmux_sessions: None,
             })
             .expect("connection is created in folder");
 

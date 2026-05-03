@@ -59,6 +59,8 @@ pub struct NativeSshTerminalRequest {
     pub pixel_width: u16,
     pub rows: u16,
     pub initial_directory: Option<String>,
+    pub use_tmux: bool,
+    pub tmux_session_id: Option<String>,
 }
 
 #[derive(Clone)]
@@ -68,6 +70,16 @@ pub(crate) struct NativeSshConnectionRequest {
     pub port: u16,
     pub auth: NativeSshAuth,
     pub known_hosts_path: PathBuf,
+}
+
+#[derive(Clone)]
+pub(crate) struct NativeSshCommandRequest {
+    pub host: String,
+    pub user: String,
+    pub port: u16,
+    pub auth: NativeSshAuth,
+    pub known_hosts_path: PathBuf,
+    pub command: String,
 }
 
 #[derive(Clone)]
@@ -239,6 +251,8 @@ pub fn start_native_terminal(
         pixel_width: request.pixel_width,
         rows: request.rows,
         initial_directory: request.initial_directory,
+        use_tmux: request.use_tmux,
+        tmux_session_id: request.tmux_session_id,
     };
     let (control_tx, control_rx) = mpsc::unbounded_channel();
     let (ready_tx, ready_rx) = std_mpsc::sync_channel(1);
@@ -360,6 +374,63 @@ pub fn trust_host_key(
     })
 }
 
+pub(crate) fn run_remote_command(request: NativeSshCommandRequest) -> Result<String, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| format!("failed to create native SSH command runtime: {error}"))?;
+
+    runtime.block_on(run_remote_command_async(request))
+}
+
+async fn run_remote_command_async(request: NativeSshCommandRequest) -> Result<String, String> {
+    let session = connect_verified_client(NativeSshConnectionRequest {
+        host: request.host,
+        user: request.user,
+        port: request.port,
+        auth: request.auth,
+        known_hosts_path: request.known_hosts_path,
+    })
+    .await?;
+
+    let mut channel = session
+        .channel_open_session()
+        .await
+        .map_err(|error| format!("failed to open SSH command channel: {error}"))?;
+    channel
+        .exec(false, request.command.into_bytes())
+        .await
+        .map_err(|error| format!("failed to run SSH command: {error}"))?;
+
+    let mut output = String::new();
+    let mut exit_status = 0;
+    while let Some(message) = channel.wait().await {
+        match message {
+            ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
+                output.push_str(&String::from_utf8_lossy(&data));
+            }
+            ChannelMsg::ExitStatus {
+                exit_status: status,
+            } => {
+                exit_status = status;
+            }
+            ChannelMsg::Eof | ChannelMsg::Close => break,
+            _ => {}
+        }
+    }
+
+    let _ = channel.eof().await;
+    let _ = channel.close().await;
+    disconnect_ssh_session(session, "command completed").await?;
+    if exit_status == 0 {
+        Ok(output)
+    } else {
+        Err(format!(
+            "SSH command exited with status {exit_status}: {output}"
+        ))
+    }
+}
+
 impl NativeSshTerminal {
     pub fn write_input(&self, data: String) -> Result<(), String> {
         self.control
@@ -447,12 +518,11 @@ async fn run_native_terminal(
         .request_shell(false)
         .await
         .map_err(|error| format!("failed to start SSH shell: {error}"))?;
-    if let Some(directory) = initial_directory_for(&request) {
-        let command = format!("cd -- {}\r", shell_single_quote(&directory));
+    if let Some(command) = startup_command_for(&request) {
         channel
-            .data(command.as_bytes())
+            .data(format!("{command}\r").as_bytes())
             .await
-            .map_err(|error| format!("failed to set SSH initial directory: {error}"))?;
+            .map_err(|error| format!("failed to initialize SSH shell: {error}"))?;
     }
 
     let _ = ready_tx.send(Ok(ready_start.elapsed().as_millis()));
@@ -548,6 +618,35 @@ fn initial_directory_for(request: &NativeSshTerminalRequest) -> Option<String> {
         .map(str::trim)
         .filter(|directory| !directory.is_empty() && *directory != "~")
         .map(str::to_string)
+}
+
+fn startup_command_for(request: &NativeSshTerminalRequest) -> Option<String> {
+    if request.use_tmux {
+        return request
+            .tmux_session_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|session_id| !session_id.is_empty())
+            .map(|session_id| {
+                remote_tmux_resume_command(initial_directory_for(request).as_deref(), session_id)
+            });
+    }
+
+    initial_directory_for(request)
+        .map(|directory| format!("cd -- {}", shell_single_quote(&directory)))
+}
+
+pub(crate) fn remote_tmux_resume_command(
+    initial_directory: Option<&str>,
+    session_id: &str,
+) -> String {
+    let cd_command = initial_directory
+        .map(|directory| format!("cd -- {} && ", shell_single_quote(directory)))
+        .unwrap_or_default();
+    format!(
+        "if command -v tmux >/dev/null 2>&1; then {cd_command}exec tmux new-session -A -s {}; else {cd_command}printf '\\r\\n[AdminDeck: tmux not found, using normal shell]\\r\\n'; exec \"${{SHELL:-sh}}\" -i; fi",
+        shell_single_quote(session_id)
+    )
 }
 
 fn shell_single_quote(value: &str) -> String {

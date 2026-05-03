@@ -18,6 +18,8 @@ Record these values with the completed checklist:
 | Shell | PowerShell / cmd / Git Bash / WSL / other |
 | Session type | Local / native SSH |
 | SSH transport, if used | Native non-ProxyJump / system ssh fallback |
+| SSH tmux mode, if used | Enabled / disabled / tmux not installed |
+| tmux session id, if used | |
 | Terminal font and size | |
 | Scrollback setting | |
 | Glyph renderer in use | WebGL / DOM fallback (inspect pane host element for an addon `<canvas>` child) |
@@ -39,6 +41,8 @@ The checklist passes when:
 | --- | --- | --- | --- |
 | Open baseline local terminal | Open a new local terminal tab. Run `echo $PSVersionTable.PSVersion` in PowerShell or `echo %COMSPEC%` in cmd. | Prompt accepts input and output appears without layout shifts. | |
 | Open optional SSH terminal | Open a trusted native SSH Connection if available. | Session reaches a prompt and resize/status behavior remains normal. | |
+| Open tmux-enabled SSH terminal | Open an SSH Connection with `Use tmux sessions` enabled. | The Pane toolbar shows a `tmux` session tag before other Pane actions. The remote shell attaches to or creates the named tmux session when tmux is installed. | |
+| Open SSH terminal without remote tmux | Open a tmux-enabled SSH Connection to a host where `tmux` is not installed, or temporarily make `tmux` unavailable on a test host. | AdminDeck falls back to the normal remote shell and the terminal remains usable. | |
 | Switch tabs without disconnecting | Open two terminal tabs. Run a long-lived safe command or leave a prompt active in the first tab, switch to the second tab, then switch back. Repeat with native SSH when available. | The first Session remains connected and usable after tab switches. No disconnect occurs unless the tab-strip close `X` is explicitly pressed or the process/remote host ends the Session. | |
 | Split terminal panes | Split the terminal tab into at least two Panes. Run a different command in each Pane. | Focus, typing, and output stay isolated to the active Pane. | |
 | Resize app window | Resize the AdminDeck window while a prompt is visible. | Prompt redraws cleanly, with no duplicated prompt fragments or stale rows. | |
@@ -66,6 +70,20 @@ If `tmux` is unavailable on the local shell, run this section in SSH or record `
 | Switch panes | Move focus between tmux panes using the configured tmux prefix shortcuts. | Input goes to the selected tmux pane only. | |
 | Resize propagation | Resize the AdminDeck window while tmux is open. | tmux recalculates layout correctly. | |
 | Mouse mode, if enabled | Enable tmux mouse mode or use an existing config, then click panes or scroll. | Mouse focus/scroll behavior matches tmux expectations. | |
+
+## SSH tmux Resume
+
+Run these checks against a trusted SSH Connection. If the remote host has no `tmux`, run the fallback check and record `Not installed`.
+
+| Check | Steps | Expected Result | Result |
+| --- | --- | --- | --- |
+| Default setting | Create a new SSH Connection. | `Use tmux sessions` is enabled by default. | |
+| Pane session tag | Open the SSH Connection. | Each terminal Pane toolbar shows its tmux session id to the left of the Pane actions. | |
+| Resume same Pane session | In a tmux-enabled Pane, run a safe long-lived command or create a tmux window, close the AdminDeck Tab, then reopen the same Connection. | The Pane attaches to the same named tmux session and the remote tmux state is still present. | |
+| Split Pane session ids | Split the SSH terminal into at least two Panes. | Each Pane gets a distinct tmux session id and input stays isolated to the active Pane. | |
+| List tmux sessions | Click the tmux session tag. | The popover lists remote tmux sessions and clearly marks attached vs detached sessions. | |
+| Close tmux session | In the tmux session popover, close a detached test session with the `X` button. | The remote tmux session is killed and the list refreshes without closing unrelated terminal Sessions. | |
+| Missing tmux fallback | Open a tmux-enabled SSH Connection where `tmux` is unavailable. | The terminal starts a normal interactive shell rather than failing the SSH Session. | |
 
 ## htop or btop
 

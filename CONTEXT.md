@@ -8,6 +8,8 @@ AdminDeck is a local-first desktop administration workspace for terminal, SSH, S
 A durable openable resource stored in SQLite. The supported kinds are local terminal, SSH terminal, and URL (an embedded WebView2 browser surface targeting a single http(s) origin). SFTP is opened from an SSH Connection and is not stored as a standalone Connection.
 _Avoid_: Profile, saved session, host entry
 
+SSH Connections may persist non-secret tmux launch preferences, including whether AdminDeck should start terminal Panes inside named tmux sessions and the stable prefix used when generating those names. The remote tmux process itself remains live Session/runtime state and is not the durable Connection.
+
 **URL Connection**:
 A Connection of kind `url`. It stores an http(s) URL plus an optional `dataPartition` label. The address bar accepts hosts without a scheme; the backend assumes `https://` when no scheme is present. The `dataPartition` field is persisted but currently a no-op: WebView2 enforces one user-data folder per process, so all URL Connections share the host app's WebView2 cookie/storage in Phase 1. Real per-Connection isolation is deferred until Phase 2 explores out-of-process WebView2 environments.
 _Avoid_: Web tab, browser bookmark, URL profile
@@ -28,6 +30,8 @@ _Avoid_: Session, connection, backend tab
 A subdivision of a tab that presents one terminal surface or workspace view.
 _Avoid_: Session, split
 
+Terminal Panes for tmux-enabled SSH Connections may carry a generated tmux session id used to resume that Pane's remote tmux session when the Pane is recreated. That id belongs to the frontend workspace/Pane layer, not the backend Connection model.
+
 ## Relationships
 
 - A **Connection** may start zero or more **Sessions** over time.
@@ -36,6 +40,7 @@ _Avoid_: Session, split
 - A **Quick Connect** starts exactly one **Session** unless the user saves it as a **Connection**.
 - A **Session** may be presented by one **Tab**.
 - A terminal **Tab** may contain one or more **Panes**.
+- A tmux-enabled SSH terminal **Pane** may start or attach to a named remote tmux session. If `tmux` is unavailable on the remote host, the Pane falls back to the normal remote shell.
 - A **Tab** is UI state only and is not the durable backend model.
 - Switching the active **Tab** does not end, disconnect, or recreate its **Session**.
 - A **Session** is intentionally ended only by an explicit close action on the presenting **Tab** or by the remote/process ending itself.

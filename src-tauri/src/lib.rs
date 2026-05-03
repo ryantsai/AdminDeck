@@ -318,6 +318,26 @@ fn close_terminal_session(
 }
 
 #[tauri::command]
+fn list_tmux_sessions(
+    app: tauri::AppHandle,
+    sessions: tauri::State<'_, sessions::SessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: sessions::TmuxConnectionRequest,
+) -> Result<Vec<sessions::TmuxSession>, String> {
+    sessions.list_tmux_sessions(app, &secrets, request)
+}
+
+#[tauri::command]
+fn close_tmux_session(
+    app: tauri::AppHandle,
+    sessions: tauri::State<'_, sessions::SessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: sessions::CloseTmuxSessionRequest,
+) -> Result<(), String> {
+    sessions.close_tmux_session(app, &secrets, request)
+}
+
+#[tauri::command]
 fn launch_elevated_terminal(
     request: sessions::LaunchElevatedTerminalRequest,
 ) -> Result<(), String> {
@@ -571,6 +591,8 @@ pub fn run() {
             write_terminal_input,
             resize_terminal,
             close_terminal_session,
+            list_tmux_sessions,
+            close_tmux_session,
             launch_elevated_terminal,
             start_sftp_session,
             list_sftp_directory,

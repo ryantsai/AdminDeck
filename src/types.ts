@@ -15,6 +15,8 @@ export interface Connection {
   localShell?: string;
   url?: string;
   dataPartition?: string;
+  useTmuxSessions?: boolean;
+  tmuxConnectionId?: string;
   urlCredentialUsername?: string;
   hasUrlCredential?: boolean;
   type: ConnectionType;
@@ -46,6 +48,7 @@ export interface CreateConnectionRequest {
   localShell?: string;
   url?: string;
   dataPartition?: string;
+  useTmuxSessions?: boolean;
 }
 
 export interface CreateConnectionFolderRequest {
@@ -86,6 +89,7 @@ export interface TerminalPane {
   cwd: string;
   buffer: string;
   connection?: Connection;
+  tmuxSessionId?: string;
 }
 
 export type SplitDirection = "right" | "left" | "down" | "up";

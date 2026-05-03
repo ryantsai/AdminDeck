@@ -8,7 +8,7 @@ AdminDeck is intended to be a fast, professional desktop workspace for personal/
 
 ## Solution
 
-AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions, SFTP dual-pane file management, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
+AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions with optional tmux resume, SFTP dual-pane file management, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
 
 The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. Mobile, RDP, VNC, team vaults, and sync are explicitly later-stage work.
 
@@ -28,7 +28,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 12. As a terminal user, I want local terminal tabs, so that AdminDeck can replace my daily terminal for common work.
 13. As a terminal user, I want local terminal connections to require no host details, so that launching the default shell is fast and obvious.
 14. As a Windows user, I want saved local terminal options for PowerShell, Command Prompt, and WSL, so that local terminals match the shell I need.
-15. As a terminal user, I want SSH terminal tabs, so that remote shell work happens in the same workspace as local work.
+15. As a terminal user, I want SSH terminal tabs with optional named tmux session resume per Pane, so that remote shell work happens in the same workspace as local work and can return to the same remote context.
 16. As a terminal user, I want split terminal panes, so that I can monitor and operate multiple shells in one tab.
 17. As a terminal user, I want xterm-compatible behavior, so that tools like vim, tmux, htop, btop, lazygit, git, npm, pnpm, and cargo work correctly.
 18. As a terminal user, I want truecolor, mouse support, alternate screen, bracketed paste, hyperlinks, and scrollback search, so that modern terminal apps feel correct.
@@ -95,7 +95,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - SSH/SFTP implementation: in-process Rust implementation as primary path.
 - SSH library candidates: evaluate russh first, ssh2/libssh2 as fallback candidate.
 - System ssh: optional fallback/debug path only.
-- Storage: local SQLite for connections, optional nested tree folders, settings, layout, recent sessions, and non-secret AI provider metadata.
+- Storage: local SQLite for connections, optional nested tree folders, settings, layout, recent sessions, non-secret SSH tmux launch preferences, and non-secret AI provider metadata.
 - Secrets: OS keychain for passwords, SSH passphrases, and AI API keys.
 - Optional later idea: portable vault mode could store credentials encrypted in SQLite for portable installs, but only with explicit opt-in, a user-supplied master password, clear lock/unlock behavior, and no plaintext or disk-stored encryption key.
 - SSH keys: reference existing key files by path; do not manage/generate keypairs in v0.1.
@@ -104,6 +104,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - CLI agent integrations: suggest-only/ask-before-execute where possible.
 - UI model: left activity rail with Dashboard and Settings entries, left-side connection manager/tree with root Connections and optional nested folders, main tab/workspace area, optional bottom/output panel, right AI assistant panel.
 - Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
+- SSH tmux model: SSH Connections can opt into tmux session launch by default. Each SSH terminal Pane gets a generated tmux session id, starts or attaches with `tmux new-session -A`, falls back to a normal remote shell if `tmux` is missing, and exposes a Pane-toolbar tag that lists attached and detached remote tmux sessions with explicit close actions.
 - SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
 - Settings: current surface is intentionally limited to two to-be-implemented placeholders, Language (i18n) and Color Scheme. Deeper terminal, SSH, SFTP, AI provider, diagnostics, update, and keybinding controls should be reintroduced only when their UX is clear and backed by the existing local storage/keychain boundaries.
 - SSH config import: the parser and typed Tauri command remain in place, but the previous top chrome import button has been removed. A visible import entry point should return through the connection tree or Settings only when that flow has a clear home.

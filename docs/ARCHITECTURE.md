@@ -38,6 +38,7 @@ Owns SQLite migrations and repositories for:
 - UI layout
 - recent sessions
 - non-secret AI provider metadata
+- non-secret SSH tmux launch preferences
 
 Secrets are never stored in SQLite.
 
@@ -62,6 +63,8 @@ Represents all openable resources as saved connections. v0.1 connection types:
 
 SFTP is a related workspace surface opened from an SSH Connection, not a standalone saved Connection type.
 
+SSH Connections may store a non-secret `useTmuxSessions` preference and stable tmux connection prefix. These values describe how future terminal Sessions should launch; they do not represent a live remote process.
+
 Later connection types:
 
 - RDP Session
@@ -74,11 +77,15 @@ Owns root-level saved Connections, optional folders, subfolders, search/filter, 
 
 Current implementation note: a Connection may have no folder and live directly in the root of the tree. Folders may contain Connections and subfolders. Status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
 
+For tmux-enabled SSH Connections, per-Pane tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. The Connection stores only the launch preference and naming prefix.
+
 ### Terminal Session
 
 Owns local PTY lifecycle, SSH terminal channel lifecycle, input/output streams, resize events, tab integration, split pane integration, and terminal compatibility behavior.
 
 Lifecycle invariant: switching the active workspace Tab must not disconnect, close, or recreate a local terminal Session, SSH terminal Session, or SFTP Session. Open Tab surfaces stay mounted while inactive so their live Sessions remain attached. Explicit tab close from the tab strip is the user-owned teardown action for the Session or Sessions presented by that Tab.
+
+When an SSH Connection has tmux enabled, each terminal Pane starts by attaching to or creating its generated tmux session with `tmux new-session -A -s <name>`. Native `russh` sessions and system `ssh` fallback sessions use the same remote startup behavior. If `tmux` is not installed on the remote host, AdminDeck starts a normal interactive shell instead. The Pane toolbar shows the tmux session id and can list or close remote tmux sessions without logging terminal contents.
 
 ### Terminal Engine
 
@@ -101,7 +108,7 @@ The current Milestone A renderer is `xterm.js` with the `@xterm/addon-webgl` GPU
 
 ### SSH Transport
 
-Owns in-process SSH connections, host key verification, authentication, terminal channels, resize propagation, reconnect behavior, and optional system ssh fallback/debug.
+Owns in-process SSH connections, host key verification, authentication, terminal channels, resize propagation, reconnect behavior, optional system ssh fallback/debug, and noninteractive remote tmux management commands.
 
 Evaluate `russh` first. Evaluate `ssh2` if `russh` does not meet v0.1 needs.
 
@@ -151,6 +158,7 @@ The primary UI is a dense desktop workspace:
 - left connection tree with root Connections and optional nested folders
 - main tabs/workspace
 - terminal split panes inside terminal tabs
+- tmux session tags and management popovers inside SSH terminal Pane toolbars
 - SFTP dual-pane view
 - right AI assistant panel
 - settings

@@ -31,6 +31,7 @@ import type {
 } from "./types";
 
 const LAYOUT_STORAGE_PREFIX = "admindeck.layout.";
+const TMUX_SESSION_STORAGE_PREFIX = "admindeck.tmuxSessions.";
 
 function loadStoredLayout(connectionId: string): StoredConnectionLayout | undefined {
   if (typeof window === "undefined") {
@@ -60,10 +61,94 @@ function persistLayout(connectionId: string, stored: StoredConnectionLayout | un
   }
 }
 
+function loadStoredTmuxSessionIds(connectionId: string): string[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(`${TMUX_SESSION_STORAGE_PREFIX}${connectionId}`);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string" && value.trim() !== "")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistTmuxSessionIds(connectionId: string, sessionIds: string[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      `${TMUX_SESSION_STORAGE_PREFIX}${connectionId}`,
+      JSON.stringify(sessionIds),
+    );
+  } catch {
+    // Storage may be unavailable (private mode, quota); fail silently.
+  }
+}
+
+function connectionUsesTmux(connection: Connection) {
+  return connection.type === "ssh" && connection.useTmuxSessions !== false;
+}
+
+function tmuxPrefixFor(connection: Connection) {
+  return normalizeTmuxIdPart(connection.tmuxConnectionId ?? `admindeck-${connection.id}`);
+}
+
+function tmuxSessionIdsForConnection(connection: Connection, count: number) {
+  if (!connectionUsesTmux(connection)) {
+    return [];
+  }
+  const sessionIds = loadStoredTmuxSessionIds(connection.id).slice(0, count);
+  while (sessionIds.length < count) {
+    sessionIds.push(generateTmuxSessionId(connection));
+  }
+  persistTmuxSessionIds(connection.id, sessionIds);
+  return sessionIds;
+}
+
+function appendTmuxSessionId(connection: Connection) {
+  if (!connectionUsesTmux(connection)) {
+    return undefined;
+  }
+  const sessionIds = loadStoredTmuxSessionIds(connection.id);
+  const sessionId = generateTmuxSessionId(connection);
+  sessionIds.push(sessionId);
+  persistTmuxSessionIds(connection.id, sessionIds);
+  return sessionId;
+}
+
+function generateTmuxSessionId(connection: Connection) {
+  return `${tmuxPrefixFor(connection)}-${randomTmuxSuffix()}`;
+}
+
+function randomTmuxSuffix() {
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const bytes = new Uint8Array(4);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Date.now().toString(36)}${Math.floor(Math.random() * 0xffff).toString(16)}`;
+}
+
+function normalizeTmuxIdPart(value: string) {
+  return (
+    value
+      .trim()
+      .replace(/[^A-Za-z0-9_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "") || "admindeck"
+  );
+}
+
 function buildPanesForConnection(connection: Connection, count: number): TerminalPane[] {
   const baseId = connection.id;
   const baseTitle = connection.type === "local" ? connection.name : "ssh";
   const baseCwd = connection.type === "local" ? "C:\\Users\\ryan" : "~";
+  const tmuxSessionIds = tmuxSessionIdsForConnection(connection, count);
   const panes: TerminalPane[] = [];
   for (let index = 0; index < count; index += 1) {
     panes.push({
@@ -72,6 +157,7 @@ function buildPanesForConnection(connection: Connection, count: number): Termina
       cwd: baseCwd,
       buffer: "",
       connection,
+      tmuxSessionId: tmuxSessionIds[index],
     });
   }
   return panes;
@@ -310,6 +396,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           cwd: normalizedPath,
           buffer: "",
           connection,
+          tmuxSessionId: appendTmuxSessionId(connection),
         },
       ],
       connection,
@@ -356,6 +443,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           cwd: focusedPane.cwd,
           buffer: "",
           connection,
+          tmuxSessionId: appendTmuxSessionId(connection),
         };
 
         const nextPanes = [...tab.panes, newPane];
