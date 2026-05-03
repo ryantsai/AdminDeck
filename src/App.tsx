@@ -6,16 +6,13 @@ import {
   Bot,
   Camera,
   Mouse,
-  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
   ClipboardPaste,
   Columns2,
-  Command,
   Copy,
-  Database,
   Download,
   Folder,
   FolderPlus,
@@ -40,7 +37,6 @@ import {
   Server,
   Settings,
   SplitSquareHorizontal,
-  Tags,
   Terminal,
   Trash2,
   Type,
@@ -70,6 +66,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
   RefObject,
+  ReactNode,
 } from "react";
 import "@icon-park/react/styles/index.css";
 import "@xterm/xterm/css/xterm.css";
@@ -129,10 +126,16 @@ import {
   type SftpTransferProgress,
   type SftpTransferResult,
   type SshHostKeyPreview,
-  type CommandProposalPlan,
   type TerminalOutput,
   type TmuxSession,
 } from "./lib/tauri";
+import {
+  AI_PROVIDER_DEFINITIONS,
+  getAiProviderDefinition,
+  normalizeAiProviderDraft,
+  providerDefaultsFor,
+  providerNeedsApiKey,
+} from "./ai/providers";
 import { aiSuggestions, connectionTree, defaultTerminalSettings } from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import {
@@ -143,11 +146,14 @@ import {
 import { ensureLayout } from "./workspace/layout";
 import {
   getPaneRenderer,
+  registerPaneInputWriter,
   registerPaneRenderer,
+  unregisterPaneInputWriter,
   unregisterPaneRenderer,
+  writeInputToPane,
 } from "./workspace/paneRegistry";
 import type {
-  AiProviderSettings,
+  AiProviderKind,
   Connection,
   ConnectionFolder,
   ConnectionStatus,
@@ -623,17 +629,10 @@ type FilePropertiesState = {
   remoteProperties?: SftpPathProperties;
 };
 
-type AssistantDraft = {
+type AssistantChatMessage = {
   id: string;
-  title: string;
-  risk: string;
-  command: string;
-  reason: string;
-  contextLabel: string;
-  selectedOutput?: string;
-  extraConfirmationRequired: boolean;
-  safetyNotes: string[];
-  status: "pending" | "approved" | "rejected";
+  role: "assistant" | "user";
+  content: string;
 };
 
 type PanelLayoutState = {
@@ -984,6 +983,7 @@ function App() {
           />
           <AssistantPanel
             collapsed={aiPanelLayout.collapsed}
+            onOpenSettings={() => setActivePage("settings")}
             onToggleCollapsed={() =>
               setAiPanelLayout((layout) => ({
                 ...layout,
@@ -5026,6 +5026,17 @@ function TerminalPaneView({
     let disposed = false;
     let sessionStarted = false;
     let removeOutputListener: (() => void) | undefined;
+    const writeInputToSession = (data: string) => {
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) {
+        return;
+      }
+      void invokeCommand("write_terminal_input", {
+        request: { sessionId, data },
+      });
+      terminal.focus();
+    };
+    registerPaneInputWriter(pane.id, writeInputToSession);
     const dataDisposable = terminal.onData((data) => {
       if (terminalSettings.confirmMultilinePaste && isMultilinePaste(data)) {
         const shouldPaste = window.confirm("Paste multiple lines into this terminal?");
@@ -5034,13 +5045,7 @@ function TerminalPaneView({
         }
       }
 
-      const sessionId = sessionIdRef.current;
-      if (!sessionId) {
-        return;
-      }
-      void invokeCommand("write_terminal_input", {
-        request: { sessionId, data },
-      });
+      writeInputToSession(data);
     });
     const selectionDisposable = terminal.onSelectionChange(() => {
       const selection = terminal.getSelection();
@@ -5176,6 +5181,7 @@ function TerminalPaneView({
       selectionDisposable.dispose();
       searchResultsDisposable.dispose();
       focusDisposable.dispose();
+      unregisterPaneInputWriter(pane.id, writeInputToSession);
       unregisterPaneRenderer(pane.id, terminal);
       resizeObserver.disconnect();
       if (resizeFrameRef.current !== null) {
@@ -7535,30 +7541,93 @@ function SettingsPage({
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
   const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
+  const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
-  const [draft, setDraft] = useState(terminalSettings);
+  const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
+  const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
+  const [terminalDraft, setTerminalDraft] = useState(terminalSettings);
+  const [aiDraft, setAiDraft] = useState(aiProviderSettings);
+  const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const hasTerminalChanges = JSON.stringify(draft) !== JSON.stringify(terminalSettings);
+  const [aiStatus, setAiStatus] = useState("");
+  const [aiError, setAiError] = useState("");
+  const hasTerminalChanges = JSON.stringify(terminalDraft) !== JSON.stringify(terminalSettings);
+  const hasAiChanges =
+    JSON.stringify(aiDraft) !== JSON.stringify(aiProviderSettings) || apiKeyDraft.trim().length > 0;
+  const aiProviderDefinition = getAiProviderDefinition(aiDraft.providerKind);
 
   useEffect(() => {
-    setDraft(terminalSettings);
+    setTerminalDraft(terminalSettings);
   }, [terminalSettings]);
+
+  useEffect(() => {
+    setAiDraft(aiProviderSettings);
+  }, [aiProviderSettings]);
 
   async function handleSaveTerminalSettings() {
     try {
       setError("");
       setStatus("");
-      const nextSettings = normalizeTerminalSettingsDraft(draft);
+      const nextSettings = normalizeTerminalSettingsDraft(terminalDraft);
       const saved = isTauriRuntime()
         ? await invokeCommand("update_terminal_settings", { request: nextSettings })
         : nextSettings;
       setTerminalSettings(saved);
-      setDraft(saved);
+      setTerminalDraft(saved);
       setStatus("Terminal settings saved.");
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  async function handleSaveAiProviderSettings() {
+    try {
+      setAiError("");
+      setAiStatus("");
+      const hasApiKeyAfterSave =
+        apiKeyDraft.trim().length > 0 || !providerNeedsApiKey(aiDraft) || aiProviderHasApiKey;
+      const nextSettings = normalizeAiProviderDraft(aiDraft, hasApiKeyAfterSave);
+
+      if (apiKeyDraft.trim()) {
+        if (isTauriRuntime()) {
+          await invokeCommand("store_secret", {
+            request: {
+              kind: "aiApiKey",
+              ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+              secret: apiKeyDraft.trim(),
+            },
+          });
+        }
+        setAiProviderHasApiKey(true);
+        setApiKeyDraft("");
+      } else if (!providerNeedsApiKey(nextSettings)) {
+        setAiProviderHasApiKey(true);
+      }
+
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_ai_provider_settings", { request: nextSettings })
+        : nextSettings;
+      setAiProviderSettings(saved);
+      setAiDraft(saved);
+      setAiStatus("AI provider saved.");
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function handleAiProviderKindChange(providerKind: AiProviderKind) {
+    const defaults = providerDefaultsFor(providerKind);
+    setAiDraft((settings) => ({
+      ...settings,
+      providerKind,
+      baseUrl: defaults.baseUrl,
+      model: defaults.model,
+      enabled: providerKind === "ollama" ? true : settings.enabled,
+    }));
+    setApiKeyDraft("");
+    setAiStatus("");
+    setAiError("");
   }
 
   return (
@@ -7622,12 +7691,12 @@ function SettingsPage({
                 <input
                   onChange={(event) => {
                     const fontFamily = event.currentTarget.value;
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       fontFamily,
                     }));
                   }}
-                  value={draft.fontFamily}
+                  value={terminalDraft.fontFamily}
                 />
               </label>
               <label>
@@ -7638,13 +7707,13 @@ function SettingsPage({
                   min={8}
                   onChange={(event) => {
                     const fontSize = Number(event.currentTarget.value);
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       fontSize,
                     }));
                   }}
                   type="number"
-                  value={draft.fontSize}
+                  value={terminalDraft.fontSize}
                 />
               </label>
               <label>
@@ -7654,14 +7723,14 @@ function SettingsPage({
                   min={1}
                   onChange={(event) => {
                     const lineHeight = Number(event.currentTarget.value);
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       lineHeight,
                     }));
                   }}
                   step={0.05}
                   type="number"
-                  value={draft.lineHeight}
+                  value={terminalDraft.lineHeight}
                 />
               </label>
             </div>
@@ -7675,14 +7744,14 @@ function SettingsPage({
                   min={100}
                   onChange={(event) => {
                     const scrollbackLines = Number(event.currentTarget.value);
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       scrollbackLines,
                     }));
                   }}
                   step={100}
                   type="number"
-                  value={draft.scrollbackLines}
+                  value={terminalDraft.scrollbackLines}
                 />
                 <small className="field-hint">Default is 10,000. Valid range is 100 to 100,000.</small>
               </label>
@@ -7691,12 +7760,12 @@ function SettingsPage({
                 <select
                   onChange={(event) => {
                     const cursorStyle = event.currentTarget.value as TerminalCursorStyle;
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       cursorStyle,
                     }));
                   }}
-                  value={draft.cursorStyle}
+                  value={terminalDraft.cursorStyle}
                 >
                   <option value="block">Block</option>
                   <option value="bar">Bar</option>
@@ -7708,12 +7777,12 @@ function SettingsPage({
                 <select
                   onChange={(event) => {
                     const defaultShell = event.currentTarget.value;
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       defaultShell,
                     }));
                   }}
-                  value={draft.defaultShell}
+                  value={terminalDraft.defaultShell}
                 >
                   <option value="powershell.exe">PowerShell</option>
                   <option value="cmd.exe">Command Prompt</option>
@@ -7725,10 +7794,10 @@ function SettingsPage({
             <div className="settings-toggles">
               <label>
                 <input
-                  checked={draft.copyOnSelect}
+                  checked={terminalDraft.copyOnSelect}
                   onChange={(event) => {
                     const copyOnSelect = event.currentTarget.checked;
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       copyOnSelect,
                     }));
@@ -7739,10 +7808,10 @@ function SettingsPage({
               </label>
               <label>
                 <input
-                  checked={draft.confirmMultilinePaste}
+                  checked={terminalDraft.confirmMultilinePaste}
                   onChange={(event) => {
                     const confirmMultilinePaste = event.currentTarget.checked;
-                    setDraft((settings) => ({
+                    setTerminalDraft((settings) => ({
                       ...settings,
                       confirmMultilinePaste,
                     }));
@@ -7793,13 +7862,132 @@ function SettingsPage({
                 <p className="panel-label">AI Assist</p>
                 <h2>AI provider</h2>
               </div>
+              <button
+                className="toolbar-button"
+                disabled={!hasAiChanges}
+                onClick={() => void handleSaveAiProviderSettings()}
+                type="button"
+              >
+                <Save size={15} />
+                Save
+              </button>
             </div>
-            <div className="settings-summary-grid">
-              <SettingsSummary label="Status" value={aiProviderSettings.enabled ? "Enabled" : "Disabled"} />
-              <SettingsSummary label="Endpoint" value={formatProviderHost(aiProviderSettings.baseUrl)} />
-              <SettingsSummary label="Model" value={aiProviderSettings.model} />
-              <SettingsSummary label="CLI policy" value="Suggest only" />
+
+            <div className="ai-provider-picker" role="group" aria-label="AI providers">
+              {AI_PROVIDER_DEFINITIONS.map((definition) => (
+                <button
+                  className={
+                    definition.kind === aiDraft.providerKind
+                      ? "ai-provider-option selected"
+                      : "ai-provider-option"
+                  }
+                  key={definition.kind}
+                  onClick={() => handleAiProviderKindChange(definition.kind)}
+                  type="button"
+                >
+                  <strong>{definition.label}</strong>
+                  <span>{definition.defaultModel}</span>
+                </button>
+              ))}
             </div>
+
+            <div className="form-grid three-columns">
+              <label>
+                <span>Provider</span>
+                <select
+                  onChange={(event) =>
+                    handleAiProviderKindChange(event.currentTarget.value as AiProviderKind)
+                  }
+                  value={aiDraft.providerKind}
+                >
+                  {AI_PROVIDER_DEFINITIONS.map((definition) => (
+                    <option key={definition.kind} value={definition.kind}>
+                      {definition.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Model</span>
+                <input
+                  list="ai-provider-model-options"
+                  onChange={(event) =>
+                    setAiDraft((settings) => ({
+                      ...settings,
+                      model: event.currentTarget.value,
+                    }))
+                  }
+                  value={aiDraft.model}
+                />
+                <datalist id="ai-provider-model-options">
+                  {aiProviderDefinition.modelOptions.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
+                </datalist>
+              </label>
+              <label>
+                <span>Status</span>
+                <select
+                  onChange={(event) =>
+                    setAiDraft((settings) => ({
+                      ...settings,
+                      enabled: event.currentTarget.value === "enabled",
+                    }))
+                  }
+                  value={aiDraft.enabled ? "enabled" : "disabled"}
+                >
+                  <option value="enabled">Enabled</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="form-grid ai-provider-secret-grid">
+              <label>
+                <span>Endpoint</span>
+                <input
+                  onChange={(event) =>
+                    setAiDraft((settings) => ({
+                      ...settings,
+                      baseUrl: event.currentTarget.value,
+                    }))
+                  }
+                  readOnly={!aiProviderDefinition.allowsCustomBaseUrl}
+                  value={aiDraft.baseUrl}
+                />
+              </label>
+              <label>
+                <span>{aiProviderDefinition.requiresApiKey ? "API key" : "API key"}</span>
+                <input
+                  autoComplete="off"
+                  disabled={!aiProviderDefinition.requiresApiKey}
+                  onChange={(event) => setApiKeyDraft(event.currentTarget.value)}
+                  placeholder={
+                    aiProviderDefinition.requiresApiKey
+                      ? aiProviderHasApiKey
+                        ? "Saved"
+                        : aiProviderDefinition.apiKeyLabel
+                      : "Not required"
+                  }
+                  type="password"
+                  value={apiKeyDraft}
+                />
+              </label>
+            </div>
+
+            <div className="settings-summary-grid compact">
+              <SettingsSummary label="Active endpoint" value={formatProviderHost(aiDraft.baseUrl)} />
+              <SettingsSummary
+                label="Capabilities"
+                value={aiProviderDefinition.capabilities
+                  .map(formatAiProviderCapability)
+                  .join(", ")}
+              />
+            </div>
+            {aiStatus ? <p className="settings-status success">{aiStatus}</p> : null}
+            {aiError ? <p className="settings-status error">{aiError}</p> : null}
           </section>
 
           <section className="settings-card settings-section" id="appearance-settings">
@@ -7847,6 +8035,21 @@ function SettingsSummary({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatAiProviderCapability(capability: string) {
+  switch (capability) {
+    case "toolCalling":
+      return "tools";
+    case "mcpReady":
+      return "MCP ready";
+    case "localRuntime":
+      return "local";
+    case "openAiCompatible":
+      return "OpenAI compatible";
+    default:
+      return capability;
+  }
+}
+
 function normalizeTerminalSettingsDraft(settings: TerminalSettings): TerminalSettings {
   if (!settings.fontFamily.trim()) {
     throw new Error("Font family is required.");
@@ -7880,9 +8083,11 @@ function normalizeTerminalSettingsDraft(settings: TerminalSettings): TerminalSet
 
 function AssistantPanel({
   collapsed,
+  onOpenSettings,
   onToggleCollapsed,
 }: {
   collapsed: boolean;
+  onOpenSettings: () => void;
   onToggleCollapsed: () => void;
 }) {
   const activeTab = useWorkspaceStore((state) =>
@@ -7894,82 +8099,94 @@ function AssistantPanel({
   );
   const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
-  const [selectedSuggestion, setSelectedSuggestion] = useState(aiSuggestions[0]?.id ?? "");
   const [prompt, setPrompt] = useState("");
-  const [draft, setDraft] = useState<AssistantDraft | null>(null);
-  const [proposalError, setProposalError] = useState("");
-  const [planningProposal, setPlanningProposal] = useState(false);
-  const suggestion = aiSuggestions.find((item) => item.id === selectedSuggestion) ?? aiSuggestions[0];
+  const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
+  const [chatError, setChatError] = useState("");
+  const [terminalSendStatus, setTerminalSendStatus] = useState("");
   const contextLabel = activeTab
     ? `${activeTab.title} - ${workspaceKindLabel(activeTab)}`
     : "No active session";
   const connectionLabel = activeTab?.connection
     ? `${activeTab.connection.user}@${activeTab.connection.host}`
     : "Workspace";
-  const providerHost = formatProviderHost(aiProviderSettings.baseUrl);
+  const providerDefinition = getAiProviderDefinition(aiProviderSettings.providerKind);
+  const providerConfigured =
+    aiProviderSettings.enabled &&
+    Boolean(aiProviderSettings.baseUrl.trim()) &&
+    Boolean(aiProviderSettings.model.trim()) &&
+    (!providerDefinition.requiresApiKey || aiProviderHasApiKey);
+  const activeTerminalPaneId =
+    activeTab?.kind === "terminal" ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id : undefined;
 
-  function handleSuggestionSelect(suggestionId: string) {
-    const nextSuggestion = aiSuggestions.find((item) => item.id === suggestionId);
-    setSelectedSuggestion(suggestionId);
-    if (nextSuggestion) {
-      setPrompt(nextSuggestion.title);
-    }
-  }
-
-  async function handleDraftProposal() {
-    if (!suggestion) {
-      setProposalError("No command suggestion is selected.");
+  function handleSendCodeToTerminal(code: string) {
+    if (!activeTerminalPaneId) {
+      setTerminalSendStatus("Open and focus a terminal first.");
       return;
     }
 
-    const normalizedPrompt = prompt.trim();
-    const request = {
-      prompt: normalizedPrompt || suggestion.title,
-      command: suggestion.command,
-      reason: suggestion.reason,
-      contextLabel,
-      selectedOutput: assistantContextSnippet?.text,
-    };
-
-    try {
-      setProposalError("");
-      setPlanningProposal(true);
-      const plan = isTauriRuntime()
-        ? await invokeCommand("plan_command_proposal", { request })
-        : planCommandProposalLocally(request);
-      setDraft({
-        id: `${suggestion.id}-${Date.now()}`,
-        title: plan.prompt,
-        risk: plan.riskLabel,
-        command: plan.command,
-        reason: plan.reason,
-        contextLabel: plan.contextLabel,
-        selectedOutput: assistantContextSnippet?.text,
-        extraConfirmationRequired: plan.extraConfirmationRequired,
-        safetyNotes: plan.safetyNotes,
-        status: "pending",
-      });
-    } catch (error) {
-      setProposalError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setPlanningProposal(false);
+    const data = code.endsWith("\n") ? code : `${code}\n`;
+    if (writeInputToPane(activeTerminalPaneId, data)) {
+      setTerminalSendStatus("Sent to focused terminal.");
+      return;
     }
+
+    setTerminalSendStatus("Focused terminal is still starting.");
   }
 
-  function handleCopyCommand(command: string) {
-    void navigator.clipboard?.writeText(command);
+  function handleChatSubmit(event: FormEvent) {
+    event.preventDefault();
+    const normalizedPrompt = prompt.trim();
+    if (!normalizedPrompt) {
+      return;
+    }
+    if (!providerConfigured) {
+      setChatError("Set up an AI provider in Settings first.");
+      return;
+    }
+
+    const userMessage: AssistantChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: normalizedPrompt,
+    };
+    const assistantMessage: AssistantChatMessage = {
+      id: `assistant-${Date.now()}`,
+      role: "assistant",
+      content: [
+        `Provider **${providerDefinition.label}** is configured with \`${aiProviderSettings.model}\`.`,
+        "",
+        "The chat transport is ready to wire into the upcoming agent runner. Code blocks rendered here can already be sent to the focused terminal.",
+      ].join("\n"),
+    };
+    setMessages((current) => [...current, userMessage, assistantMessage]);
+    setPrompt("");
+    setChatError("");
   }
 
   return (
     <aside className="assistant-panel" aria-hidden={collapsed}>
-      <div className="assistant-header">
-        <div>
-          <p className="panel-label">AI Assist</p>
-          <h2>Ask before execute</h2>
-        </div>
+      <div className="assistant-topbar">
+        <h2>AI Assistant</h2>
+        <button
+          aria-label="Refresh AI Assist"
+          className="assistant-toolbar-button"
+          title="Refresh AI Assist"
+          type="button"
+        >
+          <RefreshCw size={16} />
+        </button>
+        <button
+          aria-label="AI Assist settings"
+          className="assistant-toolbar-button"
+          onClick={onOpenSettings}
+          title="AI Assist settings"
+          type="button"
+        >
+          <Settings size={16} />
+        </button>
         <button
           aria-label="Collapse AI Assist panel"
-          className="icon-button"
+          className="assistant-toolbar-button"
           onClick={onToggleCollapsed}
           title="Collapse AI Assist panel"
           type="button"
@@ -7978,13 +8195,45 @@ function AssistantPanel({
         </button>
       </div>
 
-      <div className="assistant-context">
+      <div className="assistant-context active-session-hint">
         <Bot size={16} />
         <span>
           <strong>{contextLabel}</strong>
           <small>{connectionLabel}</small>
         </span>
       </div>
+
+      <section className="assistant-tasks">
+        <header>
+          <span>Chats</span>
+          <small>{aiSuggestions.length > 0 ? `View All(${aiSuggestions.length})` : "View All(0)"}</small>
+        </header>
+        {aiSuggestions.length > 0 ? (
+          aiSuggestions.slice(0, 3).map((item) => (
+            <button
+              className="assistant-task-row"
+              key={item.id}
+              onClick={() => setPrompt(item.title)}
+              type="button"
+            >
+              <span>{item.title}</span>
+              <small>{item.risk}</small>
+            </button>
+          ))
+        ) : (
+          <p>No chats yet.</p>
+        )}
+      </section>
+
+      {!providerConfigured ? (
+        <div className="assistant-setup-hint">
+          <KeyRound size={16} />
+          <span>
+            <strong>Set up AI provider first</strong>
+            <small>Settings &gt; AI Assist</small>
+          </span>
+        </div>
+      ) : null}
 
       {assistantContextSnippet ? (
         <section className="assistant-selection-context">
@@ -8006,129 +8255,193 @@ function AssistantPanel({
         </section>
       ) : null}
 
-      <label className="assistant-composer">
-        <span>Request</span>
-        <textarea
-          value={prompt}
-          onChange={(event) => setPrompt(event.currentTarget.value)}
-          placeholder="Draft a command for the active session"
-          rows={4}
-        />
-      </label>
-      <button
-        className="approve-button"
-        disabled={!activeTab || !suggestion || planningProposal}
-        onClick={handleDraftProposal}
-        type="button"
-      >
-        <SendHorizontal size={15} />
-        {planningProposal ? "Planning" : "Draft proposal"}
-      </button>
-      {proposalError ? <p className="form-error">{proposalError}</p> : null}
-
-      <div className="suggestion-list">
-        {aiSuggestions.map((item) => (
-          <button
-            className={item.id === selectedSuggestion ? "suggestion active" : "suggestion"}
-            key={item.id}
-            onClick={() => handleSuggestionSelect(item.id)}
-            type="button"
-          >
-            <span>{item.title}</span>
-            <small>{item.risk}</small>
-          </button>
+      <div className="assistant-chat-log">
+        {messages.map((message) => (
+          <article className={`assistant-message ${message.role}`} key={message.id}>
+            <MarkdownContent content={message.content} onSendCode={handleSendCodeToTerminal} />
+          </article>
         ))}
       </div>
 
-      <section className={`approval-card ${draft ? `approval-card-${draft.status}` : ""}`}>
-        <header>
-          <span>{draft ? draft.contextLabel : "Proposed command"}</span>
-          <strong>{draft?.status ?? "pending"}</strong>
-        </header>
-        {draft ? (
-          <>
-            <pre>
-              <code>{draft.command}</code>
-            </pre>
-            <strong className="risk-label">{draft.risk}</strong>
-            <p>{draft.reason}</p>
-            {draft.selectedOutput ? (
-              <details className="proposal-context-details">
-                <summary>Selected output context</summary>
-                <pre>
-                  <code>{draft.selectedOutput}</code>
-                </pre>
-              </details>
-            ) : null}
-            <ul className="safety-notes">
-              {draft.safetyNotes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="approval-empty">No proposal staged.</p>
-        )}
-        <div className="approval-actions">
-          <button
-            className="toolbar-button"
-            disabled={!draft}
-            onClick={() => draft && setDraft({ ...draft, status: "rejected" })}
-            type="button"
-          >
-            <X size={15} />
-            Reject
-          </button>
-          <button
-            className="toolbar-button"
-            disabled={!draft}
-            onClick={() => draft && handleCopyCommand(draft.command)}
-            type="button"
-          >
-            <Copy size={15} />
-            Copy
-          </button>
-          <button
-            className="approve-button"
-            disabled={!draft}
-            onClick={() => draft && setDraft({ ...draft, status: "approved" })}
-            type="button"
-          >
-            <Check size={15} />
-            {draft?.extraConfirmationRequired ? "Confirm" : "Approve"}
-          </button>
-        </div>
-      </section>
+      {terminalSendStatus ? <p className="assistant-send-status">{terminalSendStatus}</p> : null}
+      {chatError ? <p className="form-error">{chatError}</p> : null}
 
-      <section className="settings-stack">
-        <div>
-          <Database size={15} />
-          <span>SQLite connections</span>
-          <strong>Planned</strong>
+      <form className="assistant-chat-composer" onSubmit={handleChatSubmit}>
+        <textarea
+          disabled={!providerConfigured}
+          onChange={(event) => setPrompt(event.currentTarget.value)}
+          placeholder="Ask AI Assistant anything."
+          rows={3}
+          value={prompt}
+        />
+        <div className="assistant-composer-footer">
+          <button className="assistant-plus-button" type="button" aria-label="Add context">
+            <Plus size={18} />
+          </button>
+          <span>{aiProviderSettings.model || providerDefinition.defaultModel}</span>
+          <button
+            aria-label="Send message"
+            className="assistant-send-button"
+            disabled={!providerConfigured || !prompt.trim()}
+            type="submit"
+          >
+            <SendHorizontal size={18} />
+          </button>
         </div>
-        <div>
-          <KeyRound size={15} />
-          <span>OS keychain</span>
-          <strong>{aiProviderHasApiKey ? "Ready" : "No API key"}</strong>
-        </div>
-        <div>
-          <Tags size={15} />
-          <span>{providerHost}</span>
-          <strong>{aiProviderSettings.enabled ? "Enabled" : "Disabled"}</strong>
-        </div>
-        <div>
-          <Bot size={15} />
-          <span>{aiProviderSettings.model}</span>
-          <strong>Model</strong>
-        </div>
-        <div>
-          <Command size={15} />
-          <span>CLI agents</span>
-          <strong>{formatCliIntegrationStatus(aiProviderSettings)}</strong>
-        </div>
-      </section>
+      </form>
     </aside>
   );
+}
+
+type MarkdownBlock =
+  | { kind: "code"; code: string; language: string }
+  | { kind: "text"; text: string };
+
+function MarkdownContent({
+  content,
+  onSendCode,
+}: {
+  content: string;
+  onSendCode: (code: string) => void;
+}) {
+  return (
+    <div className="markdown-content">
+      {parseMarkdownBlocks(content).map((block, index) =>
+        block.kind === "code" ? (
+          <div className="markdown-code-block" key={`code-${index}`}>
+            <div className="markdown-code-toolbar">
+              <span>{block.language || "code"}</span>
+              <button
+                className="assistant-code-send"
+                onClick={() => onSendCode(block.code)}
+                type="button"
+              >
+                <Terminal size={13} />
+                Send
+              </button>
+            </div>
+            <pre>
+              <code>{block.code}</code>
+            </pre>
+          </div>
+        ) : (
+          <MarkdownTextBlock block={block.text} key={`text-${index}`} />
+        ),
+      )}
+    </div>
+  );
+}
+
+function MarkdownTextBlock({ block }: { block: string }) {
+  const trimmed = block.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^#{1,3}\s+/.test(trimmed)) {
+    return <h3>{renderInlineMarkdown(trimmed.replace(/^#{1,3}\s+/, ""), "heading")}</h3>;
+  }
+
+  const lines = trimmed.split(/\r?\n/);
+  if (lines.every((line) => /^[-*]\s+/.test(line.trim()))) {
+    return (
+      <ul>
+        {lines.map((line, index) => (
+          <li key={`${line}-${index}`}>
+            {renderInlineMarkdown(line.trim().replace(/^[-*]\s+/, ""), `li-${index}`)}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (lines.every((line) => /^>\s?/.test(line.trim()))) {
+    return (
+      <blockquote>
+        {renderInlineMarkdown(
+          lines.map((line) => line.trim().replace(/^>\s?/, "")).join(" "),
+          "blockquote",
+        )}
+      </blockquote>
+    );
+  }
+
+  return <p>{renderInlineMarkdown(trimmed.replace(/\n+/g, " "), "paragraph")}</p>;
+}
+
+function parseMarkdownBlocks(content: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  const textBuffer: string[] = [];
+  const codeBuffer: string[] = [];
+  let codeLanguage = "";
+  let inCodeBlock = false;
+
+  function flushText() {
+    if (textBuffer.length === 0) {
+      return;
+    }
+    blocks.push({ kind: "text", text: textBuffer.join("\n") });
+    textBuffer.length = 0;
+  }
+
+  function flushCode() {
+    blocks.push({ kind: "code", code: codeBuffer.join("\n"), language: codeLanguage });
+    codeBuffer.length = 0;
+    codeLanguage = "";
+  }
+
+  for (const line of content.split(/\r?\n/)) {
+    const fence = line.match(/^```\s*([A-Za-z0-9_+.-]*)\s*$/);
+    if (fence) {
+      if (inCodeBlock) {
+        flushCode();
+        inCodeBlock = false;
+      } else {
+        flushText();
+        codeLanguage = fence[1] ?? "";
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+    } else if (line.trim() === "") {
+      flushText();
+    } else {
+      textBuffer.push(line);
+    }
+  }
+
+  if (inCodeBlock) {
+    flushCode();
+  }
+  flushText();
+  return blocks;
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    const key = `${keyPrefix}-${match.index}`;
+    if (token.startsWith("`")) {
+      nodes.push(<code key={key}>{token.slice(1, -1)}</code>);
+    } else {
+      nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>);
+    }
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+  return nodes;
 }
 
 function formatProviderHost(baseUrl: string) {
@@ -8137,57 +8450,6 @@ function formatProviderHost(baseUrl: string) {
   } catch {
     return "OpenAI-compatible endpoint";
   }
-}
-
-function formatCliIntegrationStatus(settings: AiProviderSettings) {
-  const configuredCount = [settings.claudeCliPath, settings.codexCliPath].filter(Boolean).length;
-  return configuredCount > 0 ? `${configuredCount} suggest-only` : "Not configured";
-}
-
-function planCommandProposalLocally(request: {
-  prompt: string;
-  command: string;
-  reason: string;
-  contextLabel: string;
-  selectedOutput?: string;
-}): CommandProposalPlan {
-  const command = request.command.trim();
-  if (!command) {
-    throw new Error("proposed command is required");
-  }
-
-  const normalized = command.toLowerCase();
-  const extraConfirmationRequired = [
-    "rm -rf",
-    "remove-item",
-    "systemctl restart",
-    "restart-service",
-    "kubectl delete",
-    "password",
-    "secret",
-    "token",
-    "id_rsa",
-    "id_ed25519",
-    ".ssh",
-  ].some((needle) => normalized.includes(needle));
-
-  return {
-    prompt: request.prompt.trim() || "Draft command",
-    command,
-    reason: request.reason.trim(),
-    contextLabel: request.contextLabel.trim(),
-    riskLabel: extraConfirmationRequired ? "Extra confirmation" : "Approval required",
-    approvalRequired: true,
-    extraConfirmationRequired,
-    safetyNotes: [
-      ...(request.selectedOutput?.trim()
-        ? ["Selected terminal output is included in the assistant context for this proposal."]
-        : []),
-      extraConfirmationRequired
-        ? "May change system state or touch sensitive material."
-        : "Read-only or low-impact intent was detected, but approval is still required.",
-    ],
-  };
 }
 
 const PERFORMANCE_BUDGETS = {

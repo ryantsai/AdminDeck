@@ -101,6 +101,8 @@ pub struct SftpSettings {
 #[serde(rename_all = "camelCase")]
 pub struct AiProviderSettings {
     enabled: bool,
+    #[serde(default = "default_ai_provider_kind")]
+    provider_kind: String,
     base_url: String,
     #[serde(default = "default_ai_model")]
     model: String,
@@ -1838,6 +1840,7 @@ fn default_sftp_settings() -> SftpSettings {
 fn default_ai_provider_settings() -> AiProviderSettings {
     AiProviderSettings {
         enabled: false,
+        provider_kind: default_ai_provider_kind(),
         base_url: "https://api.openai.com/v1".to_string(),
         model: default_ai_model(),
         cli_execution_policy: default_ai_cli_execution_policy(),
@@ -1846,8 +1849,12 @@ fn default_ai_provider_settings() -> AiProviderSettings {
     }
 }
 
+fn default_ai_provider_kind() -> String {
+    "openai".to_string()
+}
+
 fn default_ai_model() -> String {
-    "gpt-5-mini".to_string()
+    "gpt-5.5".to_string()
 }
 
 fn default_ai_cli_execution_policy() -> String {
@@ -1902,7 +1909,19 @@ fn validate_sftp_settings(mut settings: SftpSettings) -> Result<SftpSettings, St
 fn validate_ai_provider_settings(
     mut settings: AiProviderSettings,
 ) -> Result<AiProviderSettings, String> {
-    settings.base_url = required_field("OpenAI-compatible endpoint", settings.base_url)?;
+    settings.provider_kind = match settings.provider_kind.trim().to_lowercase().as_str() {
+        "" | "openai" => "openai".to_string(),
+        "anthropic" => "anthropic".to_string(),
+        "openrouter" => "openrouter".to_string(),
+        "deepseek" => "deepseek".to_string(),
+        "ollama" => "ollama".to_string(),
+        "nvidia" => "nvidia".to_string(),
+        "openai-compatible" | "openai_compatible" | "openai compatible" => {
+            "openai-compatible".to_string()
+        }
+        _ => return Err("AI provider is not supported".to_string()),
+    };
+    settings.base_url = required_field("AI provider endpoint", settings.base_url)?;
     settings.base_url = settings.base_url.trim_end_matches('/').to_string();
     settings.model = required_field("AI model", settings.model)?;
     settings.cli_execution_policy = match settings.cli_execution_policy.trim() {
@@ -1918,16 +1937,16 @@ fn validate_ai_provider_settings(
     settings.codex_cli_path = trim_optional(settings.codex_cli_path);
 
     if !(settings.base_url.starts_with("https://") || settings.base_url.starts_with("http://")) {
-        return Err("OpenAI-compatible endpoint must start with https:// or http://".to_string());
+        return Err("AI provider endpoint must start with https:// or http://".to_string());
     }
 
     if settings.base_url.chars().any(char::is_whitespace) {
-        return Err("OpenAI-compatible endpoint cannot contain whitespace".to_string());
+        return Err("AI provider endpoint cannot contain whitespace".to_string());
     }
 
     if settings.base_url.contains('?') || settings.base_url.contains('#') {
         return Err(
-            "OpenAI-compatible endpoint must be a base URL without query or fragment".to_string(),
+            "AI provider endpoint must be a base URL without query or fragment".to_string(),
         );
     }
 
@@ -2827,15 +2846,17 @@ mod tests {
             .ai_provider_settings()
             .expect("default AI provider settings load");
         assert!(!defaults.enabled);
+        assert_eq!(defaults.provider_kind, "openai");
         assert_eq!(defaults.base_url, "https://api.openai.com/v1");
-        assert_eq!(defaults.model, "gpt-5-mini");
+        assert_eq!(defaults.model, "gpt-5.5");
         assert_eq!(defaults.cli_execution_policy, "suggestOnly");
 
         let updated = storage
             .update_ai_provider_settings(AiProviderSettings {
                 enabled: true,
+                provider_kind: "  OpenRouter  ".to_string(),
                 base_url: "  https://llm-gateway.internal/v1/  ".to_string(),
-                model: " gpt-5 ".to_string(),
+                model: " openai/gpt-5.5 ".to_string(),
                 cli_execution_policy: "suggest-only".to_string(),
                 claude_cli_path: Some("  C:\\Tools\\claude.exe  ".to_string()),
                 codex_cli_path: Some("  codex  ".to_string()),
@@ -2843,8 +2864,9 @@ mod tests {
             .expect("AI provider settings update");
 
         assert!(updated.enabled);
+        assert_eq!(updated.provider_kind, "openrouter");
         assert_eq!(updated.base_url, "https://llm-gateway.internal/v1");
-        assert_eq!(updated.model, "gpt-5");
+        assert_eq!(updated.model, "openai/gpt-5.5");
         assert_eq!(updated.cli_execution_policy, "suggestOnly");
         assert_eq!(
             updated.claude_cli_path.as_deref(),
@@ -2856,7 +2878,7 @@ mod tests {
             .ai_provider_settings()
             .expect("AI provider settings reload");
         assert_eq!(reloaded.base_url, "https://llm-gateway.internal/v1");
-        assert_eq!(reloaded.model, "gpt-5");
+        assert_eq!(reloaded.model, "openai/gpt-5.5");
     }
 
     #[test]
@@ -2866,8 +2888,9 @@ mod tests {
         let error = storage
             .update_ai_provider_settings(AiProviderSettings {
                 enabled: true,
+                provider_kind: "openai".to_string(),
                 base_url: "api.openai.com/v1".to_string(),
-                model: "gpt-5-mini".to_string(),
+                model: "gpt-5.5".to_string(),
                 cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
@@ -2876,7 +2899,7 @@ mod tests {
 
         assert_eq!(
             error,
-            "OpenAI-compatible endpoint must start with https:// or http://"
+            "AI provider endpoint must start with https:// or http://"
         );
     }
 
@@ -2888,6 +2911,7 @@ mod tests {
         let error = storage
             .update_ai_provider_settings(AiProviderSettings {
                 enabled: true,
+                provider_kind: "openai".to_string(),
                 base_url: "https://api.openai.com/v1".to_string(),
                 model: "   ".to_string(),
                 cli_execution_policy: "suggestOnly".to_string(),
@@ -2906,8 +2930,9 @@ mod tests {
         let error = storage
             .update_ai_provider_settings(AiProviderSettings {
                 enabled: true,
+                provider_kind: "openai".to_string(),
                 base_url: "https://api.openai.com/v1".to_string(),
-                model: "gpt-5-mini".to_string(),
+                model: "gpt-5.5".to_string(),
                 cli_execution_policy: "executeAutomatically".to_string(),
                 claude_cli_path: Some("claude".to_string()),
                 codex_cli_path: Some("codex".to_string()),

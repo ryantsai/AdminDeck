@@ -138,8 +138,18 @@ export interface SftpSettings {
   overwriteBehavior: SftpOverwriteBehavior;
 }
 
+export type AiProviderKind =
+  | "openai"
+  | "anthropic"
+  | "openrouter"
+  | "deepseek"
+  | "ollama"
+  | "nvidia"
+  | "openai-compatible";
+
 export interface AiProviderSettings {
   enabled: boolean;
+  providerKind: AiProviderKind;
   baseUrl: string;
   model: string;
   cliExecutionPolicy: "suggestOnly";
