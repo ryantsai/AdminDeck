@@ -3196,6 +3196,7 @@ function TerminalPaneView({
   const clearTerminalStartMetric = useWorkspaceStore(
     (state) => state.clearTerminalStartMetric,
   );
+  const closePane = useWorkspaceStore((state) => state.closePane);
 
   useEffect(() => {
     const element = terminalElementRef.current;
@@ -3596,6 +3597,15 @@ function TerminalPaneView({
             type="button"
           >
             <Bot size={13} />
+          </button>
+          <button
+            className="terminal-pane-action terminal-pane-close"
+            aria-label={pane.tmuxSessionId ? "Detach tmux session" : "Close pane"}
+            onClick={() => closePane(tabId, pane.id)}
+            title={pane.tmuxSessionId ? "Detach tmux session" : "Close pane"}
+            type="button"
+          >
+            <X size={13} />
           </button>
         </div>
       </header>

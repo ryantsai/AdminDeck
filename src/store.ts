@@ -308,6 +308,7 @@ interface WorkspaceState {
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
   splitTerminalPaneDirected: (tabId: string, direction: SplitDirection) => void;
+  closePane: (tabId: string, paneId: string) => void;
   openTmuxSessionInPane: (tabId: string, connection: Connection, tmuxSessionId: string, direction: SplitDirection) => void;
   setFocusedPane: (tabId: string, paneId: string) => void;
   saveTabLayout: (tabId: string) => void;
@@ -576,6 +577,30 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           focusedPaneId: newPane.id,
         };
       }),
+    }));
+  },
+  closePane: (tabId, paneId) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.id === tabId);
+    if (!tab || tab.kind !== "terminal") {
+      return;
+    }
+    if (tab.panes.length <= 1) {
+      get().closeTab(tabId);
+      return;
+    }
+    const nextPanes = tab.panes.filter((p) => p.id !== paneId);
+    const nextLayout = ensureLayout(tab.layout, nextPanes);
+    const nextFocusedPaneId =
+      tab.focusedPaneId === paneId
+        ? (leafOrder(nextLayout)[0] ?? nextPanes[0]?.id)
+        : tab.focusedPaneId;
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id !== tabId
+          ? t
+          : { ...t, panes: nextPanes, layout: nextLayout, focusedPaneId: nextFocusedPaneId },
+      ),
     }));
   },
   openTmuxSessionInPane: (tabId, connection, tmuxSessionId, direction) => {

@@ -1078,6 +1078,11 @@ h2 {
   opacity: 0.55;
 }
 
+.terminal-pane-close:hover {
+  color: #ff7070;
+  background: rgba(255, 100, 100, 0.12);
+}
+
 .terminal-search-bar {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) minmax(54px, auto) repeat(3, 24px);
