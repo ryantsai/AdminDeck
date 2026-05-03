@@ -308,7 +308,7 @@ function terminalOptionsFor(settings: TerminalSettings): ITerminalOptions {
     macOptionClickForcesSelection: true,
     macOptionIsMeta: true,
     minimumContrastRatio: 1,
-    rightClickSelectsWord: true,
+    rightClickSelectsWord: false,
     scrollOnEraseInDisplay: true,
     scrollOnUserInput: true,
     scrollback: clampScrollback(settings.scrollbackLines),

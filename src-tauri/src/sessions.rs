@@ -166,8 +166,8 @@ impl SessionManager {
         if uses_native_ssh(&request, password.as_deref(), &auth_method) {
             let known_hosts_path = ssh::app_known_hosts_path(&app)?;
             let auth = native_ssh_auth_for(&request, password, &auth_method)?;
-            let session = ssh::start_native_terminal(
-                app,
+            match ssh::start_native_terminal(
+                app.clone(),
                 ssh::NativeSshTerminalRequest {
                     session_id: session_id.clone(),
                     host: request.host.clone(),
@@ -183,21 +183,35 @@ impl SessionManager {
                     use_tmux: request.use_tmux.unwrap_or(false),
                     tmux_session_id: request.tmux_session_id.clone(),
                 },
-            )?;
-            let terminal_ready_ms = session.terminal_ready_ms();
-            self.sessions
-                .lock()
-                .map_err(|_| "terminal session lock is poisoned".to_string())?
-                .insert(
-                    session_id.clone(),
-                    TerminalSession {
-                        transport: TerminalTransport::NativeSsh(session),
-                    },
-                );
-            return Ok(TerminalSessionStarted {
-                session_id,
-                terminal_ready_ms: Some(terminal_ready_ms),
-            });
+            ) {
+                Ok(session) => {
+                    let terminal_ready_ms = session.terminal_ready_ms();
+                    self.sessions
+                        .lock()
+                        .map_err(|_| "terminal session lock is poisoned".to_string())?
+                        .insert(
+                            session_id.clone(),
+                            TerminalSession {
+                                transport: TerminalTransport::NativeSsh(session),
+                            },
+                        );
+                    return Ok(TerminalSessionStarted {
+                        session_id,
+                        terminal_ready_ms: Some(terminal_ready_ms),
+                    });
+                }
+                Err(error) if should_fallback_to_interactive_ssh(&error) => {
+                    let _ = app.emit(
+                        "terminal-output",
+                        TerminalOutput {
+                            session_id: session_id.clone(),
+                            data: "\r\n[fallback: starting interactive ssh for username/password authentication]\r\n"
+                                .to_string(),
+                        },
+                    );
+                }
+                Err(error) => return Err(error),
+            }
         }
 
         let pty_system = native_pty_system();
@@ -518,6 +532,13 @@ fn native_ssh_auth_for(
         }),
         SshAuthMethod::Agent => Ok(ssh::NativeSshAuth::Agent),
     }
+}
+
+fn should_fallback_to_interactive_ssh(error: &str) -> bool {
+    let normalized = error.to_lowercase();
+    normalized.contains("authentication")
+        && !normalized.contains("host key")
+        && !normalized.contains("known host")
 }
 
 fn connection_password_for(
@@ -878,6 +899,25 @@ mod tests {
 
         request.auth_method = Some("keyboardInteractive".to_string());
         assert!(ssh_auth_method_for(&request, None).is_err());
+    }
+
+    #[test]
+    fn native_auth_errors_fallback_to_interactive_ssh() {
+        assert!(should_fallback_to_interactive_ssh(
+            "SSH agent authentication was unavailable: Pageant agent failed to list SSH agent identities: early eof"
+        ));
+        assert!(should_fallback_to_interactive_ssh(
+            "SSH key-file authentication failed: invalid key"
+        ));
+        assert!(should_fallback_to_interactive_ssh(
+            "SSH password authentication failed: rejected"
+        ));
+        assert!(!should_fallback_to_interactive_ssh(
+            "SSH host key for example.internal:22 changed"
+        ));
+        assert!(!should_fallback_to_interactive_ssh(
+            "failed to open SSH channel"
+        ));
     }
 
     fn ssh_request() -> StartTerminalSessionRequest {

@@ -154,7 +154,14 @@ button {
 .connection-sidebar {
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 70;
+  overflow: visible;
   padding: 18px 14px;
+}
+
+.assistant-panel {
+  overflow: hidden;
 }
 
 .connections-collapsed .connection-sidebar,
@@ -334,6 +341,11 @@ h2 {
   margin-bottom: 14px;
 }
 
+.tab-quick-connect-anchor {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
 .quick-connect {
   width: 100%;
   color: #ffffff;
@@ -345,13 +357,19 @@ h2 {
   top: calc(100% + 5px);
   left: 0;
   right: 0;
-  z-index: 45;
+  z-index: 80;
   display: grid;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   box-shadow: var(--shadow);
+}
+
+.tab-quick-connect-anchor .quick-connect-menu {
+  top: calc(100% + 1px);
+  right: auto;
+  width: 260px;
 }
 
 .quick-connect-menu button {
@@ -377,6 +395,56 @@ h2 {
 .quick-connect-menu button:disabled {
   color: var(--text-faint);
   cursor: default;
+}
+
+.quick-connect-mini-dialog {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+}
+
+.quick-connect-mini-dialog label {
+  display: grid;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.quick-connect-mini-dialog input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-connect-mini-dialog input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.quick-connect-mini-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.quick-connect-mini-actions button:first-child {
+  color: #ffffff;
+  background: var(--green);
+}
+
+.quick-connect-mini-actions button:first-child:disabled {
+  color: #ffffff;
+  background: var(--green);
+  opacity: 0.55;
 }
 
 .quick-connect-menu .connection-main {
@@ -454,6 +522,7 @@ h2 {
 }
 
 .tree-list {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding-right: 2px;
@@ -1502,6 +1571,7 @@ h2 {
   font-size: 12px;
 }
 
+.terminal-context-menu,
 .sftp-context-menu,
 .tree-context-menu {
   position: fixed;
@@ -1515,6 +1585,7 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.terminal-context-menu button,
 .sftp-context-menu button,
 .tree-context-menu button {
   display: flex;
@@ -1533,20 +1604,32 @@ h2 {
   font-weight: 800;
 }
 
+.terminal-context-menu button:last-child,
 .sftp-context-menu button:last-child,
 .tree-context-menu button:last-child {
   border-bottom: 0;
 }
 
+.terminal-context-menu button:hover:not(:disabled),
 .sftp-context-menu button:hover:not(:disabled),
 .tree-context-menu button:hover:not(:disabled) {
   background: var(--surface-muted);
 }
 
+.terminal-context-menu button:disabled,
 .sftp-context-menu button:disabled,
 .tree-context-menu button:disabled {
   color: var(--text-faint);
   cursor: default;
+}
+
+.terminal-context-menu {
+  z-index: 60;
+  width: 132px;
+}
+
+.terminal-context-menu button {
+  justify-content: flex-start;
 }
 
 .tree-context-menu button {

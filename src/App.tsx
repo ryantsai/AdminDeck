@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  ClipboardPaste,
   Columns2,
   Command,
   Copy,
@@ -216,6 +217,12 @@ type TreeContextMenuState =
       x: number;
       y: number;
     };
+
+type TerminalContextMenuState = {
+  x: number;
+  y: number;
+  hasSelection: boolean;
+};
 
 type EditConnectionState = {
   connection: Connection;
@@ -670,6 +677,18 @@ async function writeToClipboard(text: string) {
   textarea.select();
   document.execCommand("copy");
   document.body.removeChild(textarea);
+}
+
+async function readFromClipboard() {
+  if (!navigator.clipboard?.readText) {
+    return "";
+  }
+
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    return "";
+  }
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -1209,6 +1228,11 @@ function ConnectionSidebar({
     openConnection(connection);
   }
 
+  function handleQuickSsh(connection: Connection) {
+    setQuickConnectMenuOpen(false);
+    openConnection(connection);
+  }
+
   async function handleQuickAdminShell(option: LocalShellOption) {
     if (!option.value) {
       return;
@@ -1431,15 +1455,7 @@ function ConnectionSidebar({
   }
 
   async function handleDeleteFolder(folder: ConnectionFolder) {
-    const childFolderCount = countFolders(folder.folders);
-    const connectionCount = countConnections(folder);
-    const detail =
-      connectionCount === 0 && childFolderCount === 0
-        ? `Delete folder ${folder.name}?`
-        : `Delete folder ${folder.name}, ${connectionCount} connection${
-            connectionCount === 1 ? "" : "s"
-          }, and ${childFolderCount} subfolder${childFolderCount === 1 ? "" : "s"}?`;
-    if (!window.confirm(detail)) {
+    if (!confirmDeleteFolder(folder)) {
       return;
     }
 
@@ -1452,6 +1468,18 @@ function ConnectionSidebar({
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  function confirmDeleteFolder(folder: ConnectionFolder) {
+    const childFolderCount = countFolders(folder.folders);
+    const connectionCount = countConnections(folder);
+    const detail =
+      connectionCount === 0 && childFolderCount === 0
+        ? `Delete folder "${folder.name}"?`
+        : `Delete folder "${folder.name}", ${connectionCount} connection${
+            connectionCount === 1 ? "" : "s"
+          }, and ${childFolderCount} subfolder${childFolderCount === 1 ? "" : "s"}?`;
+    return window.confirm(`${detail}\n\nThis cannot be undone.`);
   }
 
   async function handleRenameConnection(connection: Connection) {
@@ -1506,7 +1534,7 @@ function ConnectionSidebar({
   }
 
   async function handleDeleteConnection(connection: Connection) {
-    if (!window.confirm(`Delete ${connection.name}?`)) {
+    if (!confirmDeleteConnection(connection)) {
       return;
     }
 
@@ -1519,6 +1547,10 @@ function ConnectionSidebar({
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  function confirmDeleteConnection(connection: Connection) {
+    return window.confirm(`Delete connection "${connection.name}"?\n\nThis cannot be undone.`);
   }
 
   const treeWithLiveStatuses = useMemo(
@@ -1881,12 +1913,14 @@ function ConnectionSidebar({
           <QuickConnectMenu
             recentConnections={recentConnections}
             shellOptions={quickConnectShellOptions}
+            sshSettings={sshSettings}
             onOpenConnection={(connection) => {
               setQuickConnectMenuOpen(false);
               handleOpenConnection(connection);
             }}
             onOpenElevatedShell={(option) => void handleQuickAdminShell(option)}
             onOpenLocalShell={handleQuickLocalShell}
+            onOpenSsh={handleQuickSsh}
           />
         ) : null}
       </div>
@@ -2361,18 +2395,92 @@ function TreeContextMenu({
 function QuickConnectMenu({
   recentConnections,
   shellOptions,
+  sshSettings,
   onOpenConnection,
   onOpenElevatedShell,
   onOpenLocalShell,
+  onOpenSsh,
 }: {
   recentConnections: Connection[];
   shellOptions: LocalShellOption[];
+  sshSettings: SshSettings;
   onOpenConnection: (connection: Connection) => void;
   onOpenElevatedShell: (option: LocalShellOption) => void;
   onOpenLocalShell: (option: LocalShellOption) => void;
+  onOpenSsh: (connection: Connection) => void;
 }) {
+  const [sshDialogOpen, setSshDialogOpen] = useState(false);
+  const [sshHost, setSshHost] = useState("");
+  const [sshPort, setSshPort] = useState(String(sshSettings.defaultPort));
+  const normalizedSshPort = Number(sshPort || sshSettings.defaultPort);
+  const canSubmitSsh =
+    Boolean(sshHost.trim()) &&
+    Number.isInteger(normalizedSshPort) &&
+    normalizedSshPort >= 1 &&
+    normalizedSshPort <= 65535;
+
+  function handleSshSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const host = sshHost.trim();
+    if (!canSubmitSsh) {
+      return;
+    }
+
+    onOpenSsh({
+      id: uniqueRuntimeId("quick"),
+      name: host,
+      host,
+      user: sshSettings.defaultUser,
+      port: normalizedSshPort,
+      authMethod: "agent",
+      type: "ssh",
+      useTmuxSessions: true,
+      tmuxConnectionId: uniqueRuntimeId("admindeck"),
+      status: "idle",
+    });
+  }
+
   return (
     <div className="quick-connect-menu" role="menu" aria-label="Quick connect">
+      {sshDialogOpen ? (
+        <form className="quick-connect-mini-dialog" onSubmit={handleSshSubmit}>
+          <label>
+            <span>Hostname</span>
+            <input
+              autoFocus
+              onChange={(event) => setSshHost(event.currentTarget.value)}
+              placeholder="example.internal"
+              required
+              value={sshHost}
+            />
+          </label>
+          <label>
+            <span>Port</span>
+            <input
+              inputMode="numeric"
+              max="65535"
+              min="1"
+              onChange={(event) => setSshPort(event.currentTarget.value)}
+              placeholder={String(sshSettings.defaultPort)}
+              type="number"
+              value={sshPort}
+            />
+          </label>
+          <div className="quick-connect-mini-actions">
+            <button disabled={!canSubmitSsh} type="submit">
+              Connect
+            </button>
+            <button onClick={() => setSshDialogOpen(false)} type="button">
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button onClick={() => setSshDialogOpen(true)} role="menuitem" type="button">
+          <Server size={15} />
+          <span>SSH</span>
+        </button>
+      )}
       {shellOptions.map((option) =>
         option.canElevate ? (
           <div className="quick-connect-submenu" key={option.value ?? option.label}>
@@ -3221,9 +3329,74 @@ function workspaceKindLabel(tab: WorkspaceTab) {
 function TabStrip() {
   const tabs = useWorkspaceStore((state) => state.tabs);
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
+  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const activateTab = useWorkspaceStore((state) => state.activateTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
-  const openLocalTerminal = useWorkspaceStore((state) => state.openLocalTerminal);
+  const openConnection = useWorkspaceStore((state) => state.openConnection);
+  const [quickConnectMenuOpen, setQuickConnectMenuOpen] = useState(false);
+  const quickConnectRef = useRef<HTMLDivElement | null>(null);
+  const shellOptions = useMemo(() => localShellOptionsForPlatform(), []);
+
+  useEffect(() => {
+    if (!quickConnectMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const node = quickConnectRef.current;
+      if (node && !node.contains(event.target as Node)) {
+        setQuickConnectMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setQuickConnectMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [quickConnectMenuOpen]);
+
+  function handleQuickLocalShell(option: LocalShellOption) {
+    setQuickConnectMenuOpen(false);
+    openConnection({
+      id: uniqueRuntimeId("quick"),
+      name: option.label,
+      host: "localhost",
+      user: "local",
+      type: "local",
+      localShell: option.value,
+      status: "idle",
+    });
+  }
+
+  async function handleQuickAdminShell(option: LocalShellOption) {
+    if (!option.value) {
+      return;
+    }
+
+    setQuickConnectMenuOpen(false);
+    try {
+      await invokeCommand("launch_elevated_terminal", {
+        request: {
+          shell: option.value,
+        },
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function handleQuickSsh(connection: Connection) {
+    setQuickConnectMenuOpen(false);
+    openConnection(connection);
+  }
 
   return (
     <div className="tab-strip" aria-label="Workspace tabs">
@@ -3250,14 +3423,33 @@ function TabStrip() {
           </button>
         </div>
       ))}
-      <button
-        className="new-tab"
-        aria-label="New local terminal"
-        onClick={openLocalTerminal}
-        type="button"
-      >
-        <Plus size={15} />
-      </button>
+      <div className="quick-connect-anchor tab-quick-connect-anchor" ref={quickConnectRef}>
+        <button
+          aria-expanded={quickConnectMenuOpen}
+          aria-haspopup="menu"
+          className="new-tab"
+          aria-label="New tab"
+          onClick={() => setQuickConnectMenuOpen((isOpen) => !isOpen)}
+          title="New tab"
+          type="button"
+        >
+          <Plus size={15} />
+        </button>
+        {quickConnectMenuOpen ? (
+          <QuickConnectMenu
+            recentConnections={[]}
+            shellOptions={shellOptions}
+            sshSettings={sshSettings}
+            onOpenConnection={(connection) => {
+              setQuickConnectMenuOpen(false);
+              openConnection(connection);
+            }}
+            onOpenElevatedShell={(option) => void handleQuickAdminShell(option)}
+            onOpenLocalShell={handleQuickLocalShell}
+            onOpenSsh={handleQuickSsh}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -4759,6 +4951,7 @@ function TerminalPaneView({
     found: boolean;
   }>({ resultIndex: -1, resultCount: 0, found: true });
   const [selectedTerminalText, setSelectedTerminalText] = useState("");
+  const [contextMenu, setContextMenu] = useState<TerminalContextMenuState | null>(null);
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
   const setAssistantContextSnippet = useWorkspaceStore(
     (state) => state.setAssistantContextSnippet,
@@ -4791,13 +4984,27 @@ function TerminalPaneView({
     terminal.fit();
     terminal.focus();
     terminal.attachCustomKeyEventHandler((event) => {
-      if (event.type === "keydown" && event.ctrlKey && event.shiftKey && event.key === "C") {
+      if (event.type !== "keydown" || !event.ctrlKey) {
+        return true;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "c" && event.shiftKey) {
         const selection = terminal.getSelection();
         if (selection) {
           void writeToClipboard(selection);
+          setSelectedTerminalText(selection);
+          setContextMenu(null);
+          return false;
         }
+        return true;
+      }
+
+      if (key === "v") {
+        void handlePasteIntoTerminal();
         return false;
       }
+
       return true;
     });
     registerPaneRenderer(pane.id, terminal);
@@ -4988,6 +5195,7 @@ function TerminalPaneView({
       lastResizeDimensionsRef.current = null;
       terminalRendererRef.current = null;
       setSelectedTerminalText("");
+      setContextMenu(null);
       setSearchResult({ resultIndex: -1, resultCount: 0, found: true });
       terminal.dispose();
     };
@@ -5000,6 +5208,26 @@ function TerminalPaneView({
     recordTerminalStartMetric,
     terminalSettings,
   ]);
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    const handlePointerDown = () => setContextMenu(null);
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     if (!isActive) {
@@ -5053,6 +5281,49 @@ function TerminalPaneView({
     if (text) {
       void writeToClipboard(text);
     }
+    setContextMenu(null);
+    terminalRendererRef.current?.focus();
+  }
+
+  async function handlePasteIntoTerminal() {
+    const text = await readFromClipboard();
+    if (!text) {
+      setContextMenu(null);
+      terminalRendererRef.current?.focus();
+      return;
+    }
+
+    if (terminalSettings.confirmMultilinePaste && isMultilinePaste(text)) {
+      const shouldPaste = window.confirm("Paste multiple lines into this terminal?");
+      if (!shouldPaste) {
+        setContextMenu(null);
+        terminalRendererRef.current?.focus();
+        return;
+      }
+    }
+
+    const sessionId = sessionIdRef.current;
+    if (sessionId) {
+      void invokeCommand("write_terminal_input", {
+        request: { sessionId, data: text },
+      });
+    }
+    setContextMenu(null);
+    terminalRendererRef.current?.focus();
+  }
+
+  function handleTerminalContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    onFocus();
+
+    const selection = terminalRendererRef.current?.getSelection() ?? "";
+    setSelectedTerminalText(selection);
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      hasSelection: Boolean(selection),
+    });
   }
 
   function handleSendSelectionToAssistant() {
@@ -5236,13 +5507,84 @@ function TerminalPaneView({
         </div>
       ) : null}
       {pane.connection ? (
-        <div className="xterm-host" ref={terminalElementRef} />
+        <div className="xterm-host" onContextMenu={handleTerminalContextMenu} ref={terminalElementRef} />
       ) : (
         <pre>
           <code>{pane.buffer}</code>
         </pre>
       )}
+      {contextMenu ? (
+        <TerminalContextMenu
+          menu={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onCopy={handleCopyTerminalSelection}
+          onPaste={() => void handlePasteIntoTerminal()}
+        />
+      ) : null}
     </article>
+  );
+}
+
+function TerminalContextMenu({
+  menu,
+  onClose,
+  onCopy,
+  onPaste,
+}: {
+  menu: TerminalContextMenuState;
+  onClose: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const node = menuRef.current;
+    if (!node) {
+      return;
+    }
+
+    const bounds = node.getBoundingClientRect();
+    const left = Math.min(menu.x, window.innerWidth - bounds.width - 8);
+    const top = Math.min(menu.y, window.innerHeight - bounds.height - 8);
+    node.style.left = `${Math.max(8, left)}px`;
+    node.style.top = `${Math.max(8, top)}px`;
+  }, [menu.x, menu.y]);
+
+  return (
+    <div
+      className="terminal-context-menu"
+      onContextMenu={(event) => event.preventDefault()}
+      onPointerDown={(event) => event.stopPropagation()}
+      ref={menuRef}
+      role="menu"
+    >
+      {menu.hasSelection ? (
+        <button
+          onClick={() => {
+            onCopy();
+            onClose();
+          }}
+          role="menuitem"
+          type="button"
+        >
+          <Copy size={14} />
+          <span>Copy</span>
+        </button>
+      ) : (
+        <button
+          onClick={() => {
+            onPaste();
+            onClose();
+          }}
+          role="menuitem"
+          type="button"
+        >
+          <ClipboardPaste size={14} />
+          <span>Paste</span>
+        </button>
+      )}
+    </div>
   );
 }
 
