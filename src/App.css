@@ -1984,6 +1984,15 @@ progress {
   background: #ececec;
 }
 
+.assistant-toolbar-button:disabled {
+  color: #bdc1c6;
+  cursor: not-allowed;
+}
+
+.assistant-toolbar-button:disabled:hover {
+  background: transparent;
+}
+
 .assistant-tasks {
   display: grid;
   gap: 8px;

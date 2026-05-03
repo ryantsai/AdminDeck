@@ -129,7 +129,7 @@ Parses SSH config and creates draft connections. It should preserve supported di
 
 Current implementation note: the importer supports `Host`, `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump`. It skips wildcard-only host patterns and reports unsupported global or host-scoped directives with line numbers through the typed Tauri command. The previous top chrome import button has been removed; a future visible entry point should live in the connection tree or Settings rather than a standalone global button bar.
 
-### AI Assist
+### AI Assistant
 
 Owns provider adapters, prompt construction, command proposal, approval flow, command execution handoff, and output capture.
 
@@ -168,7 +168,7 @@ The primary UI is a dense desktop workspace:
 - tmux session tags and management popovers inside SSH terminal Pane toolbars
 - screenshot Region and Entire Window/Panel actions, shown in terminal Pane toolbars for terminal Sessions and top workspace toolbars for non-terminal surfaces
 - SFTP dual-pane view
-- right AI assistant panel
+- right AI Assistant panel
 - settings
 
 Default visual direction: quiet productivity light chrome with dark terminal panes.

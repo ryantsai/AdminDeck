@@ -1180,10 +1180,10 @@ function App() {
             <StatusBar />
           </main>
           <PanelResizeHandle
-            ariaLabel="Resize AI Assist panel"
+            ariaLabel="Resize AI Assistant panel"
             side="right"
             collapsed={aiPanelLayout.collapsed}
-            collapsedLabel="AI Assist"
+            collapsedLabel="AI Assistant"
             onClick={() =>
               aiPanelLayout.collapsed
                 ? setAiPanelLayout((layout) => ({ ...layout, collapsed: false }))
@@ -5656,11 +5656,11 @@ function TerminalPaneView({
           <ScreenshotMenu buttonClassName="terminal-pane-action" targetRef={paneRef} />
           <button
             className="terminal-pane-action"
-            aria-label="Send selection to AI Assist"
+            aria-label="Send selection to AI Assistant"
             disabled={!selectedTerminalText}
             onMouseDown={(e) => e.preventDefault()}
             onClick={handleSendSelectionToAssistant}
-            title="Send selection to AI Assist"
+            title="Send selection to AI Assistant"
             type="button"
           >
             <Bot size={13} />
@@ -5822,7 +5822,7 @@ function normalizeAssistantContextText(text: string) {
     return normalized;
   }
 
-  return `${normalized.slice(0, ASSISTANT_CONTEXT_MAX_CHARS)}\n[Selection truncated before adding to AI Assist context.]`;
+  return `${normalized.slice(0, ASSISTANT_CONTEXT_MAX_CHARS)}\n[Selection truncated before adding to AI Assistant context.]`;
 }
 
 function usesNativeSshHostKeyVerification(connection: Connection) {
@@ -7898,7 +7898,7 @@ function SettingsPage({
           </a>
           <a href="#assistant-settings" className="settings-nav-item">
             <Bot size={16} />
-            <span>AI Assist</span>
+            <span>AI Assistant</span>
           </a>
           <a href="#appearance-settings" className="settings-nav-item">
             <Palette size={16} />
@@ -8098,7 +8098,7 @@ function SettingsPage({
           <section className="settings-card settings-section" id="assistant-settings">
             <div className="settings-section-header">
               <div>
-                <p className="panel-label">AI Assist</p>
+                <p className="panel-label">AI Assistant</p>
                 <h2>AI provider</h2>
               </div>
               <div className="settings-header-actions">
@@ -8412,6 +8412,17 @@ function AssistantPanel({
     void submitAssistantPrompt();
   }
 
+  function handleNewChat() {
+    if (isSendingPrompt) {
+      return;
+    }
+    setMessages([]);
+    setPrompt("");
+    setChatError("");
+    setTerminalSendStatus("");
+    setWaitingPhrase("");
+  }
+
   async function submitAssistantPrompt() {
     const normalizedPrompt = prompt.trim();
     if (!normalizedPrompt || isSendingPrompt) {
@@ -8468,7 +8479,7 @@ function AssistantPanel({
         {
           id: `assistant-error-${Date.now()}`,
           role: "assistant",
-          content: `AI assistant error: ${message}`,
+          content: `AI Assistant error: ${message}`,
         },
       ]);
     } finally {
@@ -8509,27 +8520,37 @@ function AssistantPanel({
       <div className="assistant-topbar">
         <h2>AI Assistant</h2>
         <button
-          aria-label="Refresh AI Assist"
+          aria-label="Refresh AI Assistant"
           className="assistant-toolbar-button"
-          title="Refresh AI Assist"
+          title="Refresh AI Assistant"
           type="button"
         >
           <RefreshCw size={16} />
         </button>
         <button
-          aria-label="AI Assist settings"
+          aria-label="AI Assistant settings"
           className="assistant-toolbar-button"
           onClick={onOpenSettings}
-          title="AI Assist settings"
+          title="AI Assistant settings"
           type="button"
         >
           <Settings size={16} />
         </button>
         <button
-          aria-label="Collapse AI Assist panel"
+          aria-label="New AI Assistant chat"
+          className="assistant-toolbar-button"
+          disabled={isSendingPrompt}
+          onClick={handleNewChat}
+          title="New chat"
+          type="button"
+        >
+          <Plus size={16} />
+        </button>
+        <button
+          aria-label="Collapse AI Assistant panel"
           className="assistant-toolbar-button"
           onClick={onToggleCollapsed}
-          title="Collapse AI Assist panel"
+          title="Collapse AI Assistant panel"
           type="button"
         >
           <PanelRight size={17} />
