@@ -71,6 +71,16 @@ npm run smoke:installer
 
 The smoke test verifies the release artifact checksum, silently installs into a temporary directory, confirms `admin-deck.exe` is present and non-empty, then silently uninstalls and removes only the temporary smoke-test directory it created.
 
+## GitHub Release
+
+Publish the next build release with:
+
+```bash
+npm run release:github
+```
+
+The script increments the `<major>.<minor>.<build>` version across npm, Tauri, and Cargo metadata, builds the portable ZIP and NSIS installer, smoke tests the installer, runs frontend and Rust checks, commits the version bump, tags it as `v<version>`, pushes to `origin/main`, and creates a GitHub release with the package and checksum artifacts. Run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-github.ps1 -DryRun` to preview the next version, add `-Draft` for a draft release, or add `-SkipBuild` to publish from existing artifacts.
+
 ## Known Limitations
 
 - Windows is the only v0.1 acceptance platform.
