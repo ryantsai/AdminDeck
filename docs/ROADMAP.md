@@ -103,12 +103,12 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [x] Document repeatable performance measurement and terminal compatibility checklist.
 - [x] Measure cold launch time.
 - [x] Measure new local terminal tab time.
-- [ ] Measure SSH terminal readiness after auth.
+- [x] Measure SSH terminal readiness after auth.
 - [x] Measure idle memory.
-- [ ] Run manual compatibility checklist: vim, tmux, htop/btop, git, npm, cargo, and pane scrollback search.
+- [x] Run manual compatibility checklist: vim, tmux, htop/btop, git, npm, cargo, and pane scrollback search.
 - [x] Harden terminal bracketed paste, mouse support, and alternate screen behavior against the manual compatibility checklist.
 - [x] Fix xterm fit/pixel geometry so maximized Windows terminal panes do not clip bottom status lines.
-- [ ] Start WGPU renderer prototype if Milestone A terminal integration limits are clear.
+- [x] Decide against starting a WGPU renderer prototype for now; keep the xterm WebGL fast path.
 
 ## Milestone F: Packaging and v0.1 Release
 
