@@ -708,10 +708,133 @@ h2 {
 }
 
 .terminal-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 10px;
+  display: flex;
   min-height: 0;
+  min-width: 0;
+  gap: 10px;
+}
+
+.terminal-grid > * {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.terminal-layout-split {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  gap: 10px;
+}
+
+.terminal-layout-split-horizontal {
+  flex-direction: row;
+}
+
+.terminal-layout-split-vertical {
+  flex-direction: column;
+}
+
+.terminal-layout-leaf {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.terminal-layout-leaf > .terminal-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.terminal-pane-inactive header span,
+.terminal-pane-inactive header small,
+.terminal-pane-inactive .terminal-pane-actions small {
+  color: #4a5666;
+}
+
+.terminal-pane-inactive .xterm,
+.terminal-pane-inactive pre,
+.terminal-pane-inactive code {
+  color: #4a5666;
+}
+
+.terminal-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.terminal-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  display: grid;
+  min-width: 180px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  box-shadow: var(--shadow);
+  padding: 4px 0;
+}
+
+.terminal-menu-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 12px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.terminal-menu-item:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.terminal-menu-item:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.terminal-menu-chevron {
+  margin-left: auto;
+}
+
+.terminal-menu-submenu {
+  position: relative;
+}
+
+.terminal-menu-submenu::after {
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 8px;
+  height: 100%;
+  content: "";
+}
+
+.terminal-menu-submenu-panel {
+  position: absolute;
+  top: -5px;
+  right: calc(100% + 4px);
+  display: none;
+  min-width: 160px;
+}
+
+.terminal-menu-submenu:hover .terminal-menu-submenu-panel,
+.terminal-menu-submenu:focus-within .terminal-menu-submenu-panel {
+  display: grid;
 }
 
 .terminal-pane {

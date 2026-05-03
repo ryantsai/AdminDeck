@@ -49,6 +49,10 @@ export interface TerminalRenderer {
   open: (element: HTMLElement) => void;
   write: (data: string) => void;
   writeln: (data: string) => void;
+  setFontSize: (size: number) => void;
+  getFontSize: () => number;
+  getBufferText: () => string;
+  onFocus: (handler: () => void) => IDisposable;
 }
 
 const XTERM_CAPABILITIES = [
@@ -211,6 +215,57 @@ class XtermTerminalRenderer implements TerminalRenderer {
   writeln(data: string) {
     this.terminal.writeln(data);
   }
+
+  setFontSize(size: number) {
+    const clamped = Math.min(Math.max(Math.round(size), 6), 64);
+    this.terminal.options.fontSize = clamped;
+    try {
+      this.fitAddon.fit();
+    } catch {
+      // Fit may throw if the host is detached; safe to ignore.
+    }
+  }
+
+  getFontSize() {
+    return this.terminal.options.fontSize ?? 14;
+  }
+
+  getBufferText() {
+    const lines: string[] = [];
+    const buffers = [this.terminal.buffer.normal, this.terminal.buffer.alternate];
+    const seen = new Set<typeof buffers[number]>();
+    for (const buffer of buffers) {
+      if (!buffer || seen.has(buffer)) {
+        continue;
+      }
+      seen.add(buffer);
+      const total = buffer.length;
+      for (let row = 0; row < total; row += 1) {
+        const line = buffer.getLine(row);
+        if (!line) {
+          continue;
+        }
+        lines.push(line.translateToString(true));
+      }
+    }
+    while (lines.length > 0 && lines[lines.length - 1] === "") {
+      lines.pop();
+    }
+    return lines.join("\n");
+  }
+
+  onFocus(handler: () => void) {
+    return this.terminal.textarea
+      ? listenToFocus(this.terminal.textarea, handler)
+      : { dispose: () => undefined };
+  }
+}
+
+function listenToFocus(textarea: HTMLTextAreaElement, handler: () => void): IDisposable {
+  textarea.addEventListener("focus", handler);
+  return {
+    dispose: () => textarea.removeEventListener("focus", handler),
+  };
 }
 
 function pixelDimensionsFor(element: HTMLElement | null) {

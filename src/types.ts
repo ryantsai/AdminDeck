@@ -88,6 +88,22 @@ export interface TerminalPane {
   connection?: Connection;
 }
 
+export type SplitDirection = "right" | "left" | "down" | "up";
+export type SplitOrientation = "horizontal" | "vertical";
+
+export type LayoutNode =
+  | { type: "leaf"; paneId: string }
+  | { type: "split"; orientation: SplitOrientation; children: LayoutNode[] };
+
+export type StoredLayoutNode =
+  | { type: "leaf"; paneIndex: number }
+  | { type: "split"; orientation: SplitOrientation; children: StoredLayoutNode[] };
+
+export interface StoredConnectionLayout {
+  paneCount: number;
+  layout: StoredLayoutNode;
+}
+
 export type TerminalCursorStyle = "block" | "bar" | "underline";
 
 export interface TerminalSettings {
@@ -129,6 +145,8 @@ export interface WorkspaceTab {
   subtitle: string;
   kind: "terminal" | "sftp" | "webview";
   panes: TerminalPane[];
+  layout?: LayoutNode;
+  focusedPaneId?: string;
   connection?: Connection;
   url?: string;
   dataPartition?: string;

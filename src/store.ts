@@ -6,6 +6,14 @@ import {
   defaultTerminalSettings,
   initialTabs,
 } from "./sample-data";
+import {
+  defaultLayoutFor,
+  ensureLayout,
+  hydrateLayout,
+  leafOrder,
+  serializeLayout,
+  splitLayout,
+} from "./workspace/layout";
 import type {
   AiProviderSettings,
   AssistantContextSnippet,
@@ -13,11 +21,61 @@ import type {
   PerformanceMetrics,
   PerformanceSnapshot,
   SftpSettings,
+  SplitDirection,
   SshSettings,
+  StoredConnectionLayout,
+  TerminalPane,
   TerminalSettings,
   TerminalStartMetric,
   WorkspaceTab,
 } from "./types";
+
+const LAYOUT_STORAGE_PREFIX = "admindeck.layout.";
+
+function loadStoredLayout(connectionId: string): StoredConnectionLayout | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  try {
+    const raw = window.localStorage.getItem(`${LAYOUT_STORAGE_PREFIX}${connectionId}`);
+    return raw ? (JSON.parse(raw) as StoredConnectionLayout) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function persistLayout(connectionId: string, stored: StoredConnectionLayout | undefined) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const key = `${LAYOUT_STORAGE_PREFIX}${connectionId}`;
+  try {
+    if (!stored) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, JSON.stringify(stored));
+  } catch {
+    // Storage may be unavailable (private mode, quota); fail silently.
+  }
+}
+
+function buildPanesForConnection(connection: Connection, count: number): TerminalPane[] {
+  const baseId = connection.id;
+  const baseTitle = connection.type === "local" ? connection.name : "ssh";
+  const baseCwd = connection.type === "local" ? "C:\\Users\\ryan" : "~";
+  const panes: TerminalPane[] = [];
+  for (let index = 0; index < count; index += 1) {
+    panes.push({
+      id: index === 0 ? `pane-${baseId}` : `pane-${baseId}-${index}-${Date.now()}`,
+      title: index === 0 ? baseTitle : `${baseTitle} ${index + 1}`,
+      cwd: baseCwd,
+      buffer: "",
+      connection,
+    });
+  }
+  return panes;
+}
 
 interface WorkspaceState {
   query: string;
@@ -51,6 +109,10 @@ interface WorkspaceState {
   openTerminalHere: (connection: Connection, remotePath: string) => void;
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
+  splitTerminalPaneDirected: (tabId: string, direction: SplitDirection) => void;
+  setFocusedPane: (tabId: string, paneId: string) => void;
+  saveTabLayout: (tabId: string) => void;
+  resetTabLayout: (tabId: string) => void;
   updateWebviewTabMetadata: (
     tabId: string,
     metadata: { title?: string; subtitle?: string; url?: string },
@@ -149,21 +211,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
+    const stored = loadStoredLayout(connection.id);
+    const paneCount = Math.max(1, stored?.paneCount ?? 1);
+    const panes = buildPanesForConnection(connection, paneCount);
+    const paneIds = panes.map((pane) => pane.id);
+    const layout =
+      (stored ? hydrateLayout(stored.layout, paneIds) : undefined) ?? defaultLayoutFor(panes);
+
     const tab: WorkspaceTab = {
       id: `tab-${connection.id}`,
       title: connection.name,
       subtitle:
         connection.type === "local" ? "Local terminal session" : `${connection.user}@${connection.host}`,
       kind: "terminal",
-      panes: [
-        {
-          id: `pane-${connection.id}`,
-          title: connection.type === "local" ? connection.name : "ssh",
-          cwd: connection.type === "local" ? "C:\\Users\\ryan" : "~",
-          buffer: "",
-          connection,
-        },
-      ],
+      panes,
+      layout,
+      focusedPaneId: panes[0]?.id,
       connection,
     };
 
@@ -271,34 +334,81 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
   },
   splitTerminalPane: (tabId) => {
+    get().splitTerminalPaneDirected(tabId, "right");
+  },
+  splitTerminalPaneDirected: (tabId, direction) => {
     set((state) => ({
       tabs: state.tabs.map((tab) => {
         if (tab.id !== tabId || tab.kind !== "terminal") {
           return tab;
         }
 
-        const sourcePane = tab.panes[0];
-        const connection = sourcePane?.connection;
-        if (!sourcePane || !connection) {
+        const focusedPane =
+          tab.panes.find((pane) => pane.id === tab.focusedPaneId) ?? tab.panes[0];
+        const connection = focusedPane?.connection;
+        if (!focusedPane || !connection) {
           return tab;
         }
 
-        const paneCount = tab.panes.length + 1;
+        const newPane: TerminalPane = {
+          id: `pane-${connection.id}-${Date.now()}`,
+          title: `${focusedPane.title} ${tab.panes.length + 1}`,
+          cwd: focusedPane.cwd,
+          buffer: "",
+          connection,
+        };
+
+        const nextPanes = [...tab.panes, newPane];
+        const baseLayout = ensureLayout(tab.layout, tab.panes);
+        const nextLayout = splitLayout(
+          baseLayout,
+          focusedPane.id,
+          direction,
+          newPane.id,
+          tab.panes.map((pane) => pane.id),
+        );
+
         return {
           ...tab,
-          panes: [
-            ...tab.panes,
-            {
-              id: `pane-${connection.id}-${Date.now()}`,
-              title: `${sourcePane.title} ${paneCount}`,
-              cwd: sourcePane.cwd,
-              buffer: "",
-              connection,
-            },
-          ],
+          panes: nextPanes,
+          layout: nextLayout,
+          focusedPaneId: newPane.id,
         };
       }),
     }));
+  },
+  setFocusedPane: (tabId, paneId) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.id !== tabId || tab.focusedPaneId === paneId) {
+          return tab;
+        }
+        return { ...tab, focusedPaneId: paneId };
+      }),
+    }));
+  },
+  saveTabLayout: (tabId) => {
+    const tab = get().tabs.find((entry) => entry.id === tabId);
+    if (!tab || tab.kind !== "terminal" || !tab.connection) {
+      return;
+    }
+    const layout = ensureLayout(tab.layout, tab.panes);
+    if (!layout) {
+      return;
+    }
+    const orderedIds = leafOrder(layout);
+    const orderedPanes = orderedIds
+      .map((id) => tab.panes.find((pane) => pane.id === id))
+      .filter((pane): pane is TerminalPane => Boolean(pane));
+    const stored = serializeLayout(layout, orderedPanes);
+    persistLayout(tab.connection.id, stored);
+  },
+  resetTabLayout: (tabId) => {
+    const tab = get().tabs.find((entry) => entry.id === tabId);
+    if (!tab || tab.kind !== "terminal" || !tab.connection) {
+      return;
+    }
+    persistLayout(tab.connection.id, undefined);
   },
   updateWebviewTabMetadata: (tabId, metadata) => {
     set((state) => ({
