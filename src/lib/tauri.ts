@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 import type {
   AiProviderSettings,
   AppBootstrap,
@@ -505,6 +507,28 @@ export function invokeCommand<Name extends keyof CommandMap>(
   }
 
   return invoke<CommandMap[Name]["result"]>(name, args);
+}
+
+export async function saveTextFile(defaultFilename: string, contents: string) {
+  if (!isTauriRuntime()) {
+    return Promise.reject(new Error("Tauri runtime unavailable"));
+  }
+
+  const path = await saveDialog({
+    defaultPath: defaultFilename,
+    filters: [
+      { name: "Log files", extensions: ["log"] },
+      { name: "Text files", extensions: ["txt"] },
+    ],
+    title: "Save Buffer",
+  });
+
+  if (!path) {
+    return null;
+  }
+
+  await writeTextFile(path, contents);
+  return path;
 }
 
 export function isTauriRuntime() {

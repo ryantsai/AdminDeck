@@ -98,6 +98,7 @@ import zipIcon from "./assets/file-icons/zip.svg";
 import {
   invokeCommand,
   isTauriRuntime,
+  saveTextFile,
   type LocalDirectoryEntry,
   type SftpDirectoryEntry,
   type SftpPathProperties,
@@ -2459,6 +2460,30 @@ function formatWebviewSubtitle(url: string) {
   }
 }
 
+function normalizeFilenamePart(value: string) {
+  const normalized = value
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized || "terminal";
+}
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function formatBufferLogFilename(panelTitle: string, date = new Date()) {
+  const year = date.getFullYear();
+  const month = padDatePart(date.getMonth() + 1);
+  const day = padDatePart(date.getDate());
+  const hour = padDatePart(date.getHours());
+  const minute = padDatePart(date.getMinutes());
+  const second = padDatePart(date.getSeconds());
+  return `${normalizeFilenamePart(panelTitle)}_${year}${month}${day}_${hour}${minute}${second}.log`;
+}
+
 function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
   const splitTerminalPaneDirected = useWorkspaceStore(
     (state) => state.splitTerminalPaneDirected,
@@ -2500,28 +2525,29 @@ function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspac
     splitTerminalPaneDirected(tab.id, direction);
   }
 
-  function handleSaveBuffer() {
+  async function handleSaveBuffer() {
     setHamburgerOpen(false);
     const targetPaneId = focusedPaneId;
     if (!targetPaneId) {
       return;
     }
+    const targetPane = tab.panes.find((pane) => pane.id === targetPaneId);
     const renderer = getPaneRenderer(targetPaneId);
     if (!renderer) {
       return;
     }
     const text = renderer.getBufferText();
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    const safeName = (tab.title || "terminal").replace(/[^A-Za-z0-9._-]+/g, "_");
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    anchor.href = url;
-    anchor.download = `${safeName}-${stamp}.log`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    const defaultFilename = formatBufferLogFilename(targetPane?.title ?? tab.title);
+
+    try {
+      await saveTextFile(defaultFilename, text);
+    } catch (error) {
+      window.alert(
+        `Could not save terminal buffer: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   function applyFontSizeToPanes(size: number) {
@@ -2652,7 +2678,7 @@ function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspac
               <div className="terminal-menu" role="menu">
                 <button
                   className="terminal-menu-item"
-                  onClick={handleSaveBuffer}
+                  onClick={() => void handleSaveBuffer()}
                   role="menuitem"
                   type="button"
                 >
