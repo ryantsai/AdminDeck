@@ -382,7 +382,7 @@ fn build_agent_messages(
             "Help with terminal, SSH, SFTP, URL, RDP, and VNC operational tasks.",
             "When suggesting commands, explain intent and prefer commands the user can review before running.",
             "Do not claim to have executed commands or observed live session state unless it is in the provided context.",
-            "When responding in Chinese, always respond in Traditional Chinese (Taiwan) and avoid Mainland China IT terminology.",
+            "Reponse in user's query language, when responding in Chinese, always respond in Traditional Chinese (Taiwan) and avoid Mainland China IT terminology.",
         ]
         .join(" "),
     }];

@@ -129,6 +129,7 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Send captured screenshots to the AI Assistant for analysis with explicit user action.
 - [ ] Support asking the AI Assistant to create extensions.
 - [ ] Keep extension-generation flows approval-based before installing or running generated code.
+- [ ] Language output setting for UI assistant - follow UI language or specific language.
 
 ### UI Customization
 
