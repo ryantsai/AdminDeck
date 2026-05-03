@@ -136,7 +136,9 @@ import type {
   SftpSettings,
   SplitDirection,
   SshSettings,
+  TerminalCursorStyle,
   TerminalPane,
+  TerminalSettings,
   WorkspaceTab,
 } from "./types";
 
@@ -348,7 +350,7 @@ async function writeToClipboard(text: string) {
 }
 
 function App() {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activePage, setActivePage] = useState<"workspace" | "settings">("workspace");
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
@@ -425,30 +427,49 @@ function App() {
   }, [setAiProviderHasApiKey]);
 
   return (
-    <div className="app-shell">
-      <ActivityRail onOpenSettings={() => setSettingsOpen(true)} />
-      <ConnectionSidebar />
-      <main className="workspace">
-        <TabStrip />
-        <WorkspaceCanvas />
-        <StatusBar />
-      </main>
-      <AssistantPanel />
-      {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
+    <div className={`app-shell ${activePage === "settings" ? "settings-mode" : ""}`}>
+      <ActivityRail activePage={activePage} onNavigate={setActivePage} />
+      {activePage === "settings" ? (
+        <SettingsPage onBack={() => setActivePage("workspace")} />
+      ) : (
+        <>
+          <ConnectionSidebar />
+          <main className="workspace">
+            <TabStrip />
+            <WorkspaceCanvas />
+            <StatusBar />
+          </main>
+          <AssistantPanel />
+        </>
+      )}
     </div>
   );
 }
 
-function ActivityRail({ onOpenSettings }: { onOpenSettings: () => void }) {
+function ActivityRail({
+  activePage,
+  onNavigate,
+}: {
+  activePage: "workspace" | "settings";
+  onNavigate: (page: "workspace" | "settings") => void;
+}) {
   return (
     <nav className="activity-rail" aria-label="Primary">
-      <button className="rail-button active" aria-label="Dashboard">
+      <button
+        className={`rail-button ${activePage === "workspace" ? "active" : ""}`}
+        aria-label="Dashboard"
+        onClick={() => onNavigate("workspace")}
+      >
         <LayoutDashboard size={18} />
         <span className="rail-tooltip" role="tooltip">
           Dashboard
         </span>
       </button>
-      <button className="rail-button" aria-label="Settings" onClick={onOpenSettings}>
+      <button
+        className={`rail-button ${activePage === "settings" ? "active" : ""}`}
+        aria-label="Settings"
+        onClick={() => onNavigate("settings")}
+      >
         <Settings size={18} />
         <span className="rail-tooltip" role="tooltip">
           Settings
@@ -5599,35 +5620,342 @@ function SftpPropertiesPopup({
   );
 }
 
-function SettingsDialog({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="dialog-backdrop" role="presentation">
-      <section className="settings-dialog" aria-labelledby="settings-title">
-        <header>
-          <div>
-            <p className="panel-label">Settings</p>
-            <h2 id="settings-title">Settings</h2>
-          </div>
-          <button className="icon-button" type="button" aria-label="Close" onClick={onClose}>
-            <X size={15} />
-          </button>
-        </header>
+function SettingsPage({ onBack }: { onBack: () => void }) {
+  const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
+  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
+  const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
+  const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
+  const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
+  const [draft, setDraft] = useState(terminalSettings);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const hasTerminalChanges = JSON.stringify(draft) !== JSON.stringify(terminalSettings);
 
-        <div className="settings-placeholder-list">
-          <button className="settings-placeholder-item" type="button">
-            <Languages size={17} />
-            <span>Language (i18n)</span>
-            <strong>To be implemented</strong>
-          </button>
-          <button className="settings-placeholder-item" type="button">
-            <Palette size={17} />
-            <span>Color Scheme</span>
-            <strong>To be implemented</strong>
-          </button>
+  useEffect(() => {
+    setDraft(terminalSettings);
+  }, [terminalSettings]);
+
+  async function handleSaveTerminalSettings() {
+    try {
+      setError("");
+      setStatus("");
+      const nextSettings = normalizeTerminalSettingsDraft(draft);
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_terminal_settings", { request: nextSettings })
+        : nextSettings;
+      setTerminalSettings(saved);
+      setDraft(saved);
+      setStatus("Terminal settings saved.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return (
+    <main className="settings-page">
+      <header className="settings-page-header">
+        <div>
+          <p className="panel-label">AdminDeck</p>
+          <h1>Settings</h1>
         </div>
-      </section>
+        <button className="toolbar-button" type="button" onClick={onBack}>
+          <ArrowLeft size={15} />
+          Workspace
+        </button>
+      </header>
+
+      <div className="settings-layout">
+        <aside className="settings-nav" aria-label="Settings sections">
+          <a href="#terminal-settings" className="settings-nav-item active">
+            <Terminal size={16} />
+            <span>Terminal</span>
+          </a>
+          <a href="#ssh-settings" className="settings-nav-item">
+            <Server size={16} />
+            <span>SSH</span>
+          </a>
+          <a href="#sftp-settings" className="settings-nav-item">
+            <Download size={16} />
+            <span>SFTP</span>
+          </a>
+          <a href="#assistant-settings" className="settings-nav-item">
+            <Bot size={16} />
+            <span>Command assist</span>
+          </a>
+          <a href="#appearance-settings" className="settings-nav-item">
+            <Palette size={16} />
+            <span>Appearance</span>
+          </a>
+        </aside>
+
+        <section className="settings-content" aria-label="Settings">
+          <section className="settings-card settings-section" id="terminal-settings">
+            <div className="settings-section-header">
+              <div>
+                <p className="panel-label">Terminal</p>
+                <h2>Terminal behavior</h2>
+              </div>
+              <button
+                className="toolbar-button"
+                disabled={!hasTerminalChanges}
+                onClick={() => void handleSaveTerminalSettings()}
+                type="button"
+              >
+                <Save size={15} />
+                Save
+              </button>
+            </div>
+
+            <div className="form-grid three-columns">
+              <label>
+                <span>Font family</span>
+                <input
+                  onChange={(event) => {
+                    const fontFamily = event.currentTarget.value;
+                    setDraft((settings) => ({
+                      ...settings,
+                      fontFamily,
+                    }));
+                  }}
+                  value={draft.fontFamily}
+                />
+              </label>
+              <label>
+                <span>Font size</span>
+                <input
+                  inputMode="numeric"
+                  max={32}
+                  min={8}
+                  onChange={(event) => {
+                    const fontSize = Number(event.currentTarget.value);
+                    setDraft((settings) => ({
+                      ...settings,
+                      fontSize,
+                    }));
+                  }}
+                  type="number"
+                  value={draft.fontSize}
+                />
+              </label>
+              <label>
+                <span>Line height</span>
+                <input
+                  max={2}
+                  min={1}
+                  onChange={(event) => {
+                    const lineHeight = Number(event.currentTarget.value);
+                    setDraft((settings) => ({
+                      ...settings,
+                      lineHeight,
+                    }));
+                  }}
+                  step={0.05}
+                  type="number"
+                  value={draft.lineHeight}
+                />
+              </label>
+            </div>
+
+            <div className="form-grid three-columns">
+              <label>
+                <span>Scrollback lines</span>
+                <input
+                  inputMode="numeric"
+                  max={100000}
+                  min={100}
+                  onChange={(event) => {
+                    const scrollbackLines = Number(event.currentTarget.value);
+                    setDraft((settings) => ({
+                      ...settings,
+                      scrollbackLines,
+                    }));
+                  }}
+                  step={100}
+                  type="number"
+                  value={draft.scrollbackLines}
+                />
+                <small className="field-hint">Default is 10,000. Valid range is 100 to 100,000.</small>
+              </label>
+              <label>
+                <span>Cursor style</span>
+                <select
+                  onChange={(event) => {
+                    const cursorStyle = event.currentTarget.value as TerminalCursorStyle;
+                    setDraft((settings) => ({
+                      ...settings,
+                      cursorStyle,
+                    }));
+                  }}
+                  value={draft.cursorStyle}
+                >
+                  <option value="block">Block</option>
+                  <option value="bar">Bar</option>
+                  <option value="underline">Underline</option>
+                </select>
+              </label>
+              <label>
+                <span>Default shell</span>
+                <select
+                  onChange={(event) => {
+                    const defaultShell = event.currentTarget.value;
+                    setDraft((settings) => ({
+                      ...settings,
+                      defaultShell,
+                    }));
+                  }}
+                  value={draft.defaultShell}
+                >
+                  <option value="powershell.exe">PowerShell</option>
+                  <option value="cmd.exe">Command Prompt</option>
+                  <option value="wsl.exe">WSL</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="settings-toggles">
+              <label>
+                <input
+                  checked={draft.copyOnSelect}
+                  onChange={(event) => {
+                    const copyOnSelect = event.currentTarget.checked;
+                    setDraft((settings) => ({
+                      ...settings,
+                      copyOnSelect,
+                    }));
+                  }}
+                  type="checkbox"
+                />
+                Copy selected terminal text automatically
+              </label>
+              <label>
+                <input
+                  checked={draft.confirmMultilinePaste}
+                  onChange={(event) => {
+                    const confirmMultilinePaste = event.currentTarget.checked;
+                    setDraft((settings) => ({
+                      ...settings,
+                      confirmMultilinePaste,
+                    }));
+                  }}
+                  type="checkbox"
+                />
+                Confirm multiline paste
+              </label>
+            </div>
+
+            {status ? <p className="settings-status success">{status}</p> : null}
+            {error ? <p className="settings-status error">{error}</p> : null}
+          </section>
+
+          <section className="settings-card settings-section" id="ssh-settings">
+            <div className="settings-section-header">
+              <div>
+                <p className="panel-label">SSH</p>
+                <h2>SSH defaults</h2>
+              </div>
+            </div>
+            <div className="settings-summary-grid">
+              <SettingsSummary label="Default user" value={sshSettings.defaultUser} />
+              <SettingsSummary label="Default port" value={String(sshSettings.defaultPort)} />
+              <SettingsSummary label="Default key" value={sshSettings.defaultKeyPath || "Not set"} />
+              <SettingsSummary label="ProxyJump" value={sshSettings.defaultProxyJump || "Not set"} />
+            </div>
+          </section>
+
+          <section className="settings-card settings-section" id="sftp-settings">
+            <div className="settings-section-header">
+              <div>
+                <p className="panel-label">SFTP</p>
+                <h2>Transfer defaults</h2>
+              </div>
+            </div>
+            <div className="settings-summary-grid compact">
+              <SettingsSummary
+                label="Overwrite behavior"
+                value={sftpSettings.overwriteBehavior === "overwrite" ? "Overwrite" : "Fail"}
+              />
+            </div>
+          </section>
+
+          <section className="settings-card settings-section" id="assistant-settings">
+            <div className="settings-section-header">
+              <div>
+                <p className="panel-label">Command assist</p>
+                <h2>AI provider</h2>
+              </div>
+            </div>
+            <div className="settings-summary-grid">
+              <SettingsSummary label="Status" value={aiProviderSettings.enabled ? "Enabled" : "Disabled"} />
+              <SettingsSummary label="Endpoint" value={formatProviderHost(aiProviderSettings.baseUrl)} />
+              <SettingsSummary label="Model" value={aiProviderSettings.model} />
+              <SettingsSummary label="CLI policy" value="Suggest only" />
+            </div>
+          </section>
+
+          <section className="settings-card settings-section" id="appearance-settings">
+            <div className="settings-section-header">
+              <div>
+                <p className="panel-label">Appearance</p>
+                <h2>Interface</h2>
+              </div>
+            </div>
+            <div className="settings-placeholder-list">
+              <button className="settings-placeholder-item" type="button">
+                <Languages size={17} />
+                <span>Language (i18n)</span>
+                <strong>To be implemented</strong>
+              </button>
+              <button className="settings-placeholder-item" type="button">
+                <Palette size={17} />
+                <span>Color Scheme</span>
+                <strong>To be implemented</strong>
+              </button>
+            </div>
+          </section>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function SettingsSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="settings-summary-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
+}
+
+function normalizeTerminalSettingsDraft(settings: TerminalSettings): TerminalSettings {
+  if (!settings.fontFamily.trim()) {
+    throw new Error("Font family is required.");
+  }
+  if (!settings.defaultShell.trim()) {
+    throw new Error("Default shell is required.");
+  }
+  if (!Number.isFinite(settings.fontSize) || settings.fontSize < 8 || settings.fontSize > 32) {
+    throw new Error("Terminal font size must be between 8 and 32.");
+  }
+  if (!Number.isFinite(settings.lineHeight) || settings.lineHeight < 1 || settings.lineHeight > 2) {
+    throw new Error("Terminal line height must be between 1.0 and 2.0.");
+  }
+  if (
+    !Number.isFinite(settings.scrollbackLines) ||
+    settings.scrollbackLines < 100 ||
+    settings.scrollbackLines > 100_000
+  ) {
+    throw new Error("Terminal scrollback must be between 100 and 100000 lines.");
+  }
+
+  return {
+    ...settings,
+    fontFamily: settings.fontFamily.trim(),
+    fontSize: Math.round(settings.fontSize),
+    lineHeight: Number(settings.lineHeight.toFixed(2)),
+    scrollbackLines: Math.round(settings.scrollbackLines),
+    defaultShell: settings.defaultShell.trim(),
+  };
 }
 
 function AssistantPanel() {

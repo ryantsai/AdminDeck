@@ -1588,7 +1588,7 @@ fn default_terminal_settings() -> TerminalSettings {
         font_size: 12,
         line_height: 1.25,
         cursor_style: "block".to_string(),
-        scrollback_lines: 5000,
+        scrollback_lines: 10_000,
         copy_on_select: false,
         confirm_multiline_paste: true,
         default_shell: if cfg!(target_os = "windows") {
