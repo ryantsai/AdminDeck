@@ -1,0 +1,97 @@
+- generic [ref=e3]:
+  - navigation "Primary" [ref=e4]:
+    - button "Dashboard" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+      - tooltip "Dashboard"
+    - button "Settings" [ref=e11] [cursor=pointer]:
+      - img [ref=e12]
+      - tooltip "Settings"
+  - complementary [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - paragraph [ref=e18]: AdminDeck
+        - heading "Connections" [level=1] [ref=e19]
+      - generic [ref=e20]:
+        - button "New folder" [ref=e21] [cursor=pointer]:
+          - img [ref=e22]
+        - button "Add connection" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+    - generic [ref=e26]:
+      - img [ref=e27]
+      - textbox [ref=e30]:
+        - /placeholder: Search hosts, folders
+    - button "Quick connect" [ref=e32] [cursor=pointer]:
+      - img [ref=e33]
+      - text: Quick connect
+    - generic "Connection tree"
+  - main [ref=e35]:
+    - generic "Workspace tabs" [ref=e36]:
+      - button "New local terminal" [ref=e37] [cursor=pointer]:
+        - img [ref=e38]
+    - generic [ref=e40]:
+      - img [ref=e41]
+      - heading "No active session" [level=2] [ref=e43]
+      - paragraph [ref=e44]: Open a Connection from the tree.
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - img [ref=e47]
+        - text: Local-first
+      - generic [ref=e49]: Telemetry off
+      - 'generic "Budget: <= 1.0 s to usable UI" [ref=e50]': UI ready 1.8 s
+      - 'generic "Budget: <= 100 ms for new local terminal tabs" [ref=e51]': Local timing pending
+      - 'generic "Budget: <= 150 ms after SSH authentication, excluding network time" [ref=e52]': SSH timing pending
+      - 'generic "Memory source pending | Budget: <= 150 MiB idle working set" [ref=e53]': Memory pending
+  - complementary [ref=e54]:
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - paragraph [ref=e57]: Command assist
+        - heading "Ask before execute" [level=2] [ref=e58]
+      - img [ref=e59]
+    - generic [ref=e61]:
+      - img [ref=e62]
+      - generic [ref=e65]:
+        - strong [ref=e66]: No active session
+        - generic [ref=e67]: Workspace
+    - generic [ref=e68]:
+      - generic [ref=e69]: Request
+      - textbox "Request" [ref=e70]:
+        - /placeholder: Draft a command for the active session
+    - button "Draft proposal" [disabled] [ref=e71]:
+      - img [ref=e72]
+      - text: Draft proposal
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]: Proposed command
+        - strong [ref=e77]: pending
+      - paragraph [ref=e78]: No proposal staged.
+      - generic [ref=e79]:
+        - button "Reject" [disabled] [ref=e80]:
+          - img [ref=e81]
+          - text: Reject
+        - button "Copy" [disabled] [ref=e84]:
+          - img [ref=e85]
+          - text: Copy
+        - button "Approve" [disabled] [ref=e88]:
+          - img [ref=e89]
+          - text: Approve
+    - generic [ref=e91]:
+      - generic [ref=e92]:
+        - img [ref=e93]
+        - generic [ref=e97]: SQLite connections
+        - strong [ref=e98]: Planned
+      - generic [ref=e99]:
+        - img [ref=e100]
+        - generic [ref=e103]: OS keychain
+        - strong [ref=e104]: No API key
+      - generic [ref=e105]:
+        - img [ref=e106]
+        - generic [ref=e110]: api.openai.com
+        - strong [ref=e111]: Disabled
+      - generic [ref=e112]:
+        - img [ref=e113]
+        - generic [ref=e116]: gpt-5-mini
+        - strong [ref=e117]: Model
+      - generic [ref=e118]:
+        - img [ref=e119]
+        - generic [ref=e121]: CLI agents
+        - strong [ref=e122]: Not configured

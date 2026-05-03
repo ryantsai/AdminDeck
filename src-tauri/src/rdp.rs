@@ -21,7 +21,7 @@ mod platform {
                 },
                 LibraryLoader::{GetProcAddress, LoadLibraryW},
                 Ole::{OleInitialize, DISPID_PROPERTYPUT},
-                Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I4},
+                Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I2, VT_I4},
             },
             UI::WindowsAndMessaging::{
                 CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, HWND_TOP,
@@ -34,6 +34,10 @@ mod platform {
     const HOST_WINDOW_LABEL: &str = "main";
     const HIDDEN_RDP_POSITION: i32 = -32_000;
     const LOCALE_USER_DEFAULT: u32 = 0x0400;
+    const RDP_MIN_DESKTOP_WIDTH: i32 = 640;
+    const RDP_MIN_DESKTOP_HEIGHT: i32 = 480;
+    const RDP_DISPLAY_ORIENTATION_LANDSCAPE: i32 = 0;
+    const RDP_DISPLAY_SCALE_FACTOR_PERCENT: i32 = 100;
     const RDP_PROGIDS: &[&str] = &[
         "MsTscAx.MsTscAx.13",
         "MsTscAx.MsTscAx.12",
@@ -103,6 +107,14 @@ mod platform {
         control: String,
     }
 
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpSessionStatus {
+        session_id: String,
+        connection_state: i32,
+        connected: bool,
+    }
+
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct UpdateRdpBoundsRequest {
@@ -134,6 +146,8 @@ mod platform {
         hwnd: HWND,
         owner: HWND,
         dispatch: IDispatch,
+        desktop_width: i32,
+        desktop_height: i32,
     }
 
     // These values are always created, used, and destroyed through closures
@@ -174,13 +188,12 @@ mod platform {
                 let scale_factor = host_window
                     .scale_factor()
                     .map_err(|error| format!("failed to read host window scale factor: {error}"))?;
-                let sessions = lock_sessions(&sessions)?;
+                let mut sessions = lock_sessions(&sessions)?;
                 let session = sessions
-                    .get(&request.session_id)
+                    .get_mut(&request.session_id)
                     .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
-                show_rdp(
-                    session.hwnd,
-                    session.owner,
+                show_and_resize_rdp(
+                    session,
                     scale_factor,
                     request.x,
                     request.y,
@@ -203,19 +216,18 @@ mod platform {
                 let scale_factor = host_window
                     .scale_factor()
                     .map_err(|error| format!("failed to read host window scale factor: {error}"))?;
-                let sessions = lock_sessions(&sessions)?;
-                let session = sessions
-                    .get(&request.session_id)
-                    .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
+                let mut sessions = lock_sessions(&sessions)?;
                 if request.visible {
                     for (other_session_id, other_session) in sessions.iter() {
                         if other_session_id != &request.session_id {
                             hide_rdp(other_session.hwnd)?;
                         }
                     }
-                    show_rdp(
-                        session.hwnd,
-                        session.owner,
+                    let session = sessions.get_mut(&request.session_id).ok_or_else(|| {
+                        format!("RDP session '{}' was not found", request.session_id)
+                    })?;
+                    show_and_resize_rdp(
+                        session,
                         scale_factor,
                         request.x,
                         request.y,
@@ -223,6 +235,9 @@ mod platform {
                         request.height,
                     )
                 } else {
+                    let session = sessions.get(&request.session_id).ok_or_else(|| {
+                        format!("RDP session '{}' was not found", request.session_id)
+                    })?;
                     hide_rdp(session.hwnd)
                 }
             })
@@ -245,6 +260,26 @@ mod platform {
                     }
                 }
                 Ok(())
+            })
+        }
+
+        pub fn session_status(
+            &self,
+            app: AppHandle,
+            request: RdpSimpleRequest,
+        ) -> Result<RdpSessionStatus, String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread(app, move |_app| {
+                let sessions = lock_sessions(&sessions)?;
+                let session = sessions
+                    .get(&request.session_id)
+                    .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
+                let connection_state = get_property_i32(&session.dispatch, "Connected")?;
+                Ok(RdpSessionStatus {
+                    session_id: request.session_id,
+                    connection_state,
+                    connected: is_rdp_connected_state(connection_state),
+                })
             })
         }
     }
@@ -323,8 +358,8 @@ mod platform {
             &user,
             port,
             request.password.as_deref(),
-            size.2,
-            size.3,
+            desktop_width_for(size.2),
+            desktop_height_for(size.3),
         )?;
         invoke_method(&dispatch, "Connect")?;
 
@@ -335,6 +370,8 @@ mod platform {
                 hwnd,
                 owner: parent_hwnd,
                 dispatch,
+                desktop_width: desktop_width_for(size.2),
+                desktop_height: desktop_height_for(size.3),
             },
         );
 
@@ -430,8 +467,8 @@ mod platform {
             set_property_string(dispatch, "Domain", domain)?;
         }
         set_property_i32(dispatch, "ColorDepth", 32)?;
-        set_property_i32(dispatch, "DesktopWidth", desktop_width.max(640))?;
-        set_property_i32(dispatch, "DesktopHeight", desktop_height.max(480))?;
+        set_property_i32(dispatch, "DesktopWidth", desktop_width)?;
+        set_property_i32(dispatch, "DesktopHeight", desktop_height)?;
         set_optional_property_bool(dispatch, "PromptForCredentials", password.is_none())?;
         set_optional_property_string(dispatch, "ConnectingText", "Connecting to remote desktop")?;
         set_optional_property_string(dispatch, "DisconnectedText", "Remote desktop disconnected")?;
@@ -590,8 +627,9 @@ mod platform {
         }
     }
 
-    fn invoke_method(dispatch: &IDispatch, name: &str) -> Result<(), String> {
+    fn get_property_i32(dispatch: &IDispatch, name: &str) -> Result<i32, String> {
         let dispid = get_dispid(dispatch, name)?;
+        let mut result = VARIANT::default();
         let params = DISPPARAMS::default();
         unsafe {
             dispatch
@@ -599,14 +637,141 @@ mod platform {
                     dispid,
                     &windows::core::GUID::zeroed(),
                     LOCALE_USER_DEFAULT,
-                    DISPATCH_METHOD,
+                    DISPATCH_PROPERTYGET,
                     &params,
-                    None,
+                    Some(&mut result),
                     None,
                     None,
                 )
-                .map_err(|error| format!("failed to invoke RDP ActiveX method '{name}': {error}"))
+                .map_err(|error| {
+                    format!("failed to read RDP ActiveX property '{name}': {error}")
+                })?;
+            let variant_data = &*result.Anonymous.Anonymous;
+            let value = match variant_data.vt {
+                VT_I2 => i32::from(variant_data.Anonymous.iVal),
+                VT_I4 => variant_data.Anonymous.lVal,
+                VT_BOOL => {
+                    if variant_data.Anonymous.boolVal.as_bool() {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                _ => {
+                    let _ = VariantClear(&mut result);
+                    return Err(format!(
+                        "RDP ActiveX property '{name}' did not return an integer state"
+                    ));
+                }
+            };
+            let _ = VariantClear(&mut result);
+            Ok(value)
         }
+    }
+
+    fn invoke_method(dispatch: &IDispatch, name: &str) -> Result<(), String> {
+        invoke_method_with_i32_args(dispatch, name, &[])
+    }
+
+    fn invoke_method_with_i32_args(
+        dispatch: &IDispatch,
+        name: &str,
+        args: &[i32],
+    ) -> Result<(), String> {
+        let dispid = get_dispid(dispatch, name)?;
+        let mut variants: Vec<VARIANT> =
+            args.iter().rev().map(|value| variant_i4(*value)).collect();
+        let mut params = DISPPARAMS {
+            rgvarg: if variants.is_empty() {
+                std::ptr::null_mut()
+            } else {
+                variants.as_mut_ptr()
+            },
+            rgdispidNamedArgs: std::ptr::null_mut(),
+            cArgs: variants.len() as u32,
+            cNamedArgs: 0,
+        };
+        let mut result = VARIANT::default();
+        unsafe {
+            let invoke_result = dispatch
+                .Invoke(
+                    dispid,
+                    &windows::core::GUID::zeroed(),
+                    LOCALE_USER_DEFAULT,
+                    DISPATCH_METHOD,
+                    &mut params,
+                    Some(&mut result),
+                    None,
+                    None,
+                )
+                .map_err(|error| format!("failed to invoke RDP ActiveX method '{name}': {error}"));
+            for variant in variants.iter_mut() {
+                let _ = VariantClear(variant);
+            }
+            let _ = VariantClear(&mut result);
+            invoke_result
+        }
+    }
+
+    fn variant_i4(value: i32) -> VARIANT {
+        let mut variant = VARIANT::default();
+        unsafe {
+            let variant_data = &mut *variant.Anonymous.Anonymous;
+            variant_data.vt = VT_I4;
+            variant_data.Anonymous.lVal = value;
+        }
+        variant
+    }
+
+    fn show_and_resize_rdp(
+        session: &mut RdpSession,
+        scale_factor: f64,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    ) -> Result<(), String> {
+        let rect = show_rdp(
+            session.hwnd,
+            session.owner,
+            scale_factor,
+            x,
+            y,
+            width,
+            height,
+        )?;
+        let desktop_width = desktop_width_for(rect.2);
+        let desktop_height = desktop_height_for(rect.3);
+        if session.desktop_width != desktop_width || session.desktop_height != desktop_height {
+            if resize_remote_desktop(&session.dispatch, desktop_width, desktop_height).is_ok() {
+                session.desktop_width = desktop_width;
+                session.desktop_height = desktop_height;
+            }
+        }
+        Ok(())
+    }
+
+    fn resize_remote_desktop(
+        dispatch: &IDispatch,
+        desktop_width: i32,
+        desktop_height: i32,
+    ) -> Result<(), String> {
+        invoke_method_with_i32_args(
+            dispatch,
+            "UpdateSessionDisplaySettings",
+            &[
+                desktop_width,
+                desktop_height,
+                desktop_width,
+                desktop_height,
+                RDP_DISPLAY_ORIENTATION_LANDSCAPE,
+                RDP_DISPLAY_SCALE_FACTOR_PERCENT,
+                RDP_DISPLAY_SCALE_FACTOR_PERCENT,
+            ],
+        )
+        .or_else(|_| {
+            invoke_method_with_i32_args(dispatch, "Reconnect", &[desktop_width, desktop_height])
+        })
     }
 
     fn show_rdp(
@@ -617,7 +782,7 @@ mod platform {
         y: f64,
         width: f64,
         height: f64,
-    ) -> Result<(), String> {
+    ) -> Result<(i32, i32, i32, i32), String> {
         let rect = scaled_rect(x, y, width, height, scale_factor);
         let origin = client_to_screen_point(owner, rect.0, rect.1)?;
         unsafe {
@@ -633,7 +798,7 @@ mod platform {
             .map_err(|error| format!("failed to position RDP control: {error}"))?;
             let _ = ShowWindow(hwnd, SW_SHOW);
         }
-        Ok(())
+        Ok((origin.0, origin.1, rect.2, rect.3))
     }
 
     fn client_to_screen_point(owner: HWND, x: i32, y: i32) -> Result<(i32, i32), String> {
@@ -680,6 +845,18 @@ mod platform {
             (width.max(1.0) * scale_factor).round() as i32,
             (height.max(1.0) * scale_factor).round() as i32,
         )
+    }
+
+    fn desktop_width_for(width: i32) -> i32 {
+        width.max(RDP_MIN_DESKTOP_WIDTH)
+    }
+
+    fn desktop_height_for(height: i32) -> i32 {
+        height.max(RDP_MIN_DESKTOP_HEIGHT)
+    }
+
+    fn is_rdp_connected_state(connection_state: i32) -> bool {
+        connection_state != 0
     }
 
     fn run_on_main_thread<F, T>(app: AppHandle, f: F) -> Result<T, String>
@@ -856,6 +1033,21 @@ mod platform {
                 (10, 20, 800, 600)
             );
         }
+
+        #[test]
+        fn enforces_rdp_desktop_minimum_size() {
+            assert_eq!(desktop_width_for(320), RDP_MIN_DESKTOP_WIDTH);
+            assert_eq!(desktop_height_for(240), RDP_MIN_DESKTOP_HEIGHT);
+            assert_eq!(desktop_width_for(1200), 1200);
+            assert_eq!(desktop_height_for(900), 900);
+        }
+
+        #[test]
+        fn treats_zero_rdp_connected_state_as_disconnected() {
+            assert!(!is_rdp_connected_state(0));
+            assert!(is_rdp_connected_state(1));
+            assert!(is_rdp_connected_state(2));
+        }
     }
 }
 
@@ -889,6 +1081,14 @@ mod platform {
         host: String,
         port: u16,
         control: String,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpSessionStatus {
+        session_id: String,
+        connection_state: i32,
+        connected: bool,
     }
 
     #[derive(Deserialize)]
@@ -954,6 +1154,22 @@ mod platform {
         ) -> Result<(), String> {
             Ok(())
         }
+
+        pub fn session_status(
+            &self,
+            _app: AppHandle,
+            request: RdpSimpleRequest,
+        ) -> Result<RdpSessionStatus, String> {
+            Ok(RdpSessionStatus {
+                session_id: request.session_id,
+                connection_state: 0,
+                connected: is_rdp_connected_state(0),
+            })
+        }
+    }
+
+    fn is_rdp_connected_state(connection_state: i32) -> bool {
+        connection_state != 0
     }
 
     impl StartRdpSessionRequest {

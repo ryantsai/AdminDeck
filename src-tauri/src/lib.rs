@@ -605,6 +605,15 @@ fn close_rdp_session(
     rdp_sessions.close_session(app, request)
 }
 
+#[tauri::command]
+fn get_rdp_session_status(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::RdpSimpleRequest,
+) -> Result<rdp::RdpSessionStatus, String> {
+    rdp_sessions.session_status(app, request)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     logging::init();
@@ -698,7 +707,8 @@ pub fn run() {
             start_rdp_session,
             update_rdp_bounds,
             set_rdp_visibility,
-            close_rdp_session
+            close_rdp_session,
+            get_rdp_session_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running AdminDeck");

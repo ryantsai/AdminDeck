@@ -99,6 +99,10 @@ button {
   position: relative;
 }
 
+.rail-button-settings {
+  margin-top: auto;
+}
+
 .rail-button:hover,
 .rail-button.active {
   background: rgba(255, 255, 255, 0.12);

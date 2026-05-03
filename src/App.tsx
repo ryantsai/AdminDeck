@@ -716,7 +716,7 @@ function ActivityRail({
         </span>
       </button>
       <button
-        className={`rail-button ${activePage === "settings" ? "active" : ""}`}
+        className={`rail-button rail-button-settings ${activePage === "settings" ? "active" : ""}`}
         aria-label="Settings"
         onClick={() => onNavigate("settings")}
       >
@@ -1346,7 +1346,6 @@ function ConnectionSidebar() {
     <aside className="connection-sidebar">
       <div className="sidebar-header">
         <div>
-          <p className="panel-label">AdminDeck</p>
           <h1>Connections</h1>
         </div>
         <div className="sidebar-actions">
@@ -2904,10 +2903,12 @@ function RemoteDesktopWorkspace({
     (state) => state.markConnectionSessionStarted,
   );
   const markConnectionSessionEnded = useWorkspaceStore((state) => state.markConnectionSessionEnded);
+  const closeTab = useWorkspaceStore((state) => state.closeTab);
   const [suppressed, setSuppressed] = useState(false);
   const [rdpError, setRdpError] = useState("");
   const [rdpStatus, setRdpStatus] = useState("");
   const canStartRdp = connection?.type === "rdp";
+  const closingAfterDisconnectRef = useRef(false);
 
   const computeBounds = () => {
     const node = hostRef.current;
@@ -3112,6 +3113,36 @@ function RemoteDesktopWorkspace({
     pushRdpVisibility();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canStartRdp, isActive, suppressed]);
+
+  useEffect(() => {
+    if (!canStartRdp || !isTauriRuntime()) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      const sessionId = sessionIdRef.current;
+      if (!sessionStartedRef.current || !sessionId || closingAfterDisconnectRef.current) {
+        return;
+      }
+
+      void invokeCommand("get_rdp_session_status", {
+        request: { sessionId },
+      })
+        .then((status) => {
+          if (!status.connected && sessionIdRef.current === status.sessionId) {
+            closingAfterDisconnectRef.current = true;
+            closeTab(tab.id);
+          }
+        })
+        .catch((error) => {
+          setRdpError(error instanceof Error ? error.message : String(error));
+        });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [canStartRdp, closeTab, tab.id]);
 
   return (
     <section

@@ -279,6 +279,12 @@ export interface RdpSessionStarted {
   control: string;
 }
 
+export interface RdpSessionStatus {
+  sessionId: string;
+  connectionState: number;
+  connected: boolean;
+}
+
 export interface UpdateRdpBoundsRequest {
   sessionId: string;
   x: number;
@@ -652,6 +658,10 @@ type CommandMap = {
   close_rdp_session: {
     args: { request: RdpSimpleRequest };
     result: null;
+  };
+  get_rdp_session_status: {
+    args: { request: RdpSimpleRequest };
+    result: RdpSessionStatus;
   };
 };
 
