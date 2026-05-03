@@ -63,7 +63,7 @@ Represents all openable resources as saved connections. v0.1 connection types:
 
 SFTP is a related workspace surface opened from an SSH Connection, not a standalone saved Connection type.
 
-SSH Connections may store a non-secret `useTmuxSessions` preference and stable tmux connection prefix. These values describe how future terminal Sessions should launch; they do not represent a live remote process.
+SSH Connections may store a non-secret `useTmuxSessions` preference. This value describes how future terminal Sessions should launch; it does not represent a live remote process.
 
 Later connection types:
 
@@ -77,7 +77,7 @@ Owns root-level saved Connections, optional folders, subfolders, search/filter, 
 
 Current implementation note: a Connection may have no folder and live directly in the root of the tree. Folders may contain Connections and subfolders. Status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
 
-For tmux-enabled SSH Connections, per-Pane tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. The Connection stores only the launch preference and naming prefix.
+For tmux-enabled SSH Connections, per-Pane friendly tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. Names use the `admindeck-<sci-fi-name><number>` shape, for example `admindeck-cockpit001`. The Connection stores only the launch preference.
 
 ### Terminal Session
 

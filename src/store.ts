@@ -32,6 +32,111 @@ import type {
 
 const LAYOUT_STORAGE_PREFIX = "admindeck.layout.";
 const TMUX_SESSION_STORAGE_PREFIX = "admindeck.tmuxSessions.";
+// Stable ASCII slugs for remote tmux session names. Keep these code-facing and
+// locale-neutral; future UI localization can translate display labels separately
+// without renaming remote tmux sessions.
+const TMUX_SESSION_NAMES = [
+  "airlock",
+  "andromeda",
+  "aperture",
+  "astromech",
+  "atlantis",
+  "babylon",
+  "battlestar",
+  "bladerunner",
+  "bluebox",
+  "borgcube",
+  "ceti",
+  "cloudcity",
+  "cockpit",
+  "cosmos",
+  "cryochamber",
+  "cyberdyne",
+  "cyberdeck",
+  "cygnus",
+  "darkmatter",
+  "deathstar",
+  "deepfield",
+  "defiant",
+  "delorean",
+  "droid",
+  "dropship",
+  "dyson",
+  "eclipse",
+  "elysium",
+  "enterprise",
+  "eventhorizon",
+  "exomoon",
+  "expanse",
+  "falcon",
+  "farpoint",
+  "fluxcapacitor",
+  "galactica",
+  "ganymede",
+  "ghostshell",
+  "hal",
+  "holodeck",
+  "hologram",
+  "hyperdrive",
+  "hyperspace",
+  "ionstorm",
+  "jupiter",
+  "kessel",
+  "klingon",
+  "lightspeed",
+  "luna",
+  "matrix",
+  "mechwarrior",
+  "millennium",
+  "monolith",
+  "moonbase",
+  "mothership",
+  "nebuchadnezzar",
+  "nebula",
+  "neptune",
+  "nostromo",
+  "nova",
+  "oberon",
+  "odyssey",
+  "orion",
+  "pegasus",
+  "photon",
+  "planetfall",
+  "prometheus",
+  "quantum",
+  "quasar",
+  "replicant",
+  "rigel",
+  "rocket",
+  "rocinante",
+  "saturn",
+  "serenity",
+  "singularity",
+  "skynet",
+  "solaris",
+  "spacedock",
+  "spacewalk",
+  "stargate",
+  "starliner",
+  "starship",
+  "tachyon",
+  "tardis",
+  "terraformer",
+  "titan",
+  "tricorder",
+  "triton",
+  "uplink",
+  "vger",
+  "vortex",
+  "voyager",
+  "vulcan",
+  "warpdrive",
+  "wormhole",
+  "xwing",
+  "zefram",
+  "zenith",
+  "zion",
+];
 
 function loadStoredLayout(connectionId: string): StoredConnectionLayout | undefined {
   if (typeof window === "undefined") {
@@ -94,17 +199,13 @@ function connectionUsesTmux(connection: Connection) {
   return connection.type === "ssh" && connection.useTmuxSessions !== false;
 }
 
-function tmuxPrefixFor(connection: Connection) {
-  return normalizeTmuxIdPart(connection.tmuxConnectionId ?? `admindeck-${connection.id}`);
-}
-
 function tmuxSessionIdsForConnection(connection: Connection, count: number) {
   if (!connectionUsesTmux(connection)) {
     return [];
   }
   const sessionIds = loadStoredTmuxSessionIds(connection.id).slice(0, count);
   while (sessionIds.length < count) {
-    sessionIds.push(generateTmuxSessionId(connection));
+    sessionIds.push(generateTmuxSessionId(sessionIds));
   }
   persistTmuxSessionIds(connection.id, sessionIds);
   return sessionIds;
@@ -115,33 +216,39 @@ function appendTmuxSessionId(connection: Connection) {
     return undefined;
   }
   const sessionIds = loadStoredTmuxSessionIds(connection.id);
-  const sessionId = generateTmuxSessionId(connection);
+  const sessionId = generateTmuxSessionId(sessionIds);
   sessionIds.push(sessionId);
   persistTmuxSessionIds(connection.id, sessionIds);
   return sessionId;
 }
 
-function generateTmuxSessionId(connection: Connection) {
-  return `${tmuxPrefixFor(connection)}-${randomTmuxSuffix()}`;
-}
-
-function randomTmuxSuffix() {
-  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
-    const bytes = new Uint8Array(4);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+function generateTmuxSessionId(existingSessionIds: string[]) {
+  const nextNumber = existingSessionIds.length + 1;
+  for (let attempt = 0; attempt < TMUX_SESSION_NAMES.length * 2; attempt += 1) {
+    const sessionId = `admindeck-${randomTmuxName()}${formatTmuxSessionNumber(nextNumber)}`;
+    if (!existingSessionIds.includes(sessionId)) {
+      return sessionId;
+    }
   }
-  return `${Date.now().toString(36)}${Math.floor(Math.random() * 0xffff).toString(16)}`;
+  return `admindeck-${randomTmuxName()}${formatTmuxSessionNumber(Date.now() % 1000)}`;
 }
 
-function normalizeTmuxIdPart(value: string) {
-  return (
-    value
-      .trim()
-      .replace(/[^A-Za-z0-9_-]+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "") || "admindeck"
-  );
+function randomTmuxName() {
+  const index = randomTmuxIndex(TMUX_SESSION_NAMES.length);
+  return TMUX_SESSION_NAMES[index] ?? "stargate";
+}
+
+function randomTmuxIndex(max: number) {
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const bytes = new Uint32Array(1);
+    crypto.getRandomValues(bytes);
+    return (bytes[0] ?? 0) % max;
+  }
+  return Math.floor(Math.random() * max);
+}
+
+function formatTmuxSessionNumber(value: number) {
+  return String(Math.max(1, value)).padStart(3, "0");
 }
 
 function buildPanesForConnection(connection: Connection, count: number): TerminalPane[] {

@@ -916,16 +916,18 @@ h2 {
   position: absolute;
   top: 30px;
   right: 0;
-  z-index: 20;
+  z-index: 60;
   width: min(360px, 80vw);
   max-height: 320px;
   padding: 10px;
   overflow: auto;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--border);
+  color: #d9e5f4;
+  background: #0f1722;
+  border: 1px solid #7f90a7;
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
 .tmux-session-menu header,
@@ -938,7 +940,7 @@ h2 {
 
 .tmux-session-menu p {
   margin: 8px 0 0;
-  color: var(--text-muted);
+  color: #9fb0c6;
   font-size: 12px;
 }
 
@@ -951,21 +953,38 @@ h2 {
 .tmux-session-row {
   min-width: 0;
   padding: 7px;
-  background: var(--panel-soft);
-  border: 1px solid var(--border);
+  color: #d9e5f4;
+  background: #151f2c;
+  border: 1px solid #526178;
   border-radius: 6px;
 }
 
 .tmux-session-row span {
   display: grid;
   min-width: 0;
+  gap: 2px;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .tmux-session-row strong,
 .tmux-session-row small {
+  max-width: none;
+  margin: 0;
   overflow: hidden;
+  color: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tmux-session-row strong {
+  color: #e5edf8;
+}
+
+.tmux-session-row small {
+  color: #9fb0c6;
+  font-size: 11px;
 }
 
 .terminal-pane-action {
