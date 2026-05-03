@@ -159,6 +159,14 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Add MobaXterm/RDCMan import.
 - [ ] Add SFTP folder sync/diff/resume.
 
+### Personal Markdown Wiki
+
+- [ ] Add a fully fledged personal markdown wiki with durable storage, page tree, search, and tagging that lives alongside Connections in the workspace.
+- [ ] Add a markdown text editor with live preview, syntax highlighting, and link-aware editing for wiki pages.
+- [ ] Support deep links from wiki pages into Connections so a page can launch the referenced Connection in the workspace (e.g. open SSH terminal, SFTP, RDP, or VNC tab).
+- [ ] Support backlinks and inter-page links between wiki pages.
+- [ ] Decide wiki storage location (app data vs. user-chosen folder) and document any sync/portability implications before implementation.
+
 ### Distribution, Sync, and Trust
 
 - [ ] Add Windows installed-app auto-update mechanism for v0.2.

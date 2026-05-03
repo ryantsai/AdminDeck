@@ -2282,8 +2282,12 @@ progress {
   background: #9aa0a6;
 }
 
+.assistant-send-button:not(:disabled) {
+  background: var(--accent);
+}
+
 .assistant-send-button:not(:disabled):hover {
-  background: #80868b;
+  background: #1d4ed8;
 }
 
 .assistant-send-button:disabled {

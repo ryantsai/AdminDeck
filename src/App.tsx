@@ -7614,6 +7614,13 @@ function SettingsPage({
   }
 
   async function handleClearAiProviderSettings() {
+    const shouldClear = window.confirm(
+      "Clear all AI provider settings and remove the saved AI API key?",
+    );
+    if (!shouldClear) {
+      return;
+    }
+
     try {
       setAiError("");
       setAiStatus("");
@@ -8163,6 +8170,7 @@ function AssistantPanel({
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [chatError, setChatError] = useState("");
   const [terminalSendStatus, setTerminalSendStatus] = useState("");
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const contextLabel = activeTab
     ? `${activeTab.title} - ${workspaceKindLabel(activeTab)}`
     : "No active session";
@@ -8190,6 +8198,10 @@ function AssistantPanel({
 
   function handleChatSubmit(event: FormEvent) {
     event.preventDefault();
+    submitAssistantPrompt();
+  }
+
+  function submitAssistantPrompt() {
     const normalizedPrompt = prompt.trim();
     if (!normalizedPrompt) {
       return;
@@ -8226,6 +8238,33 @@ function AssistantPanel({
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setPrompt("");
     setChatError("");
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.ctrlKey) {
+      event.preventDefault();
+      const textarea = event.currentTarget;
+      const selectionStart = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
+      const nextPrompt = `${prompt.slice(0, selectionStart)}\n${prompt.slice(selectionEnd)}`;
+      const nextCaret = selectionStart + 1;
+      setPrompt(nextPrompt);
+      window.requestAnimationFrame(() => {
+        composerTextareaRef.current?.setSelectionRange(nextCaret, nextCaret);
+      });
+      return;
+    }
+
+    if (event.metaKey || event.shiftKey || event.altKey) {
+      return;
+    }
+
+    event.preventDefault();
+    submitAssistantPrompt();
   }
 
   return (
@@ -8323,6 +8362,8 @@ function AssistantPanel({
 
       <form className="assistant-chat-composer" onSubmit={handleChatSubmit}>
         <textarea
+          ref={composerTextareaRef}
+          onKeyDown={handleComposerKeyDown}
           onChange={(event) => setPrompt(event.currentTarget.value)}
           placeholder="Ask AI Assistant anything."
           rows={3}

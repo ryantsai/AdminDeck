@@ -117,6 +117,24 @@ pub struct AiProviderSettings {
     codex_cli_path: Option<String>,
 }
 
+impl AiProviderSettings {
+    pub(crate) fn provider_kind(&self) -> &str {
+        &self.provider_kind
+    }
+
+    pub(crate) fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    pub(crate) fn model(&self) -> &str {
+        &self.model
+    }
+
+    pub(crate) fn reasoning_effort(&self) -> &str {
+        &self.reasoning_effort
+    }
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionTree {
