@@ -2434,8 +2434,7 @@ function QuickConnectMenu({
       port: normalizedSshPort,
       authMethod: "agent",
       type: "ssh",
-      useTmuxSessions: true,
-      tmuxConnectionId: uniqueRuntimeId("admindeck"),
+      useTmuxSessions: false,
       status: "idle",
     });
   }
