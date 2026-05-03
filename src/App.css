@@ -2414,6 +2414,19 @@ progress {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.input-with-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.input-with-button .toolbar-button {
+  height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
 .connection-dialog .dialog-actions {
   justify-content: flex-end;
   padding-top: 3px;

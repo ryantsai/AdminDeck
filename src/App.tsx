@@ -111,6 +111,7 @@ import {
   invokeCommand,
   isTauriRuntime,
   saveTextFile,
+  selectKeyFile,
   type CaptureScreenshotRequest,
   type LocalDirectoryEntry,
   type SftpDirectoryEntry,
@@ -1814,6 +1815,7 @@ function ConnectionDialog({
 }) {
   const [connectionType, setConnectionType] = useState<ConnectionTileType | "">("");
   const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
+  const [keyPath, setKeyPath] = useState(sshSettings.defaultKeyPath ?? "");
   const usesSshDefaults = connectionType === "ssh";
   const usesRemoteDesktopFields = connectionType
     ? isRemoteDesktopConnectionType(connectionType)
@@ -1872,6 +1874,13 @@ function ConnectionDialog({
       urlCredentialUsername: undefined,
       urlPassword: undefined,
     });
+  }
+
+  async function handleBrowseKeyFile() {
+    const selectedPath = await selectKeyFile(keyPath || sshSettings.defaultKeyPath);
+    if (selectedPath) {
+      setKeyPath(selectedPath);
+    }
   }
 
   return (
@@ -2048,11 +2057,17 @@ function ConnectionDialog({
                 ) : authMethod === "keyFile" ? (
                   <label>
                     <span>Key path</span>
-                    <input
-                      name="keyPath"
-                      defaultValue={sshSettings.defaultKeyPath ?? ""}
-                      placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
-                    />
+                    <div className="input-with-button">
+                      <input
+                        name="keyPath"
+                        onChange={(event) => setKeyPath(event.currentTarget.value)}
+                        placeholder="C:\\Users\\ryan\\.ssh\\id_ed25519"
+                        value={keyPath}
+                      />
+                      <button className="toolbar-button" onClick={handleBrowseKeyFile} type="button">
+                        Browse
+                      </button>
+                    </div>
                   </label>
                 ) : null}
                 <label className="checkbox-row">

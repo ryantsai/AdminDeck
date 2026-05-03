@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import type {
   AiProviderSettings,
@@ -674,6 +674,21 @@ export function invokeCommand<Name extends keyof CommandMap>(
   }
 
   return invoke<CommandMap[Name]["result"]>(name, args);
+}
+
+export async function selectKeyFile(defaultPath?: string) {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+
+  const selectedPath = await openDialog({
+    defaultPath,
+    directory: false,
+    multiple: false,
+    title: "Select SSH key file",
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
 }
 
 export async function saveTextFile(defaultFilename: string, contents: string) {
