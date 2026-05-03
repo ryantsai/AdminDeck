@@ -84,6 +84,7 @@ pub(crate) struct NativeSshCommandRequest {
     pub auth: NativeSshAuth,
     pub known_hosts_path: PathBuf,
     pub command: String,
+    pub timeout_seconds: Option<u64>,
 }
 
 #[derive(Clone)]
@@ -390,7 +391,19 @@ pub(crate) fn run_remote_command(request: NativeSshCommandRequest) -> Result<Str
         .build()
         .map_err(|error| format!("failed to create native SSH command runtime: {error}"))?;
 
-    runtime.block_on(run_remote_command_async(request))
+    let timeout_seconds = request.timeout_seconds;
+    if let Some(timeout_seconds) = timeout_seconds {
+        runtime.block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(timeout_seconds),
+                run_remote_command_async(request),
+            )
+            .await
+            .map_err(|_| format!("SSH command timed out after {timeout_seconds} seconds"))?
+        })
+    } else {
+        runtime.block_on(run_remote_command_async(request))
+    }
 }
 
 async fn run_remote_command_async(request: NativeSshCommandRequest) -> Result<String, String> {

@@ -208,6 +208,7 @@ export interface AgentRunRequest {
   prompt: string;
   contextLabel: string;
   selectedOutput?: string;
+  systemContext?: string;
   messages: AgentChatMessage[];
 }
 
@@ -554,6 +555,20 @@ type CommandMap = {
         authMethod?: "keyFile" | "password" | "agent";
         secretOwnerId?: string;
         tmuxSessionId: string;
+      };
+    };
+    result: string;
+  };
+  inspect_ssh_system_context: {
+    args: {
+      request: {
+        host: string;
+        user: string;
+        port?: number;
+        keyPath?: string;
+        proxyJump?: string;
+        authMethod?: "keyFile" | "password" | "agent";
+        secretOwnerId?: string;
       };
     };
     result: string;

@@ -2017,6 +2017,26 @@ progress {
   font-size: 12px;
 }
 
+.assistant-view-all-button {
+  min-width: 0;
+  padding: 0;
+  color: #6f7378;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.assistant-view-all-button:not(:disabled):hover {
+  color: #202124;
+  text-decoration: underline;
+}
+
+.assistant-view-all-button:disabled {
+  color: #bdc1c6;
+  cursor: not-allowed;
+}
+
 .assistant-task-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2112,14 +2132,65 @@ progress {
   line-height: 1.5;
 }
 
+.assistant-message-bubble {
+  min-width: 0;
+}
+
+.assistant-message-actions {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  color: #8c8f94;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.assistant-message:hover .assistant-message-actions,
+.assistant-message:focus-within .assistant-message-actions {
+  display: inline-flex;
+}
+
+.assistant-message-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  color: #5f6368;
+  background: #f1f3f4;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.assistant-message-actions button:hover {
+  color: #202124;
+  background: #e3e6ea;
+}
+
 .assistant-message.user {
-  justify-self: end;
-  max-width: 92%;
+  justify-items: end;
+  justify-self: stretch;
+  max-width: 98%;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.assistant-message.user .assistant-message-bubble {
   padding: 8px 10px;
   color: #202124;
   background: #ffffff;
   border: 1px solid #dadce0;
   border-radius: 8px;
+}
+
+.assistant-message.user .assistant-message-actions {
+  justify-self: end;
 }
 
 .assistant-waiting {
@@ -2145,6 +2216,102 @@ progress {
   border-top-color: #4b70f5;
   border-radius: 50%;
   animation: assistant-spinner-spin 0.78s linear infinite;
+}
+
+.assistant-chat-history-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(32, 33, 36, 0.28);
+}
+
+.assistant-chat-history-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(520px, calc(100vw - 48px));
+  max-height: min(620px, calc(100vh - 48px));
+  overflow: hidden;
+  color: #202124;
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(32, 33, 36, 0.24);
+}
+
+.assistant-chat-history-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eceff3;
+}
+
+.assistant-chat-history-dialog header > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.assistant-chat-history-dialog header span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.assistant-chat-history-dialog header small {
+  color: #7a7e84;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.assistant-chat-history-list {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.assistant-chat-history-row {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  color: #404246;
+  text-align: left;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.assistant-chat-history-row:hover {
+  background: #f1f3f4;
+}
+
+.assistant-chat-history-row strong,
+.assistant-chat-history-row span,
+.assistant-chat-history-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-chat-history-row strong {
+  color: #202124;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.assistant-chat-history-row span,
+.assistant-chat-history-row small {
+  color: #7a7e84;
+  font-size: 12px;
 }
 
 .markdown-content {
@@ -2204,6 +2371,12 @@ progress {
   border-bottom: 1px solid #3a3c42;
   font-size: 11px;
   font-weight: 700;
+}
+
+.markdown-code-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .assistant-code-send {

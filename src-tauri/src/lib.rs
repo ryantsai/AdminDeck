@@ -389,6 +389,16 @@ fn capture_tmux_pane(
 }
 
 #[tauri::command]
+fn inspect_ssh_system_context(
+    app: tauri::AppHandle,
+    sessions: tauri::State<'_, sessions::SessionManager>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    request: sessions::TmuxConnectionRequest,
+) -> Result<String, String> {
+    sessions.inspect_ssh_system_context(app, &secrets, request)
+}
+
+#[tauri::command]
 fn launch_elevated_terminal(
     request: sessions::LaunchElevatedTerminalRequest,
 ) -> Result<(), String> {
@@ -705,6 +715,7 @@ pub fn run() {
             close_tmux_session,
             set_tmux_mouse,
             capture_tmux_pane,
+            inspect_ssh_system_context,
             launch_elevated_terminal,
             start_sftp_session,
             list_sftp_directory,

@@ -8,12 +8,13 @@ use std::{
     process::Command as ProcessCommand,
     sync::Mutex,
     thread,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Emitter};
 
 pub struct SessionManager {
     sessions: Mutex<HashMap<String, TerminalSession>>,
+    ssh_context_cache: Mutex<HashMap<String, Result<String, String>>>,
 }
 
 struct TerminalSession {
@@ -148,6 +149,7 @@ impl SessionManager {
     pub fn new() -> Self {
         Self {
             sessions: Mutex::new(HashMap::new()),
+            ssh_context_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -342,6 +344,37 @@ impl SessionManager {
             &request.connection,
             tmux_capture_pane_command(&tmux_session_id),
         )
+    }
+
+    pub fn inspect_ssh_system_context(
+        &self,
+        app: AppHandle,
+        secrets: &secrets::Secrets,
+        request: TmuxConnectionRequest,
+    ) -> Result<String, String> {
+        let cache_key = ssh_system_context_cache_key(&request);
+        if let Some(cached) = self
+            .ssh_context_cache
+            .lock()
+            .map_err(|_| "SSH system context cache lock is poisoned".to_string())?
+            .get(&cache_key)
+            .cloned()
+        {
+            return cached;
+        }
+
+        let result = run_ssh_command(
+            app,
+            secrets,
+            &request,
+            ssh_system_context_command(),
+            Some(Duration::from_secs(3)),
+        );
+        self.ssh_context_cache
+            .lock()
+            .map_err(|_| "SSH system context cache lock is poisoned".to_string())?
+            .insert(cache_key, result.clone());
+        result
     }
 
     pub fn write_terminal_input(&self, request: TerminalInputRequest) -> Result<(), String> {
@@ -585,6 +618,16 @@ fn run_tmux_command(
     request: &TmuxConnectionRequest,
     command: String,
 ) -> Result<String, String> {
+    run_ssh_command(app, secrets, request, command, None)
+}
+
+fn run_ssh_command(
+    app: AppHandle,
+    secrets: &secrets::Secrets,
+    request: &TmuxConnectionRequest,
+    command: String,
+    timeout: Option<Duration>,
+) -> Result<String, String> {
     let terminal_request = terminal_request_for_tmux(request);
     let password = connection_password_for(secrets, &terminal_request);
     let auth_method = ssh_auth_method_for(&terminal_request, password.as_deref())?;
@@ -596,10 +639,11 @@ fn run_tmux_command(
             auth: native_ssh_auth_for(&terminal_request, password, &auth_method)?,
             known_hosts_path: ssh::app_known_hosts_path(&app)?,
             command,
+            timeout_seconds: timeout.map(|duration| duration.as_secs().max(1)),
         });
     }
 
-    run_system_ssh_command(&terminal_request, command)
+    run_system_ssh_command(&terminal_request, command, timeout)
 }
 
 fn terminal_request_for_tmux(request: &TmuxConnectionRequest) -> StartTerminalSessionRequest {
@@ -628,6 +672,7 @@ fn terminal_request_for_tmux(request: &TmuxConnectionRequest) -> StartTerminalSe
 fn run_system_ssh_command(
     request: &StartTerminalSessionRequest,
     remote_command: String,
+    timeout: Option<Duration>,
 ) -> Result<String, String> {
     let host = request.host.trim();
     if host.is_empty() {
@@ -662,9 +707,13 @@ fn run_system_ssh_command(
     command.arg(target);
     command.arg(remote_command);
 
-    let output = command
-        .output()
-        .map_err(|error| format!("failed to run system ssh: {error}"))?;
+    let output = if let Some(timeout) = timeout {
+        run_command_with_timeout(command, timeout)?
+    } else {
+        command
+            .output()
+            .map_err(|error| format!("failed to run system ssh: {error}"))?
+    };
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     if output.status.success() {
         Ok(stdout)
@@ -672,6 +721,51 @@ fn run_system_ssh_command(
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("system ssh command failed: {stderr}"))
     }
+}
+
+fn run_command_with_timeout(
+    mut command: ProcessCommand,
+    timeout: Duration,
+) -> Result<std::process::Output, String> {
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("failed to run system ssh: {error}"))?;
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child
+            .try_wait()
+            .map_err(|error| format!("failed to wait for system ssh: {error}"))?
+        {
+            Some(_) => {
+                return child
+                    .wait_with_output()
+                    .map_err(|error| format!("failed to collect system ssh output: {error}"));
+            }
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "system ssh command timed out after {} seconds",
+                    timeout.as_secs()
+                ));
+            }
+            None => thread::sleep(Duration::from_millis(25)),
+        }
+    }
+}
+
+fn ssh_system_context_cache_key(request: &TmuxConnectionRequest) -> String {
+    format!(
+        "{}:{}:{}",
+        request.host.trim().to_ascii_lowercase(),
+        request.port.unwrap_or(22),
+        request
+            .proxy_jump
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+    )
 }
 
 fn tmux_list_command() -> String {
@@ -690,6 +784,70 @@ fn tmux_capture_pane_command(tmux_session_id: &str) -> String {
         "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S - -t {}:",
         shell_single_quote(tmux_session_id)
     )
+}
+
+fn ssh_system_context_command() -> String {
+    r#"printf 'Hostname: '; hostname 2>/dev/null || printf 'unknown'; printf '\n'
+printf 'User: '; whoami 2>/dev/null || printf 'unknown'; printf '\n'
+printf 'Kernel: '; uname -srmo 2>/dev/null || uname -a 2>/dev/null || printf 'unknown'; printf '\n'
+if [ -r /etc/os-release ]; then
+  . /etc/os-release
+  printf 'OS: %s\n' "${PRETTY_NAME:-${NAME:-unknown}}"
+elif command -v lsb_release >/dev/null 2>&1; then
+  printf 'OS: '; lsb_release -ds 2>/dev/null
+else
+  printf 'OS: unknown\n'
+fi
+printf 'Architecture: '; uname -m 2>/dev/null || printf 'unknown'; printf '\n'
+printf 'CPU: '
+if command -v nproc >/dev/null 2>&1; then
+  printf '%s cores' "$(nproc 2>/dev/null)"
+else
+  grep -c '^processor' /proc/cpuinfo 2>/dev/null | tr -d '\n' || printf 'unknown'
+  printf ' cores'
+fi
+if [ -r /proc/cpuinfo ]; then
+  cpu_model=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2- | sed 's/^ //')
+  if [ -n "$cpu_model" ]; then printf ' (%s)' "$cpu_model"; fi
+fi
+printf '\n'
+printf 'Memory: '
+if command -v free >/dev/null 2>&1; then
+  free -h 2>/dev/null | awk '/^Mem:/ {print $2 " total, " $7 " available"}'
+elif [ -r /proc/meminfo ]; then
+  awk '/MemTotal:/ {printf "%.1f GiB total\n", $2/1024/1024}' /proc/meminfo
+else
+  printf 'unknown\n'
+fi
+printf 'Disk: '
+df -h / 2>/dev/null | awk 'NR==2 {print $2 " total, " $4 " available on /"}' || printf 'unknown\n'
+printf 'Shell: %s\n' "${SHELL:-unknown}"
+printf 'Uptime: '
+uptime -p 2>/dev/null || uptime 2>/dev/null || printf 'unknown\n'
+printf 'Package managers: '
+found_pm=''
+for pm in apt dnf yum pacman zypper apk brew snap flatpak; do
+  if command -v "$pm" >/dev/null 2>&1; then
+    if [ -n "$found_pm" ]; then printf ', '; fi
+    printf '%s' "$pm"
+    found_pm=1
+  fi
+done
+if [ -z "$found_pm" ]; then printf 'unknown'; fi
+printf '\n'
+printf 'Runtimes: '
+found_runtime=''
+for runtime in node npm python3 python go rustc cargo docker podman kubectl; do
+  if command -v "$runtime" >/dev/null 2>&1; then
+    version=$("$runtime" --version 2>/dev/null | head -n 1)
+    if [ -n "$found_runtime" ]; then printf '; '; fi
+    printf '%s' "${version:-$runtime}"
+    found_runtime=1
+  fi
+done
+if [ -z "$found_runtime" ]; then printf 'none detected'; fi
+printf '\n'"#
+        .to_string()
 }
 
 fn required_tmux_session_id(value: String) -> Result<String, String> {

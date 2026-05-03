@@ -136,7 +136,7 @@ import {
   providerDefaultsFor,
   validateAiProviderForChat,
 } from "./ai/providers";
-import { aiSuggestions, connectionTree, defaultTerminalSettings } from "./sample-data";
+import { connectionTree, defaultTerminalSettings } from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import {
   createTerminalRenderer,
@@ -634,6 +634,16 @@ type AssistantChatMessage = {
   id: string;
   role: "assistant" | "user";
   content: string;
+  createdAt: string;
+};
+
+type AssistantChatThread = {
+  id: string;
+  title: string;
+  contextLabel: string;
+  messages: AssistantChatMessage[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 const ASSISTANT_WAITING_PHRASES = [
@@ -845,6 +855,147 @@ function randomAssistantWaitingPhrase() {
   ];
 }
 
+function createAssistantChatMessage(
+  role: AssistantChatMessage["role"],
+  content: string,
+): AssistantChatMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function createAssistantChatThreadId() {
+  return `assistant-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function assistantThreadTitle(messages: AssistantChatMessage[]) {
+  const firstUserMessage = messages.find((message) => message.role === "user");
+  const title = firstUserMessage?.content.trim().replace(/\s+/g, " ") || "New chat";
+  return title.length > 56 ? `${title.slice(0, 53)}...` : title;
+}
+
+function assistantThreadPreview(thread: AssistantChatThread) {
+  const lastMessage = thread.messages[thread.messages.length - 1];
+  const preview = lastMessage?.content.trim().replace(/\s+/g, " ") || "No messages";
+  return preview.length > 64 ? `${preview.slice(0, 61)}...` : preview;
+}
+
+function formatAssistantMessageTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const hours = date.getHours();
+  const hour12 = hours % 12 || 12;
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const period = hours >= 12 ? "PM" : "AM";
+  return `${hour12}:${minutes}${period}`;
+}
+
+function sortedAssistantThreads(threads: AssistantChatThread[]) {
+  return [...threads].sort(
+    (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  );
+}
+
+function upsertAssistantChatThread(
+  threads: AssistantChatThread[],
+  thread: AssistantChatThread,
+) {
+  const withoutThread = threads.filter((item) => item.id !== thread.id);
+  return sortedAssistantThreads([thread, ...withoutThread]);
+}
+
+function readAssistantChatHistory(): AssistantChatThread[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const rawHistory = window.localStorage.getItem(ASSISTANT_CHAT_HISTORY_KEY);
+    if (!rawHistory) {
+      return [];
+    }
+    const parsed = JSON.parse(rawHistory);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.flatMap(normalizeAssistantChatThread);
+  } catch {
+    return [];
+  }
+}
+
+function writeAssistantChatHistory(threads: AssistantChatThread[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(ASSISTANT_CHAT_HISTORY_KEY, JSON.stringify(threads));
+}
+
+function normalizeAssistantChatThread(value: unknown): AssistantChatThread[] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  const candidate = value as Partial<AssistantChatThread>;
+  const messages = Array.isArray(candidate.messages)
+    ? candidate.messages.flatMap(normalizeAssistantChatMessage)
+    : [];
+  if (messages.length === 0) {
+    return [];
+  }
+  const createdAt = normalizeDateString(candidate.createdAt) ?? messages[0].createdAt;
+  const updatedAt =
+    normalizeDateString(candidate.updatedAt) ?? messages[messages.length - 1].createdAt;
+  return [
+    {
+      id: typeof candidate.id === "string" && candidate.id ? candidate.id : createAssistantChatThreadId(),
+      title:
+        typeof candidate.title === "string" && candidate.title.trim()
+          ? candidate.title.trim()
+          : assistantThreadTitle(messages),
+      contextLabel:
+        typeof candidate.contextLabel === "string" && candidate.contextLabel.trim()
+          ? candidate.contextLabel.trim()
+          : "Workspace",
+      messages,
+      createdAt,
+      updatedAt,
+    },
+  ];
+}
+
+function normalizeAssistantChatMessage(value: unknown): AssistantChatMessage[] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  const candidate = value as Partial<AssistantChatMessage>;
+  if (candidate.role !== "assistant" && candidate.role !== "user") {
+    return [];
+  }
+  if (typeof candidate.content !== "string" || !candidate.content.trim()) {
+    return [];
+  }
+  return [
+    {
+      id: typeof candidate.id === "string" && candidate.id ? candidate.id : `${candidate.role}-${Date.now()}`,
+      role: candidate.role,
+      content: candidate.content,
+      createdAt: normalizeDateString(candidate.createdAt) ?? new Date().toISOString(),
+    },
+  ];
+}
+
+function normalizeDateString(value: unknown) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
 type PanelLayoutState = {
   collapsed: boolean;
   width: number;
@@ -858,6 +1009,7 @@ const AI_PANEL_MIN_WIDTH = 260;
 const AI_PANEL_MAX_WIDTH = 620;
 const CONNECTION_PANEL_LAYOUT_KEY = "admindeck.layout.connectionsPanel.v1";
 const AI_PANEL_LAYOUT_PREFIX = "admindeck.layout.aiAssistPanel.v1.";
+const ASSISTANT_CHAT_HISTORY_KEY = "admindeck.aiAssistant.chatHistory.v1";
 
 const defaultConnectionPanelLayout: PanelLayoutState = {
   collapsed: false,
@@ -5127,6 +5279,32 @@ function tmuxConnectionRequest(connection: Connection) {
   };
 }
 
+async function inspectActiveSshSystemContext(tab: WorkspaceTab | undefined) {
+  const connection =
+    tab?.connection?.type === "ssh"
+      ? tab.connection
+      : tab?.panes.find((pane) => pane.connection?.type === "ssh")?.connection;
+  if (!connection) {
+    return undefined;
+  }
+  try {
+    const context = await invokeCommand("inspect_ssh_system_context", {
+      request: tmuxConnectionRequest(connection),
+    });
+    return [
+      `Connection: ${connection.name}`,
+      `Target: ${connection.user}@${connection.host}${connection.port ? `:${connection.port}` : ""}`,
+      context.trim(),
+    ]
+      .filter(Boolean)
+      .join("\n");
+  } catch (error) {
+    return `Connection: ${connection.name}\nTarget: ${connection.user}@${connection.host}${
+      connection.port ? `:${connection.port}` : ""
+    }\nSSH system context unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 function TerminalPaneView({
   isActive,
   tabId,
@@ -8377,9 +8555,13 @@ function AssistantPanel({
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
+  const [currentThreadId, setCurrentThreadId] = useState(createAssistantChatThreadId);
+  const [chatHistory, setChatHistory] = useState<AssistantChatThread[]>(readAssistantChatHistory);
+  const [showAllChats, setShowAllChats] = useState(false);
   const [chatError, setChatError] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
   const [waitingPhrase, setWaitingPhrase] = useState("");
+  const [messageCopyStatus, setMessageCopyStatus] = useState("");
   const [terminalSendStatus, setTerminalSendStatus] = useState("");
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const contextLabel = activeTab
@@ -8391,6 +8573,12 @@ function AssistantPanel({
   const providerDefinition = getAiProviderDefinition(aiProviderSettings.providerKind);
   const activeTerminalPaneId =
     activeTab?.kind === "terminal" ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id : undefined;
+  const sortedChatHistory = useMemo(() => sortedAssistantThreads(chatHistory), [chatHistory]);
+  const recentChatHistory = sortedChatHistory.slice(0, 5);
+
+  useEffect(() => {
+    writeAssistantChatHistory(chatHistory);
+  }, [chatHistory]);
 
   function handleSendCodeToTerminal(code: string) {
     if (!activeTerminalPaneId) {
@@ -8416,11 +8604,56 @@ function AssistantPanel({
     if (isSendingPrompt) {
       return;
     }
+    saveCurrentChat();
     setMessages([]);
+    setCurrentThreadId(createAssistantChatThreadId());
     setPrompt("");
     setChatError("");
     setTerminalSendStatus("");
+    setMessageCopyStatus("");
     setWaitingPhrase("");
+    setShowAllChats(false);
+  }
+
+  function saveCurrentChat() {
+    if (messages.length === 0) {
+      return;
+    }
+    const now = new Date().toISOString();
+    const thread: AssistantChatThread = {
+      id: currentThreadId,
+      title: assistantThreadTitle(messages),
+      contextLabel,
+      messages,
+      createdAt: messages[0]?.createdAt ?? now,
+      updatedAt: messages[messages.length - 1]?.createdAt ?? now,
+    };
+    setChatHistory((current) => upsertAssistantChatThread(current, thread));
+  }
+
+  function resumeChat(thread: AssistantChatThread) {
+    if (isSendingPrompt) {
+      return;
+    }
+    saveCurrentChat();
+    setCurrentThreadId(thread.id);
+    setMessages(thread.messages);
+    setPrompt("");
+    setChatError("");
+    setTerminalSendStatus("");
+    setMessageCopyStatus("");
+    setWaitingPhrase("");
+    setShowAllChats(false);
+  }
+
+  async function handleCopyMessage(message: AssistantChatMessage) {
+    await writeToClipboard(message.content);
+    setMessageCopyStatus(`${message.role === "user" ? "Your" : "Assistant"} message copied.`);
+  }
+
+  async function handleCopyCode(code: string) {
+    await writeToClipboard(code);
+    setMessageCopyStatus("Code copied.");
   }
 
   async function submitAssistantPrompt() {
@@ -8428,19 +8661,14 @@ function AssistantPanel({
     if (!normalizedPrompt || isSendingPrompt) {
       return;
     }
-    const userMessage: AssistantChatMessage = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: normalizedPrompt,
-    };
+    const userMessage = createAssistantChatMessage("user", normalizedPrompt);
     try {
       validateAiProviderForChat(aiProviderSettings, aiProviderHasApiKey);
     } catch (error) {
-      const assistantMessage: AssistantChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: `AI provider settings error: ${error instanceof Error ? error.message : String(error)}`,
-      };
+      const assistantMessage = createAssistantChatMessage(
+        "assistant",
+        `AI provider settings error: ${error instanceof Error ? error.message : String(error)}`,
+      );
       setMessages((current) => [...current, userMessage, assistantMessage]);
       setPrompt("");
       setChatError("");
@@ -8457,30 +8685,24 @@ function AssistantPanel({
     setWaitingPhrase(randomAssistantWaitingPhrase());
     setIsSendingPrompt(true);
     try {
+      const systemContext = await inspectActiveSshSystemContext(activeTab);
       const response = await invokeCommand("run_ai_agent", {
         request: {
           prompt: normalizedPrompt,
           contextLabel,
           selectedOutput: assistantContextSnippet?.text,
+          systemContext,
           messages: history,
         },
       });
-      const assistantMessage: AssistantChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: response.content,
-      };
+      const assistantMessage = createAssistantChatMessage("assistant", response.content);
       setMessages((current) => [...current, assistantMessage]);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setChatError(message);
       setMessages((current) => [
         ...current,
-        {
-          id: `assistant-error-${Date.now()}`,
-          role: "assistant",
-          content: `AI Assistant error: ${message}`,
-        },
+        createAssistantChatMessage("assistant", `AI Assistant error: ${message}`),
       ]);
     } finally {
       setIsSendingPrompt(false);
@@ -8568,24 +8790,67 @@ function AssistantPanel({
       <section className="assistant-tasks">
         <header>
           <span>Chats</span>
-          <small>{aiSuggestions.length > 0 ? `View All(${aiSuggestions.length})` : "View All(0)"}</small>
+          <button
+            className="assistant-view-all-button"
+            disabled={sortedChatHistory.length === 0}
+            onClick={() => setShowAllChats(true)}
+            type="button"
+          >
+            View All({sortedChatHistory.length})
+          </button>
         </header>
-        {aiSuggestions.length > 0 ? (
-          aiSuggestions.slice(0, 3).map((item) => (
+        {recentChatHistory.length > 0 ? (
+          recentChatHistory.map((thread) => (
             <button
               className="assistant-task-row"
-              key={item.id}
-              onClick={() => setPrompt(item.title)}
+              key={thread.id}
+              onClick={() => resumeChat(thread)}
               type="button"
             >
-              <span>{item.title}</span>
-              <small>{item.risk}</small>
+              <span>{thread.title}</span>
+              <small>{formatAssistantMessageTime(thread.updatedAt)}</small>
             </button>
           ))
         ) : (
           <p>No chats yet.</p>
         )}
       </section>
+
+      {showAllChats ? (
+        <div className="assistant-chat-history-backdrop" role="presentation">
+          <section className="assistant-chat-history-dialog" role="dialog" aria-label="All chats">
+            <header>
+              <div>
+                <span>Chats</span>
+                <small>{sortedChatHistory.length} saved</small>
+              </div>
+              <button
+                className="assistant-toolbar-button"
+                onClick={() => setShowAllChats(false)}
+                type="button"
+                aria-label="Close chat history"
+                title="Close"
+              >
+                <X size={15} />
+              </button>
+            </header>
+            <div className="assistant-chat-history-list">
+              {sortedChatHistory.map((thread) => (
+                <button
+                  className="assistant-chat-history-row"
+                  key={thread.id}
+                  onClick={() => resumeChat(thread)}
+                  type="button"
+                >
+                  <strong>{thread.title}</strong>
+                  <span>{assistantThreadPreview(thread)}</span>
+                  <small>{formatAssistantMessageTime(thread.updatedAt)}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {assistantContextSnippet ? (
         <section className="assistant-selection-context">
@@ -8609,19 +8874,24 @@ function AssistantPanel({
 
       <div className="assistant-chat-log">
         {messages.map((message) => (
-          <article className={`assistant-message ${message.role}`} key={message.id}>
-            <MarkdownContent content={message.content} onSendCode={handleSendCodeToTerminal} />
-          </article>
+          <AssistantMessageView
+            key={message.id}
+            message={message}
+            onCopyCode={handleCopyCode}
+            onCopyMessage={handleCopyMessage}
+            onSendCode={handleSendCodeToTerminal}
+          />
         ))}
         {isSendingPrompt ? (
           <article className="assistant-message assistant-waiting" aria-live="polite">
             <span className="assistant-spinner" aria-hidden="true" />
-            <span>{waitingPhrase || "Charging the answer beacon"}</span>
+            <span>{waitingPhrase || "Charging the answer beacon"}...</span>
           </article>
         ) : null}
       </div>
 
       {terminalSendStatus ? <p className="assistant-send-status">{terminalSendStatus}</p> : null}
+      {messageCopyStatus ? <p className="assistant-send-status">{messageCopyStatus}</p> : null}
       {chatError ? <p className="form-error">{chatError}</p> : null}
 
       <form className="assistant-chat-composer" onSubmit={handleChatSubmit}>
@@ -8653,15 +8923,48 @@ function AssistantPanel({
   );
 }
 
+function AssistantMessageView({
+  message,
+  onCopyCode,
+  onCopyMessage,
+  onSendCode,
+}: {
+  message: AssistantChatMessage;
+  onCopyCode: (code: string) => void;
+  onCopyMessage: (message: AssistantChatMessage) => void;
+  onSendCode: (code: string) => void;
+}) {
+  return (
+    <article className={`assistant-message ${message.role}`}>
+      <div className="assistant-message-bubble">
+        <MarkdownContent content={message.content} onCopyCode={onCopyCode} onSendCode={onSendCode} />
+      </div>
+      <div className="assistant-message-actions">
+        <time dateTime={message.createdAt}>{formatAssistantMessageTime(message.createdAt)}</time>
+        <button
+          aria-label="Copy message"
+          onClick={() => onCopyMessage(message)}
+          title="Copy message"
+          type="button"
+        >
+          <Copy size={10} />
+        </button>
+      </div>
+    </article>
+  );
+}
+
 type MarkdownBlock =
   | { kind: "code"; code: string; language: string }
   | { kind: "text"; text: string };
 
 function MarkdownContent({
   content,
+  onCopyCode,
   onSendCode,
 }: {
   content: string;
+  onCopyCode: (code: string) => void;
   onSendCode: (code: string) => void;
 }) {
   return (
@@ -8671,14 +8974,24 @@ function MarkdownContent({
           <div className="markdown-code-block" key={`code-${index}`}>
             <div className="markdown-code-toolbar">
               <span>{block.language || "code"}</span>
-              <button
-                className="assistant-code-send"
-                onClick={() => onSendCode(block.code)}
-                type="button"
-              >
-                <Terminal size={13} />
-                Send
-              </button>
+              <div className="markdown-code-actions">
+                <button
+                  className="assistant-code-send"
+                  onClick={() => onCopyCode(block.code)}
+                  type="button"
+                >
+                  <Copy size={13} />
+                  Copy
+                </button>
+                <button
+                  className="assistant-code-send"
+                  onClick={() => onSendCode(block.code)}
+                  type="button"
+                >
+                  <Terminal size={13} />
+                  Send
+                </button>
+              </div>
             </div>
             <pre>
               <code>{block.code}</code>

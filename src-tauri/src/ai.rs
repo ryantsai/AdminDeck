@@ -188,6 +188,7 @@ pub struct AgentRunRequest {
     prompt: String,
     context_label: String,
     selected_output: Option<String>,
+    system_context: Option<String>,
     messages: Vec<AgentChatMessage>,
 }
 
@@ -287,6 +288,7 @@ impl AgentProvider for OpenAiCompatibleProvider {
             prompt,
             context_label,
             settings.reasoning_effort().to_string(),
+            request.system_context,
             request.selected_output,
             request.messages,
         );
@@ -369,6 +371,7 @@ fn build_agent_messages(
     prompt: String,
     context_label: String,
     reasoning_effort: String,
+    system_context: Option<String>,
     selected_output: Option<String>,
     history: Vec<AgentChatMessage>,
 ) -> Vec<OpenAiCompatibleMessage> {
@@ -393,6 +396,14 @@ fn build_agent_messages(
     let mut user_content = format!(
         "Active context: {context_label}\nReasoning effort: {reasoning_effort}\n\nUser request:\n{prompt}"
     );
+    if let Some(system_context) = system_context
+        .map(|context| context.trim().to_string())
+        .filter(|context| !context.is_empty())
+    {
+        user_content.push_str("\n\nSSH target system context:\n```text\n");
+        user_content.push_str(&system_context);
+        user_content.push_str("\n```");
+    }
     if let Some(selected_output) = selected_output
         .map(|output| output.trim().to_string())
         .filter(|output| !output.is_empty())
@@ -581,6 +592,7 @@ mod tests {
             "What failed?".to_string(),
             "Bastion - Terminal".to_string(),
             "high".to_string(),
+            Some("OS: Ubuntu 24.04 LTS".to_string()),
             Some("ERROR service unavailable".to_string()),
             vec![
                 AgentChatMessage {
@@ -599,6 +611,7 @@ mod tests {
         assert_eq!(messages[1].role, "user");
         assert!(messages[2].content.contains("Bastion - Terminal"));
         assert!(messages[2].content.contains("Reasoning effort: high"));
+        assert!(messages[2].content.contains("OS: Ubuntu 24.04 LTS"));
         assert!(messages[2].content.contains("ERROR service unavailable"));
     }
 
