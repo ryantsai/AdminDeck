@@ -383,6 +383,7 @@ fn build_agent_messages(
             "When suggesting commands, explain intent and prefer commands the user can review before running.",
             "Do not claim to have executed commands or observed live session state unless it is in the provided context.",
             "Reponse in user's query language, when responding in Chinese, always respond in Traditional Chinese (Taiwan) and avoid Mainland China IT terminology.",
+            "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.",
         ]
         .join(" "),
     }];
