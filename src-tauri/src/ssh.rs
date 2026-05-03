@@ -16,6 +16,10 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 
+const SSH_TMUX_RESUME_MAX_ATTEMPTS: usize = 2;
+const SSH_TMUX_RESUME_TIMEOUT: Duration = Duration::from_secs(10);
+const SSH_TMUX_RESUME_DELAY: Duration = Duration::from_millis(750);
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SshTransportPlan {
@@ -124,6 +128,12 @@ enum SshTerminalControl {
         rows: u16,
     },
     Close,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum TerminalRunOutcome {
+    Closed,
+    Disconnected,
 }
 
 #[derive(Serialize, Clone)]
@@ -488,44 +498,102 @@ async fn run_native_terminal(
     mut control_rx: mpsc::UnboundedReceiver<SshTerminalControl>,
     ready_tx: std_mpsc::SyncSender<Result<u128, String>>,
 ) -> Result<(), String> {
-    let session = connect_verified_client(NativeSshConnectionRequest {
-        host: request.host.clone(),
-        user: request.user.clone(),
-        port: request.port,
-        auth: request.auth.clone(),
-        known_hosts_path: request.known_hosts_path.clone(),
-    })
-    .await?;
+    let current_request = request;
+    let mut ready_tx = Some(ready_tx);
+    let mut resume_attempts = 0;
 
-    let ready_start = Instant::now();
-    let mut channel = session
-        .channel_open_session()
-        .await
-        .map_err(|error| format!("failed to open SSH terminal channel: {error}"))?;
-    channel
-        .request_pty(
-            false,
-            "xterm-256color",
-            request.cols.into(),
-            request.rows.into(),
-            request.pixel_width.into(),
-            request.pixel_height.into(),
-            &[],
+    loop {
+        let is_initial_start = ready_tx.is_some();
+        let timeout = if is_initial_start {
+            Duration::from_secs(15)
+        } else {
+            SSH_TMUX_RESUME_TIMEOUT
+        };
+        let result = run_native_terminal_once(
+            &app,
+            &current_request,
+            &mut control_rx,
+            ready_tx.take(),
+            timeout,
         )
-        .await
-        .map_err(|error| format!("failed to allocate SSH PTY: {error}"))?;
-    channel
-        .request_shell(false)
-        .await
-        .map_err(|error| format!("failed to start SSH shell: {error}"))?;
-    if let Some(command) = startup_command_for(&request) {
-        channel
-            .data(format!("{command}\r").as_bytes())
-            .await
-            .map_err(|error| format!("failed to initialize SSH shell: {error}"))?;
-    }
+        .await;
 
-    let _ = ready_tx.send(Ok(ready_start.elapsed().as_millis()));
+        match result {
+            Ok(TerminalRunOutcome::Closed) => return Ok(()),
+            Ok(TerminalRunOutcome::Disconnected) if can_resume_tmux_terminal(&current_request) => {}
+            Ok(TerminalRunOutcome::Disconnected) => return Ok(()),
+            Err(error) if can_resume_tmux_terminal(&current_request) => {
+                if is_initial_start {
+                    return Err(error);
+                }
+            }
+            Err(error) => return Err(error),
+        }
+
+        if resume_attempts >= SSH_TMUX_RESUME_MAX_ATTEMPTS || control_rx.is_closed() {
+            return Ok(());
+        }
+
+        resume_attempts += 1;
+        tokio::time::sleep(SSH_TMUX_RESUME_DELAY).await;
+    }
+}
+
+async fn run_native_terminal_once(
+    app: &AppHandle,
+    request: &NativeSshTerminalRequest,
+    control_rx: &mut mpsc::UnboundedReceiver<SshTerminalControl>,
+    ready_tx: Option<std_mpsc::SyncSender<Result<u128, String>>>,
+    startup_timeout: Duration,
+) -> Result<TerminalRunOutcome, String> {
+    let startup = async {
+        let session = connect_verified_client(NativeSshConnectionRequest {
+            host: request.host.clone(),
+            user: request.user.clone(),
+            port: request.port,
+            auth: request.auth.clone(),
+            known_hosts_path: request.known_hosts_path.clone(),
+        })
+        .await?;
+
+        let ready_start = Instant::now();
+        let channel = session
+            .channel_open_session()
+            .await
+            .map_err(|error| format!("failed to open SSH terminal channel: {error}"))?;
+        channel
+            .request_pty(
+                false,
+                "xterm-256color",
+                request.cols.into(),
+                request.rows.into(),
+                request.pixel_width.into(),
+                request.pixel_height.into(),
+                &[],
+            )
+            .await
+            .map_err(|error| format!("failed to allocate SSH PTY: {error}"))?;
+        channel
+            .request_shell(false)
+            .await
+            .map_err(|error| format!("failed to start SSH shell: {error}"))?;
+        if let Some(command) = startup_command_for(request) {
+            channel
+                .data(format!("{command}\r").as_bytes())
+                .await
+                .map_err(|error| format!("failed to initialize SSH shell: {error}"))?;
+        }
+
+        Ok::<_, String>((session, channel, ready_start.elapsed().as_millis()))
+    };
+
+    let (session, mut channel, terminal_ready_ms) = tokio::time::timeout(startup_timeout, startup)
+        .await
+        .map_err(|_| "timed out while starting native SSH session".to_string())??;
+
+    if let Some(ready_tx) = ready_tx {
+        let _ = ready_tx.send(Ok(terminal_ready_ms));
+    }
 
     loop {
         tokio::select! {
@@ -556,7 +624,8 @@ async fn run_native_terminal(
                     Some(SshTerminalControl::Close) | None => {
                         let _ = channel.eof().await;
                         let _ = channel.close().await;
-                        break;
+                        let _ = disconnect_ssh_session(session, "").await;
+                        return Ok(TerminalRunOutcome::Closed);
                     }
                 }
             }
@@ -569,15 +638,24 @@ async fn run_native_terminal(
                             String::from_utf8_lossy(&data).to_string(),
                         );
                     }
-                    Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => break,
+                    Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
+                        let _ = disconnect_ssh_session(session, "").await;
+                        return Ok(TerminalRunOutcome::Disconnected);
+                    }
                     _ => {}
                 }
             }
         }
     }
+}
 
-    disconnect_ssh_session(session, "").await?;
-    Ok(())
+fn can_resume_tmux_terminal(request: &NativeSshTerminalRequest) -> bool {
+    request.use_tmux
+        && request
+            .tmux_session_id
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|session_id| !session_id.is_empty())
 }
 
 async fn disconnect_ssh_session(
@@ -996,6 +1074,22 @@ mod tests {
     }
 
     #[test]
+    fn native_tmux_terminal_resume_requires_named_tmux_session() {
+        let mut request = native_terminal_request();
+
+        request.use_tmux = true;
+        request.tmux_session_id = Some("admindeck-test".to_string());
+        assert!(can_resume_tmux_terminal(&request));
+
+        request.tmux_session_id = Some("  ".to_string());
+        assert!(!can_resume_tmux_terminal(&request));
+
+        request.tmux_session_id = Some("admindeck-test".to_string());
+        request.use_tmux = false;
+        assert!(!can_resume_tmux_terminal(&request));
+    }
+
+    #[test]
     fn host_key_status_reports_unknown_trusted_and_changed() {
         let path = temp_known_hosts_path("status");
         let host_key = russh::keys::ssh_key::PublicKey::from_openssh(
@@ -1286,5 +1380,23 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("admin-deck-known-hosts-{name}-{unique}"));
         fs::create_dir_all(&dir).expect("temp directory is created");
         dir.join("known_hosts")
+    }
+
+    fn native_terminal_request() -> NativeSshTerminalRequest {
+        NativeSshTerminalRequest {
+            session_id: "native-test".to_string(),
+            host: "example.internal".to_string(),
+            user: "ryan".to_string(),
+            port: 22,
+            auth: NativeSshAuth::Agent,
+            known_hosts_path: temp_known_hosts_path("native-request"),
+            cols: 80,
+            pixel_height: 0,
+            pixel_width: 0,
+            rows: 24,
+            initial_directory: None,
+            use_tmux: false,
+            tmux_session_id: None,
+        }
     }
 }

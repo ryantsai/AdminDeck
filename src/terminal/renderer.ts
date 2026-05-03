@@ -99,7 +99,7 @@ class XtermTerminalRenderer implements TerminalRenderer {
   }
 
   get dimensions() {
-    const pixels = pixelDimensionsFor(this.hostElement);
+    const pixels = contentPixelDimensionsFor(this.terminal.element ?? this.hostElement);
     return {
       cols: this.terminal.cols,
       pixelHeight: pixels.pixelHeight,
@@ -268,11 +268,22 @@ function listenToFocus(textarea: HTMLTextAreaElement, handler: () => void): IDis
   };
 }
 
-function pixelDimensionsFor(element: HTMLElement | null) {
+function contentPixelDimensionsFor(element: HTMLElement | null) {
+  const style = element ? window.getComputedStyle(element) : null;
+  const horizontalPadding =
+    numericStyleValue(style?.paddingLeft) + numericStyleValue(style?.paddingRight);
+  const verticalPadding =
+    numericStyleValue(style?.paddingTop) + numericStyleValue(style?.paddingBottom);
+
   return {
-    pixelHeight: Math.max(0, Math.round(element?.clientHeight ?? 0)),
-    pixelWidth: Math.max(0, Math.round(element?.clientWidth ?? 0)),
+    pixelHeight: Math.max(0, Math.round((element?.clientHeight ?? 0) - verticalPadding)),
+    pixelWidth: Math.max(0, Math.round((element?.clientWidth ?? 0) - horizontalPadding)),
   };
+}
+
+function numericStyleValue(value: string | undefined) {
+  const parsed = Number.parseFloat(value ?? "0");
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function terminalOptionsFor(settings: TerminalSettings): ITerminalOptions {
