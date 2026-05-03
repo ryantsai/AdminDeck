@@ -8,6 +8,7 @@ import {
   Mouse,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Circle,
   Columns2,
@@ -31,6 +32,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   SendHorizontal,
@@ -590,6 +592,30 @@ type AssistantDraft = {
   status: "pending" | "approved" | "rejected";
 };
 
+type PanelLayoutState = {
+  collapsed: boolean;
+  width: number;
+};
+
+const CONNECTION_PANEL_DEFAULT_WIDTH = 292;
+const CONNECTION_PANEL_MIN_WIDTH = 220;
+const CONNECTION_PANEL_MAX_WIDTH = 520;
+const AI_PANEL_DEFAULT_WIDTH = 334;
+const AI_PANEL_MIN_WIDTH = 260;
+const AI_PANEL_MAX_WIDTH = 620;
+const CONNECTION_PANEL_LAYOUT_KEY = "admindeck.layout.connectionsPanel.v1";
+const AI_PANEL_LAYOUT_PREFIX = "admindeck.layout.aiAssistPanel.v1.";
+
+const defaultConnectionPanelLayout: PanelLayoutState = {
+  collapsed: false,
+  width: CONNECTION_PANEL_DEFAULT_WIDTH,
+};
+
+const defaultAiPanelLayout: PanelLayoutState = {
+  collapsed: false,
+  width: AI_PANEL_DEFAULT_WIDTH,
+};
+
 async function writeToClipboard(text: string) {
   if (navigator.clipboard) {
     try {
@@ -609,8 +635,68 @@ async function writeToClipboard(text: string) {
   document.body.removeChild(textarea);
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function loadPanelLayout(
+  key: string,
+  fallback: PanelLayoutState,
+  minWidth: number,
+  maxWidth: number,
+): PanelLayoutState {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "null") as Partial<PanelLayoutState> | null;
+    if (!parsed) {
+      return fallback;
+    }
+    return {
+      collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : fallback.collapsed,
+      width:
+        typeof parsed.width === "number" && Number.isFinite(parsed.width)
+          ? clamp(Math.round(parsed.width), minWidth, maxWidth)
+          : fallback.width,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function persistPanelLayout(key: string, layout: PanelLayoutState) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify(layout));
+  } catch {
+    // Storage may be unavailable (private mode, quota); fail silently.
+  }
+}
+
+function removeLayoutStorageKeys() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith("admindeck.layout.")) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Storage may be unavailable (private mode, quota); fail silently.
+  }
+}
+
 function App() {
   const [activePage, setActivePage] = useState<"workspace" | "settings">("workspace");
+  const activeTab = useWorkspaceStore((state) =>
+    state.tabs.find((tab) => tab.id === state.activeTabId),
+  );
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
@@ -618,6 +704,86 @@ function App() {
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
   const setFrontendLaunchMs = useWorkspaceStore((state) => state.setFrontendLaunchMs);
   const setPerformanceSnapshot = useWorkspaceStore((state) => state.setPerformanceSnapshot);
+  const resetAllLayouts = useWorkspaceStore((state) => state.resetAllLayouts);
+  const [connectionPanelLayout, setConnectionPanelLayout] = useState(() =>
+    loadPanelLayout(
+      CONNECTION_PANEL_LAYOUT_KEY,
+      defaultConnectionPanelLayout,
+      CONNECTION_PANEL_MIN_WIDTH,
+      CONNECTION_PANEL_MAX_WIDTH,
+    ),
+  );
+  const aiLayoutConnectionId = activeTab?.connection?.id ?? "workspace";
+  const [aiPanelLayout, setAiPanelLayout] = useState(() =>
+    loadPanelLayout(
+      `${AI_PANEL_LAYOUT_PREFIX}${aiLayoutConnectionId}`,
+      defaultAiPanelLayout,
+      AI_PANEL_MIN_WIDTH,
+      AI_PANEL_MAX_WIDTH,
+    ),
+  );
+
+  useEffect(() => {
+    persistPanelLayout(CONNECTION_PANEL_LAYOUT_KEY, connectionPanelLayout);
+  }, [connectionPanelLayout]);
+
+  useEffect(() => {
+    setAiPanelLayout(
+      loadPanelLayout(
+        `${AI_PANEL_LAYOUT_PREFIX}${aiLayoutConnectionId}`,
+        defaultAiPanelLayout,
+        AI_PANEL_MIN_WIDTH,
+        AI_PANEL_MAX_WIDTH,
+      ),
+    );
+  }, [aiLayoutConnectionId]);
+
+  useEffect(() => {
+    persistPanelLayout(`${AI_PANEL_LAYOUT_PREFIX}${aiLayoutConnectionId}`, aiPanelLayout);
+  }, [aiLayoutConnectionId, aiPanelLayout]);
+
+  function handleConnectionPanelResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const startX = event.clientX;
+    const startWidth = connectionPanelLayout.collapsed
+      ? 0
+      : connectionPanelLayout.width;
+
+    beginDragResize(event, (pointerEvent) => {
+      const nextWidth = clamp(
+        startWidth + pointerEvent.clientX - startX,
+        CONNECTION_PANEL_MIN_WIDTH,
+        CONNECTION_PANEL_MAX_WIDTH,
+      );
+      setConnectionPanelLayout({
+        collapsed: false,
+        width: nextWidth,
+      });
+    });
+  }
+
+  function handleAiPanelResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const startX = event.clientX;
+    const startWidth = aiPanelLayout.collapsed ? 0 : aiPanelLayout.width;
+
+    beginDragResize(event, (pointerEvent) => {
+      const nextWidth = clamp(
+        startWidth + startX - pointerEvent.clientX,
+        AI_PANEL_MIN_WIDTH,
+        AI_PANEL_MAX_WIDTH,
+      );
+      setAiPanelLayout({
+        collapsed: false,
+        width: nextWidth,
+      });
+    });
+  }
+
+  function handleResetLayout() {
+    removeLayoutStorageKeys();
+    resetAllLayouts();
+    setConnectionPanelLayout(defaultConnectionPanelLayout);
+    setAiPanelLayout(defaultAiPanelLayout);
+  }
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -687,42 +853,169 @@ function App() {
   }, [setAiProviderHasApiKey]);
 
   return (
-    <div className={`app-shell ${activePage === "settings" ? "settings-mode" : ""}`}>
-      <ActivityRail activePage={activePage} onNavigate={setActivePage} />
+    <div
+      className={`app-shell ${activePage === "settings" ? "settings-mode" : ""} ${
+        connectionPanelLayout.collapsed ? "connections-collapsed" : ""
+      } ${aiPanelLayout.collapsed ? "ai-assist-collapsed" : ""}`}
+      style={
+        {
+          "--connection-panel-width": connectionPanelLayout.collapsed
+            ? "0px"
+            : `${connectionPanelLayout.width}px`,
+          "--connection-resize-width": "1px",
+          "--ai-panel-width": aiPanelLayout.collapsed ? "0px" : `${aiPanelLayout.width}px`,
+          "--ai-resize-width": aiPanelLayout.collapsed ? "34px" : "1px",
+        } as CSSProperties
+      }
+    >
+      <ActivityRail
+        activePage={activePage}
+        connectionsCollapsed={connectionPanelLayout.collapsed}
+        onConnectionsRestore={() =>
+          setConnectionPanelLayout((layout) => ({ ...layout, collapsed: false }))
+        }
+        onNavigate={setActivePage}
+      />
       {activePage === "settings" ? (
-        <SettingsPage onBack={() => setActivePage("workspace")} />
+        <SettingsPage onBack={() => setActivePage("workspace")} onResetLayout={handleResetLayout} />
       ) : (
         <>
-          <ConnectionSidebar />
+          <ConnectionSidebar
+            collapsed={connectionPanelLayout.collapsed}
+            onToggleCollapsed={() =>
+              setConnectionPanelLayout((layout) => ({
+                ...layout,
+                collapsed: !layout.collapsed,
+              }))
+            }
+          />
+          {connectionPanelLayout.collapsed ? (
+            <div className="connection-collapsed-separator" aria-hidden="true" />
+          ) : (
+            <PanelResizeHandle
+              ariaLabel="Resize Connections column"
+              side="left"
+              onPointerDown={handleConnectionPanelResize}
+            />
+          )}
           <main className="workspace">
             <TabStrip />
             <WorkspaceCanvas />
             <StatusBar />
           </main>
-          <AssistantPanel />
+          <PanelResizeHandle
+            ariaLabel="Resize AI Assist panel"
+            side="right"
+            collapsed={aiPanelLayout.collapsed}
+            collapsedLabel="AI Assist"
+            onClick={() =>
+              aiPanelLayout.collapsed
+                ? setAiPanelLayout((layout) => ({ ...layout, collapsed: false }))
+                : undefined
+            }
+            onPointerDown={handleAiPanelResize}
+          />
+          <AssistantPanel
+            collapsed={aiPanelLayout.collapsed}
+            onToggleCollapsed={() =>
+              setAiPanelLayout((layout) => ({
+                ...layout,
+                collapsed: !layout.collapsed,
+              }))
+            }
+          />
         </>
       )}
     </div>
   );
 }
 
+function beginDragResize(
+  event: ReactPointerEvent<HTMLButtonElement>,
+  onMove: (event: PointerEvent) => void,
+) {
+  event.preventDefault();
+  event.currentTarget.setPointerCapture(event.pointerId);
+  document.body.classList.add("is-resizing-layout");
+
+  const stop = () => {
+    document.body.classList.remove("is-resizing-layout");
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", stop);
+    window.removeEventListener("pointercancel", stop);
+  };
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", stop);
+  window.addEventListener("pointercancel", stop);
+}
+
+function PanelResizeHandle({
+  ariaLabel,
+  collapsed,
+  collapsedLabel,
+  onClick,
+  side,
+  onPointerDown,
+}: {
+  ariaLabel: string;
+  collapsed?: boolean;
+  collapsedLabel?: string;
+  onClick?: () => void;
+  side: "left" | "right";
+  onPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      aria-label={ariaLabel}
+      className={`panel-resize-handle panel-resize-handle-${side} ${
+        collapsed ? "panel-resize-handle-collapsed" : ""
+      }`}
+      onClick={onClick}
+      onPointerDown={collapsed ? undefined : onPointerDown}
+      title={ariaLabel}
+      type="button"
+    >
+      {collapsed ? (
+        <span className="panel-collapsed-tab">
+          <span>{collapsedLabel}</span>
+          {side === "left" ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 function ActivityRail({
   activePage,
+  connectionsCollapsed,
+  onConnectionsRestore,
   onNavigate,
 }: {
   activePage: "workspace" | "settings";
+  connectionsCollapsed: boolean;
+  onConnectionsRestore: () => void;
   onNavigate: (page: "workspace" | "settings") => void;
 }) {
+  function handleConnectionsClick() {
+    onNavigate("workspace");
+    if (connectionsCollapsed) {
+      onConnectionsRestore();
+    }
+  }
+
   return (
     <nav className="activity-rail" aria-label="Primary">
       <button
-        className={`rail-button ${activePage === "workspace" ? "active" : ""}`}
-        aria-label="Dashboard"
-        onClick={() => onNavigate("workspace")}
+        className={`rail-button ${activePage === "workspace" ? "active" : ""} ${
+          connectionsCollapsed ? "connections-collapsed-indicator" : ""
+        }`}
+        aria-label="Connections"
+        onClick={handleConnectionsClick}
       >
         <LayoutDashboard size={18} />
         <span className="rail-tooltip" role="tooltip">
-          Dashboard
+          Connections
         </span>
       </button>
       <button
@@ -739,7 +1032,13 @@ function ActivityRail({
   );
 }
 
-function ConnectionSidebar() {
+function ConnectionSidebar({
+  collapsed,
+  onToggleCollapsed,
+}: {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
   const query = useWorkspaceStore((state) => state.query);
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
@@ -1367,7 +1666,7 @@ function ConnectionSidebar() {
   }
 
   return (
-    <aside className="connection-sidebar">
+    <aside className="connection-sidebar" aria-hidden={collapsed}>
       <div className="sidebar-header">
         <div>
           <h1>Connections</h1>
@@ -1388,6 +1687,15 @@ function ConnectionSidebar() {
             onClick={() => setFormMode("save")}
           >
             <Plus size={16} />
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Collapse Connections column"
+            title="Collapse Connections column"
+            onClick={onToggleCollapsed}
+            type="button"
+          >
+            <PanelRight size={17} />
           </button>
         </div>
       </div>
@@ -4371,11 +4679,11 @@ function TerminalPaneView({
           <ScreenshotMenu buttonClassName="terminal-pane-action" targetRef={paneRef} />
           <button
             className="terminal-pane-action"
-            aria-label="Send selection to command assist"
+            aria-label="Send selection to AI Assist"
             disabled={!selectedTerminalText}
             onMouseDown={(e) => e.preventDefault()}
             onClick={handleSendSelectionToAssistant}
-            title="Send selection to command assist"
+            title="Send selection to AI Assist"
             type="button"
           >
             <Bot size={13} />
@@ -4466,7 +4774,7 @@ function normalizeAssistantContextText(text: string) {
     return normalized;
   }
 
-  return `${normalized.slice(0, ASSISTANT_CONTEXT_MAX_CHARS)}\n[Selection truncated before adding to command assist context.]`;
+  return `${normalized.slice(0, ASSISTANT_CONTEXT_MAX_CHARS)}\n[Selection truncated before adding to AI Assist context.]`;
 }
 
 function usesNativeSshHostKeyVerification(connection: Connection) {
@@ -6384,7 +6692,13 @@ function SftpPropertiesPopup({
   );
 }
 
-function SettingsPage({ onBack }: { onBack: () => void }) {
+function SettingsPage({
+  onBack,
+  onResetLayout,
+}: {
+  onBack: () => void;
+  onResetLayout: () => void;
+}) {
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
@@ -6444,7 +6758,7 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
           </a>
           <a href="#assistant-settings" className="settings-nav-item">
             <Bot size={16} />
-            <span>Command assist</span>
+            <span>AI Assist</span>
           </a>
           <a href="#appearance-settings" className="settings-nav-item">
             <Palette size={16} />
@@ -6644,7 +6958,7 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
           <section className="settings-card settings-section" id="assistant-settings">
             <div className="settings-section-header">
               <div>
-                <p className="panel-label">Command assist</p>
+                <p className="panel-label">AI Assist</p>
                 <h2>AI provider</h2>
               </div>
             </div>
@@ -6662,6 +6976,16 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
                 <p className="panel-label">Appearance</p>
                 <h2>Interface</h2>
               </div>
+            </div>
+            <div className="settings-reset-layout">
+              <div>
+                <strong>Layout</strong>
+                <span>Reset panel widths, collapsed panels, and saved terminal pane layouts.</span>
+              </div>
+              <button className="toolbar-button" onClick={onResetLayout} type="button">
+                <RotateCcw size={15} />
+                Reset Layout
+              </button>
             </div>
             <div className="settings-placeholder-list">
               <button className="settings-placeholder-item" type="button">
@@ -6722,7 +7046,13 @@ function normalizeTerminalSettingsDraft(settings: TerminalSettings): TerminalSet
   };
 }
 
-function AssistantPanel() {
+function AssistantPanel({
+  collapsed,
+  onToggleCollapsed,
+}: {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
   const activeTab = useWorkspaceStore((state) =>
     state.tabs.find((tab) => tab.id === state.activeTabId),
   );
@@ -6799,13 +7129,21 @@ function AssistantPanel() {
   }
 
   return (
-    <aside className="assistant-panel">
+    <aside className="assistant-panel" aria-hidden={collapsed}>
       <div className="assistant-header">
         <div>
-          <p className="panel-label">Command assist</p>
+          <p className="panel-label">AI Assist</p>
           <h2>Ask before execute</h2>
         </div>
-        <PanelRight size={17} />
+        <button
+          aria-label="Collapse AI Assist panel"
+          className="icon-button"
+          onClick={onToggleCollapsed}
+          title="Collapse AI Assist panel"
+          type="button"
+        >
+          <PanelRight size={17} />
+        </button>
       </div>
 
       <div className="assistant-context">

@@ -59,7 +59,10 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 48px 292px minmax(0, 1fr) 334px;
+  grid-template-columns:
+    48px var(--connection-panel-width, 292px) var(--connection-resize-width, 1px)
+    minmax(0, 1fr) var(--ai-resize-width, 1px)
+    var(--ai-panel-width, 334px);
   height: 100vh;
   min-width: 1120px;
   color: var(--text);
@@ -108,6 +111,10 @@ button {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.rail-button.connections-collapsed-indicator {
+  color: #60a5fa;
+}
+
 .rail-tooltip {
   position: absolute;
   left: calc(100% + 9px);
@@ -139,6 +146,7 @@ button {
 .connection-sidebar,
 .assistant-panel {
   min-width: 0;
+  overflow: hidden;
   background: var(--chrome);
   border-right: 1px solid var(--border);
 }
@@ -147,6 +155,79 @@ button {
   display: flex;
   flex-direction: column;
   padding: 18px 14px;
+}
+
+.connections-collapsed .connection-sidebar,
+.ai-assist-collapsed .assistant-panel {
+  padding-right: 0;
+  padding-left: 0;
+  border: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.panel-resize-handle {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  min-width: 1px;
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  color: var(--text-faint);
+  background: var(--border);
+  cursor: col-resize;
+}
+
+.connection-collapsed-separator {
+  width: 1px;
+  height: 100vh;
+  background: var(--border);
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle:focus-visible,
+.panel-resize-handle-collapsed {
+  color: var(--text);
+  background: #bfd0ea;
+  outline: 0;
+}
+
+.panel-resize-handle-collapsed {
+  cursor: pointer;
+}
+
+.panel-collapsed-tab {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  justify-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 12px 0 8px;
+}
+
+.panel-collapsed-tab span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.panel-resize-handle-left .panel-collapsed-tab span:empty {
+  display: none;
+}
+
+.is-resizing-layout,
+.is-resizing-layout * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .sidebar-header,
@@ -2202,6 +2283,34 @@ progress {
 .settings-placeholder-list {
   display: grid;
   gap: 8px;
+}
+
+.settings-reset-layout {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+  padding: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.settings-reset-layout div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-reset-layout strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.settings-reset-layout span {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .settings-placeholder-item {

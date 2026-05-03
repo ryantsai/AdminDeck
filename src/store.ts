@@ -167,6 +167,22 @@ function persistLayout(connectionId: string, stored: StoredConnectionLayout | un
   }
 }
 
+function clearStoredLayouts() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(LAYOUT_STORAGE_PREFIX)) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Storage may be unavailable (private mode, quota); fail silently.
+  }
+}
+
 function loadStoredTmuxSessionIds(connectionId: string): string[] {
   if (typeof window === "undefined") {
     return [];
@@ -318,6 +334,7 @@ interface WorkspaceState {
   setFocusedPane: (tabId: string, paneId: string) => void;
   saveTabLayout: (tabId: string) => void;
   resetTabLayout: (tabId: string) => void;
+  resetAllLayouts: () => void;
   updateWebviewTabMetadata: (
     tabId: string,
     metadata: { title?: string; subtitle?: string; url?: string },
@@ -711,6 +728,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
     persistLayout(tab.connection.id, undefined);
+  },
+  resetAllLayouts: () => {
+    clearStoredLayouts();
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.kind !== "terminal"
+          ? tab
+          : {
+              ...tab,
+              layout: defaultLayoutFor(tab.panes),
+              focusedPaneId: tab.panes[0]?.id,
+            },
+      ),
+    }));
   },
   updateWebviewTabMetadata: (tabId, metadata) => {
     set((state) => ({
