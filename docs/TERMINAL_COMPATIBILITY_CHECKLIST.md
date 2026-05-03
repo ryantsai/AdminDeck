@@ -33,6 +33,8 @@ The checklist passes when:
 - Mouse interactions work in apps that enable mouse support.
 - Terminal resizes propagate to running apps without corrupted layout.
 - Long command output remains responsive and searchable in the correct Pane.
+- Quiet, unfocused native SSH Sessions remain connected while the app is minimized or in the background unless the remote server, network, or explicit user close ends them.
+- tmux-backed native SSH Sessions recover from a short unexpected transport break by reattaching to the same Pane tmux session id within the bounded retry window.
 - Scrollback search decorations, navigation, and close behavior do not interfere with terminal input.
 
 ## Setup Checks
@@ -44,6 +46,7 @@ The checklist passes when:
 | Open tmux-enabled SSH terminal | Open an SSH Connection with `Use tmux sessions` enabled. | The Pane toolbar shows a `tmux` session tag before other Pane actions. The remote shell attaches to or creates the named tmux session when tmux is installed. | |
 | Open SSH terminal without remote tmux | Open a tmux-enabled SSH Connection to a host where `tmux` is not installed, or temporarily make `tmux` unavailable on a test host. | AdminDeck falls back to the normal remote shell and the terminal remains usable. | |
 | Switch tabs without disconnecting | Open two terminal tabs. Run a long-lived safe command or leave a prompt active in the first tab, switch to the second tab, then switch back. Repeat with native SSH when available. | The first Session remains connected and usable after tab switches. No disconnect occurs unless the tab-strip close `X` is explicitly pressed or the process/remote host ends the Session. | |
+| Minimize/background idle SSH | Open a native SSH terminal and leave it idle at a prompt. Minimize AdminDeck or switch to another app for at least 2 minutes, then return. | The SSH Session remains connected and usable. For tmux-enabled Panes, the Pane should still be attached to the same friendly `admindeck-<sci-fi-name><number>` session id. | |
 | Split terminal panes | Split the terminal tab into at least two Panes. Run a different command in each Pane. | Focus, typing, and output stay isolated to the active Pane. | |
 | Resize app window | Resize the AdminDeck window while a prompt is visible. | Prompt redraws cleanly, with no duplicated prompt fragments or stale rows. | |
 
@@ -80,6 +83,7 @@ Run these checks against a trusted SSH Connection. If the remote host has no `tm
 | Default setting | Create a new SSH Connection. | `Use tmux sessions` is enabled by default. | |
 | Pane session tag | Open the SSH Connection. | Each terminal Pane toolbar shows its tmux session id to the left of the Pane actions. | |
 | Resume same Pane session | In a tmux-enabled Pane, run a safe long-lived command or create a tmux window, close the AdminDeck Tab, then reopen the same Connection. | The Pane attaches to the same named tmux session and the remote tmux state is still present. | |
+| Recover after idle transport close | In a tmux-enabled native SSH Pane, simulate or wait for a transient transport close, then return to the Pane. | AdminDeck silently attempts the bounded reattach and the Pane returns to the same tmux session id. If the retry window is exhausted, the failure remains quiet after startup and no unrelated Sessions are closed. | |
 | Split Pane session ids | Split the SSH terminal into at least two Panes. | Each Pane gets a distinct tmux session id and input stays isolated to the active Pane. | |
 | List tmux sessions | Click the tmux session tag. | The popover lists remote tmux sessions and clearly marks attached vs detached sessions. | |
 | Close tmux session | In the tmux session popover, close a detached test session with the `X` button. | The remote tmux session is killed and the list refreshes without closing unrelated terminal Sessions. | |

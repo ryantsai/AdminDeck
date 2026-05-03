@@ -32,6 +32,7 @@ import type {
 
 const LAYOUT_STORAGE_PREFIX = "admindeck.layout.";
 const TMUX_SESSION_STORAGE_PREFIX = "admindeck.tmuxSessions.";
+const TMUX_SESSION_ID_PATTERN = /^admindeck-[a-z]+[0-9]{3}$/;
 // Stable ASCII slugs for remote tmux session names. Keep these code-facing and
 // locale-neutral; future UI localization can translate display labels separately
 // without renaming remote tmux sessions.
@@ -174,7 +175,7 @@ function loadStoredTmuxSessionIds(connectionId: string): string[] {
     const raw = window.localStorage.getItem(`${TMUX_SESSION_STORAGE_PREFIX}${connectionId}`);
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
     return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === "string" && value.trim() !== "")
+      ? parsed.filter(isCurrentTmuxSessionId)
       : [];
   } catch {
     return [];
@@ -231,6 +232,10 @@ function generateTmuxSessionId(existingSessionIds: string[]) {
     }
   }
   return `admindeck-${randomTmuxName()}${formatTmuxSessionNumber(Date.now() % 1000)}`;
+}
+
+function isCurrentTmuxSessionId(value: unknown): value is string {
+  return typeof value === "string" && TMUX_SESSION_ID_PATTERN.test(value);
 }
 
 function randomTmuxName() {

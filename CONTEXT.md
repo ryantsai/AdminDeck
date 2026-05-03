@@ -30,7 +30,7 @@ _Avoid_: Session, connection, backend tab
 A subdivision of a tab that presents one terminal surface or workspace view.
 _Avoid_: Session, split
 
-Terminal Panes for tmux-enabled SSH Connections may carry a generated friendly tmux session id, such as `admindeck-cockpit001`, used to resume that Pane's remote tmux session when the Pane is recreated. That id belongs to the frontend workspace/Pane layer, not the backend Connection model.
+Terminal Panes for tmux-enabled SSH Connections may carry a generated friendly tmux session id, such as `admindeck-cockpit001`, used to resume that Pane's remote tmux session when the Pane is recreated. Current Pane tmux ids use the `admindeck-<sci-fi-name><number>` shape and are remembered in frontend workspace storage. That id belongs to the frontend workspace/Pane layer, not the backend Connection model.
 
 ## Relationships
 
@@ -43,6 +43,8 @@ Terminal Panes for tmux-enabled SSH Connections may carry a generated friendly t
 - A tmux-enabled SSH terminal **Pane** may start or attach to a named remote tmux session. If `tmux` is unavailable on the remote host, the Pane falls back to the normal remote shell.
 - A **Tab** is UI state only and is not the durable backend model.
 - Switching the active **Tab** does not end, disconnect, or recreate its **Session**.
+- A native SSH **Session** must not use an app-side idle timeout. Quiet, unfocused SSH Sessions are expected to remain connected unless the remote server, network, or an explicit user close ends them.
+- A tmux-enabled native SSH **Session** may silently attempt a small bounded reattach to the same Pane tmux id if the SSH channel unexpectedly closes.
 - A **Session** is intentionally ended only by an explicit close action on the presenting **Tab** or by the remote/process ending itself.
 
 ## Example Dialogue

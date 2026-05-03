@@ -821,10 +821,7 @@ pub(crate) async fn connect_verified_client(
     }
 
     let auth = normalize_native_ssh_auth(request.auth)?;
-    let config = Arc::new(client::Config {
-        inactivity_timeout: Some(Duration::from_secs(30)),
-        ..Default::default()
-    });
+    let config = Arc::new(native_ssh_client_config());
     let host_key_rejection = Arc::new(std::sync::Mutex::new(None));
     let mut session = client::connect(
         config,
@@ -844,6 +841,13 @@ pub(crate) async fn connect_verified_client(
 
     authenticate_native_ssh(&mut session, user, &auth).await?;
     Ok(session)
+}
+
+fn native_ssh_client_config() -> client::Config {
+    client::Config {
+        inactivity_timeout: None,
+        ..Default::default()
+    }
 }
 
 pub(crate) async fn authenticate_native_ssh(
@@ -1071,6 +1075,13 @@ mod tests {
             false,
             Some("bastion")
         ));
+    }
+
+    #[test]
+    fn native_ssh_client_does_not_timeout_idle_terminal_sessions() {
+        let config = native_ssh_client_config();
+
+        assert_eq!(config.inactivity_timeout, None);
     }
 
     #[test]

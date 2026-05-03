@@ -77,7 +77,7 @@ Owns root-level saved Connections, optional folders, subfolders, search/filter, 
 
 Current implementation note: a Connection may have no folder and live directly in the root of the tree. Folders may contain Connections and subfolders. Status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
 
-For tmux-enabled SSH Connections, per-Pane friendly tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. Names use the `admindeck-<sci-fi-name><number>` shape, for example `admindeck-cockpit001`. The Connection stores only the launch preference.
+For tmux-enabled SSH Connections, per-Pane friendly tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. Current Pane names use the `admindeck-<sci-fi-name><number>` shape, for example `admindeck-cockpit001`. The frontend stores these Pane names under `admindeck.tmuxSessions.<connectionId>` so the same Connection can reopen its previous Pane-to-tmux mapping. Stored Pane ids that do not match the current friendly format are ignored when new Panes are built. The durable Connection stores only the launch preference and legacy/non-user-facing namespace fields; those fields are not the active Pane tmux session id.
 
 ### Terminal Session
 
@@ -86,6 +86,8 @@ Owns local PTY lifecycle, SSH terminal channel lifecycle, input/output streams, 
 Lifecycle invariant: switching the active workspace Tab must not disconnect, close, or recreate a local terminal Session, SSH terminal Session, or SFTP Session. Open Tab surfaces stay mounted while inactive so their live Sessions remain attached. Explicit tab close from the tab strip is the user-owned teardown action for the Session or Sessions presented by that Tab.
 
 When an SSH Connection has tmux enabled, each terminal Pane starts by attaching to or creating its generated tmux session with `tmux new-session -A -s <name>`. Native `russh` sessions and system `ssh` fallback sessions use the same remote startup behavior. If `tmux` is not installed on the remote host, AdminDeck starts a normal interactive shell instead. The Pane toolbar shows the tmux session id and can list or close remote tmux sessions without logging terminal contents.
+
+Native SSH terminal Sessions do not set an app-side inactivity timeout; quiet and unfocused Sessions should remain connected. If a tmux-enabled native SSH terminal channel unexpectedly closes after startup, the SSH runtime attempts a small bounded silent reattach to the same Pane tmux session id. This is recovery for a broken transport, not a replacement for normal Session ownership: explicit Tab close still tears down the frontend Session, and non-tmux shells are not auto-restarted because that would create a fresh remote shell rather than resume existing live state.
 
 ### Terminal Engine
 
@@ -108,7 +110,7 @@ The current Milestone A renderer is `xterm.js` with the `@xterm/addon-webgl` GPU
 
 ### SSH Transport
 
-Owns in-process SSH connections, host key verification, authentication, terminal channels, resize propagation, reconnect behavior, optional system ssh fallback/debug, and noninteractive remote tmux management commands.
+Owns in-process SSH connections, host key verification, authentication, terminal channels, resize propagation, idle behavior, bounded tmux reattach behavior, optional system ssh fallback/debug, and noninteractive remote tmux management commands.
 
 Evaluate `russh` first. Evaluate `ssh2` if `russh` does not meet v0.1 needs.
 
