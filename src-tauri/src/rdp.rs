@@ -10,19 +10,23 @@ mod platform {
     use serde::{Deserialize, Serialize};
     use tauri::{AppHandle, Manager};
     use windows::{
-        core::{BSTR, Interface, PCSTR, PCWSTR},
+        core::{Interface, BSTR, PCSTR, PCWSTR},
         Win32::{
-            Foundation::{HWND, VARIANT_FALSE, VARIANT_TRUE},
+            Foundation::{HWND, POINT, VARIANT_FALSE, VARIANT_TRUE},
+            Graphics::Gdi::ClientToScreen,
             System::{
-                Com::{DISPATCH_METHOD, DISPATCH_PROPERTYGET, DISPATCH_PROPERTYPUT, DISPPARAMS, IDispatch},
+                Com::{
+                    IDispatch, DISPATCH_METHOD, DISPATCH_PROPERTYGET, DISPATCH_PROPERTYPUT,
+                    DISPPARAMS,
+                },
                 LibraryLoader::{GetProcAddress, LoadLibraryW},
                 Ole::{OleInitialize, DISPID_PROPERTYPUT},
-                Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_I4},
+                Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I4},
             },
             UI::WindowsAndMessaging::{
-                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, SW_HIDE, SW_SHOW,
-                SWP_NOZORDER, WINDOW_EX_STYLE, WS_CHILD,
-                WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_VISIBLE,
+                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, HWND_TOP,
+                SWP_NOACTIVATE, SWP_NOZORDER, SW_HIDE, SW_SHOW, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
+                WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
             },
         },
     };
@@ -31,18 +35,39 @@ mod platform {
     const HIDDEN_RDP_POSITION: i32 = -32_000;
     const LOCALE_USER_DEFAULT: u32 = 0x0400;
     const RDP_PROGIDS: &[&str] = &[
-        "MsRdpClient11NotSafeForScripting",
-        "MsRdpClient10NotSafeForScripting",
-        "MsRdpClient9NotSafeForScripting",
-        "MsRdpClient8NotSafeForScripting",
-        "MsRdpClient7NotSafeForScripting",
-        "MsRdpClient6NotSafeForScripting",
-        "MsRdpClient5NotSafeForScripting",
-        "MsRdpClientNotSafeForScripting",
+        "MsTscAx.MsTscAx.13",
+        "MsTscAx.MsTscAx.12",
+        "MsTscAx.MsTscAx.11",
+        "MsTscAx.MsTscAx.10",
+        "MsTscAx.MsTscAx.9",
+        "MsTscAx.MsTscAx.8",
+        "MsTscAx.MsTscAx.7",
+        "MsTscAx.MsTscAx.6",
+        "MsTscAx.MsTscAx.5",
+        "MsTscAx.MsTscAx.4",
+        "MsTscAx.MsTscAx.3",
+        "MsTscAx.MsTscAx.2",
+        "MsTscAx.MsTscAx.1",
+        "MsTscAx.MsTscAx",
+    ];
+    const ADVANCED_SETTINGS_PROPERTIES: &[&str] = &[
+        "AdvancedSettings12",
+        "AdvancedSettings11",
+        "AdvancedSettings10",
+        "AdvancedSettings9",
+        "AdvancedSettings8",
+        "AdvancedSettings7",
+        "AdvancedSettings6",
+        "AdvancedSettings5",
+        "AdvancedSettings4",
+        "AdvancedSettings3",
+        "AdvancedSettings2",
+        "AdvancedSettings",
     ];
 
     type AtlAxWinInit = unsafe extern "system" fn() -> i32;
-    type AtlAxGetControl = unsafe extern "system" fn(HWND, *mut *mut c_void) -> windows::core::HRESULT;
+    type AtlAxGetControl =
+        unsafe extern "system" fn(HWND, *mut *mut c_void) -> windows::core::HRESULT;
 
     struct AtlFunctions {
         ax_win_init: AtlAxWinInit,
@@ -107,6 +132,7 @@ mod platform {
 
     struct RdpSession {
         hwnd: HWND,
+        owner: HWND,
         dispatch: IDispatch,
     }
 
@@ -130,7 +156,9 @@ mod platform {
             request: StartRdpSessionRequest,
         ) -> Result<RdpSessionStarted, String> {
             let sessions = Arc::clone(&self.sessions);
-            run_on_main_thread(app, move |app| start_session_on_main_thread(sessions, &app, request))
+            run_on_main_thread(app, move |app| {
+                start_session_on_main_thread(sessions, &app, request)
+            })
         }
 
         pub fn update_bounds(
@@ -139,12 +167,26 @@ mod platform {
             request: UpdateRdpBoundsRequest,
         ) -> Result<(), String> {
             let sessions = Arc::clone(&self.sessions);
-            run_on_main_thread(app, move |_app| {
+            run_on_main_thread(app, move |app| {
+                let host_window = app
+                    .get_window(HOST_WINDOW_LABEL)
+                    .ok_or_else(|| format!("host window '{HOST_WINDOW_LABEL}' is not available"))?;
+                let scale_factor = host_window
+                    .scale_factor()
+                    .map_err(|error| format!("failed to read host window scale factor: {error}"))?;
                 let sessions = lock_sessions(&sessions)?;
                 let session = sessions
                     .get(&request.session_id)
                     .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
-                show_rdp(session.hwnd, request.x, request.y, request.width, request.height)
+                show_rdp(
+                    session.hwnd,
+                    session.owner,
+                    scale_factor,
+                    request.x,
+                    request.y,
+                    request.width,
+                    request.height,
+                )
             })
         }
 
@@ -154,7 +196,13 @@ mod platform {
             request: SetRdpVisibilityRequest,
         ) -> Result<(), String> {
             let sessions = Arc::clone(&self.sessions);
-            run_on_main_thread(app, move |_app| {
+            run_on_main_thread(app, move |app| {
+                let host_window = app
+                    .get_window(HOST_WINDOW_LABEL)
+                    .ok_or_else(|| format!("host window '{HOST_WINDOW_LABEL}' is not available"))?;
+                let scale_factor = host_window
+                    .scale_factor()
+                    .map_err(|error| format!("failed to read host window scale factor: {error}"))?;
                 let sessions = lock_sessions(&sessions)?;
                 let session = sessions
                     .get(&request.session_id)
@@ -165,7 +213,15 @@ mod platform {
                             hide_rdp(other_session.hwnd)?;
                         }
                     }
-                    show_rdp(session.hwnd, request.x, request.y, request.width, request.height)
+                    show_rdp(
+                        session.hwnd,
+                        session.owner,
+                        scale_factor,
+                        request.x,
+                        request.y,
+                        request.width,
+                        request.height,
+                    )
                 } else {
                     hide_rdp(session.hwnd)
                 }
@@ -183,8 +239,9 @@ mod platform {
                 if let Some(session) = sessions.remove(&request.session_id) {
                     let _ = invoke_method(&session.dispatch, "Disconnect");
                     unsafe {
-                        DestroyWindow(session.hwnd)
-                            .map_err(|error| format!("failed to destroy RDP host window: {error}"))?;
+                        DestroyWindow(session.hwnd).map_err(|error| {
+                            format!("failed to destroy RDP host window: {error}")
+                        })?;
                     }
                 }
                 Ok(())
@@ -201,9 +258,7 @@ mod platform {
         }
 
         pub(crate) fn password(&self) -> Option<&str> {
-            self.password
-                .as_deref()
-                .filter(|value| !value.is_empty())
+            self.password.as_deref().filter(|value| !value.is_empty())
         }
 
         pub(crate) fn set_password(&mut self, password: Option<String>) {
@@ -248,8 +303,19 @@ mod platform {
             .map_err(|error| format!("failed to get host window handle: {error}"))?;
 
         let parent_hwnd = HWND(parent_hwnd.0);
-        let size = rounded_rect(request.x, request.y, request.width, request.height);
-        let (hwnd, dispatch, control) = create_rdp_control(parent_hwnd, size)?;
+        let scale_factor = host_window
+            .scale_factor()
+            .map_err(|error| format!("failed to read host window scale factor: {error}"))?;
+        let size = scaled_rect(
+            request.x,
+            request.y,
+            request.width,
+            request.height,
+            scale_factor,
+        );
+        let screen_origin = client_to_screen_point(parent_hwnd, size.0, size.1)?;
+        let initial_rect = (screen_origin.0, screen_origin.1, size.2, size.3);
+        let (hwnd, dispatch, control) = create_rdp_control(parent_hwnd, initial_rect)?;
 
         configure_rdp_control(
             &dispatch,
@@ -267,6 +333,7 @@ mod platform {
             session_id.clone(),
             RdpSession {
                 hwnd,
+                owner: parent_hwnd,
                 dispatch,
             },
         );
@@ -280,7 +347,7 @@ mod platform {
     }
 
     fn create_rdp_control(
-        parent_hwnd: HWND,
+        owner_hwnd: HWND,
         rect: (i32, i32, i32, i32),
     ) -> Result<(HWND, IDispatch, String), String> {
         let mut last_error = String::new();
@@ -289,15 +356,15 @@ mod platform {
             let control_name = wide_null(progid);
             let hwnd = unsafe {
                 CreateWindowExW(
-                    WINDOW_EX_STYLE(0),
+                    WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
                     PCWSTR(class_name.as_ptr()),
                     PCWSTR(control_name.as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                    WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                     rect.0,
                     rect.1,
                     rect.2,
                     rect.3,
-                    Some(parent_hwnd),
+                    Some(owner_hwnd),
                     Option::<HMENU>::None,
                     None,
                     None,
@@ -312,7 +379,10 @@ mod platform {
                 }
             };
 
-            match control_dispatch(hwnd) {
+            match control_dispatch(hwnd).and_then(|dispatch| {
+                get_dispid(&dispatch, "Server")?;
+                Ok(dispatch)
+            }) {
                 Ok(dispatch) => return Ok((hwnd, dispatch, (*progid).to_string())),
                 Err(error) => {
                     last_error = format!("{progid}: {error}");
@@ -362,17 +432,15 @@ mod platform {
         set_property_i32(dispatch, "ColorDepth", 32)?;
         set_property_i32(dispatch, "DesktopWidth", desktop_width.max(640))?;
         set_property_i32(dispatch, "DesktopHeight", desktop_height.max(480))?;
-        set_property_bool(dispatch, "AllowPromptingForCredentials", true)?;
-        set_property_bool(dispatch, "PromptForCredentials", password.is_none())?;
+        set_optional_property_bool(dispatch, "PromptForCredentials", password.is_none())?;
         set_optional_property_string(dispatch, "ConnectingText", "Connecting to remote desktop")?;
         set_optional_property_string(dispatch, "DisconnectedText", "Remote desktop disconnected")?;
         if let Some(password) = password.filter(|value| !value.is_empty()) {
-            set_property_string(dispatch, "ClearTextPassword", password)?;
+            set_clear_text_password(dispatch, password);
         }
 
-        if let Ok(advanced) = get_dispatch_property(dispatch, "AdvancedSettings2")
-            .or_else(|_| get_dispatch_property(dispatch, "AdvancedSettings"))
-        {
+        if let Some(advanced) = get_advanced_settings(dispatch) {
+            let _ = set_property_bool(&advanced, "AllowPromptingForCredentials", true);
             let _ = set_property_i32(&advanced, "RDPPort", i32::from(port));
             let _ = set_property_bool(&advanced, "EnableCredSspSupport", true);
             let _ = set_property_bool(&advanced, "RedirectClipboard", true);
@@ -435,6 +503,32 @@ mod platform {
         invoke_property_put(dispatch, name, VariantArg::bool(value))
     }
 
+    fn set_optional_property_bool(
+        dispatch: &IDispatch,
+        name: &str,
+        value: bool,
+    ) -> Result<(), String> {
+        match set_property_bool(dispatch, name, value) {
+            Ok(()) => Ok(()),
+            Err(_) => Ok(()),
+        }
+    }
+
+    fn set_clear_text_password(dispatch: &IDispatch, password: &str) {
+        if set_property_string(dispatch, "ClearTextPassword", password).is_ok() {
+            return;
+        }
+        if let Some(advanced) = get_advanced_settings(dispatch) {
+            let _ = set_property_string(&advanced, "ClearTextPassword", password);
+        }
+    }
+
+    fn get_advanced_settings(dispatch: &IDispatch) -> Option<IDispatch> {
+        ADVANCED_SETTINGS_PROPERTIES
+            .iter()
+            .find_map(|name| get_dispatch_property(dispatch, name).ok())
+    }
+
     fn invoke_property_put(
         dispatch: &IDispatch,
         name: &str,
@@ -480,9 +574,17 @@ mod platform {
                     None,
                     None,
                 )
-                .map_err(|error| format!("failed to read RDP ActiveX property '{name}': {error}"))?;
-            let variant_data = &mut *result.Anonymous.Anonymous;
-            let dispatch = ManuallyDrop::take(&mut variant_data.Anonymous.pdispVal)
+                .map_err(|error| {
+                    format!("failed to read RDP ActiveX property '{name}': {error}")
+                })?;
+            let variant_data = &*result.Anonymous.Anonymous;
+            if variant_data.vt != VT_DISPATCH {
+                return Err(format!(
+                    "RDP ActiveX property '{name}' did not return IDispatch"
+                ));
+            }
+            let dispatch = (*variant_data.Anonymous.pdispVal)
+                .clone()
                 .ok_or_else(|| format!("RDP ActiveX property '{name}' did not return IDispatch"))?;
             Ok(dispatch)
         }
@@ -507,22 +609,40 @@ mod platform {
         }
     }
 
-    fn show_rdp(hwnd: HWND, x: f64, y: f64, width: f64, height: f64) -> Result<(), String> {
-        let rect = rounded_rect(x, y, width, height);
+    fn show_rdp(
+        hwnd: HWND,
+        owner: HWND,
+        scale_factor: f64,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    ) -> Result<(), String> {
+        let rect = scaled_rect(x, y, width, height, scale_factor);
+        let origin = client_to_screen_point(owner, rect.0, rect.1)?;
         unsafe {
             SetWindowPos(
                 hwnd,
-                None,
-                rect.0,
-                rect.1,
+                Some(HWND_TOP),
+                origin.0,
+                origin.1,
                 rect.2,
                 rect.3,
-                SWP_NOZORDER,
+                SWP_NOACTIVATE,
             )
             .map_err(|error| format!("failed to position RDP control: {error}"))?;
             let _ = ShowWindow(hwnd, SW_SHOW);
         }
         Ok(())
+    }
+
+    fn client_to_screen_point(owner: HWND, x: i32, y: i32) -> Result<(i32, i32), String> {
+        let mut point = POINT { x, y };
+        let ok = unsafe { ClientToScreen(owner, &mut point) };
+        if !ok.as_bool() {
+            return Err("failed to translate RDP host coordinates to screen space".to_string());
+        }
+        Ok((point.x, point.y))
     }
 
     fn hide_rdp(hwnd: HWND) -> Result<(), String> {
@@ -542,12 +662,23 @@ mod platform {
         Ok(())
     }
 
-    fn rounded_rect(x: f64, y: f64, width: f64, height: f64) -> (i32, i32, i32, i32) {
+    fn scaled_rect(
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        scale_factor: f64,
+    ) -> (i32, i32, i32, i32) {
+        let scale_factor = if scale_factor.is_finite() && scale_factor > 0.0 {
+            scale_factor
+        } else {
+            1.0
+        };
         (
-            x.max(0.0).round() as i32,
-            y.max(0.0).round() as i32,
-            width.max(1.0).round() as i32,
-            height.max(1.0).round() as i32,
+            (x.max(0.0) * scale_factor).round() as i32,
+            (y.max(0.0) * scale_factor).round() as i32,
+            (width.max(1.0) * scale_factor).round() as i32,
+            (height.max(1.0) * scale_factor).round() as i32,
         )
     }
 
@@ -684,9 +815,46 @@ mod platform {
         }
 
         #[test]
+        fn uses_registered_mstscax_progids_for_activex_creation() {
+            assert_eq!(RDP_PROGIDS.first().copied(), Some("MsTscAx.MsTscAx.13"));
+            assert!(RDP_PROGIDS.contains(&"MsTscAx.MsTscAx.12"));
+            assert!(RDP_PROGIDS.contains(&"MsTscAx.MsTscAx"));
+            assert!(
+                RDP_PROGIDS
+                    .iter()
+                    .all(|progid| !progid.starts_with("MsRdpClient")),
+                "RDP creation must use registered ProgIDs, not Microsoft Learn class names"
+            );
+        }
+
+        #[test]
+        fn tries_newest_advanced_settings_dispatch_before_legacy_names() {
+            let names = ADVANCED_SETTINGS_PROPERTIES;
+            assert_eq!(names.first().copied(), Some("AdvancedSettings12"));
+            assert!(names.contains(&"AdvancedSettings2"));
+            assert_eq!(names.last().copied(), Some("AdvancedSettings"));
+        }
+
+        #[test]
         fn validates_session_ids_for_native_window_labels() {
-            assert_eq!(required_id("rdp-session_1".to_string()).as_deref(), Ok("rdp-session_1"));
+            assert_eq!(
+                required_id("rdp-session_1".to_string()).as_deref(),
+                Ok("rdp-session_1")
+            );
             assert!(required_id("bad/session".to_string()).is_err());
+        }
+
+        #[test]
+        fn scales_logical_bounds_to_physical_pixels() {
+            assert_eq!(
+                scaled_rect(10.0, 20.0, 800.0, 600.0, 1.5),
+                (15, 30, 1200, 900)
+            );
+            assert_eq!(scaled_rect(-10.0, -20.0, 0.0, 0.0, 1.25), (0, 0, 1, 1));
+            assert_eq!(
+                scaled_rect(10.0, 20.0, 800.0, 600.0, 0.0),
+                (10, 20, 800, 600)
+            );
         }
     }
 }
@@ -797,9 +965,7 @@ mod platform {
         }
 
         pub(crate) fn password(&self) -> Option<&str> {
-            self.password
-                .as_deref()
-                .filter(|value| !value.is_empty())
+            self.password.as_deref().filter(|value| !value.is_empty())
         }
 
         pub(crate) fn set_password(&mut self, password: Option<String>) {

@@ -2896,7 +2896,7 @@ function RemoteDesktopWorkspace({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(false);
   const sessionStartingRef = useRef(false);
-  const sessionIdRef = useRef<string>(`rdp-${tab.id}`);
+  const sessionIdRef = useRef<string | null>(null);
   const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rafRef = useRef<number | null>(null);
   const visibilityRef = useRef({ isActive, suppressed: false });
@@ -2924,7 +2924,8 @@ function RemoteDesktopWorkspace({
   };
 
   const pushRdpVisibility = () => {
-    if (!sessionStartedRef.current) {
+    const sessionId = sessionIdRef.current;
+    if (!sessionStartedRef.current || !sessionId) {
       return;
     }
     const bounds = computeBounds();
@@ -2933,7 +2934,7 @@ function RemoteDesktopWorkspace({
     }
     const visible = visibilityRef.current.isActive && !visibilityRef.current.suppressed;
     void invokeCommand("set_rdp_visibility", {
-      request: { sessionId: sessionIdRef.current, visible, ...bounds },
+      request: { sessionId, visible, ...bounds },
     }).catch((error) => {
       setRdpError(error instanceof Error ? error.message : String(error));
     });
@@ -2951,13 +2952,17 @@ function RemoteDesktopWorkspace({
     }
     rafRef.current = window.requestAnimationFrame(() => {
       rafRef.current = null;
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) {
+        return;
+      }
       const bounds = computeBounds();
       if (!bounds) {
         return;
       }
       if (!visibilityRef.current.isActive || visibilityRef.current.suppressed) {
         void invokeCommand("set_rdp_visibility", {
-          request: { sessionId: sessionIdRef.current, visible: false, ...bounds },
+          request: { sessionId, visible: false, ...bounds },
         }).catch((error) => {
           setRdpError(error instanceof Error ? error.message : String(error));
         });
@@ -2975,7 +2980,7 @@ function RemoteDesktopWorkspace({
       }
       lastBoundsRef.current = bounds;
       void invokeCommand("update_rdp_bounds", {
-        request: { sessionId: sessionIdRef.current, ...bounds },
+        request: { sessionId, ...bounds },
       }).catch((error) => {
         setRdpError(error instanceof Error ? error.message : String(error));
       });
@@ -2991,7 +2996,8 @@ function RemoteDesktopWorkspace({
       return;
     }
     let disposed = false;
-    const sessionId = sessionIdRef.current;
+    const sessionId = `rdp-${tab.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    sessionIdRef.current = sessionId;
     sessionStartingRef.current = true;
     lastBoundsRef.current = bounds;
     setRdpStatus("Connecting");
@@ -3035,6 +3041,9 @@ function RemoteDesktopWorkspace({
       sessionStartingRef.current = false;
       const started = sessionStartedRef.current;
       sessionStartedRef.current = false;
+      if (sessionIdRef.current === sessionId) {
+        sessionIdRef.current = null;
+      }
       if (ownsSession) {
         void invokeCommand("close_rdp_session", { request: { sessionId } });
       }
@@ -3061,10 +3070,18 @@ function RemoteDesktopWorkspace({
     observer.observe(node);
     window.addEventListener("resize", scheduleBoundsPush);
     window.addEventListener("scroll", scheduleBoundsPush, true);
+    const repushOnNativeMove = () => {
+      lastBoundsRef.current = null;
+      scheduleBoundsPush();
+    };
+    const moveUnlisten = listen("tauri://move", repushOnNativeMove).catch(() => null);
+    const resizeUnlisten = listen("tauri://resize", repushOnNativeMove).catch(() => null);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", scheduleBoundsPush);
       window.removeEventListener("scroll", scheduleBoundsPush, true);
+      void moveUnlisten.then((dispose) => dispose?.());
+      void resizeUnlisten.then((dispose) => dispose?.());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canStartRdp]);
