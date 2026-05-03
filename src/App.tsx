@@ -45,8 +45,8 @@ import {
   X,
 } from "lucide-react";
 import {
-  Monitor as IconParkMonitor,
-  RemoteControl as IconParkRemoteControl,
+  DataScreen as IconParkDataScreen,
+  LaptopComputer as IconParkLaptopComputer,
   Server as IconParkServer,
   Terminal as IconParkTerminal,
 } from "@icon-park/react";
@@ -1724,7 +1724,7 @@ const CONNECTION_TYPE_TILES: Array<{
     type: "ssh",
     title: "SSH",
     description: "Secure shell",
-    accent: "#2563eb",
+    accent: "#374151",
   },
   {
     type: "local",
@@ -1736,7 +1736,7 @@ const CONNECTION_TYPE_TILES: Array<{
     type: "rdp",
     title: "Remote Desktop",
     description: "Windows RDP",
-    accent: "#d97706",
+    accent: "#1d4ed8",
   },
   {
     type: "vnc",
@@ -1747,9 +1747,9 @@ const CONNECTION_TYPE_TILES: Array<{
 ];
 
 const CONNECTION_ICON_FILLS: Record<ConnectionTileType, string[]> = {
-  ssh: ["#1d4ed8", "#dbeafe", "#1e40af", "#60a5fa"],
+  ssh: ["#1f2937", "#f3f4f6", "#111827", "#6b7280"],
   local: ["#047857", "#d1fae5", "#065f46", "#34d399"],
-  rdp: ["#b45309", "#ffedd5", "#92400e", "#fbbf24"],
+  rdp: ["#1e3a8a", "#dbeafe", "#172554", "#60a5fa"],
   vnc: ["#a21caf", "#fae8ff", "#86198f", "#e879f9"],
 };
 
@@ -1774,9 +1774,9 @@ function ConnectionTypeGlyph({
     case "local":
       return <IconParkTerminal {...iconProps} />;
     case "rdp":
-      return <IconParkMonitor {...iconProps} />;
+      return <IconParkDataScreen {...iconProps} />;
     case "vnc":
-      return <IconParkRemoteControl {...iconProps} />;
+      return <IconParkLaptopComputer {...iconProps} />;
     case "ssh":
       return <IconParkServer {...iconProps} />;
   }
@@ -1815,7 +1815,9 @@ function ConnectionDialog({
   const [connectionType, setConnectionType] = useState<ConnectionTileType | "">("");
   const [authMethod, setAuthMethod] = useState<"keyFile" | "password" | "agent">("keyFile");
   const usesSshDefaults = connectionType === "ssh";
-  const usesRemoteDesktopFields = connectionType ? isRemoteDesktopConnectionType(connectionType) : false;
+  const usesRemoteDesktopFields = connectionType
+    ? isRemoteDesktopConnectionType(connectionType)
+    : false;
   const folderOptions = useMemo(() => flattenFolders(tree.folders), [tree.folders]);
   const localShellOptions = useMemo(() => localShellOptionsForPlatform(), []);
 
@@ -1833,10 +1835,11 @@ function ConnectionDialog({
       connectionType === "local"
         ? "localhost"
         : String(form.get("host") ?? "").trim();
+    const requestedName = String(form.get("name") ?? "").trim();
     const name =
       connectionType === "local"
-        ? selectedLocalShellLabel
-        : String(form.get("name") ?? "").trim() || host;
+        ? requestedName || selectedLocalShellLabel
+        : requestedName || host;
     const portValue = String(form.get("port") ?? "").trim();
     const password = String(form.get("password") ?? "");
     const keyPath = String(form.get("keyPath") ?? "").trim();
@@ -1851,10 +1854,7 @@ function ConnectionDialog({
           ? "local"
           : String(form.get("user") ?? "").trim(),
       type: connectionType,
-      folderId:
-        connectionType === "local"
-          ? undefined
-          : String(form.get("folderId") ?? "").trim() || undefined,
+      folderId: String(form.get("folderId") ?? "").trim() || undefined,
       port: portValue ? Number(portValue) : undefined,
       keyPath: usesSshDefaults && authMethod === "keyFile" ? keyPath || undefined : undefined,
       proxyJump: proxyJump || undefined,
@@ -1877,7 +1877,9 @@ function ConnectionDialog({
   return (
     <div className="dialog-backdrop" role="presentation">
       <form className="connection-dialog" onSubmit={handleSubmit}>
-        <header className={mode === "save" ? "connection-dialog-header compact" : "connection-dialog-header"}>
+        <header
+          className={mode === "save" ? "connection-dialog-header compact" : "connection-dialog-header"}
+        >
           <div>
             <p className="panel-label">{mode === "save" ? "New connection" : "Quick connect"}</p>
             {mode === "quick" ? <h2>Open one-off session</h2> : null}
@@ -1890,7 +1892,7 @@ function ConnectionDialog({
         </header>
 
         <fieldset className="connection-type-picker">
-          <legend>Type</legend>
+          <legend>Type*</legend>
           <div className="connection-type-grid">
             {CONNECTION_TYPE_TILES.map((tile) => (
               <button
@@ -1915,7 +1917,7 @@ function ConnectionDialog({
 
         {connectionType ? (
           <div className="connection-dialog-fields">
-            {mode === "save" && connectionType !== "local" ? (
+            {mode === "save" ? (
               <label>
                 <span>Folder</span>
                 <select name="folderId" defaultValue="">
@@ -1931,31 +1933,37 @@ function ConnectionDialog({
             ) : null}
 
             {connectionType === "local" ? (
-              <label>
-                <span>Shell</span>
-                <select name="localShell" defaultValue={localShellOptions[0]?.value ?? ""}>
-                  {localShellOptions.map((option) => (
-                    <option value={option.value ?? ""} key={option.value ?? option.label}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <>
+                <label>
+                  <span>Name(Optional)</span>
+                  <input name="name" placeholder="Connection name" />
+                </label>
+                <label>
+                  <span>Shell</span>
+                  <select name="localShell" defaultValue={localShellOptions[0]?.value ?? ""}>
+                    {localShellOptions.map((option) => (
+                      <option value={option.value ?? ""} key={option.value ?? option.label}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
             ) : (
               <>
                 <label>
-                  <span>Name</span>
+                  <span>Name(Optional)</span>
                   <input name="name" placeholder="Connection name" />
                 </label>
 
                 <label>
-                  <span>Host</span>
+                  <span>Host*</span>
                   <input name="host" placeholder="example.internal" required />
                 </label>
 
                 <div className="form-grid">
                   <label>
-                    <span>User</span>
+                    <span>{connectionType === "vnc" ? "User" : "User*"}</span>
                     <input
                       key={`user-${connectionType}`}
                       name="user"
@@ -2003,10 +2011,11 @@ function ConnectionDialog({
               <>
                 <div className="form-grid">
                   <label>
-                    <span>Auth</span>
+                    <span>Auth*</span>
                     <select
                       name="authMethod"
                       value={authMethod}
+                      required
                       onChange={(event) =>
                         setAuthMethod(event.currentTarget.value as "keyFile" | "password" | "agent")
                       }
@@ -2028,7 +2037,7 @@ function ConnectionDialog({
 
                 {authMethod === "password" ? (
                   <label>
-                    <span>Password</span>
+                    <span>Password*</span>
                     <input
                       name="password"
                       placeholder="Stored in OS keychain"
