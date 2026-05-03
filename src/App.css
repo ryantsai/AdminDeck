@@ -750,16 +750,14 @@ h2 {
   min-height: 0;
 }
 
-.terminal-pane-inactive header span,
-.terminal-pane-inactive header small,
-.terminal-pane-inactive .terminal-pane-actions small {
-  color: #4a5666;
+.terminal-pane-inactive {
+  filter: brightness(0.45) saturate(0.7);
+  transition: filter 120ms ease-out;
 }
 
-.terminal-pane-inactive .xterm,
-.terminal-pane-inactive pre,
-.terminal-pane-inactive code {
-  color: #4a5666;
+.terminal-pane-focused {
+  filter: none;
+  transition: filter 120ms ease-out;
 }
 
 .terminal-menu-wrapper {

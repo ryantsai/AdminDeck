@@ -3073,6 +3073,7 @@ function TerminalPaneView({
     return () => window.cancelAnimationFrame(frame);
   }, [isActive]);
 
+
   useEffect(() => {
     if (searchOpen) {
       searchInputRef.current?.focus();
