@@ -165,19 +165,24 @@ try {
     Invoke-Checked -FilePath "cargo" -ArgumentList @("check", "--manifest-path", "src-tauri/Cargo.toml") -Action "Rust check"
     Invoke-Checked -FilePath "cargo" -ArgumentList @("test", "--manifest-path", "src-tauri/Cargo.toml") -Action "Rust tests"
 
-    git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+    $AddOutput = git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Unable to stage version files."
+        throw "Unable to stage version files:`n$($AddOutput -join "`n")"
     }
 
-    git commit -m "chore: release $TagName"
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unable to commit release version bump."
+    $StagedDiff = git diff --cached --name-only
+    if (-not $StagedDiff) {
+        throw "No staged version changes to commit. Files may already be at $NextVersion from a prior run; reset them with 'git checkout -- package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml' and rerun."
     }
 
-    git tag -a $TagName -m "AdminDeck $TagName"
+    $CommitOutput = git commit -m "chore: release $TagName" 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Unable to create git tag $TagName."
+        throw "Unable to commit release version bump (exit $LASTEXITCODE):`n$($CommitOutput -join "`n")"
+    }
+
+    $TagOutput = git tag -a $TagName -m "AdminDeck $TagName" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to create git tag $TagName (exit $LASTEXITCODE):`n$($TagOutput -join "`n")"
     }
 
     Invoke-Checked -FilePath "git" -ArgumentList @("push", $Remote, "HEAD:$Branch") -Action "Push release commit"
