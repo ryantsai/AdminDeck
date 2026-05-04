@@ -32,7 +32,7 @@ import type {
 
 const LAYOUT_STORAGE_PREFIX = "admindeck.layout.";
 const TMUX_SESSION_STORAGE_PREFIX = "admindeck.tmuxSessions.";
-const TMUX_SESSION_ID_PATTERN = /^admindeck-[a-z]+[0-9]{3}$/;
+const TMUX_SESSION_ID_PATTERN = /^(?:admindeck-)?[a-z]+(?:[0-9]{2}|[0-9]{3})?$/;
 // Stable ASCII slugs for remote tmux session names. Keep these code-facing and
 // locale-neutral; future UI localization can translate display labels separately
 // without renaming remote tmux sessions.
@@ -244,14 +244,25 @@ function appendTmuxSessionId(connection: Connection) {
 }
 
 function generateTmuxSessionId(existingSessionIds: string[]) {
-  const nextNumber = existingSessionIds.length + 1;
+  const existing = new Set(existingSessionIds);
+
   for (let attempt = 0; attempt < TMUX_SESSION_NAMES.length * 2; attempt += 1) {
-    const sessionId = `admindeck-${randomTmuxName()}${formatTmuxSessionNumber(nextNumber)}`;
-    if (!existingSessionIds.includes(sessionId)) {
-      return sessionId;
+    const candidate = randomTmuxName();
+    if (!existing.has(candidate)) {
+      return candidate;
     }
   }
-  return `admindeck-${randomTmuxName()}${formatTmuxSessionNumber(Date.now() % 1000)}`;
+
+  for (let suffix = 2; suffix <= 99; suffix += 1) {
+    for (let attempt = 0; attempt < TMUX_SESSION_NAMES.length; attempt += 1) {
+      const candidate = `${randomTmuxName()}${formatTmuxSessionNumber(suffix)}`;
+      if (!existing.has(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return `${randomTmuxName()}${formatTmuxSessionNumber((Date.now() % 98) + 2)}`;
 }
 
 function isCurrentTmuxSessionId(value: unknown): value is string {
@@ -273,7 +284,7 @@ function randomTmuxIndex(max: number) {
 }
 
 function formatTmuxSessionNumber(value: number) {
-  return String(Math.max(1, value)).padStart(3, "0");
+  return String(Math.max(2, value)).padStart(2, "0");
 }
 
 function buildPanesForConnection(connection: Connection, count: number): TerminalPane[] {
