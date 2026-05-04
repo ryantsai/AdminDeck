@@ -1471,6 +1471,9 @@ function ConnectionSidebar({
   const query = useWorkspaceStore((state) => state.query);
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
+  const tabs = useWorkspaceStore((state) => state.tabs);
+  const activeTabId = useWorkspaceStore((state) => state.activeTabId);
+  const addConnectionToTerminalPane = useWorkspaceStore((state) => state.addConnectionToTerminalPane);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const [tree, setTree] = useState<ConnectionTree>(connectionTree);
@@ -1574,6 +1577,16 @@ function ConnectionSidebar({
   function handleOpenConnection(connection: Connection) {
     rememberConnection(connection);
     openConnection(connection);
+  }
+
+  function handleAddConnectionToFocusedPane(connection: Connection, direction: SplitDirection) {
+    const activeTab = tabs.find((tab) => tab.id === activeTabId);
+    if (!activeTab || activeTab.kind !== "terminal") {
+      handleOpenConnection(connection);
+      return;
+    }
+    rememberConnection(connection);
+    addConnectionToTerminalPane(activeTab.id, connection, direction);
   }
 
   function handleQuickLocalShell(option: LocalShellOption) {
@@ -2355,6 +2368,7 @@ function ConnectionSidebar({
       {treeContextMenu ? (
         <TreeContextMenu
           menu={treeContextMenu}
+          canAddToPane={Boolean(tabs.find((tab) => tab.id === activeTabId && tab.kind === "terminal"))}
           onClose={() => setTreeContextMenu(null)}
           onCollapseAll={handleCollapseAllFolders}
           onCreateConnection={() => {
@@ -2390,6 +2404,13 @@ function ConnectionSidebar({
               void handleRenameConnection(menu.connection);
             } else if (menu.kind === "folder") {
               void handleRenameFolder(menu.folder);
+            }
+          }}
+          onAddToPane={(direction) => {
+            const menu = treeContextMenu;
+            setTreeContextMenu(null);
+            if (menu.kind === "connection") {
+              handleAddConnectionToFocusedPane(menu.connection, direction);
             }
           }}
         />
@@ -2654,6 +2675,7 @@ function NewFolderDraftRow({
 
 function TreeContextMenu({
   menu,
+  canAddToPane,
   onClose,
   onCollapseAll,
   onCreateConnection,
@@ -2662,8 +2684,10 @@ function TreeContextMenu({
   onExpandAll,
   onProperties,
   onRename,
+  onAddToPane,
 }: {
   menu: TreeContextMenuState;
+  canAddToPane: boolean;
   onClose: () => void;
   onCollapseAll: () => void;
   onCreateConnection: () => void;
@@ -2672,6 +2696,7 @@ function TreeContextMenu({
   onExpandAll: () => void;
   onProperties: () => void;
   onRename: () => void;
+  onAddToPane: (direction: SplitDirection) => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -2745,10 +2770,32 @@ function TreeContextMenu({
         </>
       ) : null}
       {menu.kind === "connection" ? (
-        <button onClick={onProperties} role="menuitem" type="button">
-          <IconParkSetting className="menu-item-icon" size={15} />
-          <span>Properties</span>
-        </button>
+        <>
+          {canAddToPane ? (
+            <>
+              <button onClick={() => onAddToPane("right")} role="menuitem" type="button">
+                <ArrowRight className="menu-item-icon" size={15} />
+                <span>Add to Right Pane</span>
+              </button>
+              <button onClick={() => onAddToPane("left")} role="menuitem" type="button">
+                <ArrowLeft className="menu-item-icon" size={15} />
+                <span>Add to Left Pane</span>
+              </button>
+              <button onClick={() => onAddToPane("down")} role="menuitem" type="button">
+                <ArrowDown className="menu-item-icon" size={15} />
+                <span>Add to Lower Pane</span>
+              </button>
+              <button onClick={() => onAddToPane("up")} role="menuitem" type="button">
+                <ArrowUp className="menu-item-icon" size={15} />
+                <span>Add to Upper Pane</span>
+              </button>
+            </>
+          ) : null}
+          <button onClick={onProperties} role="menuitem" type="button">
+            <IconParkSetting className="menu-item-icon" size={15} />
+            <span>Properties</span>
+          </button>
+        </>
       ) : null}
     </div>
   );
