@@ -8618,6 +8618,7 @@ function AssistantPanel({
   const [chatError, setChatError] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
   const [waitingPhrase, setWaitingPhrase] = useState("");
+  const [waitingDots, setWaitingDots] = useState(0);
   const [messageCopyStatus, setMessageCopyStatus] = useState("");
   const [terminalSendStatus, setTerminalSendStatus] = useState("");
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -8636,6 +8637,35 @@ function AssistantPanel({
   useEffect(() => {
     writeAssistantChatHistory(chatHistory);
   }, [chatHistory]);
+
+  useEffect(() => {
+    if (!isSendingPrompt) {
+      setWaitingDots(0);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setWaitingDots((current) => (current + 1) % 4);
+    }, 300);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isSendingPrompt]);
+
+  useEffect(() => {
+    if (!isSendingPrompt) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setWaitingPhrase(randomAssistantWaitingPhrase());
+    }, 3000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isSendingPrompt]);
 
   function handleSendCodeToTerminal(code: string) {
     if (!activeTerminalPaneId) {
@@ -8942,7 +8972,7 @@ function AssistantPanel({
         {isSendingPrompt ? (
           <article className="assistant-message assistant-waiting" aria-live="polite">
             <span className="assistant-spinner" aria-hidden="true" />
-            <span>{waitingPhrase || "Charging the answer beacon"}...</span>
+            <span>{waitingPhrase || "Charging the answer beacon"}<span className="assistant-waiting-dots" aria-hidden="true">{".".repeat(waitingDots)}</span></span>
           </article>
         ) : null}
       </div>
