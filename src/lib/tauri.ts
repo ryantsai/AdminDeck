@@ -209,6 +209,10 @@ export interface AgentRunRequest {
   prompt: string;
   contextLabel: string;
   selectedOutput?: string;
+  screenshot?: {
+    sourceLabel: string;
+    dataUrl: string;
+  };
   systemContext?: string;
   messages: AgentChatMessage[];
 }
@@ -228,6 +232,12 @@ export interface DiagnosticsBundle {
 export interface CaptureScreenshotRequest {
   x: number;
   y: number;
+  width: number;
+  height: number;
+}
+
+export interface AssistantScreenshot {
+  dataUrl: string;
   width: number;
   height: number;
 }
@@ -472,6 +482,10 @@ type CommandMap = {
   capture_screenshot_to_clipboard: {
     args: { request: CaptureScreenshotRequest };
     result: null;
+  };
+  capture_screenshot_for_assistant: {
+    args: { request: CaptureScreenshotRequest };
+    result: AssistantScreenshot;
   };
   ssh_transport_plan: {
     args: undefined;

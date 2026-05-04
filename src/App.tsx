@@ -293,6 +293,7 @@ type ScreenshotRect = CaptureScreenshotRequest;
 
 type ScreenshotRegionState = {
   bounds: DOMRect;
+  destination: "assistant" | "clipboard";
   pointerId?: number;
   start?: { x: number; y: number };
   current?: { x: number; y: number };
@@ -301,10 +302,15 @@ type ScreenshotRegionState = {
 function ScreenshotMenu({
   buttonClassName = "icon-button",
   targetRef,
+  targetLabel = "Workspace surface",
 }: {
   buttonClassName?: string;
   targetRef: RefObject<HTMLElement | null>;
+  targetLabel?: string;
 }) {
+  const setAssistantContextSnippet = useWorkspaceStore(
+    (state) => state.setAssistantContextSnippet,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [regionState, setRegionState] = useState<ScreenshotRegionState | null>(null);
   const [copiedStatus, setCopiedStatus] = useState("");
@@ -324,7 +330,7 @@ function ScreenshotMenu({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [menuOpen]);
 
-  async function captureRect(rect: ScreenshotRect) {
+  async function captureRect(rect: ScreenshotRect, destination: "assistant" | "clipboard") {
     if (!isTauriRuntime()) {
       window.alert("Screenshots require the Tauri desktop runtime.");
       return;
@@ -332,12 +338,28 @@ function ScreenshotMenu({
 
     try {
       await waitForScreenshotSurface();
-      await invokeCommand("capture_screenshot_to_clipboard", { request: rect });
-      setCopiedStatus("Copied");
+      if (destination === "assistant") {
+        const screenshot = await invokeCommand("capture_screenshot_for_assistant", {
+          request: rect,
+        });
+        setAssistantContextSnippet({
+          id: `screenshot-${Date.now()}`,
+          kind: "screenshot",
+          sourceLabel: `${targetLabel} screenshot`,
+          imageDataUrl: screenshot.dataUrl,
+          width: screenshot.width,
+          height: screenshot.height,
+          capturedAt: new Date().toISOString(),
+        });
+        setCopiedStatus("Sent to AI");
+      } else {
+        await invokeCommand("capture_screenshot_to_clipboard", { request: rect });
+        setCopiedStatus("Copied");
+      }
       window.setTimeout(() => setCopiedStatus(""), 1600);
     } catch (error) {
       window.alert(
-        `Could not copy screenshot: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not capture screenshot: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -354,22 +376,22 @@ function ScreenshotMenu({
     return bounds;
   }
 
-  function handleEntirePanel() {
+  function handleEntirePanel(destination: "assistant" | "clipboard") {
     setMenuOpen(false);
     const bounds = targetBounds();
     if (!bounds) {
       return;
     }
-    void captureRect(rectFromBounds(bounds));
+    void captureRect(rectFromBounds(bounds), destination);
   }
 
-  function handleRegion() {
+  function handleRegion(destination: "assistant" | "clipboard") {
     setMenuOpen(false);
     const bounds = targetBounds();
     if (!bounds) {
       return;
     }
-    setRegionState({ bounds });
+    setRegionState({ bounds, destination });
   }
 
   function handleRegionPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -407,7 +429,7 @@ function ScreenshotMenu({
     if (rect.width < 4 || rect.height < 4) {
       return;
     }
-    void captureRect(rect);
+    void captureRect(rect, regionState.destination);
   }
 
   function handleRegionKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -440,19 +462,35 @@ function ScreenshotMenu({
           <div className="terminal-menu screenshot-menu" role="menu">
             <button
               className="terminal-menu-item"
-              onClick={handleRegion}
+              onClick={() => handleRegion("clipboard")}
               role="menuitem"
               type="button"
             >
-              Region
+              Copy Region
             </button>
             <button
               className="terminal-menu-item"
-              onClick={handleEntirePanel}
+              onClick={() => handleEntirePanel("clipboard")}
               role="menuitem"
               type="button"
             >
-              Entire Window/Panel
+              Copy Entire Window/Panel
+            </button>
+            <button
+              className="terminal-menu-item"
+              onClick={() => handleRegion("assistant")}
+              role="menuitem"
+              type="button"
+            >
+              Send Region to AI Assistant
+            </button>
+            <button
+              className="terminal-menu-item"
+              onClick={() => handleEntirePanel("assistant")}
+              role="menuitem"
+              type="button"
+            >
+              Send Entire Window/Panel to AI Assistant
             </button>
           </div>
         ) : null}
@@ -4350,7 +4388,7 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
             <KeyRound size={15} />
             Fill
           </button>
-          <ScreenshotMenu targetRef={workspaceRef} />
+          <ScreenshotMenu targetLabel={`${tab.title} URL view`} targetRef={workspaceRef} />
           {fillStatus ? <span className="webview-toolbar-status">{fillStatus}</span> : null}
         </div>
       </div>
@@ -4809,7 +4847,7 @@ function RemoteDesktopWorkspace({
         </div>
         <div className="toolbar-cluster">
           {rdpStatus ? <span className="webview-toolbar-status">{rdpStatus}</span> : null}
-          <ScreenshotMenu targetRef={workspaceRef} />
+          <ScreenshotMenu targetLabel={`${tab.title} ${typeLabel} view`} targetRef={workspaceRef} />
         </div>
       </div>
       <div className="remote-desktop-workspace" ref={hostRef}>
@@ -5975,6 +6013,7 @@ function TerminalPaneView({
       : `${pane.title} terminal selection`;
     setAssistantContextSnippet({
       id: `terminal-selection-${Date.now()}`,
+      kind: "text",
       sourceLabel,
       text,
       capturedAt: new Date().toISOString(),
@@ -6076,7 +6115,11 @@ function TerminalPaneView({
           >
             <Copy size={13} />
           </button>
-          <ScreenshotMenu buttonClassName="terminal-pane-action" targetRef={paneRef} />
+          <ScreenshotMenu
+            buttonClassName="terminal-pane-action"
+            targetLabel={`${pane.connection?.name ?? pane.title} terminal Pane`}
+            targetRef={paneRef}
+          />
           <button
             className="terminal-pane-action"
             aria-label="Send selection to AI Assistant"
@@ -7108,7 +7151,7 @@ function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab
             <Terminal size={15} />
             Terminal
           </button>
-          <ScreenshotMenu targetRef={workspaceRef} />
+          <ScreenshotMenu targetLabel={`${tab.title} SFTP view`} targetRef={workspaceRef} />
         </div>
       </div>
 
@@ -9072,7 +9115,15 @@ function AssistantPanel({
         request: {
           prompt: normalizedPrompt,
           contextLabel,
-          selectedOutput: assistantContextSnippet?.text,
+          selectedOutput:
+            assistantContextSnippet?.kind === "text" ? assistantContextSnippet.text : undefined,
+          screenshot:
+            assistantContextSnippet?.kind === "screenshot"
+              ? {
+                  sourceLabel: assistantContextSnippet.sourceLabel,
+                  dataUrl: assistantContextSnippet.imageDataUrl,
+                }
+              : undefined,
           systemContext,
           messages: history,
         },
@@ -9248,9 +9299,18 @@ function AssistantPanel({
               <X size={13} />
             </button>
           </header>
-          <pre>
-            <code>{assistantContextSnippet.text}</code>
-          </pre>
+          {assistantContextSnippet.kind === "screenshot" ? (
+            <div className="assistant-screenshot-context">
+              <img alt={assistantContextSnippet.sourceLabel} src={assistantContextSnippet.imageDataUrl} />
+              <small>
+                {assistantContextSnippet.width} x {assistantContextSnippet.height}
+              </small>
+            </div>
+          ) : (
+            <pre>
+              <code>{assistantContextSnippet.text}</code>
+            </pre>
+          )}
         </section>
       ) : null}
 

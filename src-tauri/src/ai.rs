@@ -184,10 +184,18 @@ pub struct AgentChatMessage {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AgentScreenshotContext {
+    source_label: String,
+    data_url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentRunRequest {
     prompt: String,
     context_label: String,
     selected_output: Option<String>,
+    screenshot: Option<AgentScreenshotContext>,
     system_context: Option<String>,
     messages: Vec<AgentChatMessage>,
 }
@@ -290,6 +298,7 @@ impl AgentProvider for OpenAiCompatibleProvider {
             settings.reasoning_effort().to_string(),
             request.system_context,
             request.selected_output,
+            request.screenshot,
             request.messages,
         );
         let client = reqwest::Client::new();
@@ -349,7 +358,26 @@ struct OpenAiCompatibleChatRequest {
 #[derive(Serialize)]
 struct OpenAiCompatibleMessage {
     role: String,
-    content: String,
+    content: OpenAiCompatibleContent,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum OpenAiCompatibleContent {
+    Text(String),
+    Parts(Vec<OpenAiCompatibleContentPart>),
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum OpenAiCompatibleContentPart {
+    Text { text: String },
+    ImageUrl { image_url: OpenAiCompatibleImageUrl },
+}
+
+#[derive(Serialize)]
+struct OpenAiCompatibleImageUrl {
+    url: String,
 }
 
 #[derive(Deserialize)]
@@ -373,11 +401,12 @@ fn build_agent_messages(
     reasoning_effort: String,
     system_context: Option<String>,
     selected_output: Option<String>,
+    screenshot: Option<AgentScreenshotContext>,
     history: Vec<AgentChatMessage>,
 ) -> Vec<OpenAiCompatibleMessage> {
     let mut messages = vec![OpenAiCompatibleMessage {
         role: "system".to_string(),
-        content: [
+        content: OpenAiCompatibleContent::Text([
             "You are AdminDeck's AI Assistant for local-first administration workflows.",
             "Help with terminal, SSH, SFTP, URL, RDP, and VNC operational tasks.",
             "When suggesting commands, explain intent and prefer commands the user can review before running.",
@@ -385,7 +414,7 @@ fn build_agent_messages(
             "Reponse in user's query language, when responding in Chinese, always respond in Traditional Chinese (Taiwan) and avoid Mainland China IT terminology.",
             "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.",
         ]
-        .join(" "),
+        .join(" ")),
     }];
 
     messages.extend(
@@ -413,11 +442,41 @@ fn build_agent_messages(
         user_content.push_str(&selected_output);
         user_content.push_str("\n```");
     }
+    let content = match screenshot.and_then(normalize_screenshot_context) {
+        Some(screenshot) => OpenAiCompatibleContent::Parts(vec![
+            OpenAiCompatibleContentPart::Text {
+                text: format!(
+                    "{user_content}\n\nAttached screenshot source: {}",
+                    screenshot.source_label
+                ),
+            },
+            OpenAiCompatibleContentPart::ImageUrl {
+                image_url: OpenAiCompatibleImageUrl {
+                    url: screenshot.data_url,
+                },
+            },
+        ]),
+        None => OpenAiCompatibleContent::Text(user_content),
+    };
     messages.push(OpenAiCompatibleMessage {
         role: "user".to_string(),
-        content: user_content,
+        content,
     });
     messages
+}
+
+fn normalize_screenshot_context(
+    screenshot: AgentScreenshotContext,
+) -> Option<AgentScreenshotContext> {
+    let source_label = screenshot.source_label.trim().to_string();
+    let data_url = screenshot.data_url.trim().to_string();
+    if source_label.is_empty() || !data_url.starts_with("data:image/") {
+        return None;
+    }
+    Some(AgentScreenshotContext {
+        source_label,
+        data_url,
+    })
 }
 
 fn to_openai_compatible_history_message(
@@ -434,7 +493,7 @@ fn to_openai_compatible_history_message(
     }
     Some(OpenAiCompatibleMessage {
         role: role.to_string(),
-        content,
+        content: OpenAiCompatibleContent::Text(content),
     })
 }
 
@@ -595,6 +654,7 @@ mod tests {
             "high".to_string(),
             Some("OS: Ubuntu 24.04 LTS".to_string()),
             Some("ERROR service unavailable".to_string()),
+            None,
             vec![
                 AgentChatMessage {
                     role: "user".to_string(),
@@ -610,10 +670,32 @@ mod tests {
         assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].role, "system");
         assert_eq!(messages[1].role, "user");
-        assert!(messages[2].content.contains("Bastion - Terminal"));
-        assert!(messages[2].content.contains("Reasoning effort: high"));
-        assert!(messages[2].content.contains("OS: Ubuntu 24.04 LTS"));
-        assert!(messages[2].content.contains("ERROR service unavailable"));
+        let content = text_content(&messages[2]);
+        assert!(content.contains("Bastion - Terminal"));
+        assert!(content.contains("Reasoning effort: high"));
+        assert!(content.contains("OS: Ubuntu 24.04 LTS"));
+        assert!(content.contains("ERROR service unavailable"));
+    }
+
+    #[test]
+    fn agent_messages_can_attach_screenshot_context() {
+        let messages = build_agent_messages(
+            "What is visible?".to_string(),
+            "Router - URL view".to_string(),
+            "medium".to_string(),
+            None,
+            None,
+            Some(AgentScreenshotContext {
+                source_label: "Router screenshot".to_string(),
+                data_url: "data:image/png;base64,abcd".to_string(),
+            }),
+            vec![],
+        );
+
+        match &messages[1].content {
+            OpenAiCompatibleContent::Parts(parts) => assert_eq!(parts.len(), 2),
+            OpenAiCompatibleContent::Text(_) => panic!("screenshot context should use parts"),
+        }
     }
 
     #[test]
@@ -636,5 +718,12 @@ mod tests {
                 .expect("header is valid"),
             "Bearer sk-test"
         );
+    }
+
+    fn text_content(message: &OpenAiCompatibleMessage) -> &str {
+        match &message.content {
+            OpenAiCompatibleContent::Text(content) => content,
+            OpenAiCompatibleContent::Parts(_) => "",
+        }
     }
 }

@@ -274,6 +274,14 @@ fn capture_screenshot_to_clipboard(
 }
 
 #[tauri::command]
+fn capture_screenshot_for_assistant(
+    app: tauri::AppHandle,
+    request: screenshot::CaptureScreenshotRequest,
+) -> Result<screenshot::AssistantScreenshot, String> {
+    screenshot::capture_rect_for_assistant(&app, request)
+}
+
+#[tauri::command]
 fn ssh_transport_plan() -> ssh::SshTransportPlan {
     ssh::transport_plan()
 }
@@ -755,6 +763,7 @@ pub fn run() {
             get_performance_snapshot,
             create_diagnostics_bundle,
             capture_screenshot_to_clipboard,
+            capture_screenshot_for_assistant,
             ssh_transport_plan,
             import_ssh_config,
             inspect_ssh_host_key,

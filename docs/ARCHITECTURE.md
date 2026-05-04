@@ -123,7 +123,7 @@ Owns SFTP sessions launched from SSH Connections, local/remote listing, multi-se
 
 Owns explicit user-triggered screenshot capture for active workspace surfaces. Terminal Panes expose the screenshot action in the Pane toolbar; URL, SFTP, RDP, and VNC workspaces expose it in the top workspace toolbar. The frontend owns the menu and Region selection overlay, then calls the typed Tauri command with a client-area rectangle.
 
-On Windows, the Rust backend translates the requested rectangle into physical screen coordinates and uses GDI capture so native child surfaces such as WebView2 and the RDP ActiveX host are included. Captures are written directly to the system clipboard as image data. Screenshot capture does not persist image files, does not log terminal contents, and is separate from the future AI-assistant image-analysis flow, which must remain an explicit user action.
+On Windows, the Rust backend translates the requested rectangle into physical screen coordinates and uses GDI capture so native child surfaces such as WebView2 and the RDP ActiveX host are included. Captures can be written directly to the system clipboard as image data, or encoded as a transient PNG data URL and attached to the AI Assistant context through an explicit Send to AI Assistant action. Screenshot capture does not persist image files and does not log terminal contents.
 
 ### SSH Config Importer
 
@@ -142,6 +142,8 @@ v0.1 providers:
 - Codex CLI path.
 
 The AI module must enforce approval-based execution. CLI integrations should be constrained to suggest-only/ask-before-execute where possible.
+
+Screenshot context is user-attached and transient. The Assistant sends it through OpenAI-compatible multimodal chat content only when the user submits a prompt with that screenshot context still attached.
 
 ### Diagnostics
 

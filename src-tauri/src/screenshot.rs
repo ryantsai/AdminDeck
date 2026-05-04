@@ -1,7 +1,7 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureScreenshotRequest {
     x: f64,
@@ -10,11 +10,59 @@ pub struct CaptureScreenshotRequest {
     height: f64,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantScreenshot {
+    data_url: String,
+    width: u32,
+    height: u32,
+}
+
 #[cfg(target_os = "windows")]
 pub fn capture_rect_to_clipboard(
     app: &tauri::AppHandle,
     request: CaptureScreenshotRequest,
 ) -> Result<(), String> {
+    let target = capture_target(app, request)?;
+    platform::capture_screen_rect_to_clipboard(
+        target.owner_hwnd,
+        target.x,
+        target.y,
+        target.width,
+        target.height,
+    )
+}
+
+#[cfg(target_os = "windows")]
+pub fn capture_rect_for_assistant(
+    app: &tauri::AppHandle,
+    request: CaptureScreenshotRequest,
+) -> Result<AssistantScreenshot, String> {
+    let target = capture_target(app, request)?;
+    let dib =
+        platform::capture_screen_rect_to_dib(target.x, target.y, target.width, target.height)?;
+    let data_url = platform::dib_to_png_data_url(&dib, target.width as u32, target.height as u32)?;
+    Ok(AssistantScreenshot {
+        data_url,
+        width: target.width as u32,
+        height: target.height as u32,
+    })
+}
+
+#[cfg(target_os = "windows")]
+struct CaptureTarget {
+    owner_hwnd: windows_sys::Win32::Foundation::HWND,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+#[cfg(target_os = "windows")]
+fn capture_target(
+    app: &tauri::AppHandle,
+    request: CaptureScreenshotRequest,
+) -> Result<CaptureTarget, String> {
     let window = app
         .get_window("main")
         .ok_or_else(|| "main window is not available".to_string())?;
@@ -33,7 +81,13 @@ pub fn capture_rect_to_clipboard(
     let width = (request.width * scale_factor).round().max(1.0) as i32;
     let height = (request.height * scale_factor).round().max(1.0) as i32;
 
-    platform::capture_screen_rect_to_clipboard(hwnd.0, x, y, width, height)
+    Ok(CaptureTarget {
+        owner_hwnd: hwnd.0,
+        x,
+        y,
+        width,
+        height,
+    })
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -44,10 +98,20 @@ pub fn capture_rect_to_clipboard(
     Err("screenshot capture is currently available on Windows".to_string())
 }
 
+#[cfg(not(target_os = "windows"))]
+pub fn capture_rect_for_assistant(
+    _app: &tauri::AppHandle,
+    _request: CaptureScreenshotRequest,
+) -> Result<AssistantScreenshot, String> {
+    Err("screenshot capture is currently available on Windows".to_string())
+}
+
 #[cfg(target_os = "windows")]
 mod platform {
     use std::{ffi::c_void, mem, ptr};
 
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use image::{codecs::png::PngEncoder, ColorType, ImageEncoder};
     use windows_sys::Win32::{
         Foundation::{GlobalFree, HANDLE, HWND},
         Graphics::Gdi::{
@@ -69,6 +133,16 @@ mod platform {
         width: i32,
         height: i32,
     ) -> Result<(), String> {
+        let dib = capture_screen_rect_to_dib(x, y, width, height)?;
+        unsafe { write_dib_to_clipboard(owner_hwnd, &dib) }
+    }
+
+    pub fn capture_screen_rect_to_dib(
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+    ) -> Result<Vec<u8>, String> {
         if width <= 0 || height <= 0 {
             return Err("screenshot region must have a positive size".to_string());
         }
@@ -98,9 +172,31 @@ mod platform {
                 return Err("failed to capture screenshot region".to_string());
             }
 
-            let dib = bitmap_to_dib(screen_dc.0, bitmap.0, width, height)?;
-            write_dib_to_clipboard(owner_hwnd, &dib)
+            bitmap_to_dib(screen_dc.0, bitmap.0, width, height)
         }
+    }
+
+    pub fn dib_to_png_data_url(dib: &[u8], width: u32, height: u32) -> Result<String, String> {
+        let header_size = mem::size_of::<BITMAPINFOHEADER>();
+        let expected_len = header_size + width as usize * height as usize * 4;
+        if dib.len() < expected_len {
+            return Err("captured screenshot image data is incomplete".to_string());
+        }
+
+        let pixels = &dib[header_size..expected_len];
+        let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
+        for bgra in pixels.chunks_exact(4) {
+            rgba.push(bgra[2]);
+            rgba.push(bgra[1]);
+            rgba.push(bgra[0]);
+            rgba.push(255);
+        }
+
+        let mut png = Vec::new();
+        PngEncoder::new(&mut png)
+            .write_image(&rgba, width, height, ColorType::Rgba8.into())
+            .map_err(|error| format!("failed to encode screenshot for AI Assistant: {error}"))?;
+        Ok(format!("data:image/png;base64,{}", STANDARD.encode(png)))
     }
 
     unsafe fn bitmap_to_dib(

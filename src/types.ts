@@ -258,9 +258,20 @@ export interface SecretPresence {
   exists: boolean;
 }
 
-export interface AssistantContextSnippet {
-  id: string;
-  sourceLabel: string;
-  text: string;
-  capturedAt: string;
-}
+export type AssistantContextSnippet =
+  | {
+      id: string;
+      kind: "text";
+      sourceLabel: string;
+      text: string;
+      capturedAt: string;
+    }
+  | {
+      id: string;
+      kind: "screenshot";
+      sourceLabel: string;
+      imageDataUrl: string;
+      width: number;
+      height: number;
+      capturedAt: string;
+    };
