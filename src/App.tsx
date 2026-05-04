@@ -1008,7 +1008,7 @@ const AI_PANEL_DEFAULT_WIDTH = 334;
 const AI_PANEL_MIN_WIDTH = 260;
 const AI_PANEL_MAX_WIDTH = 620;
 const CONNECTION_PANEL_LAYOUT_KEY = "admindeck.layout.connectionsPanel.v1";
-const AI_PANEL_LAYOUT_PREFIX = "admindeck.layout.aiAssistPanel.v1.";
+const AI_PANEL_LAYOUT_KEY = "admindeck.layout.aiAssistPanel.v2";
 const ASSISTANT_CHAT_HISTORY_KEY = "admindeck.aiAssistant.chatHistory.v1";
 
 const defaultConnectionPanelLayout: PanelLayoutState = {
@@ -1111,9 +1111,6 @@ function removeLayoutStorageKeys() {
 
 function App() {
   const [activePage, setActivePage] = useState<"workspace" | "settings">("workspace");
-  const activeTab = useWorkspaceStore((state) =>
-    state.tabs.find((tab) => tab.id === state.activeTabId),
-  );
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
@@ -1130,10 +1127,9 @@ function App() {
       CONNECTION_PANEL_MAX_WIDTH,
     ),
   );
-  const aiLayoutConnectionId = activeTab?.connection?.id ?? "workspace";
   const [aiPanelLayout, setAiPanelLayout] = useState(() =>
     loadPanelLayout(
-      `${AI_PANEL_LAYOUT_PREFIX}${aiLayoutConnectionId}`,
+      AI_PANEL_LAYOUT_KEY,
       defaultAiPanelLayout,
       AI_PANEL_MIN_WIDTH,
       AI_PANEL_MAX_WIDTH,
@@ -1145,19 +1141,8 @@ function App() {
   }, [connectionPanelLayout]);
 
   useEffect(() => {
-    setAiPanelLayout(
-      loadPanelLayout(
-        `${AI_PANEL_LAYOUT_PREFIX}${aiLayoutConnectionId}`,
-        defaultAiPanelLayout,
-        AI_PANEL_MIN_WIDTH,
-        AI_PANEL_MAX_WIDTH,
-      ),
-    );
-  }, [aiLayoutConnectionId]);
-
-  useEffect(() => {
-    persistPanelLayout(`${AI_PANEL_LAYOUT_PREFIX}${aiLayoutConnectionId}`, aiPanelLayout);
-  }, [aiLayoutConnectionId, aiPanelLayout]);
+    persistPanelLayout(AI_PANEL_LAYOUT_KEY, aiPanelLayout);
+  }, [aiPanelLayout]);
 
   function handleConnectionPanelResize(event: ReactPointerEvent<HTMLButtonElement>) {
     const startX = event.clientX;
@@ -4403,7 +4388,10 @@ function RemoteDesktopWorkspace({
   const sessionIdRef = useRef<string | null>(null);
   const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rafRef = useRef<number | null>(null);
-  const settlingBoundsTimerRef = useRef<number[]>([]);
+  const displayReadyRef = useRef(false);
+  const displaySyncInFlightRef = useRef(false);
+  const rdpVisibleRef = useRef(false);
+  const rdpControlRef = useRef("");
   const visibilityRef = useRef({ isActive, suppressed: false });
   const markConnectionSessionStarted = useWorkspaceStore(
     (state) => state.markConnectionSessionStarted,
@@ -4415,7 +4403,6 @@ function RemoteDesktopWorkspace({
   const [rdpStatus, setRdpStatus] = useState("");
   const canStartRdp = connection?.type === "rdp";
   const closingAfterDisconnectRef = useRef(false);
-  const rdpDesktopSyncedAfterConnectRef = useRef(false);
 
   const computeBounds = () => {
     const node = hostRef.current;
@@ -4431,31 +4418,86 @@ function RemoteDesktopWorkspace({
     };
   };
 
+  const boundsEqual = (
+    first: { x: number; y: number; width: number; height: number },
+    second: { x: number; y: number; width: number; height: number },
+  ) =>
+    first.x === second.x &&
+    first.y === second.y &&
+    first.width === second.width &&
+    first.height === second.height;
+
+  const readSettledBounds = () =>
+    new Promise<{ x: number; y: number; width: number; height: number } | null>((resolve) => {
+      let previous = computeBounds();
+      let stableFrames = 0;
+      let attempts = 0;
+      const tick = () => {
+        const next = computeBounds();
+        attempts += 1;
+        if (!next) {
+          if (attempts >= 8) {
+            resolve(null);
+            return;
+          }
+          window.requestAnimationFrame(tick);
+          return;
+        }
+        if (previous && boundsEqual(previous, next)) {
+          stableFrames += 1;
+        } else {
+          stableFrames = 0;
+        }
+        previous = next;
+        if (stableFrames >= 2 || attempts >= 10) {
+          resolve(next);
+          return;
+        }
+        window.requestAnimationFrame(tick);
+      };
+      window.requestAnimationFrame(tick);
+    });
+
   const pushRdpVisibility = () => {
     const sessionId = sessionIdRef.current;
     if (!sessionStartedRef.current || !sessionId) {
       return;
     }
-    const visible = visibilityRef.current.isActive && !visibilityRef.current.suppressed;
-    const bounds = visible ? computeBounds() : lastBoundsRef.current ?? computeBounds();
+    const wantsVisible = visibilityRef.current.isActive && !visibilityRef.current.suppressed;
+    const visible = wantsVisible && displayReadyRef.current;
+    const bounds = wantsVisible ? computeBounds() : lastBoundsRef.current ?? computeBounds();
     if (!bounds) {
+      return;
+    }
+    const previous = lastBoundsRef.current;
+    const boundsChanged = !previous || !boundsEqual(previous, bounds);
+    if (wantsVisible && displayReadyRef.current && boundsChanged) {
+      displayReadyRef.current = false;
+      rdpVisibleRef.current = false;
+      setRdpStatus("Preparing display");
+      void invokeCommand("set_rdp_visibility", {
+        request: { sessionId, visible: false, ...(previous ?? bounds) },
+      }).catch((error) => {
+        setRdpError(error instanceof Error ? error.message : String(error));
+      });
+      attemptRdpDisplaySync();
       return;
     }
     void invokeCommand("set_rdp_visibility", {
       request: { sessionId, visible, ...bounds },
-    }).catch((error) => {
-      setRdpError(error instanceof Error ? error.message : String(error));
-    });
+    })
+      .then(() => {
+        rdpVisibleRef.current = visible;
+      })
+      .catch((error) => {
+        setRdpError(error instanceof Error ? error.message : String(error));
+      });
     if (!visible) {
+      if (wantsVisible) {
+        attemptRdpDisplaySync();
+      }
       return;
     }
-    const previous = lastBoundsRef.current;
-    const boundsChanged =
-      !previous ||
-      previous.x !== bounds.x ||
-      previous.y !== bounds.y ||
-      previous.width !== bounds.width ||
-      previous.height !== bounds.height;
     if (boundsChanged) {
       lastBoundsRef.current = bounds;
       void invokeCommand("update_rdp_bounds", {
@@ -4464,6 +4506,47 @@ function RemoteDesktopWorkspace({
         setRdpError(error instanceof Error ? error.message : String(error));
       });
     }
+  };
+
+  const attemptRdpDisplaySync = () => {
+    const sessionId = sessionIdRef.current;
+    if (
+      !sessionStartedRef.current ||
+      !sessionId ||
+      !visibilityRef.current.isActive ||
+      visibilityRef.current.suppressed ||
+      displayReadyRef.current ||
+      displaySyncInFlightRef.current
+    ) {
+      return;
+    }
+    const bounds = computeBounds() ?? lastBoundsRef.current;
+    if (!bounds) {
+      return;
+    }
+    displaySyncInFlightRef.current = true;
+    void invokeCommand("sync_rdp_display_size", {
+      request: { sessionId, ...bounds },
+    })
+      .then((result) => {
+        if (sessionIdRef.current !== result.sessionId) {
+          return;
+        }
+        if (result.displaySynced) {
+          displayReadyRef.current = true;
+          lastBoundsRef.current = bounds;
+          setRdpStatus(rdpControlRef.current ? `Connected with ${rdpControlRef.current}` : "Connected");
+          pushRdpVisibility();
+        } else if (result.connected) {
+          setRdpStatus("Preparing display");
+        }
+      })
+      .catch((error) => {
+        setRdpError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        displaySyncInFlightRef.current = false;
+      });
   };
 
   const scheduleBoundsPush = () => {
@@ -4486,23 +4569,35 @@ function RemoteDesktopWorkspace({
         }
         void invokeCommand("set_rdp_visibility", {
           request: { sessionId, visible: false, ...bounds },
-        }).catch((error) => {
-          setRdpError(error instanceof Error ? error.message : String(error));
-        });
+        })
+          .then(() => {
+            rdpVisibleRef.current = false;
+          })
+          .catch((error) => {
+            setRdpError(error instanceof Error ? error.message : String(error));
+          });
         return;
       }
       const bounds = computeBounds();
       if (!bounds) {
         return;
       }
+      if (!displayReadyRef.current) {
+        lastBoundsRef.current = bounds;
+        attemptRdpDisplaySync();
+        return;
+      }
       const previous = lastBoundsRef.current;
       if (
         previous &&
-        previous.x === bounds.x &&
-        previous.y === bounds.y &&
-        previous.width === bounds.width &&
-        previous.height === bounds.height
+        boundsEqual(previous, bounds)
       ) {
+        return;
+      }
+      if (!rdpVisibleRef.current) {
+        displayReadyRef.current = false;
+        setRdpStatus("Preparing display");
+        attemptRdpDisplaySync();
         return;
       }
       lastBoundsRef.current = bounds;
@@ -4514,61 +4609,56 @@ function RemoteDesktopWorkspace({
     });
   };
 
-  const scheduleSettlingBoundsPushes = () => {
-    settlingBoundsTimerRef.current.forEach((timerId) => window.clearTimeout(timerId));
-    settlingBoundsTimerRef.current = [0, 75, 250, 750, 1500].map((delay) =>
-      window.setTimeout(() => {
-        lastBoundsRef.current = null;
-        scheduleBoundsPush();
-      }, delay),
-    );
-  };
-
   useEffect(() => {
     if (!canStartRdp || !connection || !isTauriRuntime() || sessionStartedRef.current || sessionStartingRef.current) {
       return;
     }
-    const bounds = computeBounds();
-    if (!bounds) {
-      return;
-    }
     let disposed = false;
-    const sessionId = `rdp-${tab.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    sessionIdRef.current = sessionId;
-    sessionStartingRef.current = true;
-    lastBoundsRef.current = bounds;
-    rdpDesktopSyncedAfterConnectRef.current = false;
-    setRdpStatus("Connecting");
-    void invokeCommand("start_rdp_session", {
-      request: {
-        sessionId,
-        host: connection.host,
-        user: connection.user,
-        port: connection.port,
-        secretOwnerId: connection.id,
-        ...bounds,
-      },
-    })
-      .then((started) => {
-        sessionStartingRef.current = false;
-        if (disposed) {
-          void invokeCommand("close_rdp_session", { request: { sessionId: started.sessionId } });
-          return;
-        }
-        sessionStartedRef.current = true;
-        setRdpStatus(`Connected with ${started.control}`);
-        markConnectionSessionStarted(connection.id);
-        pushRdpVisibility();
-        scheduleSettlingBoundsPushes();
+    let sessionId = "";
+    void readSettledBounds().then((bounds) => {
+      if (disposed || !bounds) {
+        return;
+      }
+      sessionId = `rdp-${tab.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      sessionIdRef.current = sessionId;
+      sessionStartingRef.current = true;
+      displayReadyRef.current = false;
+      displaySyncInFlightRef.current = false;
+      rdpVisibleRef.current = false;
+      lastBoundsRef.current = bounds;
+      rdpControlRef.current = "";
+      setRdpStatus("Connecting");
+      void invokeCommand("start_rdp_session", {
+        request: {
+          sessionId,
+          host: connection.host,
+          user: connection.user,
+          port: connection.port,
+          secretOwnerId: connection.id,
+          ...bounds,
+        },
       })
-      .catch((error) => {
-        sessionStartingRef.current = false;
-        sessionStartedRef.current = false;
-        if (!disposed) {
-          setRdpStatus("");
-          setRdpError(error instanceof Error ? error.message : String(error));
-        }
-      });
+        .then((started) => {
+          sessionStartingRef.current = false;
+          if (disposed) {
+            void invokeCommand("close_rdp_session", { request: { sessionId: started.sessionId } });
+            return;
+          }
+          sessionStartedRef.current = true;
+          rdpControlRef.current = started.control;
+          setRdpStatus("Preparing display");
+          markConnectionSessionStarted(connection.id);
+          attemptRdpDisplaySync();
+        })
+        .catch((error) => {
+          sessionStartingRef.current = false;
+          sessionStartedRef.current = false;
+          if (!disposed) {
+            setRdpStatus("");
+            setRdpError(error instanceof Error ? error.message : String(error));
+          }
+        });
+    });
 
     return () => {
       disposed = true;
@@ -4576,12 +4666,13 @@ function RemoteDesktopWorkspace({
         window.cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      settlingBoundsTimerRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      settlingBoundsTimerRef.current = [];
       const ownsSession = sessionStartingRef.current || sessionStartedRef.current;
       sessionStartingRef.current = false;
       const started = sessionStartedRef.current;
       sessionStartedRef.current = false;
+      displayReadyRef.current = false;
+      displaySyncInFlightRef.current = false;
+      rdpVisibleRef.current = false;
       if (sessionIdRef.current === sessionId) {
         sessionIdRef.current = null;
       }
@@ -4669,12 +4760,15 @@ function RemoteDesktopWorkspace({
         request: { sessionId },
       })
         .then((status) => {
-          if (status.connected && !rdpDesktopSyncedAfterConnectRef.current) {
-            rdpDesktopSyncedAfterConnectRef.current = true;
-            pushRdpVisibility();
-            scheduleSettlingBoundsPushes();
+          if (!displayReadyRef.current) {
+            attemptRdpDisplaySync();
           }
-          if (!status.connected && sessionIdRef.current === status.sessionId) {
+          if (
+            !status.connected &&
+            sessionIdRef.current === status.sessionId &&
+            displayReadyRef.current &&
+            rdpVisibleRef.current
+          ) {
             closingAfterDisconnectRef.current = true;
             closeTab(tab.id);
           }
@@ -4682,7 +4776,7 @@ function RemoteDesktopWorkspace({
         .catch((error) => {
           setRdpError(error instanceof Error ? error.message : String(error));
         });
-    }, 1000);
+    }, displayReadyRef.current ? 1000 : 250);
 
     return () => {
       window.clearInterval(intervalId);

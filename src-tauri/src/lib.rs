@@ -11,6 +11,7 @@ mod ssh;
 mod ssh_config;
 mod storage;
 mod webview;
+mod window_state;
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -628,6 +629,15 @@ fn set_rdp_visibility(
 }
 
 #[tauri::command]
+fn sync_rdp_display_size(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::SyncRdpDisplaySizeRequest,
+) -> Result<rdp::RdpDisplaySizeSync, String> {
+    rdp_sessions.sync_display_size(app, request)
+}
+
+#[tauri::command]
 fn close_rdp_session(
     app: tauri::AppHandle,
     rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
@@ -662,6 +672,12 @@ pub fn run() {
                 })?
                 .join("admin-deck.sqlite3");
             let storage = storage::Storage::open(db_path).map_err(setup_error)?;
+            let main_window_settings = storage.main_window_settings().map_err(setup_error)?;
+            if let Some(main_window) = app.get_window(window_state::MAIN_WINDOW_LABEL) {
+                let initial_window_settings =
+                    window_state::restore_main_window(&main_window, main_window_settings);
+                app.manage(window_state::MainWindowState::new(initial_window_settings));
+            }
             app.manage(storage);
             app.manage(performance::PerformanceMonitor::new());
             app.manage(secrets::Secrets::new());
@@ -670,6 +686,28 @@ pub fn run() {
             app.manage(webview::WebviewSessionManager::new());
             app.manage(rdp::RdpSessionManager::new());
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() != window_state::MAIN_WINDOW_LABEL {
+                return;
+            }
+
+            if let Some(window_tracker) = window.try_state::<window_state::MainWindowState>() {
+                match event {
+                    tauri::WindowEvent::Resized(size) => {
+                        if !window.is_maximized().unwrap_or(false) {
+                            window_tracker.update_normal_size(*size);
+                        }
+                    }
+                    tauri::WindowEvent::CloseRequested { .. } => {
+                        let settings = window_tracker.snapshot_for_window(window);
+                        if let Some(storage) = window.try_state::<storage::Storage>() {
+                            let _ = storage.update_main_window_settings(settings);
+                        }
+                    }
+                    _ => {}
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             app_bootstrap,
@@ -741,6 +779,7 @@ pub fn run() {
             start_rdp_session,
             update_rdp_bounds,
             set_rdp_visibility,
+            sync_rdp_display_size,
             close_rdp_session,
             get_rdp_session_status
         ])

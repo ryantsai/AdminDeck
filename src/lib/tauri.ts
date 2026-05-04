@@ -322,6 +322,23 @@ export interface SetRdpVisibilityRequest {
   height: number;
 }
 
+export interface SyncRdpDisplaySizeRequest {
+  sessionId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface RdpDisplaySizeSync {
+  sessionId: string;
+  connectionState: number;
+  connected: boolean;
+  displaySynced: boolean;
+  desktopWidth: number;
+  desktopHeight: number;
+}
+
 export interface RdpSimpleRequest {
   sessionId: string;
 }
@@ -696,6 +713,10 @@ type CommandMap = {
   set_rdp_visibility: {
     args: { request: SetRdpVisibilityRequest };
     result: null;
+  };
+  sync_rdp_display_size: {
+    args: { request: SyncRdpDisplaySizeRequest };
+    result: RdpDisplaySizeSync;
   };
   close_rdp_session: {
     args: { request: RdpSimpleRequest };

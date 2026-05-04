@@ -12,7 +12,7 @@ mod platform {
     use windows::{
         core::{Interface, BSTR, PCSTR, PCWSTR},
         Win32::{
-            Foundation::{HWND, POINT, VARIANT_FALSE, VARIANT_TRUE},
+            Foundation::{HWND, POINT, RECT, VARIANT_FALSE, VARIANT_TRUE},
             Graphics::Gdi::ClientToScreen,
             System::{
                 Com::{
@@ -24,9 +24,9 @@ mod platform {
                 Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I2, VT_I4},
             },
             UI::WindowsAndMessaging::{
-                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, SWP_NOACTIVATE,
-                SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
-                WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
+                CreateWindowExW, DestroyWindow, GetWindowRect, SetWindowPos, ShowWindow, HMENU,
+                SWP_NOACTIVATE, SWP_NOZORDER, SW_SHOWNOACTIVATE, WS_CLIPCHILDREN,
+                WS_CLIPSIBLINGS, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
             },
         },
     };
@@ -138,6 +138,27 @@ mod platform {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
+    pub struct SyncRdpDisplaySizeRequest {
+        session_id: String,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpDisplaySizeSync {
+        session_id: String,
+        connection_state: i32,
+        connected: bool,
+        display_synced: bool,
+        desktop_width: i32,
+        desktop_height: i32,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct RdpSimpleRequest {
         session_id: String,
     }
@@ -220,7 +241,7 @@ mod platform {
                 if request.visible {
                     for (other_session_id, other_session) in sessions.iter() {
                         if other_session_id != &request.session_id {
-                            hide_rdp(other_session.hwnd)?;
+                            park_rdp_at_current_size(other_session.hwnd)?;
                         }
                     }
                     let session = sessions.get(&request.session_id).ok_or_else(|| {
@@ -240,8 +261,58 @@ mod platform {
                     let session = sessions.get(&request.session_id).ok_or_else(|| {
                         format!("RDP session '{}' was not found", request.session_id)
                     })?;
-                    hide_rdp(session.hwnd)
+                    stage_rdp(
+                        session.hwnd,
+                        scale_factor,
+                        request.x,
+                        request.y,
+                        request.width,
+                        request.height,
+                    )
+                    .map(|_| ())
                 }
+            })
+        }
+
+        pub fn sync_display_size(
+            &self,
+            app: AppHandle,
+            request: SyncRdpDisplaySizeRequest,
+        ) -> Result<RdpDisplaySizeSync, String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread(app, move |app| {
+                let host_window = app
+                    .get_window(HOST_WINDOW_LABEL)
+                    .ok_or_else(|| format!("host window '{HOST_WINDOW_LABEL}' is not available"))?;
+                let scale_factor = host_window
+                    .scale_factor()
+                    .map_err(|error| format!("failed to read host window scale factor: {error}"))?;
+                let mut sessions = lock_sessions(&sessions)?;
+                let session = sessions
+                    .get_mut(&request.session_id)
+                    .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
+                let rect = stage_rdp(
+                    session.hwnd,
+                    scale_factor,
+                    request.x,
+                    request.y,
+                    request.width,
+                    request.height,
+                )?;
+                let desktop_width = desktop_width_for(rect.2);
+                let desktop_height = desktop_height_for(rect.3);
+                let connection_state = get_property_i32(&session.dispatch, "Connected")?;
+                let connected = is_rdp_connected_state(connection_state);
+                let display_synced = connected
+                    && sync_remote_desktop_size(session, desktop_width, desktop_height, true);
+                Ok(RdpDisplaySizeSync {
+                    session_id: request.session_id,
+                    connection_state,
+                    connected,
+                    display_synced,
+                    desktop_width: session.desktop_width,
+                    desktop_height: session.desktop_height,
+                })
             })
         }
 
@@ -350,8 +421,7 @@ mod platform {
             request.height,
             scale_factor,
         );
-        let screen_origin = client_to_screen_point(parent_hwnd, size.0, size.1)?;
-        let initial_rect = (screen_origin.0, screen_origin.1, size.2, size.3);
+        let initial_rect = staged_rect(size.2, size.3);
         let (hwnd, dispatch, control) = create_rdp_control(parent_hwnd, initial_rect)?;
 
         configure_rdp_control(
@@ -487,7 +557,7 @@ mod platform {
             let _ = set_property_i32(&advanced, "RDPPort", i32::from(port));
             let _ = set_property_bool(&advanced, "EnableCredSspSupport", true);
             let _ = set_property_bool(&advanced, "RedirectClipboard", true);
-            let _ = set_property_bool(&advanced, "SmartSizing", true);
+            let _ = set_property_bool(&advanced, "SmartSizing", false);
         }
 
         Ok(())
@@ -748,18 +818,32 @@ mod platform {
         )?;
         let desktop_width = desktop_width_for(rect.2);
         let desktop_height = desktop_height_for(rect.3);
-        if should_resize_remote_desktop(
-            session.desktop_width,
-            session.desktop_height,
-            desktop_width,
-            desktop_height,
-        ) {
-            if resize_remote_desktop(&session.dispatch, desktop_width, desktop_height).is_ok() {
-                session.desktop_width = desktop_width;
-                session.desktop_height = desktop_height;
-            }
-        }
+        let _ = sync_remote_desktop_size(session, desktop_width, desktop_height, false);
         Ok(())
+    }
+
+    fn sync_remote_desktop_size(
+        session: &mut RdpSession,
+        desktop_width: i32,
+        desktop_height: i32,
+        force: bool,
+    ) -> bool {
+        if !force
+            && !should_resize_remote_desktop(
+                session.desktop_width,
+                session.desktop_height,
+                desktop_width,
+                desktop_height,
+            )
+        {
+            return true;
+        }
+        if resize_remote_desktop(&session.dispatch, desktop_width, desktop_height).is_err() {
+            return false;
+        }
+        session.desktop_width = desktop_width;
+        session.desktop_height = desktop_height;
+        true
     }
 
     fn should_resize_remote_desktop(
@@ -821,6 +905,41 @@ mod platform {
         Ok((origin.0, origin.1, rect.2, rect.3))
     }
 
+    fn stage_rdp(
+        hwnd: HWND,
+        scale_factor: f64,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    ) -> Result<(i32, i32, i32, i32), String> {
+        let rect = scaled_rect(x, y, width, height, scale_factor);
+        let staged = staged_rect(rect.2, rect.3);
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                None,
+                staged.0,
+                staged.1,
+                staged.2,
+                staged.3,
+                SWP_NOACTIVATE | SWP_NOZORDER,
+            )
+            .map_err(|error| format!("failed to stage RDP control: {error}"))?;
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        }
+        Ok(staged)
+    }
+
+    fn staged_rect(width: i32, height: i32) -> (i32, i32, i32, i32) {
+        (
+            HIDDEN_RDP_POSITION,
+            HIDDEN_RDP_POSITION,
+            width.max(1),
+            height.max(1),
+        )
+    }
+
     fn client_to_screen_point(owner: HWND, x: i32, y: i32) -> Result<(i32, i32), String> {
         let mut point = POINT { x, y };
         let ok = unsafe { ClientToScreen(owner, &mut point) };
@@ -830,19 +949,26 @@ mod platform {
         Ok((point.x, point.y))
     }
 
-    fn hide_rdp(hwnd: HWND) -> Result<(), String> {
+    fn park_rdp_at_current_size(hwnd: HWND) -> Result<(), String> {
+        let mut rect = RECT::default();
+        unsafe {
+            GetWindowRect(hwnd, &mut rect)
+                .map_err(|error| format!("failed to read RDP control bounds: {error}"))?;
+        }
+        let width = (rect.right - rect.left).max(1);
+        let height = (rect.bottom - rect.top).max(1);
         unsafe {
             SetWindowPos(
                 hwnd,
                 None,
                 HIDDEN_RDP_POSITION,
                 HIDDEN_RDP_POSITION,
-                1,
-                1,
+                width,
+                height,
                 SWP_NOACTIVATE | SWP_NOZORDER,
             )
-            .map_err(|error| format!("failed to hide RDP control: {error}"))?;
-            let _ = ShowWindow(hwnd, SW_HIDE);
+            .map_err(|error| format!("failed to park RDP control: {error}"))?;
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         }
         Ok(())
     }
@@ -1070,6 +1196,18 @@ mod platform {
         }
 
         #[test]
+        fn stages_rdp_control_offscreen_at_requested_size() {
+            assert_eq!(
+                staged_rect(1920, 1080),
+                (HIDDEN_RDP_POSITION, HIDDEN_RDP_POSITION, 1920, 1080)
+            );
+            assert_eq!(
+                staged_rect(0, -10),
+                (HIDDEN_RDP_POSITION, HIDDEN_RDP_POSITION, 1, 1)
+            );
+        }
+
+        #[test]
         fn treats_zero_rdp_connected_state_as_disconnected() {
             assert!(!is_rdp_connected_state(0));
             assert!(is_rdp_connected_state(1));
@@ -1141,6 +1279,27 @@ mod platform {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
+    pub struct SyncRdpDisplaySizeRequest {
+        pub session_id: String,
+        pub x: f64,
+        pub y: f64,
+        pub width: f64,
+        pub height: f64,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpDisplaySizeSync {
+        session_id: String,
+        connection_state: i32,
+        connected: bool,
+        display_synced: bool,
+        desktop_width: i32,
+        desktop_height: i32,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct RdpSimpleRequest {
         pub session_id: String,
     }
@@ -1172,6 +1331,21 @@ mod platform {
             _request: SetRdpVisibilityRequest,
         ) -> Result<(), String> {
             Ok(())
+        }
+
+        pub fn sync_display_size(
+            &self,
+            _app: AppHandle,
+            request: SyncRdpDisplaySizeRequest,
+        ) -> Result<RdpDisplaySizeSync, String> {
+            Ok(RdpDisplaySizeSync {
+                session_id: request.session_id,
+                connection_state: 0,
+                connected: false,
+                display_synced: false,
+                desktop_width: 0,
+                desktop_height: 0,
+            })
         }
 
         pub fn close_session(

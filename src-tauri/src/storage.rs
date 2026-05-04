@@ -1,3 +1,4 @@
+use crate::window_state::{validate_main_window_settings, MainWindowSettings};
 use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
@@ -457,6 +458,48 @@ impl Storage {
                 params![value],
             )
             .map_err(to_storage_error)?;
+        Ok(settings)
+    }
+
+    pub(crate) fn main_window_settings(&self) -> Result<Option<MainWindowSettings>, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'main_window'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|error| format!("failed to load main window settings: {error}"))?;
+
+        value
+            .map(|value| {
+                serde_json::from_str::<MainWindowSettings>(&value)
+                    .map_err(|error| format!("main window settings are invalid JSON: {error}"))
+                    .and_then(validate_main_window_settings)
+            })
+            .transpose()
+    }
+
+    pub(crate) fn update_main_window_settings(
+        &self,
+        request: MainWindowSettings,
+    ) -> Result<MainWindowSettings, String> {
+        let settings = validate_main_window_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize main window settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('main_window', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(|error| format!("failed to update main window settings: {error}"))?;
+
         Ok(settings)
     }
 
@@ -2989,6 +3032,41 @@ mod tests {
         assert_eq!(
             error,
             "CLI adapter policy must remain suggest-only for approval-based execution"
+        );
+    }
+
+    #[test]
+    fn main_window_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("main-window-settings")).expect("storage opens");
+
+        assert_eq!(
+            storage
+                .main_window_settings()
+                .expect("missing main window settings load"),
+            None
+        );
+
+        let updated = storage
+            .update_main_window_settings(MainWindowSettings {
+                width: 1440,
+                height: 900,
+                maximized: true,
+            })
+            .expect("main window settings update");
+
+        assert_eq!(
+            updated,
+            MainWindowSettings {
+                width: 1440,
+                height: 900,
+                maximized: true,
+            }
+        );
+        assert_eq!(
+            storage
+                .main_window_settings()
+                .expect("main window settings reload"),
+            Some(updated)
         );
     }
 
