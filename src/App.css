@@ -2250,6 +2250,11 @@ progress {
   animation: assistant-spinner-spin 0.78s linear infinite;
 }
 
+.assistant-waiting-dots {
+  display: inline-block;
+  min-width: 0.95em;
+}
+
 .assistant-chat-history-backdrop {
   position: fixed;
   inset: 0;
