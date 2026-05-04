@@ -8934,11 +8934,26 @@ function AssistantMessageView({
   onCopyMessage: (message: AssistantChatMessage) => void;
   onSendCode: (code: string) => void;
 }) {
+  const userMessageLineCount = message.role === "user" ? message.content.split(/\r?\n/).length : 0;
+  const shouldTruncateUserMessage = message.role === "user" && userMessageLineCount > 10;
+  const [isUserMessageExpanded, setIsUserMessageExpanded] = useState(false);
+
   return (
     <article className={`assistant-message ${message.role}`}>
-      <div className="assistant-message-bubble">
+      <div
+        className={`assistant-message-bubble${shouldTruncateUserMessage && !isUserMessageExpanded ? " assistant-message-bubble-truncated" : ""}`}
+      >
         <MarkdownContent content={message.content} onCopyCode={onCopyCode} onSendCode={onSendCode} />
       </div>
+      {shouldTruncateUserMessage ? (
+        <button
+          className="assistant-message-expand"
+          onClick={() => setIsUserMessageExpanded((expanded) => !expanded)}
+          type="button"
+        >
+          {isUserMessageExpanded ? "Show less" : "More"}
+        </button>
+      ) : null}
       <div className="assistant-message-actions">
         <time dateTime={message.createdAt}>{formatAssistantMessageTime(message.createdAt)}</time>
         <button
