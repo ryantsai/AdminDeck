@@ -108,3 +108,5 @@ The detailed manual checklist lives in `docs/TERMINAL_COMPATIBILITY_CHECKLIST.md
 | Paste into an app that enables bracketed paste, such as a shell/readline or editor | Pasted text is bracket-delimited by the terminal app when supported |
 
 If a scenario fails, note whether it is renderer behavior, shell/application behavior, SSH transport behavior, or an app layout/resize problem before changing the renderer abstraction.
+
+For RDP-specific gray gutters or a short resize after switching Tabs, check app layout before changing RDP resize logic. The right AI Assistant panel and other chrome must keep one global width/collapsed state across Tabs. If those dimensions change on Tab activation, the RDP ActiveX HWND is being resized by the workspace and the symptom can look like a remote desktop display-size failure even when the RDP Session is healthy.
