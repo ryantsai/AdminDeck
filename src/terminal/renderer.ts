@@ -100,7 +100,9 @@ class XtermTerminalRenderer implements TerminalRenderer {
   }
 
   get dimensions() {
-    const pixels = contentPixelDimensionsFor(this.terminal.element ?? this.hostElement);
+    const pixels =
+      screenPixelDimensionsFor(this.terminal.element ?? null) ??
+      contentPixelDimensionsFor(this.terminal.element ?? this.hostElement);
     return {
       cols: this.terminal.cols,
       pixelHeight: pixels.pixelHeight,
@@ -122,6 +124,7 @@ class XtermTerminalRenderer implements TerminalRenderer {
 
   fit() {
     this.fitAddon.fit();
+    this.trimRowsToVisibleScreen();
     return this.dimensions;
   }
 
@@ -213,6 +216,26 @@ class XtermTerminalRenderer implements TerminalRenderer {
     this.webglAddon = null;
   }
 
+  private trimRowsToVisibleScreen() {
+    const element = this.terminal.element;
+    const screen = element?.querySelector<HTMLElement>(".xterm-screen");
+    if (!element || !screen || !element.isConnected) {
+      return;
+    }
+
+    const style = window.getComputedStyle(element);
+    const paddingBottom = numericStyleValue(style.paddingBottom);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const elementRect = element.getBoundingClientRect();
+      const screenRect = screen.getBoundingClientRect();
+      const maxScreenBottom = elementRect.bottom - paddingBottom + 0.5;
+      if (screenRect.bottom <= maxScreenBottom || this.terminal.rows <= 1) {
+        return;
+      }
+      this.terminal.resize(this.terminal.cols, this.terminal.rows - 1);
+    }
+  }
+
   write(data: string) {
     this.terminal.write(data);
   }
@@ -226,6 +249,7 @@ class XtermTerminalRenderer implements TerminalRenderer {
     this.terminal.options.fontSize = clamped;
     try {
       this.fitAddon.fit();
+      this.trimRowsToVisibleScreen();
     } catch {
       // Fit may throw if the host is detached; safe to ignore.
     }
@@ -286,6 +310,20 @@ function contentPixelDimensionsFor(element: HTMLElement | null) {
   };
 }
 
+function screenPixelDimensionsFor(element: HTMLElement | null) {
+  const screen = element?.querySelector<HTMLElement>(".xterm-screen");
+  if (!screen) {
+    return null;
+  }
+  const rect = screen.getBoundingClientRect();
+  const pixelHeight = Math.round(rect.height);
+  const pixelWidth = Math.round(rect.width);
+  if (pixelHeight <= 0 || pixelWidth <= 0) {
+    return null;
+  }
+  return { pixelHeight, pixelWidth };
+}
+
 function numericStyleValue(value: string | undefined) {
   const parsed = Number.parseFloat(value ?? "0");
   return Number.isFinite(parsed) ? parsed : 0;
@@ -319,6 +357,9 @@ function terminalOptionsFor(settings: TerminalSettings): ITerminalOptions {
       cursor: "#d9e2ef",
       selectionBackground: "#305f95",
       selectionInactiveBackground: "#1e3a5f",
+      scrollbarSliderBackground: "rgba(149, 167, 187, 0.48)",
+      scrollbarSliderHoverBackground: "rgba(185, 202, 224, 0.72)",
+      scrollbarSliderActiveBackground: "rgba(217, 226, 239, 0.86)",
     },
   };
 }

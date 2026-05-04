@@ -5535,6 +5535,8 @@ function TerminalPaneView({
   const sessionIdRef = useRef<string | null>(null);
   const lastResizeDimensionsRef = useRef<TerminalDimensions | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
+  const resizeTimeoutRefs = useRef<number[]>([]);
+  const fitAndResizeRef = useRef<() => void>(() => undefined);
   const startedRef = useRef(false);
   const onFocusRef = useRef(onFocus);
   useEffect(() => {
@@ -5681,18 +5683,48 @@ function TerminalPaneView({
         });
       }
     }
+    fitAndResizeRef.current = fitAndResizeTerminal;
 
-    const resizeObserver = new ResizeObserver(() => {
+    function clearScheduledResizeTimeouts() {
+      for (const timeoutId of resizeTimeoutRefs.current) {
+        window.clearTimeout(timeoutId);
+      }
+      resizeTimeoutRefs.current = [];
+    }
+
+    function scheduleFitAndResizeTerminal() {
       if (resizeFrameRef.current !== null) {
         return;
       }
+      clearScheduledResizeTimeouts();
 
       resizeFrameRef.current = window.requestAnimationFrame(() => {
-        resizeFrameRef.current = null;
-        fitAndResizeTerminal();
+        resizeFrameRef.current = window.requestAnimationFrame(() => {
+          resizeFrameRef.current = null;
+          fitAndResizeTerminal();
+        });
       });
+      resizeTimeoutRefs.current = [
+        window.setTimeout(fitAndResizeTerminal, 80),
+        window.setTimeout(fitAndResizeTerminal, 180),
+        window.setTimeout(() => {
+          fitAndResizeTerminal();
+          resizeTimeoutRefs.current = [];
+        }, 320),
+      ];
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleFitAndResizeTerminal();
     });
     resizeObserver.observe(element);
+    window.addEventListener("resize", scheduleFitAndResizeTerminal);
+    scheduleFitAndResizeTerminal();
+    void document.fonts?.ready.then(() => {
+      if (!disposed) {
+        scheduleFitAndResizeTerminal();
+      }
+    });
 
     void (async () => {
       const unlisten = await listen<TerminalOutput>("terminal-output", (event) => {
@@ -5782,10 +5814,12 @@ function TerminalPaneView({
       unregisterPaneInputWriter(pane.id, writeInputToSession);
       unregisterPaneRenderer(pane.id, terminal);
       resizeObserver.disconnect();
+      window.removeEventListener("resize", scheduleFitAndResizeTerminal);
       if (resizeFrameRef.current !== null) {
         window.cancelAnimationFrame(resizeFrameRef.current);
         resizeFrameRef.current = null;
       }
+      clearScheduledResizeTimeouts();
       removeOutputListener?.();
       const sessionId = sessionIdRef.current;
       if (sessionId) {
@@ -5797,6 +5831,7 @@ function TerminalPaneView({
       sessionIdRef.current = null;
       lastResizeDimensionsRef.current = null;
       terminalRendererRef.current = null;
+      fitAndResizeRef.current = () => undefined;
       setSelectedTerminalText("");
       setContextMenu(null);
       setSearchResult({ resultIndex: -1, resultCount: 0, found: true });
@@ -5843,7 +5878,7 @@ function TerminalPaneView({
         return;
       }
 
-      renderer.fit();
+      fitAndResizeRef.current();
       renderer.focus();
     });
 

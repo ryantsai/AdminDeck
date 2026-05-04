@@ -913,12 +913,17 @@ h2 {
 }
 
 .terminal-workspace {
-  grid-template-rows: 42px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
 }
 
 .workspace-toolbar {
   min-width: 0;
   margin-bottom: 10px;
+}
+
+.terminal-workspace .workspace-toolbar {
+  margin-bottom: 0;
 }
 
 .workspace-toolbar > div:first-child {
@@ -1413,6 +1418,15 @@ h2 {
 .xterm-host .xterm {
   height: 100%;
   padding: 8px;
+}
+
+.xterm-host .xterm .xterm-viewport {
+  scrollbar-width: none;
+}
+
+.xterm-host .xterm .xterm-viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .sftp-workspace {
