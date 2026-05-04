@@ -24,7 +24,7 @@ mod platform {
                 Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I2, VT_I4},
             },
             UI::WindowsAndMessaging::{
-                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, HWND_TOP,
+                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU,
                 SWP_NOACTIVATE, SWP_NOZORDER, SW_HIDE, SW_SHOW, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
                 WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
             },
@@ -788,12 +788,12 @@ mod platform {
         unsafe {
             SetWindowPos(
                 hwnd,
-                Some(HWND_TOP),
+                None,
                 origin.0,
                 origin.1,
                 rect.2,
                 rect.3,
-                SWP_NOACTIVATE,
+                SWP_NOACTIVATE | SWP_NOZORDER,
             )
             .map_err(|error| format!("failed to position RDP control: {error}"))?;
             let _ = ShowWindow(hwnd, SW_SHOW);
