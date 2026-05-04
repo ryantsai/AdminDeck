@@ -136,7 +136,11 @@ import {
   providerDefaultsFor,
   validateAiProviderForChat,
 } from "./ai/providers";
-import { connectionTree, defaultTerminalSettings } from "./sample-data";
+import {
+  connectionTree,
+  defaultAppearanceSettings,
+  defaultTerminalSettings,
+} from "./sample-data";
 import { useWorkspaceStore } from "./store";
 import {
   createTerminalRenderer,
@@ -153,6 +157,7 @@ import {
   writeInputToPane,
 } from "./workspace/paneRegistry";
 import type {
+  AppearanceSettings,
   AiProviderKind,
   AiReasoningEffort,
   Connection,
@@ -1112,6 +1117,8 @@ function removeLayoutStorageKeys() {
 function App() {
   const [activePage, setActivePage] = useState<"workspace" | "settings">("workspace");
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
+  const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
+  const setAppearanceSettings = useWorkspaceStore((state) => state.setAppearanceSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
   const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
@@ -1226,6 +1233,12 @@ function App() {
   }, [setTerminalSettings]);
 
   useEffect(() => {
+    invokeCommand("get_appearance_settings")
+      .then(setAppearanceSettings)
+      .catch(() => undefined);
+  }, [setAppearanceSettings]);
+
+  useEffect(() => {
     invokeCommand("get_ssh_settings")
       .then(setSshSettings)
       .catch(() => undefined);
@@ -1278,6 +1291,7 @@ function App() {
           "--connection-resize-width": "1px",
           "--ai-panel-width": aiPanelLayout.collapsed ? "0px" : `${aiPanelLayout.width}px`,
           "--ai-resize-width": aiPanelLayout.collapsed ? "34px" : "1px",
+          "--app-ui-font-family": appearanceSettings.appFontFamily,
         } as CSSProperties
       }
     >
@@ -8125,18 +8139,25 @@ function SettingsPage({
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const sftpSettings = useWorkspaceStore((state) => state.sftpSettings);
   const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
+  const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
+  const setAppearanceSettings = useWorkspaceStore((state) => state.setAppearanceSettings);
   const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
   const [terminalDraft, setTerminalDraft] = useState(terminalSettings);
+  const [appearanceDraft, setAppearanceDraft] = useState(appearanceSettings);
   const [aiDraft, setAiDraft] = useState(aiProviderSettings);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [appearanceStatus, setAppearanceStatus] = useState("");
+  const [appearanceError, setAppearanceError] = useState("");
   const [aiStatus, setAiStatus] = useState("");
   const [aiError, setAiError] = useState("");
   const hasTerminalChanges = JSON.stringify(terminalDraft) !== JSON.stringify(terminalSettings);
+  const hasAppearanceChanges =
+    JSON.stringify(appearanceDraft) !== JSON.stringify(appearanceSettings);
   const hasAiChanges =
     JSON.stringify(aiDraft) !== JSON.stringify(aiProviderSettings) || apiKeyDraft.trim().length > 0;
   const aiProviderDefinition = getAiProviderDefinition(aiDraft.providerKind);
@@ -8144,6 +8165,10 @@ function SettingsPage({
   useEffect(() => {
     setTerminalDraft(terminalSettings);
   }, [terminalSettings]);
+
+  useEffect(() => {
+    setAppearanceDraft(appearanceSettings);
+  }, [appearanceSettings]);
 
   useEffect(() => {
     setAiDraft(aiProviderSettings);
@@ -8162,6 +8187,39 @@ function SettingsPage({
       setStatus("Terminal settings saved.");
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleSaveAppearanceSettings() {
+    try {
+      setAppearanceError("");
+      setAppearanceStatus("");
+      const nextSettings = normalizeAppearanceSettingsDraft(appearanceDraft);
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_appearance_settings", { request: nextSettings })
+        : nextSettings;
+      setAppearanceSettings(saved);
+      setAppearanceDraft(saved);
+      setAppearanceStatus("Appearance settings saved.");
+    } catch (error) {
+      setAppearanceError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleResetAppearanceSettings() {
+    try {
+      setAppearanceError("");
+      setAppearanceStatus("");
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_appearance_settings", {
+            request: defaultAppearanceSettings,
+          })
+        : defaultAppearanceSettings;
+      setAppearanceSettings(saved);
+      setAppearanceDraft(saved);
+      setAppearanceStatus("Appearance settings reset.");
+    } catch (error) {
+      setAppearanceError(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -8629,6 +8687,54 @@ function SettingsPage({
                 <p className="panel-label">Appearance</p>
                 <h2>Interface</h2>
               </div>
+              <div className="settings-header-actions">
+                <button
+                  className="toolbar-button"
+                  disabled={!hasAppearanceChanges}
+                  onClick={() => void handleSaveAppearanceSettings()}
+                  type="button"
+                >
+                  <Save size={15} />
+                  Save
+                </button>
+                <button
+                  className="toolbar-button"
+                  onClick={() => void handleResetAppearanceSettings()}
+                  type="button"
+                >
+                  <RotateCcw size={15} />
+                  Reset Font
+                </button>
+              </div>
+            </div>
+            <div className="form-grid">
+              <label>
+                <span>App UI font family</span>
+                <input
+                  list="app-ui-font-options"
+                  onChange={(event) => {
+                    const appFontFamily = event.currentTarget.value;
+                    setAppearanceDraft((settings) => ({
+                      ...settings,
+                      appFontFamily,
+                    }));
+                  }}
+                  value={appearanceDraft.appFontFamily}
+                />
+                <datalist id="app-ui-font-options">
+                  <option value={defaultAppearanceSettings.appFontFamily}>Satoshi</option>
+                  <option value='Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'>
+                    System sans
+                  </option>
+                  <option value='"Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif'>
+                    Segoe UI Variable
+                  </option>
+                </datalist>
+                <small className="field-hint">
+                  Default uses src/assets/fonts/Satoshi-Variable.ttf.
+                </small>
+              </label>
+              <SettingsSummary label="Active UI font" value={appearanceDraft.appFontFamily} />
             </div>
             <div className="settings-reset-layout">
               <div>
@@ -8652,6 +8758,10 @@ function SettingsPage({
                 <strong>To be implemented</strong>
               </button>
             </div>
+            {appearanceStatus ? (
+              <p className="settings-status success">{appearanceStatus}</p>
+            ) : null}
+            {appearanceError ? <p className="settings-status error">{appearanceError}</p> : null}
           </section>
         </section>
       </div>
@@ -8728,6 +8838,17 @@ function normalizeTerminalSettingsDraft(settings: TerminalSettings): TerminalSet
     lineHeight: Number(settings.lineHeight.toFixed(2)),
     scrollbackLines: Math.round(settings.scrollbackLines),
     defaultShell: settings.defaultShell.trim(),
+  };
+}
+
+function normalizeAppearanceSettingsDraft(settings: AppearanceSettings): AppearanceSettings {
+  if (!settings.appFontFamily.trim()) {
+    throw new Error("App UI font family is required.");
+  }
+
+  return {
+    ...settings,
+    appFontFamily: settings.appFontFamily.trim(),
   };
 }
 

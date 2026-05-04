@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import type {
+  AppearanceSettings,
   AiProviderSettings,
   AppBootstrap,
   Connection,
@@ -407,6 +408,14 @@ type CommandMap = {
   update_terminal_settings: {
     args: { request: TerminalSettings };
     result: TerminalSettings;
+  };
+  get_appearance_settings: {
+    args: undefined;
+    result: AppearanceSettings;
+  };
+  update_appearance_settings: {
+    args: { request: AppearanceSettings };
+    result: AppearanceSettings;
   };
   get_ssh_settings: {
     args: undefined;

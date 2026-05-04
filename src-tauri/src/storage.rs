@@ -85,6 +85,12 @@ pub struct TerminalSettings {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AppearanceSettings {
+    app_font_family: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SshSettings {
     default_user: String,
     default_port: u16,
@@ -342,6 +348,46 @@ impl Storage {
             .execute(
                 "INSERT INTO settings (key, value, updated_at)
                  VALUES ('terminal', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
+    }
+
+    pub fn appearance_settings(&self) -> Result<AppearanceSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'appearance'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_appearance_settings)
+                .map_err(|error| format!("appearance settings are invalid: {error}"))?,
+            None => Ok(default_appearance_settings()),
+        }
+    }
+
+    pub fn update_appearance_settings(
+        &self,
+        request: AppearanceSettings,
+    ) -> Result<AppearanceSettings, String> {
+        let settings = validate_appearance_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize appearance settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('appearance', ?1, CURRENT_TIMESTAMP)
                  ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value,
                     updated_at = CURRENT_TIMESTAMP",
@@ -1886,6 +1932,12 @@ fn default_terminal_settings() -> TerminalSettings {
     }
 }
 
+fn default_appearance_settings() -> AppearanceSettings {
+    AppearanceSettings {
+        app_font_family: "\"Satoshi\", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif".to_string(),
+    }
+}
+
 fn default_ssh_settings() -> SshSettings {
     SshSettings {
         default_user: default_ssh_user(),
@@ -1951,6 +2003,13 @@ fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<Terminal
         return Err("terminal scrollback must be between 100 and 100000 lines".to_string());
     }
 
+    Ok(settings)
+}
+
+fn validate_appearance_settings(
+    mut settings: AppearanceSettings,
+) -> Result<AppearanceSettings, String> {
+    settings.app_font_family = required_field("app font family", settings.app_font_family)?;
     Ok(settings)
 }
 
@@ -2869,6 +2928,32 @@ mod tests {
             .expect("terminal settings reload");
         assert_eq!(reloaded.font_family, "Cascadia Mono");
         assert_eq!(reloaded.default_shell, "pwsh.exe");
+    }
+
+    #[test]
+    fn appearance_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("appearance-settings")).expect("storage opens");
+
+        let defaults = storage
+            .appearance_settings()
+            .expect("default appearance settings load");
+        assert!(defaults.app_font_family.contains("Satoshi"));
+
+        let updated = storage
+            .update_appearance_settings(AppearanceSettings {
+                app_font_family: "  \"Segoe UI Variable\", \"Segoe UI\", sans-serif  ".to_string(),
+            })
+            .expect("appearance settings update");
+
+        assert_eq!(
+            updated.app_font_family,
+            "\"Segoe UI Variable\", \"Segoe UI\", sans-serif"
+        );
+
+        let reloaded = storage
+            .appearance_settings()
+            .expect("appearance settings reload");
+        assert_eq!(reloaded.app_font_family, updated.app_font_family);
     }
 
     #[test]

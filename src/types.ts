@@ -133,6 +133,10 @@ export interface TerminalSettings {
   defaultShell: string;
 }
 
+export interface AppearanceSettings {
+  appFontFamily: string;
+}
+
 export interface SshSettings {
   defaultUser: string;
   defaultPort: number;

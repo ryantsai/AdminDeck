@@ -1,4 +1,5 @@
 import type {
+  AppearanceSettings,
   AiProviderSettings,
   ConnectionTree,
   SftpSettings,
@@ -23,6 +24,10 @@ export const defaultTerminalSettings: TerminalSettings = {
   copyOnSelect: false,
   confirmMultilinePaste: true,
   defaultShell: "powershell.exe",
+};
+
+export const defaultAppearanceSettings: AppearanceSettings = {
+  appFontFamily: '"Satoshi", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 };
 
 export const defaultSshSettings: SshSettings = {

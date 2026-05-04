@@ -166,6 +166,21 @@ fn update_terminal_settings(
 }
 
 #[tauri::command]
+fn get_appearance_settings(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::AppearanceSettings, String> {
+    storage.appearance_settings()
+}
+
+#[tauri::command]
+fn update_appearance_settings(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::AppearanceSettings,
+) -> Result<storage::AppearanceSettings, String> {
+    storage.update_appearance_settings(request)
+}
+
+#[tauri::command]
 fn get_ssh_settings(
     storage: tauri::State<'_, storage::Storage>,
 ) -> Result<storage::SshSettings, String> {
@@ -726,6 +741,8 @@ pub fn run() {
             upsert_url_credential,
             get_terminal_settings,
             update_terminal_settings,
+            get_appearance_settings,
+            update_appearance_settings,
             get_ssh_settings,
             update_ssh_settings,
             get_sftp_settings,

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+  defaultAppearanceSettings,
   defaultAiProviderSettings,
   defaultSftpSettings,
   defaultSshSettings,
@@ -15,6 +16,7 @@ import {
   splitLayout,
 } from "./workspace/layout";
 import type {
+  AppearanceSettings,
   AiProviderSettings,
   AssistantContextSnippet,
   Connection,
@@ -332,6 +334,7 @@ interface WorkspaceState {
   tabs: WorkspaceTab[];
   activeTabId: string;
   terminalSettings: TerminalSettings;
+  appearanceSettings: AppearanceSettings;
   sshSettings: SshSettings;
   sftpSettings: SftpSettings;
   aiProviderSettings: AiProviderSettings;
@@ -341,6 +344,7 @@ interface WorkspaceState {
   performanceMetrics: PerformanceMetrics;
   setQuery: (query: string) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
+  setAppearanceSettings: (settings: AppearanceSettings) => void;
   setSshSettings: (settings: SshSettings) => void;
   setSftpSettings: (settings: SftpSettings) => void;
   setAiProviderSettings: (settings: AiProviderSettings) => void;
@@ -385,6 +389,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   tabs: initialTabs,
   activeTabId: initialTabs[0]?.id ?? "",
   terminalSettings: defaultTerminalSettings,
+  appearanceSettings: defaultAppearanceSettings,
   sshSettings: defaultSshSettings,
   sftpSettings: defaultSftpSettings,
   aiProviderSettings: defaultAiProviderSettings,
@@ -394,6 +399,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   performanceMetrics: {},
   setQuery: (query) => set({ query }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
+  setAppearanceSettings: (appearanceSettings) => set({ appearanceSettings }),
   setSshSettings: (sshSettings) => set({ sshSettings }),
   setSftpSettings: (sftpSettings) => set({ sftpSettings }),
   setAiProviderSettings: (aiProviderSettings) => set({ aiProviderSettings }),
