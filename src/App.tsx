@@ -2723,9 +2723,14 @@ function TreeContextMenu({
     }
 
     const bounds = node.getBoundingClientRect();
-    const left = Math.min(menu.x, window.innerWidth - bounds.width - 8);
+    const sidebarBounds = node.closest(".connection-sidebar")?.getBoundingClientRect();
+    const minLeft = sidebarBounds ? sidebarBounds.left + 8 : 8;
+    const maxLeft = sidebarBounds
+      ? sidebarBounds.right - bounds.width - 8
+      : window.innerWidth - bounds.width - 8;
+    const left = Math.min(menu.x, maxLeft);
     const top = Math.min(menu.y, window.innerHeight - bounds.height - 8);
-    node.style.left = `${Math.max(8, left)}px`;
+    node.style.left = `${Math.max(minLeft, left)}px`;
     node.style.top = `${Math.max(8, top)}px`;
   }, [menu.x, menu.y]);
 
@@ -3152,7 +3157,7 @@ function ConnectionDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation">
+    <div className="dialog-backdrop connection-dialog-backdrop" role="presentation">
       <form className="connection-dialog" onSubmit={handleSubmit}>
         <header
           className={mode === "quick" ? "connection-dialog-header" : "connection-dialog-header compact"}
@@ -4368,7 +4373,7 @@ function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Workspace
 function documentHasWebviewOverlay() {
   return Boolean(
     document.querySelector(
-      ".dialog-backdrop, .quick-connect-menu, .sftp-context-menu, .sftp-properties-popover, .screenshot-menu, .screenshot-region-overlay",
+      ".quick-connect-menu, .sftp-context-menu, .sftp-properties-popover, .screenshot-menu, .screenshot-region-overlay, .transfer-conflict-backdrop",
     ),
   );
 }
@@ -4398,6 +4403,7 @@ function RemoteDesktopWorkspace({
   const sessionIdRef = useRef<string | null>(null);
   const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rafRef = useRef<number | null>(null);
+  const settlingBoundsTimerRef = useRef<number[]>([]);
   const visibilityRef = useRef({ isActive, suppressed: false });
   const markConnectionSessionStarted = useWorkspaceStore(
     (state) => state.markConnectionSessionStarted,
@@ -4409,6 +4415,7 @@ function RemoteDesktopWorkspace({
   const [rdpStatus, setRdpStatus] = useState("");
   const canStartRdp = connection?.type === "rdp";
   const closingAfterDisconnectRef = useRef(false);
+  const rdpDesktopSyncedAfterConnectRef = useRef(false);
 
   const computeBounds = () => {
     const node = hostRef.current;
@@ -4507,6 +4514,16 @@ function RemoteDesktopWorkspace({
     });
   };
 
+  const scheduleSettlingBoundsPushes = () => {
+    settlingBoundsTimerRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    settlingBoundsTimerRef.current = [0, 75, 250, 750, 1500].map((delay) =>
+      window.setTimeout(() => {
+        lastBoundsRef.current = null;
+        scheduleBoundsPush();
+      }, delay),
+    );
+  };
+
   useEffect(() => {
     if (!canStartRdp || !connection || !isTauriRuntime() || sessionStartedRef.current || sessionStartingRef.current) {
       return;
@@ -4520,6 +4537,7 @@ function RemoteDesktopWorkspace({
     sessionIdRef.current = sessionId;
     sessionStartingRef.current = true;
     lastBoundsRef.current = bounds;
+    rdpDesktopSyncedAfterConnectRef.current = false;
     setRdpStatus("Connecting");
     void invokeCommand("start_rdp_session", {
       request: {
@@ -4541,6 +4559,7 @@ function RemoteDesktopWorkspace({
         setRdpStatus(`Connected with ${started.control}`);
         markConnectionSessionStarted(connection.id);
         pushRdpVisibility();
+        scheduleSettlingBoundsPushes();
       })
       .catch((error) => {
         sessionStartingRef.current = false;
@@ -4557,6 +4576,8 @@ function RemoteDesktopWorkspace({
         window.cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
+      settlingBoundsTimerRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      settlingBoundsTimerRef.current = [];
       const ownsSession = sessionStartingRef.current || sessionStartedRef.current;
       sessionStartingRef.current = false;
       const started = sessionStartedRef.current;
@@ -4648,6 +4669,11 @@ function RemoteDesktopWorkspace({
         request: { sessionId },
       })
         .then((status) => {
+          if (status.connected && !rdpDesktopSyncedAfterConnectRef.current) {
+            rdpDesktopSyncedAfterConnectRef.current = true;
+            pushRdpVisibility();
+            scheduleSettlingBoundsPushes();
+          }
           if (!status.connected && sessionIdRef.current === status.sessionId) {
             closingAfterDisconnectRef.current = true;
             closeTab(tab.id);

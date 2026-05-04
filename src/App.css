@@ -2836,6 +2836,17 @@ progress {
     rgba(15, 23, 42, 0.34);
 }
 
+.connection-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.18);
+}
+
 .connection-dialog,
 .settings-dialog {
   display: grid;
@@ -2859,6 +2870,13 @@ progress {
     var(--surface);
   border-color: rgba(148, 163, 184, 0.62);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
+}
+
+.connection-dialog-backdrop .connection-dialog {
+  width: min(620px, calc(100vw - 40px));
+  min-width: 0;
+  padding: 18px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
 }
 
 .settings-dialog {

@@ -216,14 +216,14 @@ mod platform {
                 let scale_factor = host_window
                     .scale_factor()
                     .map_err(|error| format!("failed to read host window scale factor: {error}"))?;
-                let mut sessions = lock_sessions(&sessions)?;
+                let sessions = lock_sessions(&sessions)?;
                 if request.visible {
                     for (other_session_id, other_session) in sessions.iter() {
                         if other_session_id != &request.session_id {
                             hide_rdp(other_session.hwnd)?;
                         }
                     }
-                    let session = sessions.get_mut(&request.session_id).ok_or_else(|| {
+                    let session = sessions.get(&request.session_id).ok_or_else(|| {
                         format!("RDP session '{}' was not found", request.session_id)
                     })?;
                     show_rdp(
@@ -372,8 +372,12 @@ mod platform {
                 hwnd,
                 owner: parent_hwnd,
                 dispatch,
-                desktop_width: desktop_width_for(size.2),
-                desktop_height: desktop_height_for(size.3),
+                // DesktopWidth/DesktopHeight seed the initial connection, but the
+                // ActiveX control may not apply dynamic sizing until after Connect
+                // has progressed. Keep the synced size unknown so the frontend's
+                // startup bounds pushes retry the real remote desktop resize.
+                desktop_width: 0,
+                desktop_height: 0,
             },
         );
 
@@ -744,13 +748,27 @@ mod platform {
         )?;
         let desktop_width = desktop_width_for(rect.2);
         let desktop_height = desktop_height_for(rect.3);
-        if session.desktop_width != desktop_width || session.desktop_height != desktop_height {
+        if should_resize_remote_desktop(
+            session.desktop_width,
+            session.desktop_height,
+            desktop_width,
+            desktop_height,
+        ) {
             if resize_remote_desktop(&session.dispatch, desktop_width, desktop_height).is_ok() {
                 session.desktop_width = desktop_width;
                 session.desktop_height = desktop_height;
             }
         }
         Ok(())
+    }
+
+    fn should_resize_remote_desktop(
+        current_width: i32,
+        current_height: i32,
+        desktop_width: i32,
+        desktop_height: i32,
+    ) -> bool {
+        current_width != desktop_width || current_height != desktop_height
     }
 
     fn resize_remote_desktop(
@@ -1042,6 +1060,13 @@ mod platform {
             assert_eq!(desktop_height_for(240), RDP_MIN_DESKTOP_HEIGHT);
             assert_eq!(desktop_width_for(1200), 1200);
             assert_eq!(desktop_height_for(900), 900);
+        }
+
+        #[test]
+        fn treats_unknown_desktop_size_as_needing_resize() {
+            assert!(should_resize_remote_desktop(0, 0, 1920, 1080));
+            assert!(should_resize_remote_desktop(1920, 1080, 2048, 1080));
+            assert!(!should_resize_remote_desktop(1920, 1080, 1920, 1080));
         }
 
         #[test]
