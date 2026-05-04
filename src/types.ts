@@ -110,6 +110,14 @@ export type StoredLayoutNode =
 export interface StoredConnectionLayout {
   paneCount: number;
   layout: StoredLayoutNode;
+  panes?: StoredLayoutPane[];
+}
+
+export interface StoredLayoutPane {
+  connection: Connection;
+  title?: string;
+  cwd?: string;
+  tmuxSessionId?: string;
 }
 
 export type TerminalCursorStyle = "block" | "bar" | "underline";

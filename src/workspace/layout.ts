@@ -3,6 +3,7 @@ import type {
   SplitDirection,
   SplitOrientation,
   StoredConnectionLayout,
+  StoredLayoutPane,
   StoredLayoutNode,
   TerminalPane,
 } from "../types";
@@ -192,7 +193,20 @@ export function serializeLayout(
   if (!stored) {
     return undefined;
   }
-  return { paneCount: panes.length, layout: stored };
+  const storedPanes: StoredLayoutPane[] = [];
+  for (const pane of panes) {
+    const connection = pane.connection ?? panes[0]?.connection;
+    if (!connection) {
+      continue;
+    }
+    storedPanes.push({
+      connection,
+      title: pane.title,
+      cwd: pane.cwd,
+      tmuxSessionId: pane.tmuxSessionId,
+    });
+  }
+  return { paneCount: panes.length, layout: stored, panes: storedPanes };
 }
 
 function serializeNode(

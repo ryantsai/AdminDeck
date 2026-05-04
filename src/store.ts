@@ -295,6 +295,27 @@ function buildPanesForConnection(connection: Connection, count: number): Termina
   return panes;
 }
 
+function buildPanesFromStoredLayout(connection: Connection, stored?: StoredConnectionLayout): TerminalPane[] {
+  const paneCount = Math.max(1, stored?.paneCount ?? 1);
+  const fallback = buildPanesForConnection(connection, paneCount);
+  if (!stored?.panes?.length) {
+    return fallback;
+  }
+  return fallback.map((pane, index) => {
+    const storedPane = stored.panes?.[index];
+    if (!storedPane?.connection) {
+      return pane;
+    }
+    return {
+      ...pane,
+      title: storedPane.title?.trim() || pane.title,
+      cwd: storedPane.cwd?.trim() || pane.cwd,
+      connection: storedPane.connection,
+      tmuxSessionId: storedPane.tmuxSessionId,
+    };
+  });
+}
+
 interface WorkspaceState {
   query: string;
   tabs: WorkspaceTab[];
@@ -329,6 +350,11 @@ interface WorkspaceState {
   openLocalTerminal: () => void;
   splitTerminalPane: (tabId: string) => void;
   splitTerminalPaneDirected: (tabId: string, direction: SplitDirection) => void;
+  addConnectionToTerminalPane: (
+    tabId: string,
+    connection: Connection,
+    direction: SplitDirection,
+  ) => void;
   closePane: (tabId: string, paneId: string) => void;
   openTmuxSessionInPane: (tabId: string, connection: Connection, tmuxSessionId: string, direction: SplitDirection) => void;
   setFocusedPane: (tabId: string, paneId: string) => void;
@@ -438,8 +464,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     const stored = loadStoredLayout(connection.id);
-    const paneCount = Math.max(1, stored?.paneCount ?? 1);
-    const panes = buildPanesForConnection(connection, paneCount);
+    const panes = buildPanesFromStoredLayout(connection, stored);
     const paneIds = panes.map((pane) => pane.id);
     const layout =
       (stored ? hydrateLayout(stored.layout, paneIds) : undefined) ?? defaultLayoutFor(panes);
@@ -628,6 +653,37 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           layout: nextLayout,
           focusedPaneId: newPane.id,
         };
+      }),
+    }));
+  },
+  addConnectionToTerminalPane: (tabId, connection, direction) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.id !== tabId || tab.kind !== "terminal") {
+          return tab;
+        }
+        const focusedPane = tab.panes.find((pane) => pane.id === tab.focusedPaneId) ?? tab.panes[0];
+        if (!focusedPane) {
+          return tab;
+        }
+        const newPane: TerminalPane = {
+          id: `pane-${connection.id}-${Date.now()}`,
+          title: connection.type === "local" ? connection.name : "ssh",
+          cwd: focusedPane.cwd,
+          buffer: "",
+          connection,
+          tmuxSessionId: appendTmuxSessionId(connection),
+        };
+        const nextPanes = [...tab.panes, newPane];
+        const baseLayout = ensureLayout(tab.layout, tab.panes);
+        const nextLayout = splitLayout(
+          baseLayout,
+          focusedPane.id,
+          direction,
+          newPane.id,
+          tab.panes.map((pane) => pane.id),
+        );
+        return { ...tab, panes: nextPanes, layout: nextLayout, focusedPaneId: newPane.id };
       }),
     }));
   },
