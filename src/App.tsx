@@ -242,7 +242,7 @@ type ConnectionDialogRequest = CreateConnectionRequest & {
   urlPassword?: string;
 };
 
-type ConnectionTileType = Extract<ConnectionType, "ssh" | "local" | "rdp" | "vnc">;
+type ConnectionTileType = ConnectionType;
 
 type WebviewNavigationEvent = {
   sessionId: string;
@@ -2917,6 +2917,12 @@ const CONNECTION_TYPE_TILES: Array<{
     accent: "#13a085",
   },
   {
+    type: "url",
+    title: "URL",
+    description: "Embedded web app",
+    accent: "#0ea5e9",
+  },
+  {
     type: "rdp",
     title: "Remote Desktop",
     description: "Windows RDP",
@@ -2930,7 +2936,7 @@ const CONNECTION_TYPE_TILES: Array<{
   },
 ];
 
-const CONNECTION_ICON_FILLS: Record<ConnectionTileType, string[]> = {
+const CONNECTION_ICON_FILLS: Record<Exclude<ConnectionTileType, "url">, string[]> = {
   ssh: ["#1f2937", "#f3f4f6", "#111827", "#6b7280"],
   local: ["#047857", "#d1fae5", "#065f46", "#34d399"],
   rdp: ["#1e3a8a", "#dbeafe", "#172554", "#60a5fa"],
@@ -2946,6 +2952,10 @@ function ConnectionTypeGlyph({
   size?: number;
   type: ConnectionTileType;
 }) {
+  if (type === "url") {
+    return <Globe2 className={className} size={size} />;
+  }
+
   const iconProps = {
     className,
     fill: CONNECTION_ICON_FILLS[type],
