@@ -2193,6 +2193,26 @@ progress {
   justify-self: end;
 }
 
+.assistant-message-bubble-truncated {
+  max-height: calc(10 * 1.5em);
+  overflow: hidden;
+}
+
+.assistant-message-expand {
+  justify-self: end;
+  padding: 0;
+  color: #4b70f5;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.assistant-message-expand:hover {
+  text-decoration: underline;
+}
+
 .assistant-waiting {
   display: inline-flex;
   align-items: center;
