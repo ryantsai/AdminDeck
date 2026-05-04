@@ -3381,7 +3381,7 @@ function ConnectionDialog({
                     <input
                       name="password"
                       placeholder={isEditMode ? "Leave blank to keep stored password" : "Stored in OS keychain"}
-                      required={!isEditMode || !initialConnection?.hasPassword}
+                      required={!isEditMode}
                       type="password"
                     />
                   </label>
