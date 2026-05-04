@@ -796,7 +796,7 @@ mod platform {
                 SWP_NOACTIVATE | SWP_NOZORDER,
             )
             .map_err(|error| format!("failed to position RDP control: {error}"))?;
-            let _ = ShowWindow(hwnd, SW_SHOW);
+            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         }
         Ok((origin.0, origin.1, rect.2, rect.3))
     }
@@ -819,7 +819,7 @@ mod platform {
                 HIDDEN_RDP_POSITION,
                 1,
                 1,
-                SWP_NOZORDER,
+                SWP_NOACTIVATE | SWP_NOZORDER,
             )
             .map_err(|error| format!("failed to hide RDP control: {error}"))?;
             let _ = ShowWindow(hwnd, SW_HIDE);
