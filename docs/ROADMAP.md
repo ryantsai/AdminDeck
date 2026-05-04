@@ -130,6 +130,7 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Support asking the AI Assistant to create extensions.
 - [ ] Keep extension-generation flows approval-based before installing or running generated code.
 - [ ] Language output setting for UI assistant - follow UI language or specific language.
+- [ ] Expand AI Assistant orchestration so it can (with explicit approval) automate more workflows: import Connection entries from multiple formats, monitor existing Connections, rename/reorganize layouts, help create plugins, assist with wiki workflows (once wiki ships), and optionally relay remote-assistant interactions through Telegram/WhatsApp/LINE integrations.
 
 ### UI Customization
 
@@ -156,6 +157,7 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [x] Add durable RDP connection type.
 - [x] Add durable VNC connection type.
 - [x] Implement Windows-native RDP session transport with Microsoft RDP ActiveX COM hosting.
+- [ ] Add configurable RDP session options (for example: display quality/performance tuning, clipboard mapping, and related redirect/security controls).
 - [ ] Implement VNC session transport.
 - [ ] Add MobaXterm/RDCMan import.
 - [ ] Add SFTP folder sync/diff/resume.
