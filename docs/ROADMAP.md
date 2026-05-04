@@ -130,6 +130,7 @@ Latest validation on May 3, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Support asking the AI Assistant to create extensions.
 - [ ] Keep extension-generation flows approval-based before installing or running generated code.
 - [ ] Language output setting for UI assistant - follow UI language or specific language.
+- [ ] Expand AI Assistant orchestration so it can (with explicit approval) automate more workflows: import Connection entries from multiple formats, monitor existing Connections, rename/reorganize layouts, help create plugins, assist with wiki workflows (once wiki ships), and optionally relay remote-assistant interactions through Telegram/WhatsApp/LINE integrations.
 
 ### UI Customization
 
