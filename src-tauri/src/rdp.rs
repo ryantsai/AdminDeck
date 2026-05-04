@@ -24,9 +24,9 @@ mod platform {
                 Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I2, VT_I4},
             },
             UI::WindowsAndMessaging::{
-                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU,
-                SWP_NOACTIVATE, SWP_NOZORDER, SW_HIDE, SW_SHOW, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
-                WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
+                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, SWP_NOACTIVATE,
+                SWP_NOZORDER, SW_HIDE, SW_SHOW, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_NOACTIVATE,
+                WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
             },
         },
     };

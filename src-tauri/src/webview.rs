@@ -235,19 +235,21 @@ impl WebviewSessionManager {
         {
             let mut starting_sessions = self.lock_starting()?;
             if !starting_sessions.insert(session_id.clone()) {
-                return Err(format!("webview session '{session_id}' is already starting"));
+                return Err(format!(
+                    "webview session '{session_id}' is already starting"
+                ));
             }
         }
 
-        let host_window = app
-            .get_window(HOST_WINDOW_LABEL)
-            .map_or_else(
-                || {
-                    self.clear_starting(&session_id);
-                    Err(format!("host window '{HOST_WINDOW_LABEL}' is not available"))
-                },
-                Ok,
-            )?;
+        let host_window = app.get_window(HOST_WINDOW_LABEL).map_or_else(
+            || {
+                self.clear_starting(&session_id);
+                Err(format!(
+                    "host window '{HOST_WINDOW_LABEL}' is not available"
+                ))
+            },
+            Ok,
+        )?;
 
         let label = webview_label_for(&session_id);
         let navigation_app = app.clone();

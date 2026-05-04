@@ -310,7 +310,7 @@ fn delete_secret(
 }
 
 #[tauri::command]
-fn start_terminal_session(
+async fn start_terminal_session(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
@@ -349,7 +349,7 @@ fn close_terminal_session(
 }
 
 #[tauri::command]
-fn list_tmux_sessions(
+async fn list_tmux_sessions(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
@@ -359,7 +359,7 @@ fn list_tmux_sessions(
 }
 
 #[tauri::command]
-fn close_tmux_session(
+async fn close_tmux_session(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
@@ -369,7 +369,7 @@ fn close_tmux_session(
 }
 
 #[tauri::command]
-fn set_tmux_mouse(
+async fn set_tmux_mouse(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
@@ -379,7 +379,7 @@ fn set_tmux_mouse(
 }
 
 #[tauri::command]
-fn capture_tmux_pane(
+async fn capture_tmux_pane(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
@@ -389,7 +389,7 @@ fn capture_tmux_pane(
 }
 
 #[tauri::command]
-fn inspect_ssh_system_context(
+async fn inspect_ssh_system_context(
     app: tauri::AppHandle,
     sessions: tauri::State<'_, sessions::SessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
@@ -406,7 +406,7 @@ fn launch_elevated_terminal(
 }
 
 #[tauri::command]
-fn start_sftp_session(
+async fn start_sftp_session(
     app: tauri::AppHandle,
     sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
@@ -591,7 +591,7 @@ fn close_webview_session(
 }
 
 #[tauri::command]
-fn start_rdp_session(
+async fn start_rdp_session(
     app: tauri::AppHandle,
     rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
     secrets: tauri::State<'_, secrets::Secrets>,
