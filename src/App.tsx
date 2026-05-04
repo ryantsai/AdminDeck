@@ -4429,18 +4429,33 @@ function RemoteDesktopWorkspace({
     if (!sessionStartedRef.current || !sessionId) {
       return;
     }
-    const bounds = computeBounds();
+    const visible = visibilityRef.current.isActive && !visibilityRef.current.suppressed;
+    const bounds = visible ? computeBounds() : lastBoundsRef.current ?? computeBounds();
     if (!bounds) {
       return;
     }
-    const visible = visibilityRef.current.isActive && !visibilityRef.current.suppressed;
     void invokeCommand("set_rdp_visibility", {
       request: { sessionId, visible, ...bounds },
     }).catch((error) => {
       setRdpError(error instanceof Error ? error.message : String(error));
     });
-    if (visible) {
+    if (!visible) {
+      return;
+    }
+    const previous = lastBoundsRef.current;
+    const boundsChanged =
+      !previous ||
+      previous.x !== bounds.x ||
+      previous.y !== bounds.y ||
+      previous.width !== bounds.width ||
+      previous.height !== bounds.height;
+    if (boundsChanged) {
       lastBoundsRef.current = bounds;
+      void invokeCommand("update_rdp_bounds", {
+        request: { sessionId, ...bounds },
+      }).catch((error) => {
+        setRdpError(error instanceof Error ? error.message : String(error));
+      });
     }
   };
 
@@ -4457,16 +4472,20 @@ function RemoteDesktopWorkspace({
       if (!sessionId) {
         return;
       }
-      const bounds = computeBounds();
-      if (!bounds) {
-        return;
-      }
       if (!visibilityRef.current.isActive || visibilityRef.current.suppressed) {
+        const bounds = lastBoundsRef.current ?? computeBounds();
+        if (!bounds) {
+          return;
+        }
         void invokeCommand("set_rdp_visibility", {
           request: { sessionId, visible: false, ...bounds },
         }).catch((error) => {
           setRdpError(error instanceof Error ? error.message : String(error));
         });
+        return;
+      }
+      const bounds = computeBounds();
+      if (!bounds) {
         return;
       }
       const previous = lastBoundsRef.current;

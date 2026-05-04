@@ -24,9 +24,9 @@ mod platform {
                 Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I2, VT_I4},
             },
             UI::WindowsAndMessaging::{
-                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU,
-                SWP_NOACTIVATE, SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, WS_CLIPCHILDREN,
-                WS_CLIPSIBLINGS, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
+                CreateWindowExW, DestroyWindow, SetWindowPos, ShowWindow, HMENU, SWP_NOACTIVATE,
+                SWP_NOZORDER, SW_HIDE, SW_SHOWNOACTIVATE, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
+                WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
             },
         },
     };
@@ -226,14 +226,16 @@ mod platform {
                     let session = sessions.get_mut(&request.session_id).ok_or_else(|| {
                         format!("RDP session '{}' was not found", request.session_id)
                     })?;
-                    show_and_resize_rdp(
-                        session,
+                    show_rdp(
+                        session.hwnd,
+                        session.owner,
                         scale_factor,
                         request.x,
                         request.y,
                         request.width,
                         request.height,
                     )
+                    .map(|_| ())
                 } else {
                     let session = sessions.get(&request.session_id).ok_or_else(|| {
                         format!("RDP session '{}' was not found", request.session_id)
