@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { PlannedSettingsGrid, type PlannedSetting } from "./shared";
 
 const VNC_QUALITY_SETTINGS: PlannedSetting[] = [
@@ -40,9 +41,12 @@ export function VncSettings() {
   return (
     <section className="settings-card settings-section">
       <div className="settings-section-header">
-        <div>
-          <p className="panel-label">{t("settings.sectionVnc")}</p>
-          <h2>{t("settings.qualityDefaults")}</h2>
+        <div className="settings-section-title">
+          <ConnectionIcon className="settings-section-icon" size={34} type="vnc" />
+          <div>
+            <p className="panel-label">{t("settings.sectionVnc")}</p>
+            <h2>{t("settings.qualityDefaults")}</h2>
+          </div>
         </div>
       </div>
       <PlannedSettingsGrid settings={VNC_QUALITY_SETTINGS} />

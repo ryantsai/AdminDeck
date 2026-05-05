@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import type { TerminalCursorStyle, TerminalSettings as TerminalSettingsType } from "../types";
@@ -68,9 +69,12 @@ export function TerminalSettings() {
   return (
     <section className="settings-card settings-section">
       <div className="settings-section-header">
-        <div>
-          <p className="panel-label">{t("settings.sectionTerminal")}</p>
-          <h2>{t("settings.terminalBehavior")}</h2>
+        <div className="settings-section-title">
+          <ConnectionIcon className="settings-section-icon" size={34} type="local" />
+          <div>
+            <p className="panel-label">{t("settings.sectionTerminal")}</p>
+            <h2>{t("settings.terminalBehavior")}</h2>
+          </div>
         </div>
         <button
           className="toolbar-button"

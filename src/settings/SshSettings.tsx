@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { useWorkspaceStore } from "../store";
 import { SettingsSummary } from "./shared";
 
@@ -10,9 +11,12 @@ export function SshSettings() {
   return (
     <section className="settings-card settings-section">
       <div className="settings-section-header">
-        <div>
-          <p className="panel-label">{t("settings.sectionSsh")}</p>
-          <h2>{t("settings.sshDefaults")}</h2>
+        <div className="settings-section-title">
+          <ConnectionIcon className="settings-section-icon" size={34} type="ssh" />
+          <div>
+            <p className="panel-label">{t("settings.sectionSsh")}</p>
+            <h2>{t("settings.sshDefaults")}</h2>
+          </div>
         </div>
       </div>
       <div className="settings-summary-grid">

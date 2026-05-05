@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { PlannedSettingsGrid, type PlannedSetting } from "./shared";
 
 const RDP_QUALITY_SETTINGS: PlannedSetting[] = [
@@ -40,9 +41,12 @@ export function RdpSettings() {
   return (
     <section className="settings-card settings-section">
       <div className="settings-section-header">
-        <div>
-          <p className="panel-label">{t("settings.sectionRdp")}</p>
-          <h2>{t("settings.qualityDefaults")}</h2>
+        <div className="settings-section-title">
+          <ConnectionIcon className="settings-section-icon" size={34} type="rdp" />
+          <div>
+            <p className="panel-label">{t("settings.sectionRdp")}</p>
+            <h2>{t("settings.qualityDefaults")}</h2>
+          </div>
         </div>
       </div>
       <PlannedSettingsGrid settings={RDP_QUALITY_SETTINGS} />

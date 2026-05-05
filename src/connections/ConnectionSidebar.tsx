@@ -1,7 +1,8 @@
+import { ConnectionIcon } from "./ConnectionIcon";
 import { defaultPortForConnectionType, connectionSubtitle, connectionTypeLabel, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
 import { collectConnectionFolderIds, countConnections, countFolders, filterConnectionTree, flattenConnections, flattenFolders, upsertRootConnection, withLiveConnectionStatuses } from "./treeUtils";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, Globe2, PanelRight, Play, Plus, Save, Search, Server, Terminal, X } from "lucide-react";
-import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollapseTextInput, DataScreen as IconParkDataScreen, Delete as IconParkDelete, Edit as IconParkEdit, ExpandTextInput as IconParkExpandTextInput, FolderPlus as IconParkFolderPlus, LaptopComputer as IconParkLaptopComputer, Server as IconParkServer, Setting as IconParkSetting, Terminal as IconParkTerminal } from "@icon-park/react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, PanelRight, Play, Plus, Save, Search, Server, Terminal, X } from "lucide-react";
+import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollapseTextInput, Delete as IconParkDelete, Edit as IconParkEdit, ExpandTextInput as IconParkExpandTextInput, FolderPlus as IconParkFolderPlus, Setting as IconParkSetting } from "@icon-park/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -1621,13 +1622,6 @@ export function QuickConnectMenu({
 }
 
 
-const CONNECTION_ICON_FILLS: Record<Exclude<ConnectionTileType, "url">, string[]> = {
-  ssh: ["#1f2937", "#f3f4f6", "#111827", "#6b7280"],
-  local: ["#047857", "#d1fae5", "#065f46", "#34d399"],
-  rdp: ["#1e3a8a", "#dbeafe", "#172554", "#60a5fa"],
-  vnc: ["#a21caf", "#fae8ff", "#86198f", "#e879f9"],
-};
-
 function ConnectionTypeGlyph({
   className,
   size = 16,
@@ -1637,28 +1631,7 @@ function ConnectionTypeGlyph({
   size?: number;
   type: ConnectionTileType;
 }) {
-  if (type === "url") {
-    return <Globe2 className={className} size={size} />;
-  }
-
-  const iconProps = {
-    className,
-    fill: CONNECTION_ICON_FILLS[type],
-    size,
-    strokeWidth: 3,
-    theme: "multi-color" as const,
-  };
-
-  switch (type) {
-    case "local":
-      return <IconParkTerminal {...iconProps} />;
-    case "rdp":
-      return <IconParkDataScreen {...iconProps} />;
-    case "vnc":
-      return <IconParkLaptopComputer {...iconProps} />;
-    case "ssh":
-      return <IconParkServer {...iconProps} />;
-  }
+  return <ConnectionIcon className={className} size={size} type={type} />;
 }
 
 function ConnectionGlyph({
@@ -1670,10 +1643,7 @@ function ConnectionGlyph({
   size?: number;
   type: ConnectionType;
 }) {
-  if (type === "url") {
-    return <Globe2 className={className} size={size} />;
-  }
-  return <ConnectionTypeGlyph className={className} size={size} type={type} />;
+  return <ConnectionIcon className={className} size={size} type={type} />;
 }
 
 function ConnectionDialog({
@@ -2176,7 +2146,7 @@ function ConnectionRow({
       onPointerDown={onPointerDragStart}
     >
       <button className="connection-open" onClick={onOpen}>
-        <ConnectionGlyph size={16} type={connection.type} />
+        <ConnectionGlyph size={32} type={connection.type} />
         <span className="connection-main">
           <strong>{connection.name}</strong>
           <small>{connectionSubtitle(connection)}</small>
