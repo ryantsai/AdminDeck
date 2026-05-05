@@ -292,7 +292,7 @@ function formatTmuxSessionNumber(value: number) {
 
 function buildPanesForConnection(connection: Connection, count: number): TerminalPane[] {
   const baseId = connection.id;
-  const baseTitle = connection.type === "local" ? connection.name : "ssh";
+  const baseTitle = terminalPaneTitleForConnection(connection);
   const baseCwd = connection.type === "local" ? "C:\\Users\\ryan" : "~";
   const tmuxSessionIds = tmuxSessionIdsForConnection(connection, count);
   const panes: TerminalPane[] = [];
@@ -331,16 +331,27 @@ function buildPanesFromStoredLayout(connection: Connection, stored?: StoredConne
 }
 
 function titleForConnectionPane(connection: Connection) {
-  if (connection.type === "local") {
-    return connection.name;
-  }
   if (connection.type === "url") {
     return connection.name;
   }
   if (isRemoteDesktopConnection(connection)) {
     return connection.name;
   }
-  return "ssh";
+  return terminalPaneTitleForConnection(connection);
+}
+
+function terminalPaneTitleForConnection(connection: Connection) {
+  switch (connection.type) {
+    case "local":
+      return connection.name;
+    case "telnet":
+      return "telnet";
+    case "serial":
+      return "serial";
+    case "ssh":
+    default:
+      return "ssh";
+  }
 }
 
 function buildPaneForConnection(connection: Connection, focusedPane?: WorkspacePane): WorkspacePane | null {
@@ -494,7 +505,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         lastTerminalStart,
         ...(lastTerminalStart.kind === "local"
           ? { lastLocalTerminalStart: lastTerminalStart }
-          : { lastSshTerminalStart: lastTerminalStart }),
+          : {}),
+        ...(lastTerminalStart.kind === "ssh"
+          ? { lastSshTerminalStart: lastTerminalStart }
+          : {}),
       },
     })),
   clearTerminalStartMetric: (kind) =>
@@ -503,7 +517,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...state.performanceMetrics,
         ...(kind === "local"
           ? { lastLocalTerminalStart: undefined }
-          : { lastSshTerminalStart: undefined }),
+          : {}),
+        ...(kind === "ssh" ? { lastSshTerminalStart: undefined } : {}),
       },
     })),
   activateTab: (tabId) => set({ activeTabId: tabId }),
@@ -542,8 +557,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab: WorkspaceTab = {
       id: `tab-${connection.id}`,
       title: connection.name,
-      subtitle:
-        connection.type === "local" ? "Local terminal session" : `${connection.user}@${connection.host}`,
+      subtitle: terminalConnectionSubtitle(connection),
       kind: "terminal",
       panes,
       layout,
@@ -951,4 +965,17 @@ function formatConnectionAddress(connection: Connection) {
 
 function remoteDesktopSubtitle(connection: Connection) {
   return connection.user?.trim() || formatConnectionAddress(connection);
+}
+
+function terminalConnectionSubtitle(connection: Connection) {
+  if (connection.type === "local") {
+    return "Local terminal session";
+  }
+  if (connection.type === "serial") {
+    return `${connection.serialLine ?? connection.host} @ ${connection.serialSpeed ?? 9600}`;
+  }
+  if (connection.user.trim()) {
+    return `${connection.user}@${formatConnectionAddress(connection)}`;
+  }
+  return formatConnectionAddress(connection);
 }

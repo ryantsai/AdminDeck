@@ -48,7 +48,7 @@ type WindowWithSavePicker = Window & {
 export interface StartTerminalSessionRequest {
   sessionId?: string;
   title: string;
-  type: "local" | "ssh";
+  type: "local" | "ssh" | "telnet" | "serial";
   host: string;
   user: string;
   port?: number;
@@ -57,6 +57,8 @@ export interface StartTerminalSessionRequest {
   authMethod?: "keyFile" | "password" | "agent";
   secretOwnerId?: string;
   shell?: string;
+  serialLine?: string;
+  serialSpeed?: number;
   initialDirectory?: string;
   cols?: number;
   pixelHeight?: number;

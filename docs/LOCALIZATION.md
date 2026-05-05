@@ -6,292 +6,88 @@ When a key is translated into every supported locale, remove its entry from this
 
 ## Pending Strings
 
-### `settings.satoshiDefault`
+### `connections.telnet`
 
-- English: "Satoshi (Default)"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This is the first option and identifies Satoshi as the app default UI font.
-- Tone: Neutral, concise
+- English: "Telnet"
+- Namespace: `connections`
+- Appears in: `src/connections/ConnectionSidebar.tsx`
+- UI role: Connection type label
+- Context: Connection creation/type picker tile for password-based Telnet terminal Connections.
+- Tone: Protocol name, concise
 - Placeholders: None
-- Domain notes: Keep the font family name `Satoshi` in English. Translate only the parenthetical default marker if appropriate.
+- Domain notes: Keep `Telnet` in English unless the locale has a standard transliteration.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
-### `settings.jfOpenHuninn`
+### `connections.serial`
 
-- English: "jf open Huninn"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses the bundled `src/assets/fonts/jf-openhuninn-2.1.ttf` UI font.
-- Tone: Neutral, product font name
+- English: "Serial"
+- Namespace: `connections`
+- Appears in: `src/connections/ConnectionSidebar.tsx`
+- UI role: Connection type label
+- Context: Connection creation/type picker tile for Serial terminal Connections over COM-style lines.
+- Tone: Technical noun, concise
 - Placeholders: None
-- Domain notes: Font family names should usually remain in their original branding. This is the user-facing label for the bundled Traditional Chinese-friendly font.
+- Domain notes: Refers to serial-port communication, not ordinal ordering.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
-### `settings.segoeUi`
+### `connections.telnetShell`
 
-- English: "Segoe UI"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses the Windows UI font family.
-- Tone: Neutral, system font name
+- English: "Password terminal"
+- Namespace: `connections`
+- Appears in: `src/connections/ConnectionSidebar.tsx`
+- UI role: Connection type subtitle
+- Context: Subtitle under the Telnet connection type tile, distinguishing it from SSH key/agent auth.
+- Tone: Short descriptive phrase
 - Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English.
+- Domain notes: Password is stored in the OS keychain when saved.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
-### `settings.arial`
+### `connections.serialLine`
 
-- English: "Arial"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses the Windows Arial font family.
-- Tone: Neutral, system font name
+- English: "Serial line"
+- Namespace: `connections`
+- Appears in: `src/connections/ConnectionSidebar.tsx`
+- UI role: Connection type subtitle
+- Context: Subtitle under the Serial connection type tile, and nearby copy for COM-line setup.
+- Tone: Technical, concise
 - Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English.
+- Domain notes: `Line` maps to values such as `COM1`; do not translate examples like COM port names.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
-### `settings.microsoftJhengHeiUi`
+### `connections.line`
 
-- English: "Microsoft JhengHei UI"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses a Windows Traditional Chinese UI font.
-- Tone: Neutral, system font name
+- English: "Line"
+- Namespace: `connections`
+- Appears in: `src/connections/ConnectionSidebar.tsx`
+- UI role: Form field label
+- Context: Serial Connection field for the serial port line, defaulting to `COM1`.
+- Tone: Compact field label
 - Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English.
+- Domain notes: Means serial port line/device, not a text line.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
-### `settings.microsoftYaHeiUi`
+### `connections.speed`
 
-- English: "Microsoft YaHei UI"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses a Windows Simplified Chinese UI font.
-- Tone: Neutral, system font name
+- English: "Speed"
+- Namespace: `connections`
+- Appears in: `src/connections/ConnectionSidebar.tsx`
+- UI role: Form field label
+- Context: Serial Connection baud-rate/speed field, defaulting to `9600`.
+- Tone: Compact field label
 - Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English.
+- Domain notes: Numeric serial baud rate; nearby input placeholder is `9600`.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
-### `settings.yuGothicUi`
+### `connections.serialLinePlaceholder`
 
-- English: "Yu Gothic UI"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses a Windows Japanese UI font.
-- Tone: Neutral, system font name
+- English: "COM1"
+- Namespace: `connections`
+- Appears in: `src/connections/ConnectionSidebar.tsx`
+- UI role: Input placeholder
+- Context: Placeholder/default example for the Serial Connection line field on Windows.
+- Tone: Literal device identifier example
 - Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.malgunGothic`
-
-- English: "Malgun Gothic"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses a Windows Korean UI font.
-- Tone: Neutral, system font name
-- Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.tahoma`
-
-- English: "Tahoma"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses the Windows Tahoma font family.
-- Tone: Neutral, system font name
-- Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.consolas`
-
-- English: "Consolas"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings font selector. This option chooses the Windows Consolas font family.
-- Tone: Neutral, system font name
-- Placeholders: None
-- Domain notes: Keep the Microsoft font family name in English. Consolas is monospaced and commonly used for code and terminal text.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.customFont`
-
-- English: "Custom font"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label and status value
-- Context: Appearance settings font selector. This appears only if a previously saved font stack does not match one of the curated options.
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: This hides a legacy raw CSS font-family stack while preserving the saved value until the user chooses another option.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.schemeDefault`
-
-- English: "Default"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings color scheme selector. Label for the built-in Default color scheme.
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Naming convention follows OS display theme labels.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.schemeDark`
-
-- English: "Dark"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings color scheme selector. Label for the Dark color scheme (dark background, light text).
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Standard display appearance term. Translate as the standard adjective.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.schemeLight`
-
-- English: "Light"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings color scheme selector. Label for the Light color scheme (pure white background, dark blue text, high contrast).
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Standard display appearance term. Translate as the standard adjective.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.schemeMac`
-
-- English: "Mac"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings color scheme selector. Label for the Mac-inspired color scheme (latest macOS-like grays and accent).
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Keep `Mac` as the proper name.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.schemeOrange`
-
-- English: "Orange"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings color scheme selector. Label for the Orange color scheme (light orange background, black text).
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Color name. Translate as the standard color word.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.schemePurple`
-
-- English: "Purple"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings color scheme selector. Label for the Purple color scheme (dark purple background, light text).
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Color name. Translate as the standard color word.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.schemePink`
-
-- English: "Pink"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Select option label
-- Context: Appearance settings color scheme selector. Label for the Pink color scheme (light pink background, dark purple text).
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Color name. Translate as the standard color word.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.colorSchemePreview`
-
-- English: "Preview"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Label for color swatch preview row
-- Context: Appearance settings color scheme selector. Small label above a row of 5 color swatches that preview the selected scheme's key colors (background, surface, text, accent, green).
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Standard UI term for a live preview of a selection.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.appBg`
-
-- English: "Background"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Color swatch label inside preview
-- Context: Appearance settings color scheme preview. Label inside a colored swatch indicating the app background color of the selected scheme.
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Standard UI color role label.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.surface`
-
-- English: "Surface"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Color swatch label inside preview
-- Context: Appearance settings color scheme preview. Label inside a colored swatch indicating the surface/panel background color of the selected scheme.
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Standard UI color role label.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.text`
-
-- English: "Text"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Color swatch label inside preview
-- Context: Appearance settings color scheme preview. Label inside a colored swatch indicating the primary text color of the selected scheme.
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Standard UI color role label.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.accent`
-
-- English: "Accent"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Color swatch label inside preview
-- Context: Appearance settings color scheme preview. Label inside a colored swatch indicating the accent/highlight color of the selected scheme.
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Standard UI color role label.
-- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
-
-### `settings.green`
-
-- English: "Green"
-- Namespace: `settings`
-- Appears in: `src/settings/AppearanceSettings.tsx`
-- UI role: Color swatch label inside preview
-- Context: Appearance settings color scheme preview. Label inside a colored swatch indicating the success/green color of the selected scheme.
-- Tone: Neutral, concise
-- Placeholders: None
-- Domain notes: Color name used as UI semantic role label.
+- Domain notes: Keep `COM1` untranslated.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
 ## Entry Template

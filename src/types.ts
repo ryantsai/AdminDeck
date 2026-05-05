@@ -1,4 +1,4 @@
-export type ConnectionType = "local" | "ssh" | "url" | "rdp" | "vnc";
+export type ConnectionType = "local" | "ssh" | "telnet" | "serial" | "url" | "rdp" | "vnc";
 export type ConnectionStatus = "connected" | "idle" | "offline";
 export type SshAuthMethod = "keyFile" | "password" | "agent";
 
@@ -13,6 +13,8 @@ export interface Connection {
   authMethod?: SshAuthMethod;
   hasPassword?: boolean;
   localShell?: string;
+  serialLine?: string;
+  serialSpeed?: number;
   url?: string;
   dataPartition?: string;
   useTmuxSessions?: boolean;
@@ -46,6 +48,8 @@ export interface CreateConnectionRequest {
   proxyJump?: string;
   authMethod?: SshAuthMethod;
   localShell?: string;
+  serialLine?: string;
+  serialSpeed?: number;
   url?: string;
   dataPartition?: string;
   useTmuxSessions?: boolean;
@@ -247,7 +251,7 @@ export interface PerformanceSnapshot {
 }
 
 export interface TerminalStartMetric {
-  kind: "local" | "ssh";
+  kind: "local" | "ssh" | "telnet" | "serial";
   title: string;
   durationMs: number;
   recordedAt: string;

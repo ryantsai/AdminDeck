@@ -18,7 +18,7 @@ A top-level section of the locale JSON mapping to a frontend module: `app`, `set
 
 
 **Connection**:
-A durable openable resource stored in SQLite. The supported kinds are local terminal, SSH terminal, URL (an embedded WebView2 browser surface targeting a single http(s) origin), RDP, and VNC. SFTP is opened from an SSH Connection and is not stored as a standalone Connection.
+A durable openable resource stored in SQLite. The supported kinds are local terminal, SSH terminal, Telnet terminal, Serial terminal, URL (an embedded WebView2 browser surface targeting a single http(s) origin), RDP, and VNC. SFTP is opened from an SSH Connection and is not stored as a standalone Connection.
 _Avoid_: Profile, saved session, host entry
 
 SSH Connections may persist non-secret tmux launch preferences, including whether AdminDeck should start terminal Panes inside named tmux sessions. The remote tmux process itself remains live Session/runtime state and is not the durable Connection.

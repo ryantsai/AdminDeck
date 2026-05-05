@@ -22,6 +22,7 @@ dependencies = [
  "russh-sftp",
  "serde",
  "serde_json",
+ "serial2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

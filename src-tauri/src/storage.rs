@@ -3,7 +3,7 @@ use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 
-const SCHEMA_USER_VERSION: i32 = 4;
+const SCHEMA_USER_VERSION: i32 = 5;
 
 const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS connections (
     data_partition TEXT,
     use_tmux_sessions INTEGER NOT NULL DEFAULT 1,
     tmux_connection_id TEXT,
-    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'url', 'rdp', 'vnc')),
+    serial_line TEXT,
+    serial_speed INTEGER,
+    connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'telnet', 'serial', 'url', 'rdp', 'vnc')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
 );
@@ -177,6 +179,8 @@ pub struct SavedConnection {
     data_partition: Option<String>,
     use_tmux_sessions: bool,
     tmux_connection_id: Option<String>,
+    serial_line: Option<String>,
+    serial_speed: Option<u32>,
     url_credential_username: Option<String>,
     has_url_credential: bool,
     #[serde(rename = "type")]
@@ -204,6 +208,8 @@ pub struct CreateConnectionRequest {
     url: Option<String>,
     data_partition: Option<String>,
     use_tmux_sessions: Option<bool>,
+    serial_line: Option<String>,
+    serial_speed: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -226,6 +232,8 @@ pub struct UpdateConnectionRequest {
     url: Option<String>,
     data_partition: Option<String>,
     use_tmux_sessions: Option<bool>,
+    serial_line: Option<String>,
+    serial_speed: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -564,10 +572,15 @@ impl Storage {
         let connection_type = normalize_connection_type(&request.connection_type)?;
         let name = required_field("name", request.name)?;
         let url = normalize_url_field(request.url, &connection_type)?;
+        let serial_line = normalize_serial_line(request.serial_line, &connection_type)?;
+        let serial_speed = normalize_serial_speed(request.serial_speed, &connection_type)?;
+        let port = normalize_connection_port(request.port, &connection_type);
         let host = if connection_type == "url" {
             url.as_deref()
                 .and_then(|value| extract_url_host(value))
                 .unwrap_or_default()
+        } else if connection_type == "serial" {
+            serial_line.clone().unwrap_or_else(|| "COM1".to_string())
         } else {
             required_field("host", request.host)?
         };
@@ -598,15 +611,15 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 'idle', ?16)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, serial_line, serial_speed, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 'idle', ?18)",
                 params![
                     id,
                     folder_id,
                     name,
                     host,
                     user,
-                    request.port,
+                    port,
                     key_path,
                     proxy_jump,
                     auth_method,
@@ -615,6 +628,8 @@ impl Storage {
                     data_partition,
                     use_tmux_sessions,
                     tmux_connection_id,
+                    serial_line,
+                    serial_speed,
                     connection_type,
                     next_sort_order
                 ],
@@ -638,7 +653,7 @@ impl Storage {
             name,
             host,
             user,
-            port: request.port,
+            port,
             key_path,
             proxy_jump,
             auth_method,
@@ -647,6 +662,8 @@ impl Storage {
             data_partition,
             use_tmux_sessions,
             tmux_connection_id,
+            serial_line,
+            serial_speed,
             url_credential_username: None,
             has_url_credential: false,
             connection_type,
@@ -663,10 +680,15 @@ impl Storage {
         let connection_type = normalize_connection_type(&request.connection_type)?;
         let name = required_field("name", request.name)?;
         let url = normalize_url_field(request.url, &connection_type)?;
+        let serial_line = normalize_serial_line(request.serial_line, &connection_type)?;
+        let serial_speed = normalize_serial_speed(request.serial_speed, &connection_type)?;
+        let port = normalize_connection_port(request.port, &connection_type);
         let host = if connection_type == "url" {
             url.as_deref()
                 .and_then(|value| extract_url_host(value))
                 .unwrap_or_default()
+        } else if connection_type == "serial" {
+            serial_line.clone().unwrap_or_else(|| "COM1".to_string())
         } else {
             required_field("host", request.host)?
         };
@@ -739,14 +761,16 @@ impl Storage {
                      data_partition = ?11,
                      use_tmux_sessions = ?12,
                      tmux_connection_id = ?13,
-                     sort_order = ?14
-                 WHERE id = ?15",
+                     serial_line = ?14,
+                     serial_speed = ?15,
+                     sort_order = ?16
+                 WHERE id = ?17",
                 params![
                     target_folder_id,
                     name,
                     host,
                     user,
-                    request.port,
+                    port,
                     key_path,
                     proxy_jump,
                     auth_method,
@@ -755,6 +779,8 @@ impl Storage {
                     data_partition,
                     use_tmux_sessions,
                     tmux_connection_id,
+                    serial_line,
+                    serial_speed,
                     sort_order,
                     &id
                 ],
@@ -922,7 +948,7 @@ impl Storage {
 
         let source = transaction
             .query_row(
-                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, connection_type
+                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, serial_line, serial_speed, connection_type
                  FROM connections
                  WHERE id = ?1",
                 params![source_id],
@@ -940,7 +966,9 @@ impl Storage {
                         row.get::<_, Option<String>>(9)?,
                         row.get::<_, Option<String>>(10)?,
                         row.get::<_, bool>(11)?,
-                        row.get::<_, String>(12)?,
+                        row.get::<_, Option<String>>(12)?,
+                        optional_serial_speed(row.get::<_, Option<i64>>(13)?)?,
+                        row.get::<_, String>(14)?,
                     ))
                 },
             )
@@ -960,6 +988,8 @@ impl Storage {
             url,
             data_partition,
             use_tmux_sessions,
+            serial_line,
+            serial_speed,
             connection_type,
         ) = source;
         let duplicate_name = request
@@ -978,8 +1008,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 'idle', ?16)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, serial_line, serial_speed, connection_type, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 'idle', ?18)",
                 params![
                     duplicate_id,
                     folder_id,
@@ -995,6 +1025,8 @@ impl Storage {
                     data_partition,
                     use_tmux_sessions,
                     tmux_connection_id,
+                    serial_line,
+                    serial_speed,
                     connection_type,
                     next_sort_order
                 ],
@@ -1134,7 +1166,7 @@ fn list_connections_for_folder(
     };
     let mut statement = connection
         .prepare(&format!(
-            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type,
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, serial_line, serial_speed,
                     url_credentials.username
              FROM connections
              LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
@@ -1396,14 +1428,14 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type,
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, serial_line, serial_speed,
                     url_credentials.username
              FROM connections
              LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
              WHERE connections.id = ?1",
             params![connection_id],
             |row| {
-                let url_credential_username: Option<String> = row.get(14)?;
+                let url_credential_username: Option<String> = row.get(16)?;
                 Ok(SavedConnection {
                     id: row.get(0)?,
                     name: row.get(1)?,
@@ -1419,6 +1451,8 @@ fn get_connection_by_id(
                     use_tmux_sessions: row.get(11)?,
                     tmux_connection_id: row.get(12)?,
                     connection_type: row.get(13)?,
+                    serial_line: row.get(14)?,
+                    serial_speed: optional_serial_speed(row.get::<_, Option<i64>>(15)?)?,
                     url_credential_username: url_credential_username.clone(),
                     has_url_credential: url_credential_username.is_some(),
                     status: "idle".to_string(),
@@ -1437,7 +1471,7 @@ fn get_connection_by_id(
 }
 
 fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedConnection> {
-    let url_credential_username: Option<String> = row.get(14)?;
+    let url_credential_username: Option<String> = row.get(16)?;
     Ok(SavedConnection {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -1453,6 +1487,8 @@ fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedC
         use_tmux_sessions: row.get(11)?,
         tmux_connection_id: row.get(12)?,
         connection_type: row.get(13)?,
+        serial_line: row.get(14)?,
+        serial_speed: optional_serial_speed(row.get::<_, Option<i64>>(15)?)?,
         url_credential_username: url_credential_username.clone(),
         has_url_credential: url_credential_username.is_some(),
         status: "idle".to_string(),
@@ -1521,6 +1557,10 @@ fn run_migrations(connection: &mut SqliteConnection) -> Result<(), String> {
 
     if current < 4 {
         rebuild_connections_for_remote_desktop_kinds(connection)?;
+    }
+
+    if current < 5 {
+        rebuild_connections_for_telnet_serial_kinds(connection)?;
     }
 
     connection
@@ -1659,6 +1699,80 @@ fn rebuild_connections_for_remote_desktop_kinds(
     Ok(())
 }
 
+// SQLite cannot ALTER a CHECK constraint in place. v5 expands the durable
+// Connection kind set to include Telnet and Serial, and adds Serial settings.
+fn rebuild_connections_for_telnet_serial_kinds(
+    connection: &mut SqliteConnection,
+) -> Result<(), String> {
+    let transaction = connection.transaction().map_err(to_storage_error)?;
+    transaction
+        .execute_batch(
+            r#"
+            DROP TABLE IF EXISTS temp.url_credentials_backup;
+            DROP TABLE IF EXISTS temp.connection_tags_backup;
+
+            CREATE TEMP TABLE url_credentials_backup AS
+                SELECT connection_id, username, updated_at FROM url_credentials;
+
+            CREATE TEMP TABLE connection_tags_backup AS
+                SELECT connection_id, tag, sort_order FROM connection_tags;
+
+            CREATE TABLE connections_new (
+                id TEXT PRIMARY KEY,
+                folder_id TEXT REFERENCES connection_folders(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                host TEXT NOT NULL,
+                username TEXT NOT NULL,
+                port INTEGER,
+                key_path TEXT,
+                proxy_jump TEXT,
+                auth_method TEXT NOT NULL DEFAULT 'keyFile',
+                local_shell TEXT,
+                url TEXT,
+                data_partition TEXT,
+                use_tmux_sessions INTEGER NOT NULL DEFAULT 1,
+                tmux_connection_id TEXT,
+                serial_line TEXT,
+                serial_speed INTEGER,
+                connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'telnet', 'serial', 'url', 'rdp', 'vnc')),
+                status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
+                sort_order INTEGER NOT NULL
+            );
+
+            INSERT INTO connections_new (
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, serial_line, serial_speed, connection_type, status, sort_order
+            )
+            SELECT
+                id, folder_id, name, host, username, port, key_path, proxy_jump,
+                auth_method, local_shell, url, data_partition, use_tmux_sessions, tmux_connection_id, NULL, NULL, connection_type, status, sort_order
+            FROM connections;
+
+            DROP TABLE connections;
+            ALTER TABLE connections_new RENAME TO connections;
+
+            CREATE INDEX IF NOT EXISTS idx_connections_folder_sort
+                ON connections(folder_id, sort_order);
+
+            INSERT OR REPLACE INTO url_credentials (connection_id, username, updated_at)
+            SELECT backup.connection_id, backup.username, backup.updated_at
+            FROM url_credentials_backup backup
+            INNER JOIN connections ON connections.id = backup.connection_id;
+
+            INSERT OR REPLACE INTO connection_tags (connection_id, tag, sort_order)
+            SELECT backup.connection_id, backup.tag, backup.sort_order
+            FROM connection_tags_backup backup
+            INNER JOIN connections ON connections.id = backup.connection_id;
+
+            DROP TABLE url_credentials_backup;
+            DROP TABLE connection_tags_backup;
+            "#,
+        )
+        .map_err(to_storage_error)?;
+    transaction.commit().map_err(to_storage_error)?;
+    Ok(())
+}
+
 fn ensure_url_credentials_table(connection: &mut SqliteConnection) -> Result<(), String> {
     connection
         .execute_batch(
@@ -1758,8 +1872,12 @@ fn ensure_folder_exists(
 
 fn normalize_connection_type(value: &str) -> Result<String, String> {
     match value.trim().to_lowercase().as_str() {
-        "local" | "ssh" | "url" | "rdp" | "vnc" => Ok(value.trim().to_lowercase()),
-        _ => Err("connection type must be local, ssh, url, rdp, or vnc".to_string()),
+        "local" | "ssh" | "telnet" | "serial" | "url" | "rdp" | "vnc" => {
+            Ok(value.trim().to_lowercase())
+        }
+        _ => {
+            Err("connection type must be local, ssh, telnet, serial, url, rdp, or vnc".to_string())
+        }
     }
 }
 
@@ -1797,7 +1915,7 @@ fn extract_url_host(value: &str) -> Option<String> {
 
 fn normalize_connection_user(value: String, connection_type: &str) -> Result<String, String> {
     match connection_type {
-        "url" => Ok(String::new()),
+        "serial" | "url" => Ok(String::new()),
         "vnc" => Ok(value.trim().to_string()),
         _ => required_field("user", value),
     }
@@ -1811,6 +1929,14 @@ fn normalize_ssh_optional_field(value: Option<String>, connection_type: &str) ->
     value
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn normalize_connection_port(value: Option<u16>, connection_type: &str) -> Option<u16> {
+    if connection_type == "serial" {
+        return None;
+    }
+
+    value
 }
 
 fn normalize_data_partition(
@@ -1847,6 +1973,38 @@ fn normalize_use_tmux_sessions(value: Option<bool>, connection_type: &str) -> bo
     connection_type == "ssh" && value.unwrap_or(true)
 }
 
+fn normalize_serial_line(
+    value: Option<String>,
+    connection_type: &str,
+) -> Result<Option<String>, String> {
+    if connection_type != "serial" {
+        return Ok(None);
+    }
+
+    let line = value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "COM1".to_string());
+    if line.chars().any(char::is_control) {
+        return Err("serial line cannot contain control characters".to_string());
+    }
+    Ok(Some(line))
+}
+
+fn normalize_serial_speed(
+    value: Option<u32>,
+    connection_type: &str,
+) -> Result<Option<u32>, String> {
+    if connection_type != "serial" {
+        return Ok(None);
+    }
+
+    match value.unwrap_or(9600) {
+        0 => Err("serial speed must be greater than 0".to_string()),
+        speed => Ok(Some(speed)),
+    }
+}
+
 fn normalize_local_shell(
     value: Option<String>,
     connection_type: &str,
@@ -1873,6 +2031,10 @@ fn normalize_auth_method(
     connection_type: &str,
     key_path: &Option<String>,
 ) -> Result<String, String> {
+    if connection_type == "telnet" {
+        return Ok("password".to_string());
+    }
+
     if connection_type != "ssh" {
         return Ok("keyFile".to_string());
     }
@@ -2016,7 +2178,12 @@ fn validate_appearance_settings(
         "default" | "dark" | "light" | "mac" | "orange" | "purple" | "pink" => {
             settings.color_scheme.to_lowercase()
         }
-        _ => return Err("color scheme must be one of: default, dark, light, mac, orange, purple, pink".to_string()),
+        _ => {
+            return Err(
+                "color scheme must be one of: default, dark, light, mac, orange, purple, pink"
+                    .to_string(),
+            )
+        }
     };
     Ok(settings)
 }
@@ -2174,6 +2341,15 @@ fn optional_port(value: Option<i64>) -> rusqlite::Result<Option<u16>> {
     }
 }
 
+fn optional_serial_speed(value: Option<i64>) -> rusqlite::Result<Option<u32>> {
+    match value {
+        Some(speed) => u32::try_from(speed)
+            .map(Some)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error))),
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2229,6 +2405,8 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: None,
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("SSH connection is created")
     }
@@ -2249,6 +2427,8 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: None,
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("local connection is created")
     }
@@ -2386,6 +2566,8 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: None,
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("migrated database accepts RDP connections");
     }
@@ -2409,6 +2591,8 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: None,
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("connection is created");
 
@@ -2448,6 +2632,8 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: Some(true),
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("RDP connection is created");
 
@@ -2474,12 +2660,72 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: None,
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("VNC connection is created");
 
         assert_eq!(vnc.connection_type, "vnc");
         assert_eq!(vnc.user, "");
         assert_eq!(vnc.port, Some(5900));
+    }
+
+    #[test]
+    fn create_connection_can_persist_telnet_and_serial_connections() {
+        let storage = Storage::open(temp_db_path("telnet-serial-create")).expect("storage opens");
+
+        let telnet = storage
+            .create_connection(CreateConnectionRequest {
+                name: "Legacy Router".to_string(),
+                host: "router.internal".to_string(),
+                user: "admin".to_string(),
+                connection_type: "telnet".to_string(),
+                folder_id: None,
+                port: Some(23),
+                key_path: Some("C:\\ignored\\id_ed25519".to_string()),
+                proxy_jump: Some("ignored.internal".to_string()),
+                auth_method: Some("agent".to_string()),
+                local_shell: None,
+                url: None,
+                data_partition: None,
+                use_tmux_sessions: Some(true),
+                serial_line: None,
+                serial_speed: None,
+            })
+            .expect("Telnet connection is created");
+
+        assert_eq!(telnet.connection_type, "telnet");
+        assert_eq!(telnet.auth_method, "password");
+        assert!(telnet.key_path.is_none());
+        assert!(telnet.proxy_jump.is_none());
+        assert!(!telnet.use_tmux_sessions);
+
+        let serial = storage
+            .create_connection(CreateConnectionRequest {
+                name: "Console Cable".to_string(),
+                host: String::new(),
+                user: "ignored".to_string(),
+                connection_type: "serial".to_string(),
+                folder_id: None,
+                port: Some(22),
+                key_path: None,
+                proxy_jump: None,
+                auth_method: None,
+                local_shell: None,
+                url: None,
+                data_partition: None,
+                use_tmux_sessions: None,
+                serial_line: Some("COM7".to_string()),
+                serial_speed: Some(115200),
+            })
+            .expect("Serial connection is created");
+
+        assert_eq!(serial.connection_type, "serial");
+        assert_eq!(serial.host, "COM7");
+        assert_eq!(serial.user, "");
+        assert_eq!(serial.port, None);
+        assert_eq!(serial.serial_line.as_deref(), Some("COM7"));
+        assert_eq!(serial.serial_speed, Some(115200));
     }
 
     #[test]
@@ -2500,6 +2746,8 @@ mod tests {
                 url: Some("router.internal".to_string()),
                 data_partition: Some("ops".to_string()),
                 use_tmux_sessions: None,
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("URL connection is created");
 
@@ -2617,6 +2865,8 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: Some(false),
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("connection is updated");
 
@@ -2796,6 +3046,8 @@ mod tests {
                 url: None,
                 data_partition: None,
                 use_tmux_sessions: None,
+                serial_line: None,
+                serial_speed: None,
             })
             .expect("connection is created in folder");
 

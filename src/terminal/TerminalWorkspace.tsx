@@ -904,7 +904,7 @@ function TerminalPaneView({
     const focusDisposable = terminal.onFocus(() => {
       onFocusRef.current();
     });
-    const terminalSessionType = connection.type === "local" ? "local" : "ssh";
+    const terminalSessionType = terminalSessionTypeFor(connection);
     terminal.writeln(`Starting ${terminalSessionType} session for ${connection.name}...`);
 
     if (!isTauriRuntime()) {
@@ -1050,7 +1050,7 @@ function TerminalPaneView({
           request: {
             sessionId: requestedSessionId,
             title: connection.name,
-            type: connection.type === "local" ? "local" : "ssh",
+            type: terminalSessionType,
             host: connection.host,
             user: connection.user,
             port: connection.port,
@@ -1062,7 +1062,9 @@ function TerminalPaneView({
               connection.type === "local"
                 ? connection.localShell ?? terminalSettings.defaultShell
                 : undefined,
-            initialDirectory: connection.type === "local" ? undefined : pane.cwd.trim() || undefined,
+            serialLine: connection.type === "serial" ? connection.serialLine ?? connection.host : undefined,
+            serialSpeed: connection.type === "serial" ? connection.serialSpeed ?? 9600 : undefined,
+            initialDirectory: connection.type === "ssh" ? pane.cwd.trim() || undefined : undefined,
             cols: terminalDimensions.cols,
             pixelHeight: terminalDimensions.pixelHeight,
             pixelWidth: terminalDimensions.pixelWidth,
@@ -1536,6 +1538,15 @@ function terminalDimensionsEqual(left: TerminalDimensions, right: TerminalDimens
     left.pixelWidth === right.pixelWidth &&
     left.rows === right.rows
   );
+}
+
+function terminalSessionTypeFor(connection: Connection): "local" | "ssh" | "telnet" | "serial" {
+  return connection.type === "local" ||
+    connection.type === "ssh" ||
+    connection.type === "telnet" ||
+    connection.type === "serial"
+    ? connection.type
+    : "ssh";
 }
 
 function normalizeAssistantContextText(text: string) {

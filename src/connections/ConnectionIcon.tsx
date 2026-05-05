@@ -1,6 +1,8 @@
 import type { ConnectionType } from "../types";
 import rdpIcon from "../assets/connection-icons/rdp.png";
+import serialIcon from "../assets/connection-icons/serial.png";
 import sshIcon from "../assets/connection-icons/ssh.png";
+import telnetIcon from "../assets/connection-icons/telnet.png";
 import terminalIcon from "../assets/connection-icons/terminal.png";
 import urlIcon from "../assets/connection-icons/url.png";
 import vncIcon from "../assets/connection-icons/vnc.png";
@@ -8,6 +10,8 @@ import vncIcon from "../assets/connection-icons/vnc.png";
 const CONNECTION_ICON_SRC: Record<ConnectionType, string> = {
   local: terminalIcon,
   ssh: sshIcon,
+  telnet: telnetIcon,
+  serial: serialIcon,
   url: urlIcon,
   rdp: rdpIcon,
   vnc: vncIcon,

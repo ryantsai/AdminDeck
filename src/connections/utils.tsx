@@ -1,4 +1,4 @@
-import { Mouse, Columns2, Globe2, Laptop, Monitor, Server, Terminal } from "lucide-react";
+import { Cable, Mouse, Columns2, Globe2, Laptop, Monitor, Network, Server, Terminal } from "lucide-react";
 import { invokeCommand, type SshHostKeyPreview } from "../lib/tauri";
 import type { Connection, ConnectionType, SshSettings, WorkspaceTab } from "../types";
 
@@ -55,6 +55,9 @@ export function defaultPortForConnectionType(type: ConnectionType, sshSettings: 
   if (type === "vnc") {
     return 5900;
   }
+  if (type === "telnet") {
+    return 23;
+  }
   return sshSettings.defaultPort;
 }
 
@@ -64,6 +67,10 @@ export function connectionTypeLabel(type: ConnectionType) {
       return "Local terminal";
     case "ssh":
       return "SSH terminal";
+    case "telnet":
+      return "Telnet";
+    case "serial":
+      return "Serial";
     case "url":
       return "URL";
     case "rdp":
@@ -79,6 +86,9 @@ export function connectionSubtitle(connection: Connection) {
   }
   if (connection.type === "url") {
     return connection.url ?? connection.host;
+  }
+  if (connection.type === "serial") {
+    return `${connection.serialLine ?? connection.host} @ ${connection.serialSpeed ?? 9600}`;
   }
   const address = connection.port ? `${connection.host}:${connection.port}` : connection.host;
   if (connection.user) {
@@ -97,6 +107,10 @@ export function connectionIconForType(type: ConnectionType) {
       return Monitor;
     case "vnc":
       return Mouse;
+    case "telnet":
+      return Network;
+    case "serial":
+      return Cable;
     case "ssh":
       return Server;
   }

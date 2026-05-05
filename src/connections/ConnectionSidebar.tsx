@@ -356,6 +356,8 @@ export function ConnectionSidebar({
       hasPassword: Boolean(password),
       type: connectionRequest.type,
       localShell: connectionRequest.localShell,
+      serialLine: connectionRequest.serialLine,
+      serialSpeed: connectionRequest.serialSpeed,
       url: connectionRequest.url,
       dataPartition: connectionRequest.dataPartition,
       useTmuxSessions: connectionRequest.useTmuxSessions,
@@ -1676,6 +1678,8 @@ function ConnectionDialog({
     initialConnection?.keyPath ?? sshSettings.defaultKeyPath ?? "",
   );
   const usesSshDefaults = connectionType === "ssh";
+  const isTelnetConnection = connectionType === "telnet";
+  const isSerialConnection = connectionType === "serial";
   const usesRemoteDesktopFields = connectionType
     ? isRemoteDesktopConnectionType(connectionType)
     : false;
@@ -1697,6 +1701,16 @@ function ConnectionDialog({
       type: "ssh",
       title: t("connections.ssh"),
       subtitle: t("connections.secureShell"),
+    },
+    {
+      type: "telnet",
+      title: t("connections.telnet"),
+      subtitle: t("connections.telnetShell"),
+    },
+    {
+      type: "serial",
+      title: t("connections.serial"),
+      subtitle: t("connections.serialLine"),
     },
     {
       type: "url",
@@ -1731,9 +1745,12 @@ function ConnectionDialog({
       localShellOptions.find((option) => (option.value ?? "") === selectedLocalShell)?.label ??
       t("connections.localTerminal");
     const rawUrl = String(form.get("url") ?? "").trim();
+    const serialLine = String(form.get("serialLine") ?? "COM1").trim() || "COM1";
     const host =
       connectionType === "local"
         ? "localhost"
+        : connectionType === "serial"
+          ? serialLine
         : connectionType === "url"
           ? rawUrl
           : String(form.get("host") ?? "").trim();
@@ -1741,6 +1758,8 @@ function ConnectionDialog({
     const name =
       connectionType === "local"
         ? requestedName || selectedLocalShellLabel
+        : connectionType === "serial"
+          ? requestedName || serialLine
         : requestedName || host;
     const portValue = String(form.get("port") ?? "").trim();
     const password = String(form.get("password") ?? "");
@@ -1754,6 +1773,8 @@ function ConnectionDialog({
       user:
         connectionType === "local"
           ? "local"
+          : connectionType === "serial"
+            ? ""
           : connectionType === "url"
             ? initialConnection?.user ?? "web"
             : String(form.get("user") ?? "").trim(),
@@ -1765,13 +1786,20 @@ function ConnectionDialog({
       authMethod: usesSshDefaults ? authMethod : undefined,
       useTmuxSessions: usesSshDefaults ? useTmuxSessions : undefined,
       localShell: connectionType === "local" ? selectedLocalShell || undefined : undefined,
+      serialLine: connectionType === "serial" ? serialLine : undefined,
+      serialSpeed:
+        connectionType === "serial"
+          ? Number(String(form.get("serialSpeed") ?? "9600").trim() || "9600")
+          : undefined,
       url: connectionType === "url" ? rawUrl : undefined,
       dataPartition:
         connectionType === "url"
           ? String(form.get("dataPartition") ?? "").trim() || undefined
           : undefined,
       password:
-        usesSshDefaults && authMethod === "password"
+        isTelnetConnection
+          ? password
+          : usesSshDefaults && authMethod === "password"
           ? password
           : usesRemoteDesktopFields
             ? password || undefined
@@ -1885,6 +1913,36 @@ function ConnectionDialog({
                   </select>
                 </label>
               </>
+            ) : isSerialConnection ? (
+              <>
+                <label>
+                  <span>{t("connections.nameOptional")}</span>
+                  <input name="name" defaultValue={initialConnection?.name ?? ""} placeholder={t("connections.connectionName")} />
+                </label>
+                <div className="form-grid">
+                  <label>
+                    <span>{t("connections.line")}*</span>
+                    <input
+                      name="serialLine"
+                      defaultValue={initialConnection?.serialLine ?? initialConnection?.host ?? "COM1"}
+                      placeholder={t("connections.serialLinePlaceholder")}
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>{t("connections.speed")}*</span>
+                    <input
+                      name="serialSpeed"
+                      defaultValue={initialConnection?.serialSpeed ?? 9600}
+                      inputMode="numeric"
+                      min="1"
+                      type="number"
+                      placeholder="9600"
+                      required
+                    />
+                  </label>
+                </div>
+              </>
             ) : isUrlConnection ? (
               <>
                 <label>
@@ -1948,7 +2006,7 @@ function ConnectionDialog({
                       name="user"
                       defaultValue={
                         initialConnection?.user ??
-                        (connectionType === "ssh" ? sshSettings.defaultUser : "")
+                        (connectionType === "ssh" || connectionType === "telnet" ? sshSettings.defaultUser : "")
                       }
                       placeholder={
                         connectionType === "rdp"
@@ -1986,6 +2044,19 @@ function ConnectionDialog({
                   autoComplete="current-password"
                   name="password"
                   placeholder={isEditMode ? t("connections.leaveBlankPassword") : t("connections.storedInKeychain")}
+                  type="password"
+                />
+              </label>
+            ) : null}
+
+            {isTelnetConnection ? (
+              <label>
+                <span>{t("connections.passwordLabel")}*</span>
+                <input
+                  autoComplete="current-password"
+                  name="password"
+                  placeholder={isEditMode ? t("connections.leaveBlankPassword") : t("connections.storedInKeychain")}
+                  required={!isEditMode}
                   type="password"
                 />
               </label>

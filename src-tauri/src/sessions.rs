@@ -1,4 +1,4 @@
-use crate::{secrets, ssh};
+use crate::{secrets, serial, ssh, telnet};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -28,6 +28,8 @@ enum TerminalTransport {
         child: Box<dyn Child + Send + Sync>,
     },
     NativeSsh(ssh::NativeSshTerminal),
+    NativeTelnet(telnet::NativeTelnetTerminal),
+    NativeSerial(serial::NativeSerialTerminal),
 }
 
 #[derive(Deserialize)]
@@ -45,6 +47,8 @@ pub struct StartTerminalSessionRequest {
     pub auth_method: Option<String>,
     pub secret_owner_id: Option<String>,
     pub shell: Option<String>,
+    pub serial_line: Option<String>,
+    pub serial_speed: Option<u32>,
     pub initial_directory: Option<String>,
     pub cols: Option<u16>,
     pub pixel_height: Option<u16>,
@@ -124,8 +128,8 @@ impl TerminalSessionStarted {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalOutput {
-    session_id: String,
-    data: String,
+    pub(crate) session_id: String,
+    pub(crate) data: String,
 }
 
 #[derive(Deserialize)]
@@ -164,6 +168,73 @@ impl SessionManager {
             .clone()
             .unwrap_or_else(|| make_session_id(&request.title));
         let password = connection_password_for(secrets, &request);
+        if request
+            .connection_type
+            .trim()
+            .eq_ignore_ascii_case("telnet")
+        {
+            let password =
+                password.ok_or_else(|| "password is required for Telnet sessions".to_string())?;
+            let session = telnet::start_native_terminal(
+                app,
+                telnet::NativeTelnetTerminalRequest {
+                    session_id: session_id.clone(),
+                    host: request.host.clone(),
+                    user: request.user.clone(),
+                    port: request.port.unwrap_or(23),
+                    password,
+                },
+            )?;
+            self.sessions
+                .lock()
+                .map_err(|_| "terminal session lock is poisoned".to_string())?
+                .insert(
+                    session_id.clone(),
+                    TerminalSession {
+                        transport: TerminalTransport::NativeTelnet(session),
+                    },
+                );
+            return Ok(TerminalSessionStarted {
+                session_id,
+                terminal_ready_ms: None,
+            });
+        }
+
+        if request
+            .connection_type
+            .trim()
+            .eq_ignore_ascii_case("serial")
+        {
+            let line = request
+                .serial_line
+                .clone()
+                .unwrap_or_else(|| request.host.clone());
+            let session = serial::start_native_terminal(
+                app,
+                serial::NativeSerialTerminalRequest {
+                    session_id: session_id.clone(),
+                    line,
+                    speed: request
+                        .serial_speed
+                        .or(request.port.map(u32::from))
+                        .unwrap_or(9600),
+                },
+            )?;
+            self.sessions
+                .lock()
+                .map_err(|_| "terminal session lock is poisoned".to_string())?
+                .insert(
+                    session_id.clone(),
+                    TerminalSession {
+                        transport: TerminalTransport::NativeSerial(session),
+                    },
+                );
+            return Ok(TerminalSessionStarted {
+                session_id,
+                terminal_ready_ms: None,
+            });
+        }
+
         let auth_method = ssh_auth_method_for(&request, password.as_deref())?;
         if uses_native_ssh(&request, password.as_deref(), &auth_method) {
             let known_hosts_path = ssh::app_known_hosts_path(&app)?;
@@ -395,6 +466,8 @@ impl SessionManager {
                     .map_err(|error| format!("failed to flush terminal input: {error}"))
             }
             TerminalTransport::NativeSsh(session) => session.write_input(request.data),
+            TerminalTransport::NativeTelnet(session) => session.write_input(request.data),
+            TerminalTransport::NativeSerial(session) => session.write_input(request.data),
         }
     }
 
@@ -416,6 +489,7 @@ impl SessionManager {
                 request.pixel_width.unwrap_or(0),
                 request.pixel_height.unwrap_or(0),
             ),
+            TerminalTransport::NativeTelnet(_) | TerminalTransport::NativeSerial(_) => Ok(()),
         }
     }
 
@@ -431,6 +505,8 @@ impl SessionManager {
                     let _ = child.kill();
                 }
                 TerminalTransport::NativeSsh(session) => session.close(),
+                TerminalTransport::NativeTelnet(session) => session.close(),
+                TerminalTransport::NativeSerial(session) => session.close(),
             }
         }
         Ok(())
@@ -578,6 +654,19 @@ fn connection_password_for(
     secrets: &secrets::Secrets,
     request: &StartTerminalSessionRequest,
 ) -> Option<String> {
+    if request
+        .connection_type
+        .trim()
+        .eq_ignore_ascii_case("telnet")
+    {
+        return request.secret_owner_id.as_ref().and_then(|owner_id| {
+            secrets
+                .read_connection_password(owner_id.clone())
+                .ok()
+                .flatten()
+        });
+    }
+
     if !request.connection_type.trim().eq_ignore_ascii_case("ssh") {
         return None;
     }
@@ -659,6 +748,8 @@ fn terminal_request_for_tmux(request: &TmuxConnectionRequest) -> StartTerminalSe
         auth_method: request.auth_method.clone(),
         secret_owner_id: request.secret_owner_id.clone(),
         shell: None,
+        serial_line: None,
+        serial_speed: None,
         initial_directory: None,
         cols: None,
         pixel_height: None,
@@ -1091,6 +1182,8 @@ mod tests {
             auth_method: None,
             secret_owner_id: None,
             shell: None,
+            serial_line: None,
+            serial_speed: None,
             initial_directory: None,
             cols: None,
             pixel_height: None,

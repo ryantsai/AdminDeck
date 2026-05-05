@@ -87,6 +87,8 @@ Represents all openable resources as saved connections. Current connection types
 
 - Local Terminal
 - SSH Terminal
+- Telnet Terminal
+- Serial Terminal
 - URL
 - RDP
 - VNC
@@ -109,7 +111,7 @@ For tmux-enabled SSH Connections, per-Pane friendly tmux session names are gener
 
 ### Terminal Session
 
-Owns local PTY lifecycle, SSH terminal channel lifecycle, input/output streams, resize events, tab integration, split pane integration, and terminal compatibility behavior.
+Owns local PTY lifecycle, SSH terminal channel lifecycle, Telnet TCP lifecycle, Serial port lifecycle, input/output streams, resize events, tab integration, split pane integration, and terminal compatibility behavior.
 
 Lifecycle invariant: switching the active workspace Tab must not disconnect, close, or recreate a local terminal Session, SSH terminal Session, or SFTP Session. Open Tab surfaces stay mounted while inactive so their live Sessions remain attached. Explicit tab close from the tab strip is the user-owned teardown action for the Session or Sessions presented by that Tab.
 

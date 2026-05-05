@@ -186,3 +186,32 @@ Latest validation on May 5, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Add optional crash reporting after explicit opt-in design.
 - [ ] Evaluate team sharing/sync as a major product-scope decision before implementation.
 - [ ] Evaluate mobile apps as a major platform-scope decision after desktop architecture proves itself.
+
+## Milestone H: v0.3 Horizon
+
+### AI Assistant Tool Calling and Context
+
+- [ ] Add AI Assistant tool calling support for local tools (rg, curl, filesystem search) and web search.
+- [ ] Allow AI Assistant to read the current active Connection text buffer.
+- [ ] Allow AI Assistant to reference previous session text buffers via RAG/agentic search.
+- [ ] Add voice input for AI Assistant with local model support.
+
+### Session Logging and Universal Search
+
+- [ ] Autosave all SSH/Terminal/Telnet/Serial text buffers to plain-text log files by default, organized by Connection name and random serial number under a sensible folder structure.
+- [ ] Add a button in the Connection pane to browse the session log list for a Connection.
+- [ ] Add universal search across all session logs and Connection items.
+
+### Screenshot Tool
+
+- [ ] Add screenshot tool accessible from system tray right-click that opens a screenshot section in the main interface.
+
+### Recording
+
+- [ ] Add RDP/VNC screen recording.
+
+### Additional Protocol Support
+
+- [ ] Add Apple Remote Desktop support (low priority).
+- [ ] Add Hyper-V client support (low priority).
+- [ ] Add VMware vSphere support (low priority).
