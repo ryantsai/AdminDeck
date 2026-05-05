@@ -108,6 +108,8 @@
     "aiProviderSaved": "Proveedor de IA guardado.",
     "aiProviderCleared": "Configuración del proveedor de IA borrada.",
     "clearAiConfirm": "¿Borrar toda la configuración del proveedor de IA y eliminar la clave API guardada?",
+    "outputLanguage": "Idioma de salida",
+    "outputLanguageUiLanguage": "Idioma de la interfaz",
     "settingsContent": "Configuración"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "Borrador de extensión",
     "composerPlaceholder": "Pregúntale lo que sea al Asistente IA.",
     "sendMessage": "Enviar mensaje",
+    "stopMessage": "Detener respuesta",
     "copy": "Copiar",
     "send": "Enviar",
     "code": "code",

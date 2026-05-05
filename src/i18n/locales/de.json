@@ -108,6 +108,8 @@
     "aiProviderSaved": "KI-Anbieter gespeichert.",
     "aiProviderCleared": "KI-Anbietereinstellungen gelöscht.",
     "clearAiConfirm": "Alle KI-Anbietereinstellungen löschen und den gespeicherten API-Schlüssel entfernen?",
+    "outputLanguage": "Ausgabesprache",
+    "outputLanguageUiLanguage": "UI-Sprache",
     "settingsContent": "Einstellungen"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "Erweiterungsentwurf",
     "composerPlaceholder": "KI-Assistenten etwas fragen.",
     "sendMessage": "Nachricht senden",
+    "stopMessage": "Antwort stoppen",
     "copy": "Kopieren",
     "send": "Senden",
     "code": "code",

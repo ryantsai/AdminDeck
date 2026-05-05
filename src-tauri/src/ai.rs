@@ -199,6 +199,7 @@ pub struct AgentRunRequest {
     screenshot: Option<AgentScreenshotContext>,
     system_context: Option<String>,
     messages: Vec<AgentChatMessage>,
+    output_language: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -302,6 +303,7 @@ impl AgentProvider for OpenAiCompatibleProvider {
             request.selected_output,
             request.screenshot,
             request.messages,
+            request.output_language,
         );
         let client = reqwest::Client::new();
         let response = client
@@ -406,22 +408,25 @@ fn build_agent_messages(
     selected_output: Option<String>,
     screenshot: Option<AgentScreenshotContext>,
     history: Vec<AgentChatMessage>,
+    output_language: Option<String>,
 ) -> Vec<OpenAiCompatibleMessage> {
     let normalized_intent = normalize_agent_intent(intent);
-    let mut system_instructions = vec![
-        "You are AdminDeck's AI Assistant for local-first administration workflows.",
-        "Help with terminal, SSH, SFTP, URL, RDP, and VNC operational tasks.",
-        "When suggesting commands, explain intent and prefer commands the user can review before running.",
-        "Do not claim to have executed commands or observed live session state unless it is in the provided context.",
-        "Reponse in user's query language, when responding in Chinese, always respond in Traditional Chinese (Taiwan) and avoid Mainland China IT terminology.",
-        "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.",
+    let mut system_instructions: Vec<String> = vec![
+        "You are AdminDeck's AI Assistant for local-first administration workflows.".to_string(),
+        "Help with terminal, SSH, SFTP, URL, RDP, and VNC operational tasks.".to_string(),
+        "When suggesting commands, explain intent and prefer commands the user can review before running.".to_string(),
+        "Do not claim to have executed commands or observed live session state unless it is in the provided context.".to_string(),
+        "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.".to_string(),
     ];
+    if let Some(language) = normalize_output_language(output_language) {
+        system_instructions.push(language);
+    }
     if normalized_intent == AgentIntent::ExtensionCreation {
         system_instructions.extend([
-            "EXTENSION DRAFT MODE: The user is asking for an AdminDeck extension draft. Produce reviewable extension design, manifest, permission request, and source files only.",
-            "Do not say that AdminDeck installed, enabled, executed, loaded, or verified generated extension code.",
-            "Keep extension output approval-based: require explicit user review before any future install, run, file write, permission grant, or command execution step.",
-            "Prefer narrow extension permissions, local-first storage boundaries, and clear trust notes. If an AdminDeck extension API is not provided in context, mark API details as proposed rather than claiming they exist.",
+            "EXTENSION DRAFT MODE: The user is asking for an AdminDeck extension draft. Produce reviewable extension design, manifest, permission request, and source files only.".to_string(),
+            "Do not say that AdminDeck installed, enabled, executed, loaded, or verified generated extension code.".to_string(),
+            "Keep extension output approval-based: require explicit user review before any future install, run, file write, permission grant, or command execution step.".to_string(),
+            "Prefer narrow extension permissions, local-first storage boundaries, and clear trust notes. If an AdminDeck extension API is not provided in context, mark API details as proposed rather than claiming they exist.".to_string(),
         ]);
     }
 
@@ -507,6 +512,13 @@ fn normalize_agent_intent(intent: Option<String>) -> AgentIntent {
         | Some("extensiondraft") => AgentIntent::ExtensionCreation,
         _ => AgentIntent::Chat,
     }
+}
+
+fn normalize_output_language(language: Option<String>) -> Option<String> {
+    language
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("Always respond in {value}."))
 }
 
 fn normalize_screenshot_context(
@@ -710,6 +722,7 @@ mod tests {
                     content: "skip me".to_string(),
                 },
             ],
+            None,
         );
 
         assert_eq!(messages.len(), 3);
@@ -736,6 +749,7 @@ mod tests {
                 data_url: "data:image/png;base64,abcd".to_string(),
             }),
             vec![],
+            None,
         );
 
         match &messages[1].content {
@@ -755,6 +769,7 @@ mod tests {
             None,
             None,
             vec![],
+            None,
         );
 
         let system_content = text_content(&messages[0]);

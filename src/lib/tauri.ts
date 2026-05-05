@@ -216,6 +216,7 @@ export interface AgentRunRequest {
   };
   systemContext?: string;
   messages: AgentChatMessage[];
+  outputLanguage?: string;
 }
 
 export interface AgentRunResponse {

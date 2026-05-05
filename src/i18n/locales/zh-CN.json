@@ -108,6 +108,8 @@
     "aiProviderSaved": "AI 提供者已保存。",
     "aiProviderCleared": "AI 提供者设置已清除。",
     "clearAiConfirm": "清除所有 AI 提供者设置并移除已保存的 AI API 密钥？",
+    "outputLanguage": "输出语言",
+    "outputLanguageUiLanguage": "UI 语言",
     "settingsContent": "设置"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "草稿扩展",
     "composerPlaceholder": "向 AI 助手询问任何问题。",
     "sendMessage": "发送消息",
+    "stopMessage": "停止回复",
     "copy": "复制",
     "send": "发送",
     "code": "code",

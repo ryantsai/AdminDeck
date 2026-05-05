@@ -108,6 +108,8 @@
     "aiProviderSaved": "AI provider saved.",
     "aiProviderCleared": "AI provider settings cleared.",
     "clearAiConfirm": "Clear all AI provider settings and remove the saved AI API key?",
+    "outputLanguage": "Output language",
+    "outputLanguageUiLanguage": "UI Language",
     "settingsContent": "Settings"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "Draft Extension",
     "composerPlaceholder": "Ask AI Assistant anything.",
     "sendMessage": "Send message",
+    "stopMessage": "Stop response",
     "copy": "Copy",
     "send": "Send",
     "code": "code",

@@ -2785,6 +2785,14 @@ progress {
   background: #1d4ed8;
 }
 
+.assistant-send-button[data-state="stopping"] {
+  background: #dc2626;
+}
+
+.assistant-send-button[data-state="stopping"]:hover {
+  background: #b91c1c;
+}
+
 .assistant-send-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;

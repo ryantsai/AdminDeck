@@ -199,6 +199,7 @@ export function providerDefaultsFor(kind: AiProviderKind): AiProviderSettings {
     baseUrl: definition.baseUrl,
     model: definition.defaultModel,
     reasoningEffort: definition.defaultReasoningEffort,
+    outputLanguage: "",
     cliExecutionPolicy: "suggestOnly",
     claudeCliPath: "",
     codexCliPath: "",

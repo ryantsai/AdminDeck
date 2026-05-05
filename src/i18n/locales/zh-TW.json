@@ -108,6 +108,8 @@
     "aiProviderSaved": "AI 提供者已儲存。",
     "aiProviderCleared": "AI 提供者設定已清除。",
     "clearAiConfirm": "清除所有 AI 提供者設定並移除已儲存的 AI API 金鑰？",
+    "outputLanguage": "輸出語言",
+    "outputLanguageUiLanguage": "UI 語言",
     "settingsContent": "設定"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "草稿擴充功能",
     "composerPlaceholder": "向 AI 助理詢問任何問題。",
     "sendMessage": "傳送訊息",
+    "stopMessage": "停止回應",
     "copy": "複製",
     "send": "傳送",
     "code": "code",

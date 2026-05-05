@@ -116,6 +116,8 @@ pub struct AiProviderSettings {
     model: String,
     #[serde(default = "default_ai_reasoning_effort")]
     reasoning_effort: String,
+    #[serde(default)]
+    output_language: String,
     #[serde(default = "default_ai_cli_execution_policy")]
     cli_execution_policy: String,
     #[serde(default)]
@@ -1956,6 +1958,7 @@ fn default_ai_provider_settings() -> AiProviderSettings {
         base_url: "https://api.openai.com/v1".to_string(),
         model: default_ai_model(),
         reasoning_effort: default_ai_reasoning_effort(),
+        output_language: String::new(),
         cli_execution_policy: default_ai_cli_execution_policy(),
         claude_cli_path: None,
         codex_cli_path: None,
@@ -2071,6 +2074,7 @@ fn validate_ai_provider_settings(
             )
         }
     };
+    settings.output_language = settings.output_language.trim().to_string();
     settings.claude_cli_path = trim_optional(settings.claude_cli_path);
     settings.codex_cli_path = trim_optional(settings.codex_cli_path);
 
@@ -3023,6 +3027,7 @@ mod tests {
                 base_url: "  https://llm-gateway.internal/v1/  ".to_string(),
                 model: " openai/gpt-5.5 ".to_string(),
                 reasoning_effort: " XHIGH ".to_string(),
+                output_language: String::new(),
                 cli_execution_policy: "suggest-only".to_string(),
                 claude_cli_path: Some("  C:\\Tools\\claude.exe  ".to_string()),
                 codex_cli_path: Some("  codex  ".to_string()),
@@ -3060,6 +3065,7 @@ mod tests {
                 base_url: "api.openai.com/v1".to_string(),
                 model: "gpt-5.5".to_string(),
                 reasoning_effort: "medium".to_string(),
+                output_language: String::new(),
                 cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
@@ -3084,6 +3090,7 @@ mod tests {
                 base_url: "https://api.openai.com/v1".to_string(),
                 model: "   ".to_string(),
                 reasoning_effort: "medium".to_string(),
+                output_language: String::new(),
                 cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
@@ -3104,6 +3111,7 @@ mod tests {
                 base_url: "https://api.openai.com/v1".to_string(),
                 model: "gpt-5.5".to_string(),
                 reasoning_effort: "medium".to_string(),
+                output_language: String::new(),
                 cli_execution_policy: "executeAutomatically".to_string(),
                 claude_cli_path: Some("claude".to_string()),
                 codex_cli_path: Some("codex".to_string()),

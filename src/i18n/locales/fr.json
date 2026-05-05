@@ -108,6 +108,8 @@
     "aiProviderSaved": "Fournisseur IA enregistré.",
     "aiProviderCleared": "Paramètres du fournisseur IA effacés.",
     "clearAiConfirm": "Effacer tous les paramètres du fournisseur IA et supprimer la clé API enregistrée ?",
+    "outputLanguage": "Langue de sortie",
+    "outputLanguageUiLanguage": "Langue de l'interface",
     "settingsContent": "Paramètres"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "Brouillon d'extension",
     "composerPlaceholder": "Demandez ce que vous voulez à l'assistant IA.",
     "sendMessage": "Envoyer le message",
+    "stopMessage": "Arrêter la réponse",
     "copy": "Copier",
     "send": "Envoyer",
     "code": "code",

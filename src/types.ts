@@ -185,6 +185,7 @@ export interface AiProviderSettings {
   baseUrl: string;
   model: string;
   reasoningEffort: AiReasoningEffort;
+  outputLanguage: string;
   cliExecutionPolicy: "suggestOnly";
   claudeCliPath?: string;
   codexCliPath?: string;

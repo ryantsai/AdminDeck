@@ -108,6 +108,8 @@
     "aiProviderSaved": "Provider IA salvato.",
     "aiProviderCleared": "Impostazioni provider IA cancellate.",
     "clearAiConfirm": "Cancellare tutte le impostazioni del provider IA e rimuovere la chiave API salvata?",
+    "outputLanguage": "Lingua di output",
+    "outputLanguageUiLanguage": "Lingua dell'interfaccia",
     "settingsContent": "Impostazioni"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "Bozza estensione",
     "composerPlaceholder": "Chiedi qualsiasi cosa all'assistente IA.",
     "sendMessage": "Invia messaggio",
+    "stopMessage": "Interrompi risposta",
     "copy": "Copia",
     "send": "Invia",
     "code": "code",

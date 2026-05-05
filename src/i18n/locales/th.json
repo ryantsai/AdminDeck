@@ -108,6 +108,8 @@
     "aiProviderSaved": "บันทึกผู้ให้บริการ AI แล้ว",
     "aiProviderCleared": "ล้างการตั้งค่าผู้ให้บริการ AI แล้ว",
     "clearAiConfirm": "ล้างการตั้งค่าผู้ให้บริการ AI ทั้งหมดและลบคีย์ API AI ที่บันทึกไว้หรือไม่",
+    "outputLanguage": "ภาษาที่ใช้ตอบ",
+    "outputLanguageUiLanguage": "ภาษา UI",
     "settingsContent": "การตั้งค่า"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "ร่างส่วนขยาย",
     "composerPlaceholder": "ถามอะไรก็ได้กับผู้ช่วย AI",
     "sendMessage": "ส่งข้อความ",
+    "stopMessage": "หยุดการตอบกลับ",
     "copy": "คัดลอก",
     "send": "ส่ง",
     "code": "code",

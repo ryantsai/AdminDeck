@@ -108,6 +108,8 @@
     "aiProviderSaved": "AI 제공자가 저장되었습니다.",
     "aiProviderCleared": "AI 제공자 설정이 지워졌습니다.",
     "clearAiConfirm": "모든 AI 제공자 설정을 지우고 저장된 AI API 키를 삭제하시겠습니까?",
+    "outputLanguage": "출력 언어",
+    "outputLanguageUiLanguage": "UI 언어",
     "settingsContent": "설정"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "확장 초안 작성",
     "composerPlaceholder": "AI 어시스턴트에게 무엇이든 물어보세요.",
     "sendMessage": "메시지 보내기",
+    "stopMessage": "응답 중지",
     "copy": "복사",
     "send": "보내기",
     "code": "code",

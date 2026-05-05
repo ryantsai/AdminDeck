@@ -108,6 +108,8 @@
     "aiProviderSaved": "AIプロバイダーを保存しました。",
     "aiProviderCleared": "AIプロバイダー設定をクリアしました。",
     "clearAiConfirm": "すべてのAIプロバイダー設定をクリアし、保存されたAI APIキーを削除しますか？",
+    "outputLanguage": "出力言語",
+    "outputLanguageUiLanguage": "UI 言語",
     "settingsContent": "設定"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "拡張機能をドラフト",
     "composerPlaceholder": "AIアシスタントに何でも質問してください。",
     "sendMessage": "メッセージを送信",
+    "stopMessage": "応答を停止",
     "copy": "コピー",
     "send": "送信",
     "code": "code",

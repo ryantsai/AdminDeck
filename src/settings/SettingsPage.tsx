@@ -580,6 +580,15 @@ export function SettingsPage({
                   }
                 />
               ))}
+              <AiOutputLanguageControl
+                draft={aiDraft}
+                onDraftChange={(patch) =>
+                  setAiDraft((settings) => ({
+                    ...settings,
+                    ...patch,
+                  }))
+                }
+              />
             </div>
 
             <div className="settings-summary-grid compact">
@@ -941,6 +950,35 @@ function AiProviderSettingsFieldControl({
     default:
       return null;
   }
+}
+
+function AiOutputLanguageControl({
+  draft,
+  onDraftChange,
+}: {
+  draft: AiProviderSettings;
+  onDraftChange: (patch: Partial<AiProviderSettings>) => void;
+}) {
+  const { t } = useTranslation();
+  const datalistId = "ai-output-language-options";
+  const languageNames = SUPPORTED_LANGUAGES.map((code) => t(`languages.${code}` as never));
+
+  return (
+    <label>
+      <span>{t("settings.outputLanguage")}</span>
+      <input
+        list={datalistId}
+        onChange={(event) => onDraftChange({ outputLanguage: event.currentTarget.value })}
+        placeholder={t("settings.outputLanguageUiLanguage")}
+        value={draft.outputLanguage}
+      />
+      <datalist id={datalistId}>
+        {languageNames.map((name, index) => (
+          <option key={SUPPORTED_LANGUAGES[index]} value={name} />
+        ))}
+      </datalist>
+    </label>
+  );
 }
 
 function SettingsSummary({ label, value }: { label: string; value: string }) {

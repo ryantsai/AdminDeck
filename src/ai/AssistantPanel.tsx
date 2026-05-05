@@ -14,6 +14,7 @@ import {
   ScrollText,
   SendHorizontal,
   Settings,
+  Square,
   Terminal,
   X,
 } from "lucide-react";
@@ -26,6 +27,15 @@ import { getAiProviderDefinition, validateAiProviderForChat } from "./providers"
 import { useWorkspaceStore } from "../store";
 import { writeInputToPane } from "../workspace/paneRegistry";
 import i18next from "../i18n/config";
+
+function resolveAssistantOutputLanguage(outputLanguage: string): string | undefined {
+  if (!outputLanguage) {
+    const uiCode = i18next.language || "en";
+    const name = i18next.t(`languages.${uiCode}`);
+    return name && name !== `languages.${uiCode}` ? name : undefined;
+  }
+  return outputLanguage;
+}
 
 type AssistantChatMessage = {
   id: string;
@@ -249,6 +259,7 @@ export function AssistantPanel({
   const [addContextMenuOpen, setAddContextMenuOpen] = useState(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const addContextMenuRef = useRef<HTMLDivElement | null>(null);
+  const activeAssistantRequestIdRef = useRef(0);
   const contextLabel = activeTab
     ? `${activeTab.title} - ${workspaceKindLabel(activeTab)}`
     : t("ai.noActiveSession");
@@ -338,6 +349,21 @@ export function AssistantPanel({
   function handleChatSubmit(event: FormEvent) {
     event.preventDefault();
     void submitAssistantPrompt();
+  }
+
+  function handleStopAssistantPrompt() {
+    if (!isSendingPrompt) {
+      return;
+    }
+
+    activeAssistantRequestIdRef.current += 1;
+    setIsSendingPrompt(false);
+    setWaitingPhrase("");
+    setWaitingDots(0);
+    setChatError("");
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+    });
   }
 
   function handleNewChat() {
@@ -458,8 +484,14 @@ export function AssistantPanel({
     setChatError("");
     setWaitingPhrase(randomAssistantWaitingPhrase());
     setIsSendingPrompt(true);
+    const requestId = activeAssistantRequestIdRef.current + 1;
+    activeAssistantRequestIdRef.current = requestId;
     try {
       const systemContext = await inspectActiveSshSystemContext(activeTab);
+      if (activeAssistantRequestIdRef.current !== requestId) {
+        return;
+      }
+
       const response = await invokeCommand("run_ai_agent", {
         request: {
           prompt: normalizedPrompt,
@@ -476,8 +508,13 @@ export function AssistantPanel({
               : undefined,
           systemContext,
           messages: history,
+          outputLanguage: resolveAssistantOutputLanguage(aiProviderSettings.outputLanguage),
         },
       });
+      if (activeAssistantRequestIdRef.current !== requestId) {
+        return;
+      }
+
       const assistantMessage = createAssistantChatMessage(
         "assistant",
         response.content,
@@ -485,6 +522,10 @@ export function AssistantPanel({
       );
       setMessages((current) => [...current, assistantMessage]);
     } catch (error) {
+      if (activeAssistantRequestIdRef.current !== requestId) {
+        return;
+      }
+
       const message = error instanceof Error ? error.message : String(error);
       setChatError(message);
       setMessages((current) => [
@@ -492,8 +533,10 @@ export function AssistantPanel({
         createAssistantChatMessage("assistant", `${t("ai.errorPrefix")}: ${message}`, requestIntent),
       ]);
     } finally {
-      setIsSendingPrompt(false);
-      setWaitingPhrase("");
+      if (activeAssistantRequestIdRef.current === requestId) {
+        setIsSendingPrompt(false);
+        setWaitingPhrase("");
+      }
     }
   }
 
@@ -781,12 +824,15 @@ export function AssistantPanel({
           </div>
           <span>{aiProviderSettings.model || providerDefinition.defaultModel}</span>
           <button
-            aria-label={t("ai.sendMessage")}
+            aria-label={isSendingPrompt ? t("ai.stopMessage") : t("ai.sendMessage")}
             className="assistant-send-button"
-            disabled={!prompt.trim() || isSendingPrompt}
-            type="submit"
+            data-state={isSendingPrompt ? "stopping" : "sending"}
+            disabled={!isSendingPrompt && !prompt.trim()}
+            onClick={isSendingPrompt ? handleStopAssistantPrompt : undefined}
+            title={isSendingPrompt ? t("ai.stopMessage") : t("ai.sendMessage")}
+            type={isSendingPrompt ? "button" : "submit"}
           >
-            <SendHorizontal size={18} />
+            {isSendingPrompt ? <Square fill="currentColor" size={13} /> : <SendHorizontal size={18} />}
           </button>
         </div>
       </form>

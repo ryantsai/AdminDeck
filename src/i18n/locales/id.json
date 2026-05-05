@@ -108,6 +108,8 @@
     "aiProviderSaved": "Penyedia AI disimpan.",
     "aiProviderCleared": "Pengaturan penyedia AI dihapus.",
     "clearAiConfirm": "Hapus semua pengaturan penyedia AI dan hapus kunci API AI yang tersimpan?",
+    "outputLanguage": "Bahasa output",
+    "outputLanguageUiLanguage": "Bahasa UI",
     "settingsContent": "Pengaturan"
   },
   "connections": {
@@ -411,6 +413,7 @@
     "draftExtension": "Draf Ekstensi",
     "composerPlaceholder": "Tanyakan apa saja ke AI Assistant.",
     "sendMessage": "Kirim pesan",
+    "stopMessage": "Hentikan respons",
     "copy": "Salin",
     "send": "Kirim",
     "code": "code",

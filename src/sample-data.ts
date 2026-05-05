@@ -46,6 +46,7 @@ export const defaultAiProviderSettings: AiProviderSettings = {
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-5.5",
   reasoningEffort: "medium",
+  outputLanguage: "",
   cliExecutionPolicy: "suggestOnly",
   claudeCliPath: "",
   codexCliPath: "",
