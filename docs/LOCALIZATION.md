@@ -162,6 +162,30 @@ When a key is translated into every supported locale, remove its entry from this
 - Domain notes: Refers to the visible capture target, not a backend Session or durable Connection.
 - Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
 
+### `ai.noMessages`
+
+- English: "No messages"
+- Namespace: `ai`
+- Appears in: `src/ai/AssistantPanel.tsx`
+- UI role: Chat history preview fallback
+- Context: Fallback preview text for a saved AI Assistant chat row if no last message content is available after history normalization.
+- Tone: Neutral, concise
+- Placeholders: None
+- Domain notes: Refers to chat messages inside the AI Assistant panel, not workspace Sessions or terminal output.
+- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
+
+### `ai.deleteChat`
+
+- English: "Delete chat {{title}}"
+- Namespace: `ai`
+- Appears in: `src/ai/AssistantPanel.tsx`
+- UI role: Button aria-label and tooltip
+- Context: X button beside each saved chat title in the AI Assistant panel's View All chat history list. Activating it removes that saved chat from local history.
+- Tone: Direct, concise
+- Placeholders: `{{title}}` is the saved chat title, usually an AI-generated short summary of the first user request.
+- Domain notes: The chat is AI Assistant history stored locally in browser/Tauri local storage; it is not a backend Session, Tab, or durable Connection.
+- Translation status: Pending for fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id
+
 ## Entry Template
 
 ```markdown

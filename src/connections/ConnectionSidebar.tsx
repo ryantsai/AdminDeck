@@ -1226,33 +1226,37 @@ function ConnectionFolderNode({
       </div>
       {!isCollapsed ? (
         <>
-          {folder.connections.map((connection, connectionIndex) => (
-            <ConnectionRow
-              connection={connection}
-              connectionIndex={connectionIndex}
-              dragDisabled={dragDisabled}
-              folderId={folder.id}
-              isDraggingSource={draggedSourceId === `connection-${connection.id}`}
-              isDropTarget={dropTarget === `connection-${connection.id}`}
-              key={connection.id}
-              onClickCapture={onClickCapture}
-              onOpen={() => onOpenConnection(connection)}
-              onContextMenu={(event) => onConnectionContextMenu(connection, folder.id, event)}
-              onPointerDragStart={(event) =>
-                onPointerDragStart(
-                  event,
-                  { kind: "connection", connectionId: connection.id },
-                  {
-                    kind: "connection",
-                    title: connection.name,
-                    subtitle: connection.host,
-                    connectionType: connection.type,
-                    connectionStatus: connection.status,
-                  },
-                )
-              }
-            />
-          ))}
+          {folder.connections.length > 0 ? (
+            <div className="tree-folder-connections">
+              {folder.connections.map((connection, connectionIndex) => (
+                <ConnectionRow
+                  connection={connection}
+                  connectionIndex={connectionIndex}
+                  dragDisabled={dragDisabled}
+                  folderId={folder.id}
+                  isDraggingSource={draggedSourceId === `connection-${connection.id}`}
+                  isDropTarget={dropTarget === `connection-${connection.id}`}
+                  key={connection.id}
+                  onClickCapture={onClickCapture}
+                  onOpen={() => onOpenConnection(connection)}
+                  onContextMenu={(event) => onConnectionContextMenu(connection, folder.id, event)}
+                  onPointerDragStart={(event) =>
+                    onPointerDragStart(
+                      event,
+                      { kind: "connection", connectionId: connection.id },
+                      {
+                        kind: "connection",
+                        title: connection.name,
+                        subtitle: connection.host,
+                        connectionType: connection.type,
+                        connectionStatus: connection.status,
+                      },
+                    )
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
           {pendingFolderDraft?.parentFolderId === folder.id ? (
             <NewFolderDraftRow
               level={level + 1}
@@ -1605,7 +1609,7 @@ export function QuickConnectMenu({
             onClick={() => onOpenConnection(connection)}
             type="button"
           >
-            <ConnectionGlyph size={15} type={connection.type} />
+            <ConnectionGlyph localShell={connection.localShell} size={15} type={connection.type} />
             <span className="connection-main">
               <strong>{connection.name}</strong>
               <small>{connectionSubtitle(connection)}</small>
@@ -1638,14 +1642,23 @@ function ConnectionTypeGlyph({
 
 function ConnectionGlyph({
   className,
+  localShell,
   size = 16,
   type,
 }: {
   className?: string;
+  localShell?: string;
   size?: number;
   type: ConnectionType;
 }) {
-  return <ConnectionIcon className={className} size={size} type={type} />;
+  return (
+    <ConnectionIcon
+      className={className}
+      localShell={localShell}
+      size={size}
+      type={type}
+    />
+  );
 }
 
 function ConnectionDialog({
@@ -1844,7 +1857,7 @@ function ConnectionDialog({
 
         {isEditMode && initialConnection ? (
           <div className="connection-type-summary">
-            <ConnectionGlyph size={20} type={initialConnection.type} />
+            <ConnectionGlyph localShell={initialConnection.localShell} size={20} type={initialConnection.type} />
             <span>
               <strong>{connectionTypeLabel(initialConnection.type)}</strong>
               <small>{connectionSubtitle(initialConnection)}</small>
@@ -2217,7 +2230,7 @@ function ConnectionRow({
       onPointerDown={onPointerDragStart}
     >
       <button className="connection-open" onClick={onOpen}>
-        <ConnectionGlyph size={32} type={connection.type} />
+        <ConnectionGlyph localShell={connection.localShell} size={32} type={connection.type} />
         <span className="connection-main">
           <strong>{connection.name}</strong>
           <small>{connectionSubtitle(connection)}</small>

@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { RotateCcw, Save } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { defaultAppearanceSettings } from "../sample-data";
@@ -71,47 +70,19 @@ const SCHEME_PREVIEW_COLORS: Record<ColorScheme, string[]> = {
   pink: ["#fff0f5", "#ffffff", "#2d1b3a", "#c026d3", "#15803d"],
 };
 
-function normalizeAppearanceSettingsDraft(settings: AppearanceSettingsType): AppearanceSettingsType {
-  if (!settings.appFontFamily.trim()) {
-    throw new Error("App UI font family is required.");
-  }
-
-  return {
-    ...settings,
-    appFontFamily: settings.appFontFamily.trim(),
-  };
-}
-
 export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => void }) {
   const { t } = useTranslation();
   const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
   const setAppearanceSettings = useWorkspaceStore((state) => state.setAppearanceSettings);
-  const [draft, setDraft] = useState(appearanceSettings);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
-  const hasChanges = JSON.stringify(draft) !== JSON.stringify(appearanceSettings);
 
-  useEffect(() => {
-    setDraft(appearanceSettings);
-  }, [appearanceSettings]);
-
-  async function handleSave() {
-    try {
-      setError("");
-      setStatus("");
-      const nextSettings = normalizeAppearanceSettingsDraft(draft);
-      const saved = isTauriRuntime()
-        ? await invokeCommand("update_appearance_settings", { request: nextSettings })
-        : nextSettings;
-      setAppearanceSettings(saved);
-      setDraft(saved);
-      setStatus(t("settings.appearanceSaved"));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+  async function applyAppearance(settings: AppearanceSettingsType) {
+    setAppearanceSettings(settings);
+    if (isTauriRuntime()) {
+      invokeCommand("update_appearance_settings", { request: settings }).catch(() => undefined);
     }
   }
 
-  const previewColors = SCHEME_PREVIEW_COLORS[draft.colorScheme];
+  const previewColors = SCHEME_PREVIEW_COLORS[appearanceSettings.colorScheme];
 
   return (
     <section className="settings-card settings-section">
@@ -120,17 +91,6 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
           <p className="panel-label">{t("settings.sectionAppearance")}</p>
           <h2>{t("settings.appearanceInterface")}</h2>
         </div>
-        <div className="settings-header-actions">
-          <button
-            className="toolbar-button"
-            disabled={!hasChanges}
-            onClick={() => void handleSave()}
-            type="button"
-          >
-            <Save size={15} />
-            {t("settings.save")}
-          </button>
-        </div>
       </div>
       <div className="form-grid appearance-font-grid">
         <label>
@@ -138,15 +98,15 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
           <select
             onChange={(event) => {
               const appFontFamily = event.currentTarget.value;
-              setDraft((settings) => ({
-                ...settings,
+              void applyAppearance({
+                ...appearanceSettings,
                 appFontFamily,
-              }));
+              });
             }}
-            value={draft.appFontFamily}
+            value={appearanceSettings.appFontFamily}
           >
-            {APP_UI_FONT_OPTIONS.some((option) => option.value === draft.appFontFamily) ? null : (
-              <option value={draft.appFontFamily}>{t("settings.customFont")}</option>
+            {APP_UI_FONT_OPTIONS.some((option) => option.value === appearanceSettings.appFontFamily) ? null : (
+              <option value={appearanceSettings.appFontFamily}>{t("settings.customFont")}</option>
             )}
             {APP_UI_FONT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -160,12 +120,12 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
           <select
             onChange={(event) => {
               const colorScheme = event.currentTarget.value as ColorScheme;
-              setDraft((settings) => ({
-                ...settings,
+              void applyAppearance({
+                ...appearanceSettings,
                 colorScheme,
-              }));
+              });
             }}
-            value={draft.colorScheme}
+            value={appearanceSettings.colorScheme}
           >
             {COLOR_SCHEME_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -201,10 +161,6 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
           {t("settings.resetLayout")}
         </button>
       </div>
-      {status ? (
-        <p className="settings-status success">{status}</p>
-      ) : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
     </section>
   );
 }

@@ -92,8 +92,21 @@ function assistantThreadTitle(messages: AssistantChatMessage[]) {
 
 function assistantThreadPreview(thread: AssistantChatThread) {
   const lastMessage = thread.messages[thread.messages.length - 1];
-  const preview = lastMessage?.content.trim().replace(/\s+/g, " ") || "No messages";
+  const preview = lastMessage?.content.trim().replace(/\s+/g, " ") || i18next.t("ai.noMessages");
   return preview.length > 64 ? `${preview.slice(0, 61)}...` : preview;
+}
+
+function sanitizeAssistantThreadTitle(value: string) {
+  const title = value
+    .trim()
+    .split(/\r?\n/)[0]
+    ?.replace(/^title:\s*/i, "")
+    .replace(/^["'`]+|["'`.]+$/g, "")
+    .trim();
+  if (!title) {
+    return "";
+  }
+  return title.length > 56 ? `${title.slice(0, 53)}...` : title;
 }
 
 function formatAssistantMessageTime(value: string) {
@@ -247,6 +260,7 @@ export function AssistantPanel({
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [currentThreadId, setCurrentThreadId] = useState(createAssistantChatThreadId);
+  const [currentThreadTitle, setCurrentThreadTitle] = useState<string | undefined>();
   const [chatHistory, setChatHistory] = useState<AssistantChatThread[]>(readAssistantChatHistory);
   const [showAllChats, setShowAllChats] = useState(false);
   const [chatError, setChatError] = useState("");
@@ -254,8 +268,6 @@ export function AssistantPanel({
   const [assistantIntent, setAssistantIntent] = useState<AssistantPromptIntent>("chat");
   const [waitingPhrase, setWaitingPhrase] = useState("");
   const [waitingDots, setWaitingDots] = useState(0);
-  const [messageCopyStatus, setMessageCopyStatus] = useState("");
-  const [terminalSendStatus, setTerminalSendStatus] = useState("");
   const [addContextMenuOpen, setAddContextMenuOpen] = useState(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const addContextMenuRef = useRef<HTMLDivElement | null>(null);
@@ -271,6 +283,7 @@ export function AssistantPanel({
     activeTab?.kind === "terminal" ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id : undefined;
   const sortedChatHistory = useMemo(() => sortedAssistantThreads(chatHistory), [chatHistory]);
   const recentChatHistory = sortedChatHistory.slice(0, 5);
+  const shouldShowChatHistory = messages.length === 0 && !prompt.trim() && !isSendingPrompt;
 
   useEffect(() => {
     writeAssistantChatHistory(chatHistory);
@@ -333,17 +346,11 @@ export function AssistantPanel({
 
   function handleSendCodeToTerminal(code: string) {
     if (!activeTerminalPaneId) {
-      setTerminalSendStatus(t("ai.openTerminalFirst"));
       return;
     }
 
     const data = code.endsWith("\n") ? code : `${code}\n`;
-    if (writeInputToPane(activeTerminalPaneId, data)) {
-      setTerminalSendStatus(t("ai.sentToTerminal"));
-      return;
-    }
-
-    setTerminalSendStatus(t("ai.terminalStarting"));
+    writeInputToPane(activeTerminalPaneId, data);
   }
 
   function handleChatSubmit(event: FormEvent) {
@@ -373,10 +380,9 @@ export function AssistantPanel({
     saveCurrentChat();
     setMessages([]);
     setCurrentThreadId(createAssistantChatThreadId());
+    setCurrentThreadTitle(undefined);
     setPrompt("");
     setChatError("");
-    setTerminalSendStatus("");
-    setMessageCopyStatus("");
     setWaitingPhrase("");
     setAssistantIntent("chat");
     setShowAllChats(false);
@@ -386,14 +392,21 @@ export function AssistantPanel({
     if (messages.length === 0) {
       return;
     }
+    saveChatMessages(messages, currentThreadTitle ?? assistantThreadTitle(messages));
+  }
+
+  function saveChatMessages(nextMessages: AssistantChatMessage[], title: string) {
+    if (nextMessages.length === 0) {
+      return;
+    }
     const now = new Date().toISOString();
     const thread: AssistantChatThread = {
       id: currentThreadId,
-      title: assistantThreadTitle(messages),
+      title,
       contextLabel,
-      messages,
-      createdAt: messages[0]?.createdAt ?? now,
-      updatedAt: messages[messages.length - 1]?.createdAt ?? now,
+      messages: nextMessages,
+      createdAt: nextMessages[0]?.createdAt ?? now,
+      updatedAt: nextMessages[nextMessages.length - 1]?.createdAt ?? now,
     };
     setChatHistory((current) => upsertAssistantChatThread(current, thread));
   }
@@ -404,24 +417,34 @@ export function AssistantPanel({
     }
     saveCurrentChat();
     setCurrentThreadId(thread.id);
+    setCurrentThreadTitle(thread.title);
     setMessages(thread.messages);
     setPrompt("");
     setChatError("");
-    setTerminalSendStatus("");
-    setMessageCopyStatus("");
     setWaitingPhrase("");
     setAssistantIntent("chat");
     setShowAllChats(false);
   }
 
+  function deleteChat(threadId: string) {
+    setChatHistory((current) => current.filter((thread) => thread.id !== threadId));
+    if (threadId === currentThreadId) {
+      setMessages([]);
+      setCurrentThreadId(createAssistantChatThreadId());
+      setCurrentThreadTitle(undefined);
+      setPrompt("");
+      setChatError("");
+      setWaitingPhrase("");
+      setAssistantIntent("chat");
+    }
+  }
+
   async function handleCopyMessage(message: AssistantChatMessage) {
     await writeToClipboard(message.content);
-    setMessageCopyStatus(t("ai.messageCopied"));
   }
 
   async function handleCopyCode(code: string) {
     await writeToClipboard(code);
-    setMessageCopyStatus(t("ai.codeCopied"));
   }
 
   function handleStartExtensionDraft() {
@@ -431,8 +454,6 @@ export function AssistantPanel({
 
     setAddContextMenuOpen(false);
     setAssistantIntent("extensionCreation");
-    setTerminalSendStatus("");
-    setMessageCopyStatus(t("ai.extensionStagedNotice"));
     if (!prompt.trim()) {
       setPrompt(EXTENSION_DRAFT_PROMPT);
       window.requestAnimationFrame(() => {
@@ -449,8 +470,26 @@ export function AssistantPanel({
 
   function handleStubContextOption(label: string) {
     setAddContextMenuOpen(false);
-    setTerminalSendStatus("");
-    setMessageCopyStatus(`${label} ${t("ai.stagedInUi")}`);
+    void label;
+    composerTextareaRef.current?.focus();
+  }
+
+  async function generateThreadTitleFromProvider(
+    userPrompt: string,
+    requestIntent: AssistantPromptIntent,
+  ) {
+    const response = await invokeCommand("run_ai_agent", {
+      request: {
+        prompt:
+          "Create a concise chat title for this user request. Return only the title, no quotes, no markdown, maximum 8 words.\n\nUser request:\n" +
+          userPrompt,
+        contextLabel,
+        intent: requestIntent,
+        messages: [],
+        outputLanguage: resolveAssistantOutputLanguage(aiProviderSettings.outputLanguage),
+      },
+    });
+    return sanitizeAssistantThreadTitle(response.content);
   }
 
   async function submitAssistantPrompt() {
@@ -461,6 +500,10 @@ export function AssistantPanel({
     const requestIntent = assistantIntentForPrompt(assistantIntent, normalizedPrompt);
     setAssistantIntent(requestIntent);
     const userMessage = createAssistantChatMessage("user", normalizedPrompt, requestIntent);
+    const previousMessages = messages;
+    const nextMessages = [...previousMessages, userMessage];
+    const isFirstThreadMessage = previousMessages.length === 0;
+    const fallbackTitle = currentThreadTitle ?? assistantThreadTitle(nextMessages);
     try {
       validateAiProviderForChat(aiProviderSettings, aiProviderHasApiKey);
     } catch (error) {
@@ -469,24 +512,42 @@ export function AssistantPanel({
         `${t("ai.providerError")}: ${error instanceof Error ? error.message : String(error)}`,
         requestIntent,
       );
-      setMessages((current) => [...current, userMessage, assistantMessage]);
+      const failedMessages = [...nextMessages, assistantMessage];
+      setMessages(failedMessages);
+      setCurrentThreadTitle(fallbackTitle);
+      saveChatMessages(failedMessages, fallbackTitle);
       setPrompt("");
       setChatError("");
       return;
     }
 
-    const history = messages.map((message) => ({
+    const history = previousMessages.map((message) => ({
       role: message.role,
       content: message.content,
     }));
-    setMessages((current) => [...current, userMessage]);
+    setMessages(nextMessages);
+    setCurrentThreadTitle(fallbackTitle);
+    saveChatMessages(nextMessages, fallbackTitle);
     setPrompt("");
     setChatError("");
     setWaitingPhrase(randomAssistantWaitingPhrase());
     setIsSendingPrompt(true);
     const requestId = activeAssistantRequestIdRef.current + 1;
     activeAssistantRequestIdRef.current = requestId;
+    let threadTitle = fallbackTitle;
     try {
+      if (isFirstThreadMessage) {
+        const generatedTitle = await generateThreadTitleFromProvider(normalizedPrompt, requestIntent);
+        if (activeAssistantRequestIdRef.current !== requestId) {
+          return;
+        }
+        if (generatedTitle) {
+          threadTitle = generatedTitle;
+          setCurrentThreadTitle(generatedTitle);
+          saveChatMessages(nextMessages, generatedTitle);
+        }
+      }
+
       const systemContext = await inspectActiveSshSystemContext(activeTab);
       if (activeAssistantRequestIdRef.current !== requestId) {
         return;
@@ -520,7 +581,9 @@ export function AssistantPanel({
         response.content,
         requestIntent,
       );
-      setMessages((current) => [...current, assistantMessage]);
+      const completedMessages = [...nextMessages, assistantMessage];
+      setMessages(completedMessages);
+      saveChatMessages(completedMessages, threadTitle);
     } catch (error) {
       if (activeAssistantRequestIdRef.current !== requestId) {
         return;
@@ -528,10 +591,12 @@ export function AssistantPanel({
 
       const message = error instanceof Error ? error.message : String(error);
       setChatError(message);
-      setMessages((current) => [
-        ...current,
+      const failedMessages = [
+        ...nextMessages,
         createAssistantChatMessage("assistant", `${t("ai.errorPrefix")}: ${message}`, requestIntent),
-      ]);
+      ];
+      setMessages(failedMessages);
+      saveChatMessages(failedMessages, threadTitle);
     } finally {
       if (activeAssistantRequestIdRef.current === requestId) {
         setIsSendingPrompt(false);
@@ -627,43 +692,11 @@ export function AssistantPanel({
         </div>
       ) : null}
 
-      <section className="assistant-tasks">
-        <header>
-          <span>{t("ai.chats")}</span>
-          <button
-            className="assistant-view-all-button"
-            disabled={sortedChatHistory.length === 0}
-            onClick={() => setShowAllChats(true)}
-            type="button"
-          >
-            {t("ai.viewAll")}({sortedChatHistory.length})
-          </button>
-        </header>
-        {recentChatHistory.length > 0 ? (
-          recentChatHistory.map((thread) => (
-            <button
-              className="assistant-task-row"
-              key={thread.id}
-              onClick={() => resumeChat(thread)}
-              type="button"
-            >
-              <span>{thread.title}</span>
-              <small>{formatAssistantMessageTime(thread.updatedAt)}</small>
-            </button>
-          ))
-        ) : (
-          <p>{t("ai.noChatsYet")}</p>
-        )}
-      </section>
-
-      {showAllChats ? (
-        <div className="assistant-chat-history-backdrop" role="presentation">
-          <section className="assistant-chat-history-dialog" role="dialog" aria-label={t("ai.allChats")}>
-            <header>
-              <div>
-                <span>{t("ai.chats")}</span>
-                <small>{sortedChatHistory.length} {t("ai.saved")}</small>
-              </div>
+      {shouldShowChatHistory ? (
+        <section className={`assistant-tasks${showAllChats ? " assistant-chat-history-panel" : ""}`}>
+          <header>
+            <span>{showAllChats ? t("ai.allChats") : t("ai.chats")}</span>
+            {showAllChats ? (
               <button
                 className="assistant-toolbar-button"
                 onClick={() => setShowAllChats(false)}
@@ -673,55 +706,61 @@ export function AssistantPanel({
               >
                 <X size={15} />
               </button>
-            </header>
+            ) : (
+              <button
+                className="assistant-view-all-button"
+                disabled={sortedChatHistory.length === 0}
+                onClick={() => setShowAllChats(true)}
+                type="button"
+              >
+                {t("ai.viewAll")}({sortedChatHistory.length})
+              </button>
+            )}
+          </header>
+          {showAllChats ? (
             <div className="assistant-chat-history-list">
               {sortedChatHistory.map((thread) => (
-                <button
-                  className="assistant-chat-history-row"
-                  key={thread.id}
-                  onClick={() => resumeChat(thread)}
-                  type="button"
-                >
-                  <strong>{thread.title}</strong>
-                  <span>{assistantThreadPreview(thread)}</span>
-                  <small>{formatAssistantMessageTime(thread.updatedAt)}</small>
-                </button>
+                <div className="assistant-chat-history-row-wrap" key={thread.id}>
+                  <button
+                    className="assistant-chat-history-row"
+                    onClick={() => resumeChat(thread)}
+                    type="button"
+                  >
+                    <strong>{thread.title}</strong>
+                    <span>{assistantThreadPreview(thread)}</span>
+                    <small>{formatAssistantMessageTime(thread.updatedAt)}</small>
+                  </button>
+                  <button
+                    aria-label={t("ai.deleteChat", { title: thread.title })}
+                    className="assistant-chat-history-delete"
+                    onClick={() => deleteChat(thread.id)}
+                    title={t("ai.deleteChat", { title: thread.title })}
+                    type="button"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               ))}
             </div>
-          </section>
-        </div>
-      ) : null}
-
-      {assistantContextSnippet ? (
-        <section className="assistant-selection-context">
-          <header>
-            <span>{assistantContextSnippet.sourceLabel}</span>
-            <button
-              className="row-action"
-              aria-label={t("ai.clearContext")}
-              onClick={clearAssistantContextSnippet}
-              title={t("ai.clearContext")}
-              type="button"
-            >
-              <X size={13} />
-            </button>
-          </header>
-          {assistantContextSnippet.kind === "screenshot" ? (
-            <div className="assistant-screenshot-context">
-              <img alt={assistantContextSnippet.sourceLabel} src={assistantContextSnippet.imageDataUrl} />
-              <small>
-                {assistantContextSnippet.width} x {assistantContextSnippet.height}
-              </small>
-            </div>
+          ) : recentChatHistory.length > 0 ? (
+            recentChatHistory.map((thread) => (
+              <button
+                className="assistant-task-row"
+                key={thread.id}
+                onClick={() => resumeChat(thread)}
+                type="button"
+              >
+                <span>{thread.title}</span>
+                <small>{formatAssistantMessageTime(thread.updatedAt)}</small>
+              </button>
+            ))
           ) : (
-            <pre>
-              <code>{assistantContextSnippet.text}</code>
-            </pre>
+            <p>{t("ai.noChatsYet")}</p>
           )}
         </section>
       ) : null}
 
-      <div className="assistant-chat-log">
+      <div className={`assistant-chat-log${showAllChats && shouldShowChatHistory ? " assistant-chat-log-condensed" : ""}`}>
         {messages.map((message) => (
           <AssistantMessageView
             key={message.id}
@@ -739,11 +778,37 @@ export function AssistantPanel({
         ) : null}
       </div>
 
-      {terminalSendStatus ? <p className="assistant-send-status">{terminalSendStatus}</p> : null}
-      {messageCopyStatus ? <p className="assistant-send-status">{messageCopyStatus}</p> : null}
       {chatError ? <p className="form-error">{chatError}</p> : null}
 
       <form className="assistant-chat-composer" onSubmit={handleChatSubmit}>
+        {assistantContextSnippet ? (
+          <section className="assistant-selection-context">
+            <header>
+              <span>{assistantContextSnippet.sourceLabel}</span>
+              <button
+                className="row-action"
+                aria-label={t("ai.clearContext")}
+                onClick={clearAssistantContextSnippet}
+                title={t("ai.clearContext")}
+                type="button"
+              >
+                <X size={13} />
+              </button>
+            </header>
+            {assistantContextSnippet.kind === "screenshot" ? (
+              <div className="assistant-screenshot-context">
+                <img alt={assistantContextSnippet.sourceLabel} src={assistantContextSnippet.imageDataUrl} />
+                <small>
+                  {assistantContextSnippet.width} x {assistantContextSnippet.height}
+                </small>
+              </div>
+            ) : (
+              <pre>
+                <code>{assistantContextSnippet.text}</code>
+              </pre>
+            )}
+          </section>
+        ) : null}
         <textarea
           ref={composerTextareaRef}
           onKeyDown={handleComposerKeyDown}
