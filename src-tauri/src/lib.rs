@@ -425,22 +425,40 @@ fn launch_elevated_terminal(
     sessions::launch_elevated_terminal(request)
 }
 
-#[tauri::command]
-async fn start_sftp_session(
-    app: tauri::AppHandle,
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
-    request: sftp::StartSftpSessionRequest,
-) -> Result<sftp::SftpSessionStarted, String> {
-    sftp_sessions.start_sftp_session(app, &secrets, request)
+async fn run_blocking_command<T, F>(label: &'static str, job: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(job)
+        .await
+        .map_err(|error| format!("{label} worker failed: {error}"))?
 }
 
 #[tauri::command]
-fn list_sftp_directory(
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+async fn start_sftp_session(
+    app: tauri::AppHandle,
+    request: sftp::StartSftpSessionRequest,
+) -> Result<sftp::SftpSessionStarted, String> {
+    let worker_app = app.clone();
+    run_blocking_command("SFTP startup", move || {
+        let sftp_sessions = worker_app.state::<sftp::SftpSessionManager>();
+        let secrets = worker_app.state::<secrets::Secrets>();
+        sftp_sessions.start_sftp_session(worker_app.clone(), &secrets, request)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_sftp_directory(
+    app: tauri::AppHandle,
     request: sftp::ListSftpDirectoryRequest,
 ) -> Result<sftp::SftpDirectoryListing, String> {
-    sftp_sessions.list_directory(request)
+    run_blocking_command("SFTP list directory", move || {
+        let sftp_sessions = app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.list_directory(request)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -451,21 +469,29 @@ fn list_local_directory(
 }
 
 #[tauri::command]
-fn upload_sftp_path(
+async fn upload_sftp_path(
     app: tauri::AppHandle,
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     request: sftp::UploadSftpPathRequest,
 ) -> Result<sftp::SftpTransferResult, String> {
-    sftp_sessions.upload_path(app, request)
+    let worker_app = app.clone();
+    run_blocking_command("SFTP upload", move || {
+        let sftp_sessions = worker_app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.upload_path(worker_app.clone(), request)
+    })
+    .await
 }
 
 #[tauri::command]
-fn download_sftp_path(
+async fn download_sftp_path(
     app: tauri::AppHandle,
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
     request: sftp::DownloadSftpPathRequest,
 ) -> Result<sftp::SftpTransferResult, String> {
-    sftp_sessions.download_path(app, request)
+    let worker_app = app.clone();
+    run_blocking_command("SFTP download", move || {
+        let sftp_sessions = worker_app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.download_path(worker_app.clone(), request)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -477,51 +503,75 @@ fn cancel_sftp_transfer(
 }
 
 #[tauri::command]
-fn create_sftp_folder(
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+async fn create_sftp_folder(
+    app: tauri::AppHandle,
     request: sftp::CreateSftpFolderRequest,
 ) -> Result<(), String> {
-    sftp_sessions.create_folder(request)
+    run_blocking_command("SFTP create folder", move || {
+        let sftp_sessions = app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.create_folder(request)
+    })
+    .await
 }
 
 #[tauri::command]
-fn rename_sftp_path(
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+async fn rename_sftp_path(
+    app: tauri::AppHandle,
     request: sftp::RenameSftpPathRequest,
 ) -> Result<(), String> {
-    sftp_sessions.rename_path(request)
+    run_blocking_command("SFTP rename", move || {
+        let sftp_sessions = app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.rename_path(request)
+    })
+    .await
 }
 
 #[tauri::command]
-fn delete_sftp_path(
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+async fn delete_sftp_path(
+    app: tauri::AppHandle,
     request: sftp::DeleteSftpPathRequest,
 ) -> Result<(), String> {
-    sftp_sessions.delete_path(request)
+    run_blocking_command("SFTP delete", move || {
+        let sftp_sessions = app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.delete_path(request)
+    })
+    .await
 }
 
 #[tauri::command]
-fn sftp_path_properties(
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+async fn sftp_path_properties(
+    app: tauri::AppHandle,
     request: sftp::SftpPathPropertiesRequest,
 ) -> Result<sftp::SftpPathProperties, String> {
-    sftp_sessions.path_properties(request)
+    run_blocking_command("SFTP properties", move || {
+        let sftp_sessions = app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.path_properties(request)
+    })
+    .await
 }
 
 #[tauri::command]
-fn update_sftp_path_properties(
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+async fn update_sftp_path_properties(
+    app: tauri::AppHandle,
     request: sftp::UpdateSftpPathPropertiesRequest,
 ) -> Result<sftp::SftpPathProperties, String> {
-    sftp_sessions.update_path_properties(request)
+    run_blocking_command("SFTP update properties", move || {
+        let sftp_sessions = app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.update_path_properties(request)
+    })
+    .await
 }
 
 #[tauri::command]
-fn close_sftp_session(
-    sftp_sessions: tauri::State<'_, sftp::SftpSessionManager>,
+async fn close_sftp_session(
+    app: tauri::AppHandle,
     session_id: String,
 ) -> Result<(), String> {
-    sftp_sessions.close_sftp_session(session_id)
+    run_blocking_command("SFTP close", move || {
+        let sftp_sessions = app.state::<sftp::SftpSessionManager>();
+        sftp_sessions.close_sftp_session(session_id)
+    })
+    .await
 }
 
 #[tauri::command]

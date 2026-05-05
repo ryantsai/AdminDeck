@@ -219,6 +219,7 @@ button {
   color: var(--text);
   font-family: var(--app-ui-font-family);
   background: var(--app-bg);
+  border-top: 1px solid var(--border);
 }
 
 .app-shell.settings-mode {
@@ -3333,6 +3334,53 @@ progress {
 
 .settings-dialog {
   width: min(460px, calc(100vw - 40px));
+}
+
+.confirm-delete-dialog {
+  display: grid;
+  gap: 8px;
+  width: min(380px, calc(100vw - 40px));
+  padding: 18px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.confirm-delete-dialog .panel-label {
+  margin-bottom: 0;
+}
+
+.confirm-delete-name {
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.confirm-delete-detail {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.confirm-delete-warning {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.confirm-delete-dialog .dialog-actions {
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.approve-button.danger {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.approve-button.danger:hover {
+  opacity: 0.88;
 }
 
 .settings-page {

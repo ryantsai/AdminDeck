@@ -135,6 +135,11 @@ export function ConnectionSidebar({
   const [pendingFolderDraft, setPendingFolderDraft] = useState<PendingFolderDraft | null>(null);
   const [treeContextMenu, setTreeContextMenu] = useState<TreeContextMenuState | null>(null);
   const [editConnection, setEditConnection] = useState<EditConnectionState | null>(null);
+  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<
+    | { kind: "connection"; connection: Connection }
+    | { kind: "folder"; folder: ConnectionFolder }
+    | null
+  >(null);
   const quickConnectRef = useRef<HTMLDivElement | null>(null);
   const draggedItemRef = useRef<DraggedTreeItem | null>(null);
   const pointerDragTargetRef = useRef<TreeDropTarget | null>(null);
@@ -478,10 +483,6 @@ export function ConnectionSidebar({
   }
 
   async function handleDeleteFolder(folder: ConnectionFolder) {
-    if (!confirmDeleteFolder(folder)) {
-      return;
-    }
-
     try {
       setTreeError("");
       await invokeCommand("delete_connection_folder", {
@@ -491,18 +492,6 @@ export function ConnectionSidebar({
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
-  }
-
-  function confirmDeleteFolder(folder: ConnectionFolder) {
-    const childFolderCount = countFolders(folder.folders);
-    const connectionCount = countConnections(folder);
-    const detail =
-      connectionCount === 0 && childFolderCount === 0
-        ? `Delete folder "${folder.name}"?`
-        : `Delete folder "${folder.name}", ${connectionCount} connection${
-            connectionCount === 1 ? "" : "s"
-          }, and ${childFolderCount} subfolder${childFolderCount === 1 ? "" : "s"}?`;
-    return window.confirm(`${detail}\n\nThis cannot be undone.`);
   }
 
   async function handleRenameConnection(connection: Connection) {
@@ -557,10 +546,6 @@ export function ConnectionSidebar({
   }
 
   async function handleDeleteConnection(connection: Connection) {
-    if (!confirmDeleteConnection(connection)) {
-      return;
-    }
-
     try {
       setTreeError("");
       await invokeCommand("delete_connection", {
@@ -570,10 +555,6 @@ export function ConnectionSidebar({
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
-  }
-
-  function confirmDeleteConnection(connection: Connection) {
-    return window.confirm(`Delete connection "${connection.name}"?\n\nThis cannot be undone.`);
   }
 
   const treeWithLiveStatuses = useMemo(
@@ -1051,9 +1032,9 @@ export function ConnectionSidebar({
             const menu = treeContextMenu;
             setTreeContextMenu(null);
             if (menu.kind === "connection") {
-              void handleDeleteConnection(menu.connection);
+              setConfirmDeleteTarget({ kind: "connection", connection: menu.connection });
             } else if (menu.kind === "folder") {
-              void handleDeleteFolder(menu.folder);
+              setConfirmDeleteTarget({ kind: "folder", folder: menu.folder });
             }
           }}
           onProperties={() => {
@@ -1111,6 +1092,21 @@ export function ConnectionSidebar({
             setFormError("");
           }}
           onSubmit={handleConnectionUpdate}
+        />
+      ) : null}
+      {confirmDeleteTarget ? (
+        <ConfirmDeleteDialog
+          onCancel={() => setConfirmDeleteTarget(null)}
+          onConfirm={() => {
+            const target = confirmDeleteTarget;
+            setConfirmDeleteTarget(null);
+            if (target.kind === "connection") {
+              void handleDeleteConnection(target.connection);
+            } else {
+              void handleDeleteFolder(target.folder);
+            }
+          }}
+          target={confirmDeleteTarget}
         />
       ) : null}
     </aside>
@@ -2154,6 +2150,69 @@ function ConnectionDialog({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function ConfirmDeleteDialog({
+  onCancel,
+  onConfirm,
+  target,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  target:
+    | { kind: "connection"; connection: Connection }
+    | { kind: "folder"; folder: ConnectionFolder };
+}) {
+  const { t } = useTranslation();
+  const name =
+    target.kind === "connection" ? target.connection.name : target.folder.name;
+  const title =
+    target.kind === "connection"
+      ? t("connections.deleteConnectionConfirm")
+      : t("connections.deleteFolderConfirm");
+
+  let detail = "";
+  if (target.kind === "folder") {
+    const childFolderCount = countFolders(target.folder.folders);
+    const connectionCount = countConnections(target.folder);
+    if (connectionCount > 0 || childFolderCount > 0) {
+      const parts: string[] = [];
+      if (connectionCount > 0) {
+        parts.push(
+          connectionCount === 1
+            ? `${connectionCount} connection`
+            : `${connectionCount} connections`,
+        );
+      }
+      if (childFolderCount > 0) {
+        parts.push(
+          childFolderCount === 1
+            ? `${childFolderCount} subfolder`
+            : `${childFolderCount} subfolders`,
+        );
+      }
+      detail = `Delete folder "${name}", ${parts.join(" and ")}?`;
+    }
+  }
+
+  return (
+    <div className="dialog-backdrop confirm-delete-backdrop" role="presentation">
+      <div className="confirm-delete-dialog" role="alertdialog" aria-label={title}>
+        <p className="panel-label">{title}</p>
+        <p className="confirm-delete-name">{name}</p>
+        {detail ? <p className="confirm-delete-detail">{detail}</p> : null}
+        <p className="confirm-delete-warning">{t("connections.cannotBeUndone")}</p>
+        <div className="dialog-actions">
+          <button className="approve-button danger" type="button" onClick={onConfirm}>
+            {t("common.delete")}
+          </button>
+          <button className="toolbar-button" type="button" onClick={onCancel}>
+            {t("common.cancel")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
