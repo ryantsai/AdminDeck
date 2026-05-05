@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import {
+  open as openDialog,
+  save as saveDialog,
+} from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import type {
   AppearanceSettings,
@@ -8,6 +11,9 @@ import type {
   Connection,
   ConnectionFolder,
   ConnectionTree,
+  DatabaseBackupInfo,
+  GeneralSettings,
+  ImportedDatabaseSnapshot,
   CreateConnectionFolderRequest,
   CreateConnectionRequest,
   DuplicateConnectionRequest,
@@ -447,6 +453,26 @@ type CommandMap = {
     args: { request: { connectionId: string; username: string } };
     result: Connection;
   };
+  get_general_settings: {
+    args: undefined;
+    result: GeneralSettings;
+  };
+  update_general_settings: {
+    args: { request: GeneralSettings };
+    result: GeneralSettings;
+  };
+  export_settings_database: {
+    args: { path: string };
+    result: null;
+  };
+  import_settings_database: {
+    args: { path: string };
+    result: ImportedDatabaseSnapshot;
+  };
+  backup_settings_database: {
+    args: undefined;
+    result: DatabaseBackupInfo;
+  };
   get_terminal_settings: {
     args: undefined;
     result: TerminalSettings;
@@ -830,6 +856,41 @@ export function invokeCommand<Name extends keyof CommandMap>(
   return invoke<CommandMap[Name]["result"]>(name, args);
 }
 
+export async function selectSettingsImportFile(options: {
+  title: string;
+  filterName: string;
+}) {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+
+  const selectedPath = await openDialog({
+    directory: false,
+    filters: [{ name: options.filterName, extensions: ["zip"] }],
+    multiple: false,
+    title: options.title,
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
+}
+
+export async function selectSettingsExportFile(options: {
+  title: string;
+  filterName: string;
+}) {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+
+  const path = await saveDialog({
+    defaultPath: `admindeck-settings-${new Date().toISOString().slice(0, 10)}.zip`,
+    filters: [{ name: options.filterName, extensions: ["zip"] }],
+    title: options.title,
+  });
+
+  return typeof path === "string" ? path : null;
+}
+
 export async function selectKeyFile(defaultPath?: string) {
   if (!isTauriRuntime()) {
     return null;
@@ -873,7 +934,10 @@ export async function saveTextFile(defaultFilename: string, contents: string) {
   return saveTextFileWithBrowserPicker(defaultFilename, contents);
 }
 
-async function saveTextFileWithBrowserPicker(defaultFilename: string, contents: string) {
+async function saveTextFileWithBrowserPicker(
+  defaultFilename: string,
+  contents: string,
+) {
   const picker = (window as WindowWithSavePicker).showSaveFilePicker;
   if (!picker) {
     throw new Error("No save dialog is available in this runtime");
@@ -906,12 +970,15 @@ function canUseBrowserSaveDialog() {
     return false;
   }
 
-  return typeof (window as WindowWithSavePicker).showSaveFilePicker === "function";
+  return (
+    typeof (window as WindowWithSavePicker).showSaveFilePicker === "function"
+  );
 }
 
 export function isTauriRuntime() {
   return (
     typeof window !== "undefined" &&
-    "__TAURI_INTERNALS__" in (window as Window & { __TAURI_INTERNALS__?: unknown })
+    "__TAURI_INTERNALS__" in
+      (window as Window & { __TAURI_INTERNALS__?: unknown })
   );
 }

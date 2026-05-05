@@ -154,6 +154,44 @@ fn get_terminal_settings(
 }
 
 #[tauri::command]
+fn get_general_settings(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::GeneralSettings, String> {
+    storage.general_settings()
+}
+
+#[tauri::command]
+fn update_general_settings(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::GeneralSettings,
+) -> Result<storage::GeneralSettings, String> {
+    storage.update_general_settings(request)
+}
+
+#[tauri::command]
+fn export_settings_database(
+    storage: tauri::State<'_, storage::Storage>,
+    path: String,
+) -> Result<(), String> {
+    storage.export_database_zip(path.into())
+}
+
+#[tauri::command]
+fn import_settings_database(
+    storage: tauri::State<'_, storage::Storage>,
+    path: String,
+) -> Result<storage::ImportedDatabaseSnapshot, String> {
+    storage.import_database_zip(path.into())
+}
+
+#[tauri::command]
+fn backup_settings_database(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::DatabaseBackupInfo, String> {
+    storage.backup_database()
+}
+
+#[tauri::command]
 fn update_terminal_settings(
     storage: tauri::State<'_, storage::Storage>,
     request: storage::TerminalSettings,
@@ -563,10 +601,7 @@ async fn update_sftp_path_properties(
 }
 
 #[tauri::command]
-async fn close_sftp_session(
-    app: tauri::AppHandle,
-    session_id: String,
-) -> Result<(), String> {
+async fn close_sftp_session(app: tauri::AppHandle, session_id: String) -> Result<(), String> {
     run_blocking_command("SFTP close", move || {
         let sftp_sessions = app.state::<sftp::SftpSessionManager>();
         sftp_sessions.close_sftp_session(session_id)
@@ -849,6 +884,7 @@ pub fn run() {
                         let settings = window_tracker.snapshot_for_window(window);
                         if let Some(storage) = window.try_state::<storage::Storage>() {
                             let _ = storage.update_main_window_settings(settings);
+                            let _ = storage.backup_if_enabled_for_quit();
                         }
                     }
                     _ => {}
@@ -869,6 +905,11 @@ pub fn run() {
             move_connection_folder,
             move_connection,
             upsert_url_credential,
+            get_general_settings,
+            update_general_settings,
+            export_settings_database,
+            import_settings_database,
+            backup_settings_database,
             get_terminal_settings,
             update_terminal_settings,
             get_appearance_settings,

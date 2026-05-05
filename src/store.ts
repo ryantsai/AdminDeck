@@ -4,6 +4,7 @@ import {
   defaultAiProviderSettings,
   defaultSftpSettings,
   defaultSshSettings,
+  defaultGeneralSettings,
   defaultTerminalSettings,
   initialTabs,
 } from "./sample-data";
@@ -27,6 +28,7 @@ import type {
   SshSettings,
   StoredConnectionLayout,
   TerminalPane,
+  GeneralSettings,
   TerminalSettings,
   TerminalStartMetric,
   WorkspacePane,
@@ -142,19 +144,26 @@ const TMUX_SESSION_NAMES = [
   "zion",
 ];
 
-function loadStoredLayout(connectionId: string): StoredConnectionLayout | undefined {
+function loadStoredLayout(
+  connectionId: string,
+): StoredConnectionLayout | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
   try {
-    const raw = window.localStorage.getItem(`${LAYOUT_STORAGE_PREFIX}${connectionId}`);
+    const raw = window.localStorage.getItem(
+      `${LAYOUT_STORAGE_PREFIX}${connectionId}`,
+    );
     return raw ? (JSON.parse(raw) as StoredConnectionLayout) : undefined;
   } catch {
     return undefined;
   }
 }
 
-function persistLayout(connectionId: string, stored: StoredConnectionLayout | undefined) {
+function persistLayout(
+  connectionId: string,
+  stored: StoredConnectionLayout | undefined,
+) {
   if (typeof window === "undefined") {
     return;
   }
@@ -191,11 +200,11 @@ function loadStoredTmuxSessionIds(connectionId: string): string[] {
     return [];
   }
   try {
-    const raw = window.localStorage.getItem(`${TMUX_SESSION_STORAGE_PREFIX}${connectionId}`);
+    const raw = window.localStorage.getItem(
+      `${TMUX_SESSION_STORAGE_PREFIX}${connectionId}`,
+    );
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter(isCurrentTmuxSessionId)
-      : [];
+    return Array.isArray(parsed) ? parsed.filter(isCurrentTmuxSessionId) : [];
   } catch {
     return [];
   }
@@ -290,7 +299,10 @@ function formatTmuxSessionNumber(value: number) {
   return String(Math.max(2, value)).padStart(2, "0");
 }
 
-function buildPanesForConnection(connection: Connection, count: number): TerminalPane[] {
+function buildPanesForConnection(
+  connection: Connection,
+  count: number,
+): TerminalPane[] {
   const baseId = connection.id;
   const baseTitle = terminalPaneTitleForConnection(connection);
   const baseCwd = connection.type === "local" ? "C:\\Users\\ryan" : "~";
@@ -298,7 +310,10 @@ function buildPanesForConnection(connection: Connection, count: number): Termina
   const panes: TerminalPane[] = [];
   for (let index = 0; index < count; index += 1) {
     panes.push({
-      id: index === 0 ? `pane-${baseId}` : `pane-${baseId}-${index}-${Date.now()}`,
+      id:
+        index === 0
+          ? `pane-${baseId}`
+          : `pane-${baseId}-${index}-${Date.now()}`,
       title: index === 0 ? baseTitle : `${baseTitle} ${index + 1}`,
       cwd: baseCwd,
       buffer: "",
@@ -309,7 +324,10 @@ function buildPanesForConnection(connection: Connection, count: number): Termina
   return panes;
 }
 
-function buildPanesFromStoredLayout(connection: Connection, stored?: StoredConnectionLayout): TerminalPane[] {
+function buildPanesFromStoredLayout(
+  connection: Connection,
+  stored?: StoredConnectionLayout,
+): TerminalPane[] {
   const paneCount = Math.max(1, stored?.paneCount ?? 1);
   const fallback = buildPanesForConnection(connection, paneCount);
   if (!stored?.panes?.length) {
@@ -354,7 +372,10 @@ function terminalPaneTitleForConnection(connection: Connection) {
   }
 }
 
-function buildPaneForConnection(connection: Connection, focusedPane?: WorkspacePane): WorkspacePane | null {
+function buildPaneForConnection(
+  connection: Connection,
+  focusedPane?: WorkspacePane,
+): WorkspacePane | null {
   if (connection.type === "url") {
     if (!connection.url) {
       return null;
@@ -397,6 +418,7 @@ interface WorkspaceState {
   query: string;
   tabs: WorkspaceTab[];
   activeTabId: string;
+  generalSettings: GeneralSettings;
   terminalSettings: TerminalSettings;
   appearanceSettings: AppearanceSettings;
   sshSettings: SshSettings;
@@ -407,6 +429,7 @@ interface WorkspaceState {
   activeSessionCounts: Record<string, number>;
   performanceMetrics: PerformanceMetrics;
   setQuery: (query: string) => void;
+  setGeneralSettings: (settings: GeneralSettings) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
   setAppearanceSettings: (settings: AppearanceSettings) => void;
   setSshSettings: (settings: SshSettings) => void;
@@ -435,7 +458,12 @@ interface WorkspaceState {
     direction: SplitDirection,
   ) => void;
   closePane: (tabId: string, paneId: string) => void;
-  openTmuxSessionInPane: (tabId: string, connection: Connection, tmuxSessionId: string, direction: SplitDirection) => void;
+  openTmuxSessionInPane: (
+    tabId: string,
+    connection: Connection,
+    tmuxSessionId: string,
+    direction: SplitDirection,
+  ) => void;
   setFocusedPane: (tabId: string, paneId: string) => void;
   saveTabLayout: (tabId: string) => void;
   resetTabLayout: (tabId: string) => void;
@@ -446,12 +474,14 @@ interface WorkspaceState {
   ) => void;
   markConnectionSessionStarted: (connectionId: string) => void;
   markConnectionSessionEnded: (connectionId: string) => void;
+  closeAllTabs: () => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   query: "",
   tabs: initialTabs,
   activeTabId: initialTabs[0]?.id ?? "",
+  generalSettings: defaultGeneralSettings,
   terminalSettings: defaultTerminalSettings,
   appearanceSettings: defaultAppearanceSettings,
   sshSettings: defaultSshSettings,
@@ -462,14 +492,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeSessionCounts: {},
   performanceMetrics: {},
   setQuery: (query) => set({ query }),
+  setGeneralSettings: (generalSettings) => set({ generalSettings }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
   setAppearanceSettings: (appearanceSettings) => set({ appearanceSettings }),
   setSshSettings: (sshSettings) => set({ sshSettings }),
   setSftpSettings: (sftpSettings) => set({ sftpSettings }),
   setAiProviderSettings: (aiProviderSettings) => set({ aiProviderSettings }),
   setAiProviderHasApiKey: (aiProviderHasApiKey) => set({ aiProviderHasApiKey }),
-  setAssistantContextSnippet: (assistantContextSnippet) => set({ assistantContextSnippet }),
-  clearAssistantContextSnippet: () => set({ assistantContextSnippet: undefined }),
+  setAssistantContextSnippet: (assistantContextSnippet) =>
+    set({ assistantContextSnippet }),
+  clearAssistantContextSnippet: () =>
+    set({ assistantContextSnippet: undefined }),
   setFrontendLaunchMs: (frontendLaunchMs) =>
     set((state) => ({
       performanceMetrics: {
@@ -492,7 +525,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 title: "Native SSH terminal",
                 durationMs: snapshot.lastSshTerminalReadyMs,
                 recordedAt: snapshot.lastSshTerminalReadyAtUnixSeconds
-                  ? new Date(snapshot.lastSshTerminalReadyAtUnixSeconds * 1000).toISOString()
+                  ? new Date(
+                      snapshot.lastSshTerminalReadyAtUnixSeconds * 1000,
+                    ).toISOString()
                   : new Date().toISOString(),
               },
             }),
@@ -515,20 +550,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       performanceMetrics: {
         ...state.performanceMetrics,
-        ...(kind === "local"
-          ? { lastLocalTerminalStart: undefined }
-          : {}),
+        ...(kind === "local" ? { lastLocalTerminalStart: undefined } : {}),
         ...(kind === "ssh" ? { lastSshTerminalStart: undefined } : {}),
       },
     })),
   activateTab: (tabId) => set({ activeTabId: tabId }),
+  closeAllTabs: () => set({ tabs: [], activeTabId: "" }),
   closeTab: (tabId) => {
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);
     set({
       tabs: remainingTabs,
       activeTabId:
         get().activeTabId === tabId
-          ? remainingTabs[0]?.id ?? ""
+          ? (remainingTabs[0]?.id ?? "")
           : get().activeTabId,
     });
   },
@@ -542,7 +576,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    const existingTab = get().tabs.find((tab) => tab.id === `tab-${connection.id}`);
+    const existingTab = get().tabs.find(
+      (tab) => tab.id === `tab-${connection.id}`,
+    );
     if (existingTab) {
       set({ activeTabId: existingTab.id });
       return;
@@ -552,7 +588,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const panes = buildPanesFromStoredLayout(connection, stored);
     const paneIds = panes.map((pane) => pane.id);
     const layout =
-      (stored ? hydrateLayout(stored.layout, paneIds) : undefined) ?? defaultLayoutFor(panes);
+      (stored ? hydrateLayout(stored.layout, paneIds) : undefined) ??
+      defaultLayoutFor(panes);
 
     const tab: WorkspaceTab = {
       id: `tab-${connection.id}`,
@@ -575,7 +612,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    const existingTab = get().tabs.find((tab) => tab.id === `tab-${connection.id}`);
+    const existingTab = get().tabs.find(
+      (tab) => tab.id === `tab-${connection.id}`,
+    );
     if (existingTab) {
       set({ activeTabId: existingTab.id });
       return;
@@ -606,7 +645,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    const existingTab = get().tabs.find((tab) => tab.id === `tab-${connection.id}`);
+    const existingTab = get().tabs.find(
+      (tab) => tab.id === `tab-${connection.id}`,
+    );
     if (existingTab) {
       set({ activeTabId: existingTab.id });
       return;
@@ -721,7 +762,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           return tab;
         }
 
-        const focusedPane = tab.panes.find((pane) => pane.id === tab.focusedPaneId) ?? tab.panes[0];
+        const focusedPane =
+          tab.panes.find((pane) => pane.id === tab.focusedPaneId) ??
+          tab.panes[0];
         const connection = focusedPane?.connection;
         if (!focusedPane || !connection) {
           return tab;
@@ -758,7 +801,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (tab.id !== tabId || tab.kind !== "terminal") {
           return tab;
         }
-        const focusedPane = tab.panes.find((pane) => pane.id === tab.focusedPaneId) ?? tab.panes[0];
+        const focusedPane =
+          tab.panes.find((pane) => pane.id === tab.focusedPaneId) ??
+          tab.panes[0];
         if (!focusedPane) {
           return tab;
         }
@@ -775,7 +820,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           newPane.id,
           tab.panes.map((pane) => pane.id),
         );
-        return { ...tab, panes: nextPanes, layout: nextLayout, focusedPaneId: newPane.id };
+        return {
+          ...tab,
+          panes: nextPanes,
+          layout: nextLayout,
+          focusedPaneId: newPane.id,
+        };
       }),
     }));
   },
@@ -799,7 +849,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tabs: s.tabs.map((t) =>
         t.id !== tabId
           ? t
-          : { ...t, panes: nextPanes, layout: nextLayout, focusedPaneId: nextFocusedPaneId },
+          : {
+              ...t,
+              panes: nextPanes,
+              layout: nextLayout,
+              focusedPaneId: nextFocusedPaneId,
+            },
       ),
     }));
   },
@@ -811,7 +866,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         }
 
         const focusedPane =
-          tab.panes.find((pane) => pane.id === tab.focusedPaneId) ?? tab.panes[0];
+          tab.panes.find((pane) => pane.id === tab.focusedPaneId) ??
+          tab.panes[0];
         if (!focusedPane || !isTerminalPane(focusedPane)) {
           return tab;
         }
@@ -866,7 +922,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const orderedIds = leafOrder(layout);
     const orderedPanes = orderedIds
       .map((id) => tab.panes.find((pane) => pane.id === id))
-      .filter((pane): pane is TerminalPane => pane !== undefined && isTerminalPane(pane));
+      .filter(
+        (pane): pane is TerminalPane =>
+          pane !== undefined && isTerminalPane(pane),
+      );
     if (orderedPanes.length !== tab.panes.length) {
       return;
     }
@@ -899,7 +958,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tabs: state.tabs.map((tab) => {
         if (tab.kind === "terminal") {
           const updatesTab = tab.id === tabId;
-          const updatesPane = tab.panes.some((pane) => pane.kind === "webview" && pane.id === tabId);
+          const updatesPane = tab.panes.some(
+            (pane) => pane.kind === "webview" && pane.id === tabId,
+          );
           if (!updatesTab && !updatesPane) {
             return tab;
           }
@@ -907,13 +968,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
           return {
             ...tab,
-            title: updatesTab || updatesSinglePaneTab ? metadata.title ?? tab.title : tab.title,
+            title:
+              updatesTab || updatesSinglePaneTab
+                ? (metadata.title ?? tab.title)
+                : tab.title,
             subtitle:
-              updatesTab || updatesSinglePaneTab ? metadata.subtitle ?? tab.subtitle : tab.subtitle,
-            url: updatesTab || updatesSinglePaneTab ? metadata.url ?? tab.url : tab.url,
+              updatesTab || updatesSinglePaneTab
+                ? (metadata.subtitle ?? tab.subtitle)
+                : tab.subtitle,
+            url:
+              updatesTab || updatesSinglePaneTab
+                ? (metadata.url ?? tab.url)
+                : tab.url,
             panes: tab.panes.map((pane) =>
               pane.kind === "webview" && pane.id === tabId
-                ? { ...pane, title: metadata.title ?? pane.title, url: metadata.url ?? pane.url }
+                ? {
+                    ...pane,
+                    title: metadata.title ?? pane.title,
+                    url: metadata.url ?? pane.url,
+                  }
                 : pane,
             ),
           };
@@ -960,7 +1033,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 }));
 
 function formatConnectionAddress(connection: Connection) {
-  return connection.port ? `${connection.host}:${connection.port}` : connection.host;
+  return connection.port
+    ? `${connection.host}:${connection.port}`
+    : connection.host;
 }
 
 function remoteDesktopSubtitle(connection: Connection) {
