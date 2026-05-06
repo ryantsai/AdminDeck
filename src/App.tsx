@@ -113,6 +113,7 @@ function App() {
   const resetAllLayouts = useWorkspaceStore((state) => state.resetAllLayouts);
   const openConnectionCount = useWorkspaceStore((state) => state.tabs.length);
   const openConnectionCountRef = useRef(openConnectionCount);
+  const allowWindowCloseRef = useRef(false);
   useBootstrapSettings();
   const [connectionPanelLayout, setConnectionPanelLayout] = useState(() =>
     loadPanelLayout(
@@ -201,18 +202,25 @@ function App() {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    void getCurrentWindow()
+    const appWindow = getCurrentWindow();
+    void appWindow
       .onCloseRequested((event) => {
+        if (allowWindowCloseRef.current) {
+          return;
+        }
+
         const openConnections = openConnectionCountRef.current;
         if (openConnections === 0) {
           return;
         }
 
+        event.preventDefault();
         const shouldQuit = window.confirm(
           t("app.quitOpenConnectionsConfirm", { count: openConnections }),
         );
-        if (!shouldQuit) {
-          event.preventDefault();
+        if (shouldQuit) {
+          allowWindowCloseRef.current = true;
+          void appWindow.close();
         }
       })
       .then((dispose) => {

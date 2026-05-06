@@ -409,51 +409,66 @@ fn close_terminal_session(
 #[tauri::command]
 async fn list_tmux_sessions(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::TmuxConnectionRequest,
 ) -> Result<Vec<sessions::TmuxSession>, String> {
-    sessions.list_tmux_sessions(app, &secrets, request)
+    run_blocking_command("tmux list sessions", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.list_tmux_sessions(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn close_tmux_session(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::CloseTmuxSessionRequest,
 ) -> Result<(), String> {
-    sessions.close_tmux_session(app, &secrets, request)
+    run_blocking_command("tmux close session", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.close_tmux_session(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn set_tmux_mouse(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::SetTmuxSessionMouseRequest,
 ) -> Result<(), String> {
-    sessions.set_tmux_session_mouse(app, &secrets, request)
+    run_blocking_command("tmux set mouse", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.set_tmux_session_mouse(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn capture_tmux_pane(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::CaptureTmuxPaneRequest,
 ) -> Result<String, String> {
-    sessions.capture_tmux_pane(app, &secrets, request)
+    run_blocking_command("tmux capture pane", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.capture_tmux_pane(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn inspect_ssh_system_context(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::TmuxConnectionRequest,
 ) -> Result<String, String> {
-    sessions.inspect_ssh_system_context(app, &secrets, request)
+    run_blocking_command("SSH system context inspection", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.inspect_ssh_system_context(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
