@@ -8,6 +8,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { dialogButtonAria, menuButtonAria } from "../lib/aria";
+import i18next from "../i18n/config";
 import { invokeCommand, isTauriRuntime, saveTextFile, type TerminalOutput, type TmuxSession } from "../lib/tauri";
 import { defaultTerminalSettings } from "../sample-data";
 import { useWorkspaceStore } from "../store";
@@ -505,6 +506,13 @@ function formatRemoteDesktopPaneSubtitle(connection: Connection) {
   return connection.user?.trim() || connection.host;
 }
 
+function tmuxSessionDisplayName(sessionId: string) {
+  const baseName = sessionId.replace(/^admindeck-/, "").replace(/(?:[0-9]{2}|[0-9]{3})$/, "");
+  const translationKey = `terminal.tmuxSessionNames.${baseName}`;
+  const localizedName = i18next.t(translationKey);
+  return localizedName === translationKey ? sessionId : `${localizedName} (${sessionId})`;
+}
+
 function TmuxSessionTag({
   connection,
   sessionId,
@@ -663,7 +671,7 @@ function TmuxSessionTag({
         title="Show tmux sessions"
         type="button"
       >
-        tmux {sessionId}
+        tmux {tmuxSessionDisplayName(sessionId)}
       </button>
       {open ? (
         <div className="tmux-session-menu" role="dialog" aria-label="tmux sessions">
@@ -698,7 +706,7 @@ function TmuxSessionTag({
                       title={isInApp ? "Focus pane" : "Open in pane"}
                       type="button"
                     >
-                      <strong>{session.id}</strong>
+                      <strong>{tmuxSessionDisplayName(session.id)}</strong>
                       <small>
                         {isInApp ? "open" : session.attached ? "attached" : "detached"}
                         {" · "}

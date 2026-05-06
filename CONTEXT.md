@@ -47,7 +47,7 @@ _Avoid_: Session, connection, backend tab
 A subdivision of a tab that presents one terminal surface or workspace view.
 _Avoid_: Session, split
 
-Terminal Panes for tmux-enabled SSH Connections may carry a generated friendly tmux session id, such as `admindeck-cockpit001`, used to resume that Pane's remote tmux session when the Pane is recreated. Current Pane tmux ids use the `admindeck-<sci-fi-name><number>` shape and are remembered in frontend workspace storage. That id belongs to the frontend workspace/Pane layer, not the backend Connection model.
+Terminal Panes for tmux-enabled SSH Connections may carry a generated friendly tmux session id, such as `neonunit`, used to resume that Pane's remote tmux session when the Pane is recreated. Current Pane tmux ids use the `<anime-sci-fi-slug><number>` shape and are remembered in frontend workspace storage. That id belongs to the frontend workspace/Pane layer, not the backend Connection model.
 
 ## Relationships
 

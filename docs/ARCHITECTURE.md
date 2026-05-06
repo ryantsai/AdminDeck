@@ -109,7 +109,7 @@ Owns root-level saved Connections, optional folders, subfolders, search/filter, 
 
 Current implementation note: a Connection may have no folder and live directly in the root of the tree. Folders may contain Connections and subfolders. Status badges are derived from active frontend workspace Sessions. Durable Connections load as idle and do not persist live session state in SQLite.
 
-For tmux-enabled SSH Connections, per-Pane friendly tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. Current Pane names use the `admindeck-<sci-fi-name><number>` shape, for example `admindeck-cockpit001`. The frontend stores these Pane names under `admindeck.tmuxSessions.<connectionId>` so the same Connection can reopen its previous Pane-to-tmux mapping. Stored Pane ids that do not match the current friendly format are ignored when new Panes are built. The durable Connection stores only the launch preference and legacy/non-user-facing namespace fields; those fields are not the active Pane tmux session id.
+For tmux-enabled SSH Connections, per-Pane friendly tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. Current Pane names use the `<anime-sci-fi-slug><number>` shape, for example `neonunit`. The frontend stores these Pane names under `admindeck.tmuxSessions.<connectionId>` so the same Connection can reopen its previous Pane-to-tmux mapping. Stored Pane ids that do not match the current friendly format are ignored when new Panes are built. The durable Connection stores only the launch preference and legacy/non-user-facing namespace fields; those fields are not the active Pane tmux session id.
 
 ### Terminal Session
 

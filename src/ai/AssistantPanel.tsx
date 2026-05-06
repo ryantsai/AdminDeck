@@ -61,9 +61,9 @@ const EXTENSION_DRAFT_PROMPT = "Create an AdminDeck extension draft for: ";
 function randomAssistantWaitingPhrase() {
   const phrases = i18next.t("ai.waitingPhrases", { returnObjects: true }) as readonly string[];
   if (!Array.isArray(phrases) || phrases.length === 0) {
-    return "Charging the answer beacon";
+    return i18next.t("ai.chargingBeacon");
   }
-  return phrases[Math.floor(Math.random() * phrases.length)] ?? "Charging the answer beacon";
+  return phrases[Math.floor(Math.random() * phrases.length)] ?? i18next.t("ai.chargingBeacon");
 }
 
 function createAssistantChatMessage(
