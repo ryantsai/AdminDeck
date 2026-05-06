@@ -461,6 +461,8 @@
     "pastedImageSourceWithNumber": "Pasted image {{number}}",
     "pastedImages": "Pasted images ({{count}})",
     "removeImageAttachment": "Remove {{label}}",
+    "openImagePreview": "Open {{label}} preview",
+    "imagePreviewTitle": "{{label}} preview",
     "imageInputNotSupported": "This model does not support image input, so pasted screenshots are not sent.",
     "composerPlaceholder": "Ask AI Assistant anything.",
     "sendMessage": "Send message",

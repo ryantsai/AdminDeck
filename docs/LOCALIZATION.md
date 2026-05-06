@@ -61,3 +61,25 @@ When a key is translated into every supported locale, remove its entry from this
 - Placeholder details: `{{label}}` is the image attachment label, such as `Pasted image 1`.
 - Domain notes: Removing only detaches the pending image from the outgoing AI Assistant prompt.
 
+### ai.openImagePreview
+
+- English value: `Open {{label}} preview`
+- Namespace: `ai`
+- File/component: `src/ai/AssistantPanel.tsx`
+- UI role: button aria-label and tooltip
+- Surrounding user flow: User clicks a small image attachment preview in the AI Assistant chat history to open a larger preview dialog.
+- Tone: Direct action label.
+- Placeholder details: `{{label}}` is the stored image attachment label, such as `Pasted image 1` or a screenshot source label.
+- Domain notes: Opens an in-app preview of an already stored chat attachment; it does not send the image again or persist new data.
+
+### ai.imagePreviewTitle
+
+- English value: `{{label}} preview`
+- Namespace: `ai`
+- File/component: `src/ai/AssistantPanel.tsx`
+- UI role: dialog aria-label
+- Surrounding user flow: User has opened a larger preview dialog for an image attachment from AI Assistant chat history.
+- Tone: Short, descriptive.
+- Placeholder details: `{{label}}` is the stored image attachment label, such as `Pasted image 1` or a screenshot source label.
+- Domain notes: Refers to the in-app preview dialog for an already stored chat attachment.
+

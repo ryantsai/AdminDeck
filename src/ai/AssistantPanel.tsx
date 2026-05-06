@@ -21,7 +21,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, FormEvent, KeyboardEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { menuButtonAria } from "../lib/aria";
+import { dialogButtonAria, menuButtonAria } from "../lib/aria";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import {
   getAiProviderDefinition,
@@ -1244,30 +1244,68 @@ function AssistantMessageView({
   const shouldTruncateUserMessage = message.role === "user" && userMessageLineCount > 10;
   const canSendCode = message.intent !== "extensionCreation";
   const [isUserMessageExpanded, setIsUserMessageExpanded] = useState(false);
+  const [previewImage, setPreviewImage] = useState<AssistantImageAttachment | null>(null);
+
+  useEffect(() => {
+    if (!previewImage) {
+      return;
+    }
+
+    function handlePreviewKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPreviewImage(null);
+      }
+    }
+
+    window.addEventListener("keydown", handlePreviewKeyDown);
+    return () => window.removeEventListener("keydown", handlePreviewKeyDown);
+  }, [previewImage]);
 
   return (
     <article className={`assistant-message ${message.role}`}>
-      <div
-        className={`assistant-message-bubble${shouldTruncateUserMessage && !isUserMessageExpanded ? " assistant-message-bubble-truncated" : ""}`}
-      >
-        {message.imageAttachments?.length ? (
-          <div className="assistant-message-attachments">
-            {message.imageAttachments.map((image) => (
-              <figure className="assistant-message-attachment" key={image.id}>
-                <img alt={image.sourceLabel} src={image.imageDataUrl} />
-                <figcaption>
-                  {image.sourceLabel} · {image.width} x {image.height}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        ) : null}
-        <MarkdownContent
-          canSendCode={canSendCode}
-          content={message.content}
-          onCopyCode={onCopyCode}
-          onSendCode={onSendCode}
-        />
+      <div className="assistant-message-content">
+        <div
+          className={`assistant-message-bubble${shouldTruncateUserMessage && !isUserMessageExpanded ? " assistant-message-bubble-truncated" : ""}`}
+        >
+          {message.imageAttachments?.length ? (
+            <div className="assistant-message-attachments">
+              {message.imageAttachments.map((image) => (
+                <figure className="assistant-message-attachment" key={image.id}>
+                  <button
+                    {...dialogButtonAria(previewImage?.id === image.id)}
+                    aria-label={t("ai.openImagePreview", { label: image.sourceLabel })}
+                    className="assistant-message-attachment-button"
+                    onClick={() => setPreviewImage(image)}
+                    title={t("ai.openImagePreview", { label: image.sourceLabel })}
+                    type="button"
+                  >
+                    <img alt={image.sourceLabel} src={image.imageDataUrl} />
+                  </button>
+                  <figcaption>
+                    {image.sourceLabel} · {image.width} x {image.height}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : null}
+          <MarkdownContent
+            canSendCode={canSendCode}
+            content={message.content}
+            onCopyCode={onCopyCode}
+            onSendCode={onSendCode}
+          />
+        </div>
+        <div className="assistant-message-actions">
+          <time dateTime={message.createdAt}>{formatAssistantMessageTime(message.createdAt)}</time>
+          <button
+            aria-label={t("ai.copyMessage")}
+            onClick={() => onCopyMessage(message)}
+            title={t("ai.copyMessage")}
+            type="button"
+          >
+            <Copy size={10} />
+          </button>
+        </div>
       </div>
       {shouldTruncateUserMessage ? (
         <button
@@ -1278,17 +1316,39 @@ function AssistantMessageView({
           {isUserMessageExpanded ? t("ai.showLess") : t("ai.more")}
         </button>
       ) : null}
-      <div className="assistant-message-actions">
-        <time dateTime={message.createdAt}>{formatAssistantMessageTime(message.createdAt)}</time>
-        <button
-          aria-label={t("ai.copyMessage")}
-          onClick={() => onCopyMessage(message)}
-          title={t("ai.copyMessage")}
-          type="button"
+      {previewImage ? (
+        <div
+          className="assistant-image-preview-backdrop"
+          onClick={() => setPreviewImage(null)}
+          role="presentation"
         >
-          <Copy size={10} />
-        </button>
-      </div>
+          <div
+            aria-label={t("ai.imagePreviewTitle", { label: previewImage.sourceLabel })}
+            className="assistant-image-preview-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <header>
+              <div>
+                <strong>{previewImage.sourceLabel}</strong>
+                <small>
+                  {previewImage.width} x {previewImage.height}
+                </small>
+              </div>
+              <button
+                aria-label={t("ai.close")}
+                className="assistant-toolbar-button"
+                onClick={() => setPreviewImage(null)}
+                title={t("ai.close")}
+                type="button"
+              >
+                <X size={15} />
+              </button>
+            </header>
+            <img alt={previewImage.sourceLabel} src={previewImage.imageDataUrl} />
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
