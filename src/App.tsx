@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, LayoutDashboard, Settings } from "lucide-rea
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invokeCommand, isTauriRuntime } from "./lib/tauri";
 import { useBootstrapSettings } from "./lib/settings";
 import { SettingsPage } from "./settings/SettingsPage";
@@ -23,13 +24,13 @@ const CONNECTION_PANEL_DEFAULT_WIDTH = 292;
 
 const CONNECTION_PANEL_MIN_WIDTH = 220;
 
-const CONNECTION_PANEL_MAX_WIDTH = 520;
+const CONNECTION_PANEL_MAX_WIDTH = 1560;
 
 const AI_PANEL_DEFAULT_WIDTH = 334;
 
 const AI_PANEL_MIN_WIDTH = 260;
 
-const AI_PANEL_MAX_WIDTH = 620;
+const AI_PANEL_MAX_WIDTH = 1860;
 
 const CONNECTION_PANEL_LAYOUT_KEY = "admindeck.layout.connectionsPanel.v1";
 
@@ -110,7 +111,14 @@ function App() {
   const setPerformanceSnapshot = useWorkspaceStore((state) => state.setPerformanceSnapshot);
   const appShellRef = useRef<HTMLDivElement | null>(null);
   const resetAllLayouts = useWorkspaceStore((state) => state.resetAllLayouts);
+  const openConnectionCount = useWorkspaceStore((state) => state.tabs.length);
+  const openConnectionCountRef = useRef(openConnectionCount);
+  const [quitConfirm, setQuitConfirm] = useState<{ count: number } | null>(null);
   useBootstrapSettings();
+
+  useEffect(() => {
+    openConnectionCountRef.current = openConnectionCount;
+  }, [openConnectionCount]);
   const [connectionPanelLayout, setConnectionPanelLayout] = useState(() =>
     loadPanelLayout(
       CONNECTION_PANEL_LAYOUT_KEY,
@@ -212,6 +220,38 @@ function App() {
   }, [setPerformanceSnapshot]);
 
   useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    const appWindow = getCurrentWindow();
+    void appWindow
+      .onCloseRequested((event) => {
+        const count = openConnectionCountRef.current;
+        if (count <= 0) {
+          return;
+        }
+        event.preventDefault();
+        setQuitConfirm({ count });
+      })
+      .then((dispose) => {
+        if (disposed) {
+          dispose();
+          return;
+        }
+        unlisten = dispose;
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
     const preventDefaultContextMenu = (event: globalThis.MouseEvent) => {
       event.preventDefault();
     };
@@ -261,57 +301,99 @@ function App() {
         }
         onNavigate={setActivePage}
       />
-      {activePage === "settings" ? (
-        <SettingsPage onBack={() => setActivePage("workspace")} onResetLayout={handleResetLayout} />
-      ) : (
-        <>
-          <ConnectionSidebar
-            collapsed={connectionPanelLayout.collapsed}
-            onToggleCollapsed={() =>
-              setConnectionPanelLayout((layout) => ({
-                ...layout,
-                collapsed: !layout.collapsed,
-              }))
-            }
-          />
-          {connectionPanelLayout.collapsed ? (
-            <div className="connection-collapsed-separator" aria-hidden="true" />
-          ) : (
-            <PanelResizeHandle
-              ariaLabel={t("app.resizeConnections")}
-              side="left"
-              onPointerDown={handleConnectionPanelResize}
-            />
-          )}
-          <main className="workspace">
-            <TabStrip />
-            <WorkspaceCanvas />
-            <StatusBar />
-          </main>
+      <div className="workspace-page" aria-hidden={activePage === "settings"}>
+        <ConnectionSidebar
+          collapsed={connectionPanelLayout.collapsed}
+          onToggleCollapsed={() =>
+            setConnectionPanelLayout((layout) => ({
+              ...layout,
+              collapsed: !layout.collapsed,
+            }))
+          }
+        />
+        {connectionPanelLayout.collapsed ? (
+          <div className="connection-collapsed-separator" aria-hidden="true" />
+        ) : (
           <PanelResizeHandle
-            ariaLabel={t("app.resizeAiAssistant")}
-            side="right"
-            collapsed={aiPanelLayout.collapsed}
-            collapsedLabel={t("app.aiAssistant")}
-            onClick={() =>
-              aiPanelLayout.collapsed
-                ? setAiPanelLayout((layout) => ({ ...layout, collapsed: false }))
-                : undefined
-            }
-            onPointerDown={handleAiPanelResize}
+            ariaLabel={t("app.resizeConnections")}
+            side="left"
+            onPointerDown={handleConnectionPanelResize}
           />
-          <AssistantPanel
-            collapsed={aiPanelLayout.collapsed}
-            onOpenSettings={() => setActivePage("settings")}
-            onToggleCollapsed={() =>
-              setAiPanelLayout((layout) => ({
-                ...layout,
-                collapsed: !layout.collapsed,
-              }))
-            }
-          />
-        </>
-      )}
+        )}
+        <main className="workspace">
+          <TabStrip />
+          <WorkspaceCanvas workspaceActive={activePage === "workspace"} />
+          <StatusBar />
+        </main>
+        <PanelResizeHandle
+          ariaLabel={t("app.resizeAiAssistant")}
+          side="right"
+          collapsed={aiPanelLayout.collapsed}
+          collapsedLabel={t("app.aiAssistant")}
+          onClick={() =>
+            aiPanelLayout.collapsed
+              ? setAiPanelLayout((layout) => ({ ...layout, collapsed: false }))
+              : undefined
+          }
+          onPointerDown={handleAiPanelResize}
+        />
+        <AssistantPanel
+          collapsed={aiPanelLayout.collapsed}
+          onOpenSettings={() => setActivePage("settings")}
+          onToggleCollapsed={() =>
+            setAiPanelLayout((layout) => ({
+              ...layout,
+              collapsed: !layout.collapsed,
+            }))
+          }
+        />
+      </div>
+      {activePage === "settings" ? (
+        <SettingsPage
+          onBack={() => setActivePage("workspace")}
+          onResetLayout={handleResetLayout}
+        />
+      ) : null}
+      {quitConfirm ? (
+        <QuitConfirmDialog
+          count={quitConfirm.count}
+          onCancel={() => setQuitConfirm(null)}
+          onConfirm={() => {
+            setQuitConfirm(null);
+            void getCurrentWindow().destroy();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function QuitConfirmDialog({
+  count,
+  onCancel,
+  onConfirm,
+}: {
+  count: number;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation();
+  const title = t("app.quitConfirmTitle");
+  return (
+    <div className="dialog-backdrop confirm-delete-backdrop" role="presentation">
+      <div className="confirm-delete-dialog" role="alertdialog" aria-label={title}>
+        <p className="panel-label">{title}</p>
+        <p className="confirm-delete-name">{t("app.quitConfirmBody", { count })}</p>
+        <p className="confirm-delete-warning">{t("app.quitConfirmHint")}</p>
+        <div className="dialog-actions">
+          <button className="approve-button danger" type="button" onClick={onConfirm}>
+            {t("app.quitConfirmAction")}
+          </button>
+          <button className="toolbar-button" type="button" onClick={onCancel}>
+            {t("common.cancel")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

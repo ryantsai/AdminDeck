@@ -1,7 +1,16 @@
 use crate::window_state::{validate_main_window_settings, MainWindowSettings};
 use rusqlite::{params, Connection as SqliteConnection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{
+    fs,
+    fs::File,
+    io::{copy, Read, Write},
+    path::{Path, PathBuf},
+    sync::Mutex,
+    time::{Duration, SystemTime},
+};
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 const SCHEMA_USER_VERSION: i32 = 5;
 
@@ -70,6 +79,32 @@ CREATE TABLE IF NOT EXISTS settings (
 pub struct Storage {
     db_path: PathBuf,
     connection: Mutex<SqliteConnection>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneralSettings {
+    auto_backup_enabled: bool,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseBackupInfo {
+    path: String,
+    filename: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedDatabaseSnapshot {
+    general_settings: GeneralSettings,
+    terminal_settings: TerminalSettings,
+    appearance_settings: AppearanceSettings,
+    ssh_settings: SshSettings,
+    sftp_settings: SftpSettings,
+    ai_provider_settings: AiProviderSettings,
+    connection_tree: ConnectionTree,
+    backup: DatabaseBackupInfo,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -298,11 +333,7 @@ impl Storage {
             })?;
         }
 
-        let connection = SqliteConnection::open(&db_path)
-            .map_err(|error| format!("failed to open SQLite database: {error}"))?;
-        connection
-            .pragma_update(None, "foreign_keys", "ON")
-            .map_err(|error| format!("failed to enable SQLite foreign keys: {error}"))?;
+        let connection = open_initialized_connection(&db_path)?;
 
         let storage = Self {
             db_path,
@@ -316,12 +347,184 @@ impl Storage {
         format!("SQLite: {}", self.db_path.display())
     }
 
+    pub fn backup_if_enabled_for_quit(&self) -> Result<Option<DatabaseBackupInfo>, String> {
+        if self.general_settings()?.auto_backup_enabled {
+            self.backup_database().map(Some).and_then(|backup| {
+                self.delete_old_backups()?;
+                Ok(backup)
+            })
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn backup_database(&self) -> Result<DatabaseBackupInfo, String> {
+        let backup_dir = self.backup_dir()?;
+        fs::create_dir_all(&backup_dir).map_err(|error| {
+            format!(
+                "failed to create backup directory {}: {error}",
+                backup_dir.display()
+            )
+        })?;
+        let filename = format!("admin-deck-{}.sqlite3", timestamp_for_filename());
+        let path = backup_dir.join(&filename);
+        let connection = self.lock()?;
+        let sql_path = path
+            .to_str()
+            .ok_or_else(|| "backup path is not valid UTF-8".to_string())?
+            .replace("'", "''");
+        connection
+            .execute_batch(&format!("VACUUM INTO '{}';", sql_path))
+            .map_err(|error| format!("failed to create database backup: {error}"))?;
+        Ok(DatabaseBackupInfo {
+            path: path.display().to_string(),
+            filename,
+        })
+    }
+
+    pub fn export_database_zip(&self, export_path: PathBuf) -> Result<(), String> {
+        let export_parent = export_path
+            .parent()
+            .ok_or_else(|| "export destination must include a parent directory".to_string())?;
+        fs::create_dir_all(export_parent).map_err(|error| {
+            format!(
+                "failed to create export directory {}: {error}",
+                export_parent.display()
+            )
+        })?;
+        let temp_db_path = self.temp_database_path("export");
+        remove_file_if_exists(&temp_db_path)?;
+        {
+            let connection = self.lock()?;
+            let sql_path = temp_db_path
+                .to_str()
+                .ok_or_else(|| "temporary export path is not valid UTF-8".to_string())?
+                .replace("'", "''");
+            connection
+                .execute_batch(&format!("VACUUM INTO '{}';", sql_path))
+                .map_err(|error| format!("failed to snapshot database for export: {error}"))?;
+        }
+
+        let export_file = File::create(&export_path).map_err(|error| {
+            format!(
+                "failed to create export file {}: {error}",
+                export_path.display()
+            )
+        })?;
+        let mut zip = ZipWriter::new(export_file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file("admin-deck.sqlite3", options)
+            .map_err(|error| format!("failed to add database to export: {error}"))?;
+        let mut temp_db = File::open(&temp_db_path).map_err(|error| {
+            format!(
+                "failed to read database snapshot {}: {error}",
+                temp_db_path.display()
+            )
+        })?;
+        copy(&mut temp_db, &mut zip)
+            .map_err(|error| format!("failed to write database export: {error}"))?;
+        zip.start_file("manifest.json", options)
+            .map_err(|error| format!("failed to add export manifest: {error}"))?;
+        let manifest = serde_json::json!({
+            "product": "AdminDeck",
+            "format": "admindeck-settings-export",
+            "version": 1,
+            "createdAt": OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_else(|_| "unknown".to_string()),
+        });
+        zip.write_all(manifest.to_string().as_bytes())
+            .map_err(|error| format!("failed to write export manifest: {error}"))?;
+        zip.finish()
+            .map_err(|error| format!("failed to finish database export: {error}"))?;
+        remove_file_if_exists(&temp_db_path)?;
+        Ok(())
+    }
+
+    pub fn import_database_zip(
+        &self,
+        import_path: PathBuf,
+    ) -> Result<ImportedDatabaseSnapshot, String> {
+        let temp_import_path = self.temp_database_path("import");
+        remove_file_if_exists(&temp_import_path)?;
+        extract_imported_database(&import_path, &temp_import_path)?;
+        validate_import_database(&temp_import_path)?;
+
+        let backup = self.backup_database()?;
+        {
+            let mut connection = self.lock()?;
+            let placeholder = SqliteConnection::open_in_memory()
+                .map_err(|error| format!("failed to prepare database replacement: {error}"))?;
+            let old_connection = std::mem::replace(&mut *connection, placeholder);
+            drop(old_connection);
+            fs::copy(&temp_import_path, &self.db_path).map_err(|error| {
+                format!(
+                    "failed to replace database {} with import {}: {error}",
+                    self.db_path.display(),
+                    temp_import_path.display()
+                )
+            })?;
+            let new_connection = open_initialized_connection(&self.db_path)?;
+            *connection = new_connection;
+        }
+        remove_file_if_exists(&temp_import_path)?;
+        Ok(ImportedDatabaseSnapshot {
+            general_settings: self.general_settings()?,
+            terminal_settings: self.terminal_settings()?,
+            appearance_settings: self.appearance_settings()?,
+            ssh_settings: self.ssh_settings()?,
+            sftp_settings: self.sftp_settings()?,
+            ai_provider_settings: self.ai_provider_settings()?,
+            connection_tree: self.list_connection_tree()?,
+            backup,
+        })
+    }
+
     pub fn list_connection_tree(&self) -> Result<ConnectionTree, String> {
         let connection = self.lock()?;
         Ok(ConnectionTree {
             connections: list_connections_for_folder(&connection, None)?,
             folders: list_folders_for_parent(&connection, None)?,
         })
+    }
+
+    pub fn general_settings(&self) -> Result<GeneralSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'general'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_general_settings)
+                .map_err(|error| format!("general settings are invalid: {error}"))?,
+            None => Ok(default_general_settings()),
+        }
+    }
+
+    pub fn update_general_settings(
+        &self,
+        request: GeneralSettings,
+    ) -> Result<GeneralSettings, String> {
+        let settings = validate_general_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize general settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('general', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
     }
 
     pub fn terminal_settings(&self) -> Result<TerminalSettings, String> {
@@ -1148,11 +1351,135 @@ impl Storage {
         self.list_connection_tree()
     }
 
+    fn backup_dir(&self) -> Result<PathBuf, String> {
+        let parent = self
+            .db_path
+            .parent()
+            .ok_or_else(|| "database path must include a parent directory".to_string())?;
+        Ok(parent.join("backups"))
+    }
+
+    fn temp_database_path(&self, prefix: &str) -> PathBuf {
+        let parent = self.db_path.parent().unwrap_or_else(|| Path::new("."));
+        parent.join(format!(
+            "admin-deck-{prefix}-{}.sqlite3",
+            timestamp_for_filename()
+        ))
+    }
+
+    fn delete_old_backups(&self) -> Result<(), String> {
+        let backup_dir = self.backup_dir()?;
+        let cutoff = SystemTime::now()
+            .checked_sub(Duration::from_secs(7 * 24 * 60 * 60))
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        let entries = match fs::read_dir(&backup_dir) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(format!(
+                    "failed to read backup directory {}: {error}",
+                    backup_dir.display()
+                ))
+            }
+        };
+
+        for entry in entries {
+            let entry =
+                entry.map_err(|error| format!("failed to inspect backup entry: {error}"))?;
+            let path = entry.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("sqlite3") {
+                continue;
+            }
+            let metadata = entry
+                .metadata()
+                .map_err(|error| format!("failed to inspect backup {}: {error}", path.display()))?;
+            if metadata.modified().unwrap_or(SystemTime::now()) < cutoff {
+                remove_file_if_exists(&path)?;
+            }
+        }
+        Ok(())
+    }
+
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, SqliteConnection>, String> {
         self.connection
             .lock()
             .map_err(|_| "SQLite connection lock is poisoned".to_string())
     }
+}
+
+fn open_initialized_connection(db_path: &Path) -> Result<SqliteConnection, String> {
+    let connection = SqliteConnection::open(db_path)
+        .map_err(|error| format!("failed to open SQLite database: {error}"))?;
+    connection
+        .pragma_update(None, "foreign_keys", "ON")
+        .map_err(|error| format!("failed to enable SQLite foreign keys: {error}"))?;
+    Ok(connection)
+}
+
+fn timestamp_for_filename() -> String {
+    let format = time::macros::format_description!("[year][month][day]-[hour][minute][second]");
+    OffsetDateTime::now_utc()
+        .format(format)
+        .unwrap_or_else(|_| {
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|duration| duration.as_secs().to_string())
+                .unwrap_or_else(|_| "0".to_string())
+        })
+}
+
+fn remove_file_if_exists(path: &Path) -> Result<(), String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("failed to remove file {}: {error}", path.display())),
+    }
+}
+
+fn extract_imported_database(import_path: &Path, temp_import_path: &Path) -> Result<(), String> {
+    let import_file = File::open(import_path).map_err(|error| {
+        format!(
+            "failed to open import file {}: {error}",
+            import_path.display()
+        )
+    })?;
+    let mut archive = ZipArchive::new(import_file)
+        .map_err(|error| format!("import file is not a valid AdminDeck export zip: {error}"))?;
+    let mut db_file = archive
+        .by_name("admin-deck.sqlite3")
+        .map_err(|_| "import zip does not contain admin-deck.sqlite3".to_string())?;
+    let mut contents = Vec::new();
+    db_file
+        .read_to_end(&mut contents)
+        .map_err(|error| format!("failed to read imported database: {error}"))?;
+    fs::write(temp_import_path, contents).map_err(|error| {
+        format!(
+            "failed to write imported database snapshot {}: {error}",
+            temp_import_path.display()
+        )
+    })
+}
+
+fn validate_import_database(path: &Path) -> Result<(), String> {
+    let connection = open_initialized_connection(path)?;
+    let user_version: i32 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(|error| format!("failed to inspect imported database schema: {error}"))?;
+    if user_version > SCHEMA_USER_VERSION {
+        return Err(format!(
+            "imported database schema version {user_version} is newer than this app supports ({SCHEMA_USER_VERSION})"
+        ));
+    }
+    drop(connection);
+    let storage = Storage::open(path.to_path_buf())?;
+    storage.general_settings()?;
+    storage.terminal_settings()?;
+    storage.appearance_settings()?;
+    storage.ssh_settings()?;
+    storage.sftp_settings()?;
+    storage.ai_provider_settings()?;
+    storage.list_connection_tree()?;
+    Ok(())
 }
 
 fn list_connections_for_folder(
@@ -2076,6 +2403,12 @@ fn required_field(field: &str, value: String) -> Result<String, String> {
     }
 }
 
+fn default_general_settings() -> GeneralSettings {
+    GeneralSettings {
+        auto_backup_enabled: true,
+    }
+}
+
 fn default_terminal_settings() -> TerminalSettings {
     TerminalSettings {
         font_family: "\"Cascadia Mono\", \"JetBrains Mono\", Consolas, monospace".to_string(),
@@ -2143,6 +2476,10 @@ fn default_ai_reasoning_effort() -> String {
 
 fn default_ai_cli_execution_policy() -> String {
     "suggestOnly".to_string()
+}
+
+fn validate_general_settings(settings: GeneralSettings) -> Result<GeneralSettings, String> {
+    Ok(settings)
 }
 
 fn validate_terminal_settings(mut settings: TerminalSettings) -> Result<TerminalSettings, String> {
@@ -3156,6 +3493,61 @@ mod tests {
 
         assert_eq!(tree.connections[0].id, wsl.id);
         assert_eq!(tree.connections[1].id, powershell.id);
+    }
+
+    #[test]
+    fn general_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("general-settings")).expect("storage opens");
+
+        let defaults = storage
+            .general_settings()
+            .expect("default general settings load");
+        assert!(defaults.auto_backup_enabled);
+
+        let updated = storage
+            .update_general_settings(GeneralSettings {
+                auto_backup_enabled: false,
+            })
+            .expect("general settings update");
+        assert!(!updated.auto_backup_enabled);
+
+        let reloaded = storage.general_settings().expect("general settings reload");
+        assert!(!reloaded.auto_backup_enabled);
+    }
+
+    #[test]
+    fn database_export_import_restores_settings_and_connections() {
+        let db_path = temp_db_path("database-export-import");
+        let storage = Storage::open(db_path).expect("storage opens");
+        storage
+            .update_general_settings(GeneralSettings {
+                auto_backup_enabled: false,
+            })
+            .expect("general settings update");
+        let connection = create_test_ssh_connection(&storage, "Prod SSH", "prod.internal", None);
+        let export_path = temp_db_path("database-export-import").with_extension("zip");
+
+        storage
+            .export_database_zip(export_path.clone())
+            .expect("database exports");
+        storage
+            .update_general_settings(GeneralSettings {
+                auto_backup_enabled: true,
+            })
+            .expect("general settings changes after export");
+        storage
+            .delete_connection(connection.id.clone())
+            .expect("connection can be removed before import");
+
+        let imported = storage
+            .import_database_zip(export_path.clone())
+            .expect("database imports");
+
+        assert!(!imported.general_settings.auto_backup_enabled);
+        assert_eq!(imported.connection_tree.connections.len(), 1);
+        assert_eq!(imported.connection_tree.connections[0].id, connection.id);
+        assert!(Path::new(&imported.backup.path).exists());
+        remove_file_if_exists(&export_path).expect("export cleanup succeeds");
     }
 
     #[test]

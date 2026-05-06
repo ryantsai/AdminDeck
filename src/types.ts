@@ -1,4 +1,11 @@
-export type ConnectionType = "local" | "ssh" | "telnet" | "serial" | "url" | "rdp" | "vnc";
+export type ConnectionType =
+  | "local"
+  | "ssh"
+  | "telnet"
+  | "serial"
+  | "url"
+  | "rdp"
+  | "vnc";
 export type ConnectionStatus = "connected" | "idle" | "offline";
 export type SshAuthMethod = "keyFile" | "password" | "agent";
 
@@ -128,7 +135,11 @@ export type LayoutNode =
 
 export type StoredLayoutNode =
   | { type: "leaf"; paneIndex: number }
-  | { type: "split"; orientation: SplitOrientation; children: StoredLayoutNode[] };
+  | {
+      type: "split";
+      orientation: SplitOrientation;
+      children: StoredLayoutNode[];
+    };
 
 export interface StoredConnectionLayout {
   paneCount: number;
@@ -144,6 +155,26 @@ export interface StoredLayoutPane {
 }
 
 export type TerminalCursorStyle = "block" | "bar" | "underline";
+
+export interface GeneralSettings {
+  autoBackupEnabled: boolean;
+}
+
+export interface DatabaseBackupInfo {
+  path: string;
+  filename: string;
+}
+
+export interface ImportedDatabaseSnapshot {
+  generalSettings: GeneralSettings;
+  terminalSettings: TerminalSettings;
+  appearanceSettings: AppearanceSettings;
+  sshSettings: SshSettings;
+  sftpSettings: SftpSettings;
+  aiProviderSettings: AiProviderSettings;
+  connectionTree: ConnectionTree;
+  backup: DatabaseBackupInfo;
+}
 
 export interface TerminalSettings {
   fontFamily: string;

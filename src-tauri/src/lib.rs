@@ -154,6 +154,55 @@ fn get_terminal_settings(
 }
 
 #[tauri::command]
+fn get_general_settings(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::GeneralSettings, String> {
+    storage.general_settings()
+}
+
+#[tauri::command]
+fn update_general_settings(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::GeneralSettings,
+) -> Result<storage::GeneralSettings, String> {
+    storage.update_general_settings(request)
+}
+
+#[tauri::command]
+fn export_settings_database(
+    storage: tauri::State<'_, storage::Storage>,
+    path: String,
+) -> Result<(), String> {
+    storage.export_database_zip(path.into())
+}
+
+#[tauri::command]
+fn import_settings_database(
+    storage: tauri::State<'_, storage::Storage>,
+    path: String,
+) -> Result<storage::ImportedDatabaseSnapshot, String> {
+    storage.import_database_zip(path.into())
+}
+
+#[tauri::command]
+fn backup_settings_database(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::DatabaseBackupInfo, String> {
+    storage.backup_database()
+}
+
+fn persist_main_window_for_close(
+    window: &tauri::Window,
+    storage: &storage::Storage,
+    window_tracker: &window_state::MainWindowState,
+) -> Result<(), String> {
+    let settings = window_tracker.snapshot_for_window(window);
+    storage.update_main_window_settings(settings)?;
+    storage.backup_if_enabled_for_quit()?;
+    Ok(())
+}
+
+#[tauri::command]
 fn update_terminal_settings(
     storage: tauri::State<'_, storage::Storage>,
     request: storage::TerminalSettings,
@@ -371,51 +420,66 @@ fn close_terminal_session(
 #[tauri::command]
 async fn list_tmux_sessions(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::TmuxConnectionRequest,
 ) -> Result<Vec<sessions::TmuxSession>, String> {
-    sessions.list_tmux_sessions(app, &secrets, request)
+    run_blocking_command("tmux list sessions", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.list_tmux_sessions(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn close_tmux_session(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::CloseTmuxSessionRequest,
 ) -> Result<(), String> {
-    sessions.close_tmux_session(app, &secrets, request)
+    run_blocking_command("tmux close session", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.close_tmux_session(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn set_tmux_mouse(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::SetTmuxSessionMouseRequest,
 ) -> Result<(), String> {
-    sessions.set_tmux_session_mouse(app, &secrets, request)
+    run_blocking_command("tmux set mouse", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.set_tmux_session_mouse(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn capture_tmux_pane(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::CaptureTmuxPaneRequest,
 ) -> Result<String, String> {
-    sessions.capture_tmux_pane(app, &secrets, request)
+    run_blocking_command("tmux capture pane", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.capture_tmux_pane(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
 async fn inspect_ssh_system_context(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
     request: sessions::TmuxConnectionRequest,
 ) -> Result<String, String> {
-    sessions.inspect_ssh_system_context(app, &secrets, request)
+    run_blocking_command("SSH system context inspection", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.inspect_ssh_system_context(app.clone(), &secrets, request)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -563,10 +627,7 @@ async fn update_sftp_path_properties(
 }
 
 #[tauri::command]
-async fn close_sftp_session(
-    app: tauri::AppHandle,
-    session_id: String,
-) -> Result<(), String> {
+async fn close_sftp_session(app: tauri::AppHandle, session_id: String) -> Result<(), String> {
     run_blocking_command("SFTP close", move || {
         let sftp_sessions = app.state::<sftp::SftpSessionManager>();
         sftp_sessions.close_sftp_session(session_id)
@@ -846,9 +907,14 @@ pub fn run() {
                         }
                     }
                     tauri::WindowEvent::CloseRequested { .. } => {
-                        let settings = window_tracker.snapshot_for_window(window);
                         if let Some(storage) = window.try_state::<storage::Storage>() {
-                            let _ = storage.update_main_window_settings(settings);
+                            if let Err(error) =
+                                persist_main_window_for_close(window, &storage, &window_tracker)
+                            {
+                                eprintln!(
+                                    "failed to persist main window state before close: {error}"
+                                );
+                            }
                         }
                     }
                     _ => {}
@@ -869,6 +935,11 @@ pub fn run() {
             move_connection_folder,
             move_connection,
             upsert_url_credential,
+            get_general_settings,
+            update_general_settings,
+            export_settings_database,
+            import_settings_database,
+            backup_settings_database,
             get_terminal_settings,
             update_terminal_settings,
             get_appearance_settings,

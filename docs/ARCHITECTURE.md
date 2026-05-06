@@ -111,6 +111,10 @@ Current implementation note: a Connection may have no folder and live directly i
 
 For tmux-enabled SSH Connections, per-Pane friendly tmux session names are generated and remembered in the frontend workspace layer so split Panes can resume independently. Current Pane names use the `admindeck-<sci-fi-name><number>` shape, for example `admindeck-cockpit001`. The frontend stores these Pane names under `admindeck.tmuxSessions.<connectionId>` so the same Connection can reopen its previous Pane-to-tmux mapping. Stored Pane ids that do not match the current friendly format are ignored when new Panes are built. The durable Connection stores only the launch preference and legacy/non-user-facing namespace fields; those fields are not the active Pane tmux session id.
 
+### Backend Command Runtime Boundaries
+
+Tauri commands that need synchronous native integrations, OS process calls, network control loops, or helper functions that internally create and `block_on` a Tokio runtime must cross that boundary with `run_blocking_command`/`tauri::async_runtime::spawn_blocking` before calling the helper. Async command handlers must not directly call code that starts a nested runtime or blocks the current Tokio worker; doing so can panic with "Cannot start a runtime from within a runtime" and can also starve unrelated Connection types. This invariant applies across all live Session families: local terminal helpers, SSH/tmux/AI context inspection, SFTP transfers, URL/WebView2 lifecycle calls, RDP ActiveX operations, and VNC RFB operations. When adding a command for any Connection or Session type, choose one of these shapes explicitly: pure async all the way down, synchronous command with no nested async runtime, or async command that immediately moves the blocking/nested-runtime work into `run_blocking_command`.
+
 ### Terminal Session
 
 Owns local PTY lifecycle, SSH terminal channel lifecycle, Telnet TCP lifecycle, Serial port lifecycle, input/output streams, resize events, tab integration, split pane integration, and terminal compatibility behavior.

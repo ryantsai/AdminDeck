@@ -14,12 +14,23 @@ export const AI_PROVIDER_SECRET_OWNER_ID = "openai-compatible-provider";
 // time. Bootstrap is best-effort: any single load failure is ignored so the
 // app still renders with the in-memory defaults from `sample-data`.
 export function useBootstrapSettings() {
-  const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
-  const setAppearanceSettings = useWorkspaceStore((state) => state.setAppearanceSettings);
+  const setGeneralSettings = useWorkspaceStore(
+    (state) => state.setGeneralSettings,
+  );
+  const setTerminalSettings = useWorkspaceStore(
+    (state) => state.setTerminalSettings,
+  );
+  const setAppearanceSettings = useWorkspaceStore(
+    (state) => state.setAppearanceSettings,
+  );
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
-  const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
-  const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
+  const setAiProviderSettings = useWorkspaceStore(
+    (state) => state.setAiProviderSettings,
+  );
+  const setAiProviderHasApiKey = useWorkspaceStore(
+    (state) => state.setAiProviderHasApiKey,
+  );
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -29,6 +40,12 @@ export function useBootstrapSettings() {
     let disposed = false;
 
     const swallow = (_error: unknown) => undefined;
+
+    void invokeCommand("get_general_settings")
+      .then((settings) => {
+        if (!disposed) setGeneralSettings(settings);
+      })
+      .catch(swallow);
 
     void invokeCommand("get_terminal_settings")
       .then((settings) => {
@@ -77,6 +94,7 @@ export function useBootstrapSettings() {
   }, [
     setAiProviderHasApiKey,
     setAiProviderSettings,
+    setGeneralSettings,
     setAppearanceSettings,
     setSftpSettings,
     setSshSettings,

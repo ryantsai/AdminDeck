@@ -151,6 +151,13 @@ export function ConnectionSidebar({
 
   useEffect(() => {
     void reloadConnectionGroups();
+    const handleTreeInvalidated = () => {
+      void reloadConnectionGroups();
+    };
+    window.addEventListener("admindeck:connection-tree-invalidated", handleTreeInvalidated);
+    return () => {
+      window.removeEventListener("admindeck:connection-tree-invalidated", handleTreeInvalidated);
+    };
   }, []);
 
   useEffect(() => {

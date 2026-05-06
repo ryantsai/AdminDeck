@@ -140,7 +140,11 @@ export function TabStrip() {
   );
 }
 
-export function WorkspaceCanvas() {
+export function WorkspaceCanvas({
+  workspaceActive = true,
+}: {
+  workspaceActive?: boolean;
+} = {}) {
   const { t } = useTranslation();
   const tabs = useWorkspaceStore((state) => state.tabs);
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
@@ -161,17 +165,39 @@ export function WorkspaceCanvas() {
     <div className="workspace-canvas">
       {tabs.map((tab) => {
         if (tab.kind === "sftp") {
-          return <SftpWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
+          return (
+            <SftpWorkspace
+              isActive={workspaceActive && tab.id === activeTabId}
+              key={tab.id}
+              tab={tab}
+            />
+          );
         }
         if (tab.kind === "webview") {
-          return <WebViewWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
+          return (
+            <WebViewWorkspace
+              isActive={workspaceActive && tab.id === activeTabId}
+              key={tab.id}
+              tab={tab}
+            />
+          );
         }
         if (tab.kind === "remoteDesktop") {
           return (
-            <RemoteDesktopWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />
+            <RemoteDesktopWorkspace
+              isActive={workspaceActive && tab.id === activeTabId}
+              key={tab.id}
+              tab={tab}
+            />
           );
         }
-        return <TerminalWorkspace isActive={tab.id === activeTabId} key={tab.id} tab={tab} />;
+        return (
+          <TerminalWorkspace
+            isActive={workspaceActive && tab.id === activeTabId}
+            key={tab.id}
+            tab={tab}
+          />
+        );
       })}
     </div>
   );

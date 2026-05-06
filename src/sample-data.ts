@@ -2,6 +2,7 @@ import type {
   AppearanceSettings,
   AiProviderSettings,
   ConnectionTree,
+  GeneralSettings,
   SftpSettings,
   SshSettings,
   TerminalSettings,
@@ -15,6 +16,10 @@ export const connectionTree: ConnectionTree = {
 
 export const initialTabs: WorkspaceTab[] = [];
 
+export const defaultGeneralSettings: GeneralSettings = {
+  autoBackupEnabled: true,
+};
+
 export const defaultTerminalSettings: TerminalSettings = {
   fontFamily: '"Cascadia Mono", "JetBrains Mono", Consolas, monospace',
   fontSize: 12,
@@ -27,7 +32,8 @@ export const defaultTerminalSettings: TerminalSettings = {
 };
 
 export const defaultAppearanceSettings: AppearanceSettings = {
-  appFontFamily: '"Satoshi", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  appFontFamily:
+    '"Satoshi", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   colorScheme: "default",
 };
 
