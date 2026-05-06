@@ -31,7 +31,7 @@ import {
   validateAiProviderForChat,
 } from "./providers";
 import { useWorkspaceStore } from "../store";
-import { writeInputToPane } from "../workspace/paneRegistry";
+import { sendTextToRdpPane, writeInputToPane } from "../workspace/paneRegistry";
 import i18next from "../i18n/config";
 
 function resolveAssistantOutputLanguage(outputLanguage: string): string | undefined {
@@ -429,6 +429,10 @@ export function AssistantPanel({
     !currentModelSupportsImageInput && (hasPendingImageContext || imagePasteRejected);
   const activeTerminalPaneId =
     activeTab?.kind === "terminal" ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id : undefined;
+  const activeRdpPaneId =
+    activeTab?.kind === "remoteDesktop" && activeTab.connection?.type === "rdp"
+      ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id
+      : undefined;
   const sortedChatHistory = useMemo(() => sortedAssistantThreads(chatHistory), [chatHistory]);
   const recentChatHistory = sortedChatHistory.slice(0, 5);
   const shouldShowChatHistory = messages.length === 0 && !prompt.trim() && !isSendingPrompt;
@@ -499,12 +503,21 @@ export function AssistantPanel({
   }, [addContextMenuOpen]);
 
   function handleSendCodeToTerminal(code: string) {
-    if (!activeTerminalPaneId) {
+    if (activeTerminalPaneId) {
+      const data = code.endsWith("\n") ? code : `${code}\n`;
+      writeInputToPane(activeTerminalPaneId, data);
       return;
     }
 
-    const data = code.endsWith("\n") ? code : `${code}\n`;
-    writeInputToPane(activeTerminalPaneId, data);
+    if (activeRdpPaneId) {
+      const trimmed = code.replace(/\r?\n$/, "");
+      const send = sendTextToRdpPane(activeRdpPaneId, trimmed, true);
+      if (send) {
+        send.catch((error) => {
+          setChatError(error instanceof Error ? error.message : String(error));
+        });
+      }
+    }
   }
 
   function handleChatSubmit(event: FormEvent) {

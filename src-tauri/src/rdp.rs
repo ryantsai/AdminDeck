@@ -12,22 +12,29 @@ mod platform {
     use windows::{
         core::{Interface, BSTR, PCSTR, PCWSTR},
         Win32::{
-            Foundation::{HWND, LPARAM, POINT, RECT, VARIANT_FALSE, VARIANT_TRUE, WPARAM},
+            Foundation::{HANDLE, HGLOBAL, HWND, LPARAM, POINT, RECT, VARIANT_FALSE, VARIANT_TRUE, WPARAM},
             Graphics::Gdi::ClientToScreen,
             System::{
                 Com::{
                     IDispatch, DISPATCH_METHOD, DISPATCH_PROPERTYGET, DISPATCH_PROPERTYPUT,
                     DISPPARAMS,
                 },
+                DataExchange::{
+                    CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+                },
                 LibraryLoader::{GetProcAddress, LoadLibraryW},
-                Ole::{OleInitialize, DISPID_PROPERTYPUT},
+                Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
+                Ole::{CF_UNICODETEXT, OleInitialize, DISPID_PROPERTYPUT},
                 Variant::{VariantClear, VARIANT, VT_BOOL, VT_BSTR, VT_DISPATCH, VT_I2, VT_I4},
             },
-            UI::WindowsAndMessaging::{
-                CreateWindowExW, DestroyWindow, GetWindowRect, SendMessageW, SetWindowPos,
-                ShowWindow, HMENU, SWP_NOACTIVATE, SWP_NOZORDER, SW_SHOWNOACTIVATE, WM_KEYDOWN,
-                WM_KEYUP, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-                WS_POPUP, WS_VISIBLE,
+            UI::{
+                Input::KeyboardAndMouse::{SetFocus, VkKeyScanW},
+                WindowsAndMessaging::{
+                    CreateWindowExW, DestroyWindow, GetWindowRect, SendMessageW, SetForegroundWindow,
+                    SetWindowPos, ShowWindow, HMENU, SWP_NOACTIVATE, SWP_NOZORDER,
+                    SW_SHOWNOACTIVATE, WM_KEYDOWN, WM_KEYUP, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
+                    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
+                },
             },
         },
     };
@@ -42,6 +49,13 @@ mod platform {
     const VK_CONTROL_KEY: usize = 0x11;
     const VK_ALT_KEY: usize = 0x12;
     const VK_END_KEY: usize = 0x23;
+    const VK_RETURN_KEY: usize = 0x0D;
+    const VK_TAB_KEY: usize = 0x09;
+    const VK_SHIFT_KEY: usize = 0x10;
+    const VK_V_KEY: usize = 0x56;
+    const RDP_TEXT_MODE_CLIPBOARD: &str = "clipboard";
+    const RDP_TEXT_MODE_SEND_KEYS: &str = "sendKeys";
+    const RDP_TEXT_LIMIT: usize = 64 * 1024;
     const RDP_PROGIDS: &[&str] = &[
         "MsTscAx.MsTscAx.13",
         "MsTscAx.MsTscAx.12",
@@ -165,6 +179,24 @@ mod platform {
     #[serde(rename_all = "camelCase")]
     pub struct RdpSimpleRequest {
         session_id: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SendRdpTextRequest {
+        session_id: String,
+        text: String,
+        mode: Option<String>,
+        press_enter: Option<bool>,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpTextSent {
+        session_id: String,
+        mode: String,
+        fell_back: bool,
+        char_count: u32,
     }
 
     struct RdpSession {
@@ -373,6 +405,79 @@ mod platform {
                     .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
                 invoke_method(&session.dispatch, "SendCtrlAltDel")
                     .or_else(|_| send_ctrl_alt_end_to_rdp(session.hwnd))
+            })
+        }
+
+        pub fn send_text(
+            &self,
+            app: AppHandle,
+            request: SendRdpTextRequest,
+        ) -> Result<RdpTextSent, String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread(app, move |_app| {
+                if request.text.len() > RDP_TEXT_LIMIT {
+                    return Err(format!(
+                        "RDP text payload is {} bytes which exceeds the {RDP_TEXT_LIMIT}-byte limit",
+                        request.text.len()
+                    ));
+                }
+                let press_enter = request.press_enter.unwrap_or(false);
+                let requested_mode = request
+                    .mode
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or(RDP_TEXT_MODE_CLIPBOARD)
+                    .to_string();
+                let sessions = lock_sessions(&sessions)?;
+                let session = sessions.get(&request.session_id).ok_or_else(|| {
+                    format!("RDP session '{}' was not found", request.session_id)
+                })?;
+                let connection_state = get_property_i32(&session.dispatch, "Connected").unwrap_or(0);
+                if !is_rdp_connected_state(connection_state) {
+                    return Err(
+                        "RDP session is not connected; cannot send text to remote desktop"
+                            .to_string(),
+                    );
+                }
+                let char_count = request.text.chars().count() as u32;
+                if char_count == 0 && !press_enter {
+                    return Ok(RdpTextSent {
+                        session_id: request.session_id,
+                        mode: requested_mode,
+                        fell_back: false,
+                        char_count: 0,
+                    });
+                }
+                focus_rdp_control(session.hwnd);
+                match requested_mode.as_str() {
+                    RDP_TEXT_MODE_SEND_KEYS => {
+                        send_text_via_keys(session.hwnd, &request.text, press_enter)?;
+                        Ok(RdpTextSent {
+                            session_id: request.session_id,
+                            mode: RDP_TEXT_MODE_SEND_KEYS.to_string(),
+                            fell_back: false,
+                            char_count,
+                        })
+                    }
+                    _ => match send_text_via_clipboard(session.hwnd, &request.text, press_enter) {
+                        Ok(()) => Ok(RdpTextSent {
+                            session_id: request.session_id,
+                            mode: RDP_TEXT_MODE_CLIPBOARD.to_string(),
+                            fell_back: false,
+                            char_count,
+                        }),
+                        Err(_) => {
+                            send_text_via_keys(session.hwnd, &request.text, press_enter)?;
+                            Ok(RdpTextSent {
+                                session_id: request.session_id,
+                                mode: RDP_TEXT_MODE_SEND_KEYS.to_string(),
+                                fell_back: true,
+                                char_count,
+                            })
+                        }
+                    },
+                }
             })
         }
     }
@@ -767,6 +872,173 @@ mod platform {
 
     fn invoke_method(dispatch: &IDispatch, name: &str) -> Result<(), String> {
         invoke_method_with_i32_args(dispatch, name, &[])
+    }
+
+    fn send_text_via_clipboard(hwnd: HWND, text: &str, press_enter: bool) -> Result<(), String> {
+        if !text.is_empty() {
+            write_unicode_clipboard(hwnd, text)?;
+            unsafe {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYDOWN,
+                    Some(WPARAM(VK_CONTROL_KEY)),
+                    Some(LPARAM(0)),
+                );
+                let _ = SendMessageW(hwnd, WM_KEYDOWN, Some(WPARAM(VK_V_KEY)), Some(LPARAM(0)));
+                let _ = SendMessageW(hwnd, WM_KEYUP, Some(WPARAM(VK_V_KEY)), Some(LPARAM(0)));
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYUP,
+                    Some(WPARAM(VK_CONTROL_KEY)),
+                    Some(LPARAM(0)),
+                );
+            }
+        }
+        if press_enter {
+            post_vk(hwnd, VK_RETURN_KEY);
+        }
+        Ok(())
+    }
+
+    fn write_unicode_clipboard(owner: HWND, text: &str) -> Result<(), String> {
+        let mut wide: Vec<u16> = text.encode_utf16().collect();
+        wide.push(0);
+        let bytes = wide.len() * std::mem::size_of::<u16>();
+
+        unsafe {
+            OpenClipboard(Some(owner))
+                .map_err(|error| format!("failed to open clipboard for RDP paste: {error}"))?;
+
+            let result = (|| -> Result<(), String> {
+                EmptyClipboard().map_err(|error| {
+                    format!("failed to empty clipboard for RDP paste: {error}")
+                })?;
+                let hmem: HGLOBAL = GlobalAlloc(GMEM_MOVEABLE, bytes).map_err(|error| {
+                    format!("failed to allocate clipboard memory for RDP paste: {error}")
+                })?;
+                let dst = GlobalLock(hmem) as *mut u16;
+                if dst.is_null() {
+                    return Err("failed to lock clipboard memory for RDP paste".to_string());
+                }
+                std::ptr::copy_nonoverlapping(wide.as_ptr(), dst, wide.len());
+                let _ = GlobalUnlock(hmem);
+                let handle = HANDLE(hmem.0);
+                if SetClipboardData(CF_UNICODETEXT.0 as u32, Some(handle)).is_err() {
+                    return Err("failed to set clipboard data for RDP paste".to_string());
+                }
+                Ok(())
+            })();
+
+            let _ = CloseClipboard();
+            result
+        }
+    }
+
+    fn send_text_via_keys(hwnd: HWND, text: &str, press_enter: bool) -> Result<(), String> {
+        for ch in text.chars() {
+            match ch {
+                '\r' => {}
+                '\n' => post_vk(hwnd, VK_RETURN_KEY),
+                '\t' => post_vk(hwnd, VK_TAB_KEY),
+                _ => post_unicode_char_via_keys(hwnd, ch)?,
+            }
+        }
+        if press_enter {
+            post_vk(hwnd, VK_RETURN_KEY);
+        }
+        Ok(())
+    }
+
+    fn post_unicode_char_via_keys(hwnd: HWND, ch: char) -> Result<(), String> {
+        let code = ch as u32;
+        if code > u16::MAX as u32 {
+            return Err(format!(
+                "character U+{code:04X} cannot be typed via SendKeys: only BMP characters are supported"
+            ));
+        }
+        let scan = unsafe { VkKeyScanW(code as u16) };
+        if scan == -1 {
+            return Err(format!(
+                "character '{ch}' cannot be typed via SendKeys on the active keyboard layout; switch to clipboard mode"
+            ));
+        }
+        let vk = (scan & 0xff) as usize;
+        let modifiers = (scan >> 8) & 0xff;
+        let need_shift = modifiers & 0x01 != 0;
+        let need_ctrl = modifiers & 0x02 != 0;
+        let need_alt = modifiers & 0x04 != 0;
+        unsafe {
+            if need_shift {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYDOWN,
+                    Some(WPARAM(VK_SHIFT_KEY)),
+                    Some(LPARAM(0)),
+                );
+            }
+            if need_ctrl {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYDOWN,
+                    Some(WPARAM(VK_CONTROL_KEY)),
+                    Some(LPARAM(0)),
+                );
+            }
+            if need_alt {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYDOWN,
+                    Some(WPARAM(VK_ALT_KEY)),
+                    Some(LPARAM(0)),
+                );
+            }
+            let _ = SendMessageW(hwnd, WM_KEYDOWN, Some(WPARAM(vk)), Some(LPARAM(0)));
+            let _ = SendMessageW(hwnd, WM_KEYUP, Some(WPARAM(vk)), Some(LPARAM(0)));
+            if need_alt {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYUP,
+                    Some(WPARAM(VK_ALT_KEY)),
+                    Some(LPARAM(0)),
+                );
+            }
+            if need_ctrl {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYUP,
+                    Some(WPARAM(VK_CONTROL_KEY)),
+                    Some(LPARAM(0)),
+                );
+            }
+            if need_shift {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_KEYUP,
+                    Some(WPARAM(VK_SHIFT_KEY)),
+                    Some(LPARAM(0)),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn focus_rdp_control(hwnd: HWND) {
+        // Bring the RDP ActiveX HWND forward and give it keyboard focus so synthesised
+        // keystrokes route into the remote session even when the assistant panel
+        // currently holds focus. Ignore errors: SetForegroundWindow can be denied by
+        // Windows foreground-lock rules, but SetFocus on the in-process HWND still
+        // delivers messages to the control.
+        unsafe {
+            let _ = SetForegroundWindow(hwnd);
+            let _ = SetFocus(Some(hwnd));
+        }
+    }
+
+    fn post_vk(hwnd: HWND, vk: usize) {
+        unsafe {
+            let _ = SendMessageW(hwnd, WM_KEYDOWN, Some(WPARAM(vk)), Some(LPARAM(0)));
+            let _ = SendMessageW(hwnd, WM_KEYUP, Some(WPARAM(vk)), Some(LPARAM(0)));
+        }
     }
 
     fn send_ctrl_alt_end_to_rdp(hwnd: HWND) -> Result<(), String> {
@@ -1346,6 +1618,24 @@ mod platform {
         pub session_id: String,
     }
 
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SendRdpTextRequest {
+        pub session_id: String,
+        pub text: String,
+        pub mode: Option<String>,
+        pub press_enter: Option<bool>,
+    }
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RdpTextSent {
+        session_id: String,
+        mode: String,
+        fell_back: bool,
+        char_count: u32,
+    }
+
     impl RdpSessionManager {
         pub fn new() -> Self {
             Self
@@ -1417,6 +1707,17 @@ mod platform {
         ) -> Result<(), String> {
             Err(
                 "RDP Ctrl+Alt+Delete requires Windows and the Microsoft RDP ActiveX control"
+                    .to_string(),
+            )
+        }
+
+        pub fn send_text(
+            &self,
+            _app: AppHandle,
+            _request: SendRdpTextRequest,
+        ) -> Result<RdpTextSent, String> {
+            Err(
+                "RDP text injection requires Windows and the Microsoft RDP ActiveX control"
                     .to_string(),
             )
         }

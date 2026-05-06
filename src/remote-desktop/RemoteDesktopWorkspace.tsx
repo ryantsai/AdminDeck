@@ -13,6 +13,7 @@ import type {
 import { invokeCommand, isTauriRuntime, type AssistantScreenshot } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import type { WorkspaceTab } from "../types";
+import { registerRdpTextSender, unregisterRdpTextSender } from "../workspace/paneRegistry";
 
 type VncSessionEvent =
   | { kind: "connected"; sessionId: string; name: string }
@@ -395,6 +396,10 @@ export function RemoteDesktopWorkspace({
     }
     let disposed = false;
     let sessionId = "";
+    const rdpPaneId = tab.panes[0]?.id;
+    let registeredRdpSender:
+      | ((text: string, pressEnter: boolean) => Promise<void>)
+      | null = null;
     void readSettledBounds().then((bounds) => {
       if (disposed || !bounds) {
         return;
@@ -428,6 +433,19 @@ export function RemoteDesktopWorkspace({
           rdpControlRef.current = started.control;
           setRdpStatus(t("remoteDesktop.preparingDisplay"));
           markConnectionSessionStarted(connection.id);
+          if (rdpPaneId) {
+            const startedSessionId = started.sessionId;
+            registeredRdpSender = async (text, pressEnter) => {
+              await invokeCommand("send_rdp_text", {
+                request: {
+                  sessionId: startedSessionId,
+                  text,
+                  pressEnter,
+                },
+              });
+            };
+            registerRdpTextSender(rdpPaneId, registeredRdpSender);
+          }
           attemptRdpDisplaySync();
         })
         .catch((error) => {
@@ -455,6 +473,10 @@ export function RemoteDesktopWorkspace({
       rdpVisibleRef.current = false;
       if (sessionIdRef.current === sessionId) {
         sessionIdRef.current = null;
+      }
+      if (rdpPaneId && registeredRdpSender) {
+        unregisterRdpTextSender(rdpPaneId, registeredRdpSender);
+        registeredRdpSender = null;
       }
       if (ownsSession) {
         void invokeCommand("close_rdp_session", { request: { sessionId } });

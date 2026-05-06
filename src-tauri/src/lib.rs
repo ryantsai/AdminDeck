@@ -791,6 +791,15 @@ fn send_rdp_ctrl_alt_delete(
 }
 
 #[tauri::command]
+fn send_rdp_text(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::SendRdpTextRequest,
+) -> Result<rdp::RdpTextSent, String> {
+    rdp_sessions.send_text(app, request)
+}
+
+#[tauri::command]
 fn start_vnc_session(
     app: tauri::AppHandle,
     vnc_sessions: tauri::State<'_, vnc::VncSessionManager>,
@@ -997,6 +1006,7 @@ pub fn run() {
             close_rdp_session,
             get_rdp_session_status,
             send_rdp_ctrl_alt_delete,
+            send_rdp_text,
             start_vnc_session,
             send_vnc_pointer_event,
             send_vnc_key_event,

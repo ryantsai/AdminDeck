@@ -369,6 +369,22 @@ export interface RdpSimpleRequest {
   sessionId: string;
 }
 
+export type RdpTextMode = "clipboard" | "sendKeys";
+
+export interface SendRdpTextRequest {
+  sessionId: string;
+  text: string;
+  mode?: RdpTextMode;
+  pressEnter?: boolean;
+}
+
+export interface RdpTextSent {
+  sessionId: string;
+  mode: RdpTextMode;
+  fellBack: boolean;
+  charCount: number;
+}
+
 export interface StartVncSessionRequest {
   sessionId: string;
   host: string;
@@ -819,6 +835,10 @@ type CommandMap = {
   send_rdp_ctrl_alt_delete: {
     args: { request: RdpSimpleRequest };
     result: null;
+  };
+  send_rdp_text: {
+    args: { request: SendRdpTextRequest };
+    result: RdpTextSent;
   };
   start_vnc_session: {
     args: { request: StartVncSessionRequest };
