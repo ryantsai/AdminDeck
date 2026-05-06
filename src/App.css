@@ -1203,6 +1203,10 @@ h2 {
   padding-right: 34px;
 }
 
+.embedded-workspace-pane > .remote-desktop-shell .remote-desktop-pane > header {
+  padding-right: 40px;
+}
+
 .embedded-pane-close {
   position: absolute;
   top: 9px;
@@ -1220,10 +1224,18 @@ h2 {
   cursor: pointer;
 }
 
-.embedded-pane-close:hover {
-  color: var(--text);
-  background: var(--surface-muted);
-  border-color: var(--border);
+.embedded-workspace-pane:has(> .remote-desktop-shell) .embedded-pane-close {
+  top: 5px;
+  color: #95a7bb;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(128, 153, 184, 0.18);
+  border-radius: 5px;
+}
+
+.embedded-workspace-pane:has(> .remote-desktop-shell) .embedded-pane-close:hover {
+  color: #ff7070;
+  background: rgba(255, 100, 100, 0.12);
+  border-color: rgba(255, 112, 112, 0.28);
 }
 
 .terminal-workspace-embedded-only .embedded-workspace-pane {
