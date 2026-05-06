@@ -2541,6 +2541,39 @@ progress {
   justify-self: end;
 }
 
+.assistant-message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+.assistant-message-attachment {
+  display: grid;
+  gap: 4px;
+  width: min(128px, 100%);
+  margin: 0;
+}
+
+.assistant-message-attachment img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--terminal);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.assistant-message-attachment figcaption {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .assistant-message-bubble-truncated {
   max-height: calc(10 * 1.5em);
   overflow: hidden;
@@ -3137,6 +3170,66 @@ progress {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
+}
+
+.assistant-attachment-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+.assistant-attachment-preview {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+}
+
+.assistant-attachment-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--terminal);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.assistant-attachment-preview figcaption {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.assistant-attachment-preview figcaption span,
+.assistant-attachment-preview figcaption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-attachment-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: #ffffff;
+  background: rgb(15 23 42 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.assistant-attachment-remove:hover {
+  background: rgb(15 23 42 / 0.9);
 }
 
 .approval-card p {

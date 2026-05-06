@@ -197,6 +197,8 @@ pub struct AgentRunRequest {
     intent: Option<String>,
     selected_output: Option<String>,
     screenshot: Option<AgentScreenshotContext>,
+    #[serde(default)]
+    screenshots: Vec<AgentScreenshotContext>,
     system_context: Option<String>,
     messages: Vec<AgentChatMessage>,
     output_language: Option<String>,
@@ -355,6 +357,7 @@ impl AgentProvider for OpenAiCompatibleProvider {
             request.selected_output,
             supports_image_input(self.provider_kind, settings.model()),
             request.screenshot,
+            request.screenshots,
             request.messages,
             request.output_language,
         );
@@ -464,6 +467,7 @@ fn build_agent_messages(
     selected_output: Option<String>,
     supports_image_input: bool,
     screenshot: Option<AgentScreenshotContext>,
+    screenshots: Vec<AgentScreenshotContext>,
     history: Vec<AgentChatMessage>,
     output_language: Option<String>,
 ) -> Vec<OpenAiCompatibleMessage> {
@@ -518,24 +522,36 @@ fn build_agent_messages(
         user_content.push_str(&selected_output);
         user_content.push_str("\n```");
     }
-    let content = match screenshot
-        .filter(|_| supports_image_input)
-        .and_then(normalize_screenshot_context)
-    {
-        Some(screenshot) => OpenAiCompatibleContent::Parts(vec![
-            OpenAiCompatibleContentPart::Text {
-                text: format!(
-                    "{user_content}\n\nAttached screenshot source: {}",
-                    screenshot.source_label
-                ),
-            },
-            OpenAiCompatibleContentPart::ImageUrl {
-                image_url: OpenAiCompatibleImageUrl {
-                    url: screenshot.data_url,
-                },
-            },
-        ]),
-        None => OpenAiCompatibleContent::Text(user_content),
+    let mut image_contexts: Vec<AgentScreenshotContext> = vec![];
+    if let Some(screenshot) = screenshot {
+        image_contexts.push(screenshot);
+    }
+    image_contexts.extend(screenshots);
+    let image_contexts: Vec<AgentScreenshotContext> = image_contexts
+        .into_iter()
+        .filter_map(normalize_screenshot_context)
+        .collect();
+    let content = if supports_image_input && !image_contexts.is_empty() {
+        let source_labels = image_contexts
+            .iter()
+            .map(|screenshot| screenshot.source_label.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut parts = vec![OpenAiCompatibleContentPart::Text {
+            text: format!("{user_content}\n\nAttached image sources: {source_labels}"),
+        }];
+        parts.extend(
+            image_contexts
+                .into_iter()
+                .map(|screenshot| OpenAiCompatibleContentPart::ImageUrl {
+                    image_url: OpenAiCompatibleImageUrl {
+                        url: screenshot.data_url,
+                    },
+                }),
+        );
+        OpenAiCompatibleContent::Parts(parts)
+    } else {
+        OpenAiCompatibleContent::Text(user_content)
     };
     messages.push(OpenAiCompatibleMessage {
         role: "user".to_string(),
@@ -905,6 +921,7 @@ mod tests {
             Some("ERROR service unavailable".to_string()),
             true,
             None,
+            vec![],
             vec![
                 AgentChatMessage {
                     role: "user".to_string(),
@@ -943,12 +960,44 @@ mod tests {
                 data_url: "data:image/png;base64,abcd".to_string(),
             }),
             vec![],
+            vec![],
             None,
         );
 
         match &messages[1].content {
             OpenAiCompatibleContent::Parts(parts) => assert_eq!(parts.len(), 2),
             OpenAiCompatibleContent::Text(_) => panic!("screenshot context should use parts"),
+        }
+    }
+
+    #[test]
+    fn agent_messages_can_attach_multiple_image_contexts() {
+        let messages = build_agent_messages(
+            "Compare these.".to_string(),
+            "Workspace".to_string(),
+            None,
+            "medium".to_string(),
+            None,
+            None,
+            true,
+            None,
+            vec![
+                AgentScreenshotContext {
+                    source_label: "First".to_string(),
+                    data_url: "data:image/jpeg;base64,one".to_string(),
+                },
+                AgentScreenshotContext {
+                    source_label: "Second".to_string(),
+                    data_url: "data:image/jpeg;base64,two".to_string(),
+                },
+            ],
+            vec![],
+            None,
+        );
+
+        match &messages[1].content {
+            OpenAiCompatibleContent::Parts(parts) => assert_eq!(parts.len(), 3),
+            OpenAiCompatibleContent::Text(_) => panic!("image contexts should use parts"),
         }
     }
 
@@ -966,6 +1015,7 @@ mod tests {
                 source_label: "Router screenshot".to_string(),
                 data_url: "data:image/png;base64,abcd".to_string(),
             }),
+            vec![],
             vec![],
             None,
         );
@@ -990,6 +1040,7 @@ mod tests {
             None,
             true,
             None,
+            vec![],
             vec![],
             None,
         );

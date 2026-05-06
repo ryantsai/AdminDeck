@@ -46,6 +46,7 @@ type AssistantChatMessage = {
   id: string;
   role: "assistant" | "user";
   content: string;
+  imageAttachments?: AssistantImageAttachment[];
   intent?: AssistantPromptIntent;
   createdAt: string;
 };
@@ -61,7 +62,7 @@ type AssistantChatThread = {
 
 type AssistantPromptIntent = "chat" | "extensionCreation";
 
-type AssistantPastedImageContext = {
+type AssistantImageAttachment = {
   id: string;
   sourceLabel: string;
   imageDataUrl: string;
@@ -70,6 +71,8 @@ type AssistantPastedImageContext = {
 };
 
 const EXTENSION_DRAFT_PROMPT = "Create an AdminDeck extension draft for: ";
+const ASSISTANT_IMAGE_MAX_EDGE = 1280;
+const ASSISTANT_IMAGE_JPEG_QUALITY = 0.72;
 
 function randomAssistantWaitingPhrase() {
   const phrases = i18next.t("ai.waitingPhrases", { returnObjects: true }) as readonly string[];
@@ -83,11 +86,13 @@ function createAssistantChatMessage(
   role: AssistantChatMessage["role"],
   content: string,
   intent?: AssistantPromptIntent,
+  imageAttachments?: AssistantImageAttachment[],
 ): AssistantChatMessage {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     content,
+    imageAttachments,
     intent,
     createdAt: new Date().toISOString(),
   };
@@ -151,16 +156,87 @@ function readImageFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function readImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
     const image = new Image();
-    image.addEventListener("load", () => {
-      resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    });
-    image.addEventListener("error", () => {
-      resolve({ width: 0, height: 0 });
-    });
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", () => reject(new Error("failed to load image")));
     image.src = dataUrl;
+  });
+}
+
+async function compressImageDataUrl(dataUrl: string) {
+  const image = await loadImage(dataUrl);
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  if (sourceWidth <= 0 || sourceHeight <= 0) {
+    return { dataUrl, width: 0, height: 0 };
+  }
+
+  const scale = Math.min(1, ASSISTANT_IMAGE_MAX_EDGE / Math.max(sourceWidth, sourceHeight));
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return { dataUrl, width: sourceWidth, height: sourceHeight };
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  return {
+    dataUrl: canvas.toDataURL("image/jpeg", ASSISTANT_IMAGE_JPEG_QUALITY),
+    width,
+    height,
+  };
+}
+
+async function createImageAttachment(
+  sourceLabel: string,
+  dataUrl: string,
+): Promise<AssistantImageAttachment> {
+  const compressed = await compressImageDataUrl(dataUrl);
+  return {
+    id: `assistant-image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    sourceLabel,
+    imageDataUrl: compressed.dataUrl,
+    width: compressed.width,
+    height: compressed.height,
+  };
+}
+
+function normalizeImageAttachments(value: unknown): AssistantImageAttachment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const candidate = item as Partial<AssistantImageAttachment>;
+    if (
+      typeof candidate.sourceLabel !== "string" ||
+      !candidate.sourceLabel.trim() ||
+      typeof candidate.imageDataUrl !== "string" ||
+      !candidate.imageDataUrl.startsWith("data:image/")
+    ) {
+      return [];
+    }
+    return [
+      {
+        id:
+          typeof candidate.id === "string" && candidate.id
+            ? candidate.id
+            : `assistant-image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        sourceLabel: candidate.sourceLabel.trim(),
+        imageDataUrl: candidate.imageDataUrl,
+        width: typeof candidate.width === "number" ? candidate.width : 0,
+        height: typeof candidate.height === "number" ? candidate.height : 0,
+      },
+    ];
   });
 }
 
@@ -267,6 +343,11 @@ function normalizeAssistantChatMessage(value: unknown): AssistantChatMessage[] {
       id: typeof candidate.id === "string" && candidate.id ? candidate.id : `${candidate.role}-${Date.now()}`,
       role: candidate.role,
       content: candidate.content,
+      imageAttachments: normalizeImageAttachments(candidate.imageAttachments),
+      intent:
+        candidate.intent === "chat" || candidate.intent === "extensionCreation"
+          ? candidate.intent
+          : undefined,
       createdAt: normalizeDateString(candidate.createdAt) ?? new Date().toISOString(),
     },
   ];
@@ -313,8 +394,7 @@ export function AssistantPanel({
   const [waitingPhrase, setWaitingPhrase] = useState("");
   const [waitingDots, setWaitingDots] = useState(0);
   const [addContextMenuOpen, setAddContextMenuOpen] = useState(false);
-  const [pastedImageContext, setPastedImageContext] =
-    useState<AssistantPastedImageContext | null>(null);
+  const [pastedImageContexts, setPastedImageContexts] = useState<AssistantImageAttachment[]>([]);
   const [imagePasteRejected, setImagePasteRejected] = useState(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const addContextMenuRef = useRef<HTMLDivElement | null>(null);
@@ -343,17 +423,7 @@ export function AssistantPanel({
           dataUrl: assistantContextSnippet.imageDataUrl,
         }
       : undefined;
-  const pastedScreenshotContext = pastedImageContext
-    ? {
-        sourceLabel: pastedImageContext.sourceLabel,
-        dataUrl: pastedImageContext.imageDataUrl,
-      }
-    : undefined;
-  const requestScreenshotContext =
-    currentModelSupportsImageInput
-      ? pastedScreenshotContext ?? assistantScreenshotContext
-      : undefined;
-  const hasPendingImageContext = Boolean(pastedScreenshotContext ?? assistantScreenshotContext);
+  const hasPendingImageContext = pastedImageContexts.length > 0 || Boolean(assistantScreenshotContext);
   const showImageNotSupportedNotice =
     !currentModelSupportsImageInput && (hasPendingImageContext || imagePasteRejected);
   const activeTerminalPaneId =
@@ -467,7 +537,7 @@ export function AssistantPanel({
     setPrompt("");
     setChatError("");
     setWaitingPhrase("");
-    setPastedImageContext(null);
+    setPastedImageContexts([]);
     setImagePasteRejected(false);
     setAssistantIntent("chat");
     setShowAllChats(false);
@@ -507,7 +577,7 @@ export function AssistantPanel({
     setPrompt("");
     setChatError("");
     setWaitingPhrase("");
-    setPastedImageContext(null);
+    setPastedImageContexts([]);
     setImagePasteRejected(false);
     setAssistantIntent("chat");
     setShowAllChats(false);
@@ -522,7 +592,7 @@ export function AssistantPanel({
       setPrompt("");
       setChatError("");
       setWaitingPhrase("");
-      setPastedImageContext(null);
+      setPastedImageContexts([]);
       setImagePasteRejected(false);
       setAssistantIntent("chat");
     }
@@ -612,7 +682,30 @@ export function AssistantPanel({
     }
     const requestIntent = assistantIntentForPrompt(assistantIntent, normalizedPrompt);
     setAssistantIntent(requestIntent);
-    const userMessage = createAssistantChatMessage("user", normalizedPrompt, requestIntent);
+    let imageAttachments: AssistantImageAttachment[] = [];
+    if (currentModelSupportsImageInput) {
+      imageAttachments = [...pastedImageContexts];
+      if (assistantScreenshotContext) {
+        try {
+          imageAttachments = [
+            ...imageAttachments,
+            await createImageAttachment(
+              assistantScreenshotContext.sourceLabel,
+              assistantScreenshotContext.dataUrl,
+            ),
+          ];
+        } catch (error) {
+          setChatError(error instanceof Error ? error.message : String(error));
+          return;
+        }
+      }
+    }
+    const userMessage = createAssistantChatMessage(
+      "user",
+      normalizedPrompt,
+      requestIntent,
+      imageAttachments.length > 0 ? imageAttachments : undefined,
+    );
     const previousMessages = messages;
     const nextMessages = [...previousMessages, userMessage];
     const isFirstThreadMessage = previousMessages.length === 0;
@@ -630,6 +723,11 @@ export function AssistantPanel({
       setCurrentThreadTitle(fallbackTitle);
       saveChatMessages(failedMessages, fallbackTitle);
       setPrompt("");
+      setPastedImageContexts([]);
+      setImagePasteRejected(false);
+      if (assistantContextSnippet?.kind === "screenshot") {
+        clearAssistantContextSnippet();
+      }
       setChatError("");
       return;
     }
@@ -642,6 +740,11 @@ export function AssistantPanel({
     setCurrentThreadTitle(fallbackTitle);
     saveChatMessages(nextMessages, fallbackTitle);
     setPrompt("");
+    setPastedImageContexts([]);
+    setImagePasteRejected(false);
+    if (assistantContextSnippet?.kind === "screenshot") {
+      clearAssistantContextSnippet();
+    }
     setChatError("");
     setWaitingPhrase(randomAssistantWaitingPhrase());
     setIsSendingPrompt(true);
@@ -673,7 +776,10 @@ export function AssistantPanel({
           intent: requestIntent,
           selectedOutput:
             assistantContextSnippet?.kind === "text" ? assistantContextSnippet.text : undefined,
-          screenshot: requestScreenshotContext,
+          screenshots: imageAttachments.map((attachment) => ({
+            sourceLabel: attachment.sourceLabel,
+            dataUrl: attachment.imageDataUrl,
+          })),
           systemContext,
           messages: history,
           outputLanguage: resolveAssistantOutputLanguage(aiProviderSettings.outputLanguage),
@@ -740,10 +846,20 @@ export function AssistantPanel({
   }
 
   async function handleComposerPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
-    const imageItem = Array.from(event.clipboardData.items).find((item) =>
-      item.type.startsWith("image/"),
+    const clipboardFiles = Array.from(event.clipboardData.files).filter((file) =>
+      file.type.startsWith("image/"),
     );
-    if (!imageItem) {
+    const imageFiles =
+      clipboardFiles.length > 0
+        ? clipboardFiles
+        : Array.from(event.clipboardData.items).flatMap((item) => {
+            if (!item.type.startsWith("image/")) {
+              return [];
+            }
+            const file = item.getAsFile();
+            return file ? [file] : [];
+          });
+    if (imageFiles.length === 0) {
       return;
     }
 
@@ -753,22 +869,20 @@ export function AssistantPanel({
       return;
     }
 
-    const imageFile = imageItem.getAsFile();
-    if (!imageFile) {
-      setImagePasteRejected(true);
-      return;
-    }
-
     try {
-      const dataUrl = await readImageFileAsDataUrl(imageFile);
-      const dimensions = await readImageDimensions(dataUrl);
-      setPastedImageContext({
-        id: `assistant-pasted-image-${Date.now()}`,
-        sourceLabel: t("ai.pastedImageSource"),
-        imageDataUrl: dataUrl,
-        width: dimensions.width,
-        height: dimensions.height,
-      });
+      const attachments = await Promise.all(
+        imageFiles.map(async (imageFile, index) => {
+          const dataUrl = await readImageFileAsDataUrl(imageFile);
+          const attachment = await createImageAttachment(t("ai.pastedImageSource"), dataUrl);
+          return imageFiles.length === 1
+            ? attachment
+            : {
+                ...attachment,
+                sourceLabel: t("ai.pastedImageSourceWithNumber", { number: index + 1 }),
+              };
+        }),
+      );
+      setPastedImageContexts((current) => [...current, ...attachments]);
       setImagePasteRejected(false);
     } catch (error) {
       setImagePasteRejected(true);
@@ -953,15 +1067,15 @@ export function AssistantPanel({
             )}
           </section>
         ) : null}
-        {pastedImageContext ? (
+        {pastedImageContexts.length > 0 ? (
           <section className="assistant-selection-context">
             <header>
-              <span>{pastedImageContext.sourceLabel}</span>
+              <span>{t("ai.pastedImages", { count: pastedImageContexts.length })}</span>
               <button
                 className="row-action"
                 aria-label={t("ai.clearContext")}
                 onClick={() => {
-                  setPastedImageContext(null);
+                  setPastedImageContexts([]);
                   setImagePasteRejected(false);
                 }}
                 title={t("ai.clearContext")}
@@ -970,11 +1084,31 @@ export function AssistantPanel({
                 <X size={13} />
               </button>
             </header>
-            <div className="assistant-screenshot-context">
-              <img alt={pastedImageContext.sourceLabel} src={pastedImageContext.imageDataUrl} />
-              <small>
-                {pastedImageContext.width} x {pastedImageContext.height}
-              </small>
+            <div className="assistant-attachment-preview-grid">
+              {pastedImageContexts.map((image) => (
+                <figure className="assistant-attachment-preview" key={image.id}>
+                  <img alt={image.sourceLabel} src={image.imageDataUrl} />
+                  <figcaption>
+                    <span>{image.sourceLabel}</span>
+                    <small>
+                      {image.width} x {image.height}
+                    </small>
+                  </figcaption>
+                  <button
+                    aria-label={t("ai.removeImageAttachment", { label: image.sourceLabel })}
+                    className="assistant-attachment-remove"
+                    onClick={() =>
+                      setPastedImageContexts((current) =>
+                        current.filter((attachment) => attachment.id !== image.id),
+                      )
+                    }
+                    title={t("ai.removeImageAttachment", { label: image.sourceLabel })}
+                    type="button"
+                  >
+                    <X size={12} />
+                  </button>
+                </figure>
+              ))}
             </div>
           </section>
         ) : null}
@@ -1116,6 +1250,18 @@ function AssistantMessageView({
       <div
         className={`assistant-message-bubble${shouldTruncateUserMessage && !isUserMessageExpanded ? " assistant-message-bubble-truncated" : ""}`}
       >
+        {message.imageAttachments?.length ? (
+          <div className="assistant-message-attachments">
+            {message.imageAttachments.map((image) => (
+              <figure className="assistant-message-attachment" key={image.id}>
+                <img alt={image.sourceLabel} src={image.imageDataUrl} />
+                <figcaption>
+                  {image.sourceLabel} · {image.width} x {image.height}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : null}
         <MarkdownContent
           canSendCode={canSendCode}
           content={message.content}

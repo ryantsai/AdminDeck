@@ -28,3 +28,36 @@ When a key is translated into every supported locale, remove its entry from this
 - Placeholder details: None.
 - Domain notes: "Model" means the selected AI model in Settings/assistant picker; image input means multimodal image content sent to the provider API.
 
+### ai.pastedImageSourceWithNumber
+
+- English value: `Pasted image {{number}}`
+- Namespace: `ai`
+- File/component: `src/ai/AssistantPanel.tsx`
+- UI role: label
+- Surrounding user flow: User pastes multiple images into the AI Assistant composer and each attached preview gets a numbered source label.
+- Tone: Short, neutral, descriptive.
+- Placeholder details: `{{number}}` is a 1-based index for the pasted image within the paste action.
+- Domain notes: Refers to images/screenshots pasted from the clipboard, not saved Connections or Sessions.
+
+### ai.pastedImages
+
+- English value: `Pasted images ({{count}})`
+- Namespace: `ai`
+- File/component: `src/ai/AssistantPanel.tsx`
+- UI role: section label
+- Surrounding user flow: User has one or more pasted image attachments staged above the AI Assistant input.
+- Tone: Short, neutral, descriptive.
+- Placeholder details: `{{count}}` is the number of currently staged image attachments.
+- Domain notes: Refers only to pending pasted image attachments in the composer.
+
+### ai.removeImageAttachment
+
+- English value: `Remove {{label}}`
+- Namespace: `ai`
+- File/component: `src/ai/AssistantPanel.tsx`
+- UI role: button aria-label and tooltip
+- Surrounding user flow: User removes a single pasted image attachment from the AI Assistant composer before sending.
+- Tone: Direct action label.
+- Placeholder details: `{{label}}` is the image attachment label, such as `Pasted image 1`.
+- Domain notes: Removing only detaches the pending image from the outgoing AI Assistant prompt.
+

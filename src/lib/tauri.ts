@@ -223,6 +223,10 @@ export interface AgentRunRequest {
     sourceLabel: string;
     dataUrl: string;
   };
+  screenshots?: Array<{
+    sourceLabel: string;
+    dataUrl: string;
+  }>;
   systemContext?: string;
   messages: AgentChatMessage[];
   outputLanguage?: string;
