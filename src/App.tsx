@@ -36,6 +36,8 @@ const CONNECTION_PANEL_LAYOUT_KEY = "admindeck.layout.connectionsPanel.v1";
 
 const AI_PANEL_LAYOUT_KEY = "admindeck.layout.aiAssistPanel.v2";
 
+const QUIT_PREPARE_TIMEOUT_MS = 5000;
+
 const defaultConnectionPanelLayout: PanelLayoutState = {
   collapsed: false,
   width: CONNECTION_PANEL_DEFAULT_WIDTH,
@@ -113,7 +115,7 @@ function App() {
   const resetAllLayouts = useWorkspaceStore((state) => state.resetAllLayouts);
   const openConnectionCount = useWorkspaceStore((state) => state.tabs.length);
   const openConnectionCountRef = useRef(openConnectionCount);
-  const allowWindowCloseRef = useRef(false);
+  const quitInProgressRef = useRef(false);
   useBootstrapSettings();
   const [connectionPanelLayout, setConnectionPanelLayout] = useState(() =>
     loadPanelLayout(
@@ -205,23 +207,41 @@ function App() {
     const appWindow = getCurrentWindow();
     void appWindow
       .onCloseRequested((event) => {
-        if (allowWindowCloseRef.current) {
+        event.preventDefault();
+        if (quitInProgressRef.current) {
           return;
         }
 
         const openConnections = openConnectionCountRef.current;
-        if (openConnections === 0) {
+        if (
+          openConnections > 0 &&
+          !window.confirm(
+            t("app.quitOpenConnectionsConfirm", { count: openConnections }),
+          )
+        ) {
           return;
         }
 
-        event.preventDefault();
-        const shouldQuit = window.confirm(
-          t("app.quitOpenConnectionsConfirm", { count: openConnections }),
+        quitInProgressRef.current = true;
+        let timeoutId: number | undefined;
+        const preparation = invokeCommand("prepare_main_window_for_quit").catch(
+          (error: unknown) => {
+            console.error("Failed to prepare AdminDeck for quit", error);
+          },
         );
-        if (shouldQuit) {
-          allowWindowCloseRef.current = true;
-          void appWindow.close();
-        }
+        const timeout = new Promise<void>((resolve) => {
+          timeoutId = window.setTimeout(resolve, QUIT_PREPARE_TIMEOUT_MS);
+        });
+
+        void Promise.race([preparation, timeout])
+          .finally(() => {
+            if (timeoutId !== undefined) {
+              window.clearTimeout(timeoutId);
+            }
+          })
+          .finally(() => {
+            void appWindow.destroy();
+          });
       })
       .then((dispose) => {
         if (disposed) {
