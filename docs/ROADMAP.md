@@ -216,3 +216,12 @@ Latest validation on May 7, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Add Apple Remote Desktop support (low priority).
 - [ ] Add Hyper-V client support (low priority).
 - [ ] Add VMware vSphere support (low priority).
+
+### IT Ops Center (Future Idea)
+
+- [ ] Add a simple workflow engine for IT operations that runs against selected SSH/Telnet/Serial Connections with explicit per-run approval.
+- [ ] Add batch command broadcast to multiple Connections (target by tag, folder, or multi-select) with per-host output panes and a consolidated result view.
+- [ ] Add automated server-update playbooks (e.g. `apt`, `dnf`, `yum`, Windows Update via WinRM) with dry-run preview, host grouping, and rollback-aware sequencing.
+- [ ] Add AI-enabled triggers that watch terminal output, SFTP changes, or scheduled probes and propose follow-up workflow runs through the AI Assistant approval flow.
+- [ ] Add a workflow library with reusable steps (run command, copy file via SFTP, wait, conditional branch) and durable run history, scoped to local-first storage with no telemetry.
+- [ ] Decide credential, secret-redaction, and audit-log boundaries for workflow execution before enabling general operator use.
