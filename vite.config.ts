@@ -30,4 +30,22 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "react/jsx-runtime"],
+          i18n: ["i18next", "react-i18next"],
+          icons: ["lucide-react", "@icon-park/react"],
+          xterm: [
+            "@xterm/xterm",
+            "@xterm/addon-fit",
+            "@xterm/addon-search",
+            "@xterm/addon-web-links",
+            "@xterm/addon-webgl",
+          ],
+        },
+      },
+    },
+  },
 }));

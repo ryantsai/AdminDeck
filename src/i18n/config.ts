@@ -2,6 +2,21 @@ import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 import en from "./locales/en.json";
 
+const localeLoaders = {
+  fr: () => import("./locales/fr.json"),
+  it: () => import("./locales/it.json"),
+  de: () => import("./locales/de.json"),
+  es: () => import("./locales/es.json"),
+  "es-MX": () => import("./locales/es-MX.json"),
+  "pt-BR": () => import("./locales/pt-BR.json"),
+  "zh-TW": () => import("./locales/zh-TW.json"),
+  "zh-CN": () => import("./locales/zh-CN.json"),
+  ja: () => import("./locales/ja.json"),
+  ko: () => import("./locales/ko.json"),
+  th: () => import("./locales/th.json"),
+  id: () => import("./locales/id.json"),
+} as const;
+
 export const SUPPORTED_LANGUAGES = [
   "en",
   "fr",
@@ -19,7 +34,6 @@ export const SUPPORTED_LANGUAGES = [
 ] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
-
 export const LANGUAGE_STORAGE_KEY = "admindeck.language";
 
 export function detectLanguage(): SupportedLanguage {
@@ -127,32 +141,35 @@ i18next.use(initReactI18next).init({
   returnEmptyString: false,
 });
 
-let resourcesLoaded = false;
+let readyLanguage: SupportedLanguage | null = null;
 
-export async function ensureI18nReady(): Promise<void> {
-  if (resourcesLoaded) {
-    return;
-  }
-
-  const language = detectLanguage();
-  if (language === "en") {
-    resourcesLoaded = true;
+async function loadLocale(language: SupportedLanguage): Promise<void> {
+  if (language === "en" || i18next.hasResourceBundle(language, "translation")) {
     return;
   }
 
   try {
-    const module = await import(`./locales/${language}.json`);
+    const module = await localeLoaders[language]();
     i18next.addResourceBundle(language, "translation", module.default ?? module, true, true);
   } catch {
     // Fall back to English silently
   }
+}
+
+export async function ensureI18nReady(): Promise<void> {
+  const language = detectLanguage();
+  if (readyLanguage === language) {
+    return;
+  }
+
+  await loadLocale(language);
 
   if (i18next.language !== language) {
     await i18next.changeLanguage(language);
     persistLanguage(language);
   }
 
-  resourcesLoaded = true;
+  readyLanguage = language;
 }
 
 export async function switchLanguage(language: SupportedLanguage): Promise<void> {
@@ -160,17 +177,10 @@ export async function switchLanguage(language: SupportedLanguage): Promise<void>
     return;
   }
 
-  if (language !== "en" && !i18next.hasResourceBundle(language, "translation")) {
-    try {
-      const module = await import(`./locales/${language}.json`);
-      i18next.addResourceBundle(language, "translation", module.default ?? module, true, true);
-    } catch {
-      // Fall back to English silently
-    }
-  }
-
+  await loadLocale(language);
   await i18next.changeLanguage(language);
   persistLanguage(language);
+  readyLanguage = language;
 }
 
 export default i18next;
