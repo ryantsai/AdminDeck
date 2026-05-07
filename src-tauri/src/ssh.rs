@@ -65,6 +65,7 @@ pub struct NativeSshTerminalRequest {
     pub initial_directory: Option<String>,
     pub use_tmux: bool,
     pub tmux_session_id: Option<String>,
+    pub tmux_history_limit: u32,
 }
 
 #[derive(Clone)]
@@ -264,6 +265,7 @@ pub fn start_native_terminal(
         initial_directory: request.initial_directory,
         use_tmux: request.use_tmux,
         tmux_session_id: request.tmux_session_id,
+        tmux_history_limit: clamp_tmux_history_limit(request.tmux_history_limit),
     };
     let (control_tx, control_rx) = mpsc::unbounded_channel();
     let (ready_tx, ready_rx) = std_mpsc::sync_channel(1);
@@ -719,7 +721,11 @@ fn startup_command_for(request: &NativeSshTerminalRequest) -> Option<String> {
             .map(str::trim)
             .filter(|session_id| !session_id.is_empty())
             .map(|session_id| {
-                remote_tmux_resume_command(initial_directory_for(request).as_deref(), session_id)
+                remote_tmux_resume_command(
+                    initial_directory_for(request).as_deref(),
+                    session_id,
+                    request.tmux_history_limit,
+                )
             });
     }
 
@@ -730,14 +736,20 @@ fn startup_command_for(request: &NativeSshTerminalRequest) -> Option<String> {
 pub(crate) fn remote_tmux_resume_command(
     initial_directory: Option<&str>,
     session_id: &str,
+    history_limit: u32,
 ) -> String {
     let cd_command = initial_directory
         .map(|directory| format!("cd -- {} && ", shell_single_quote(directory)))
         .unwrap_or_default();
     format!(
-        "if command -v tmux >/dev/null 2>&1; then {cd_command}exec tmux new-session -A -s {} \\; set-option mouse on \\; set-option history-limit 5000; else {cd_command}printf '\\r\\n[AdminDeck: tmux not found, using normal shell]\\r\\n'; exec \"${{SHELL:-sh}}\" -i; fi",
-        shell_single_quote(session_id)
+        "if command -v tmux >/dev/null 2>&1; then {cd_command}exec tmux new-session -A -s {} \\; set-option mouse on \\; set-option history-limit {}; else {cd_command}printf '\\r\\n[AdminDeck: tmux not found, using normal shell]\\r\\n'; exec \"${{SHELL:-sh}}\" -i; fi",
+        shell_single_quote(session_id),
+        clamp_tmux_history_limit(history_limit),
     )
+}
+
+fn clamp_tmux_history_limit(value: u32) -> u32 {
+    value.clamp(100, 100_000)
 }
 
 fn shell_single_quote(value: &str) -> String {
@@ -1189,7 +1201,7 @@ mod tests {
 
     #[test]
     fn tmux_resume_command_enables_mouse_mode_for_internal_scrollback() {
-        let cmd = remote_tmux_resume_command(None, "admindeck-test");
+        let cmd = remote_tmux_resume_command(None, "admindeck-test", 5_000);
         assert!(
             cmd.contains("\\; set-option mouse on"),
             "command must enable tmux mouse mode so tmux owns alternate-buffer scrolling: {cmd}"
@@ -1198,7 +1210,7 @@ mod tests {
 
     #[test]
     fn tmux_resume_command_enables_mouse_mode_with_initial_directory() {
-        let cmd = remote_tmux_resume_command(Some("/home/user"), "admindeck-test");
+        let cmd = remote_tmux_resume_command(Some("/home/user"), "admindeck-test", 5_000);
         assert!(
             cmd.contains("\\; set-option mouse on"),
             "command must enable tmux mouse mode even with initial directory: {cmd}"
@@ -1207,10 +1219,19 @@ mod tests {
 
     #[test]
     fn tmux_resume_command_sets_default_history_limit() {
-        let cmd = remote_tmux_resume_command(None, "admindeck-test");
+        let cmd = remote_tmux_resume_command(None, "admindeck-test", 5_000);
         assert!(
             cmd.contains("\\; set-option history-limit 5000"),
             "command must keep tmux pane history aligned with AdminDeck's default terminal buffer: {cmd}"
+        );
+    }
+
+    #[test]
+    fn tmux_resume_command_uses_requested_history_limit() {
+        let cmd = remote_tmux_resume_command(None, "admindeck-test", 12_000);
+        assert!(
+            cmd.contains("\\; set-option history-limit 12000"),
+            "command must apply the SSH buffer setting to tmux history: {cmd}"
         );
     }
 
@@ -1448,6 +1469,7 @@ mod tests {
             initial_directory: None,
             use_tmux: false,
             tmux_session_id: None,
+            tmux_history_limit: 5_000,
         }
     }
 }

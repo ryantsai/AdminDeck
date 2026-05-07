@@ -55,6 +55,7 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
     (state) => state.splitTerminalPaneDirected,
   );
   const openSftpBrowser = useWorkspaceStore((state) => state.openSftpBrowser);
+  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const setFocusedPane = useWorkspaceStore((state) => state.setFocusedPane);
   const saveTabLayout = useWorkspaceStore((state) => state.saveTabLayout);
   const resetTabLayout = useWorkspaceStore((state) => state.resetTabLayout);
@@ -84,6 +85,7 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
               request: {
                 ...tmuxConnectionRequest(targetPane.connection),
                 tmuxSessionId: targetPane.tmuxSessionId,
+                bufferLines: sshSettings.bufferLines,
               },
             })
           : renderer.getBufferText();
@@ -705,6 +707,7 @@ function TerminalPaneView({
   const splitMenuRef = useRef<HTMLDivElement | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement | null>(null);
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
+  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const setAssistantContextSnippet = useWorkspaceStore(
     (state) => state.setAssistantContextSnippet,
   );
@@ -766,7 +769,11 @@ function TerminalPaneView({
     }
 
     startedRef.current = true;
-    const terminal = createTerminalRenderer(terminalSettings);
+    const rendererSettings =
+      connection.type === "ssh"
+        ? { ...terminalSettings, scrollbackLines: sshSettings.bufferLines }
+        : terminalSettings;
+    const terminal = createTerminalRenderer(rendererSettings);
     terminalRendererRef.current = terminal;
     terminal.open(element);
     terminal.fit();
@@ -968,6 +975,7 @@ function TerminalPaneView({
             rows: terminalDimensions.rows,
             useTmux: connection.type === "ssh" && connection.useTmuxSessions !== false,
             tmuxSessionId: pane.tmuxSessionId,
+            sshBufferLines: connection.type === "ssh" ? sshSettings.bufferLines : undefined,
           },
         });
         if (disposed) {
@@ -1158,7 +1166,13 @@ function TerminalPaneView({
   }
 
   async function handleSendBufferToAssistant() {
-    const text = (await terminalBufferForAssistant(pane, terminalRendererRef.current)).trim();
+    const text = (
+      await terminalBufferForAssistant(
+        pane,
+        terminalRendererRef.current,
+        sshSettings.bufferLines,
+      )
+    ).trim();
     if (!text) {
       return;
     }
@@ -1650,6 +1664,7 @@ function terminalSessionTypeFor(connection: Connection): "local" | "ssh" | "teln
 async function terminalBufferForAssistant(
   pane: TerminalPane,
   renderer: TerminalRenderer | null,
+  bufferLines: number,
 ) {
   if (pane.connection?.type === "ssh" && pane.tmuxSessionId) {
     try {
@@ -1657,6 +1672,7 @@ async function terminalBufferForAssistant(
         request: {
           ...tmuxConnectionRequest(pane.connection),
           tmuxSessionId: pane.tmuxSessionId,
+          bufferLines,
         },
       });
     } catch (error) {

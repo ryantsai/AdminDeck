@@ -39,6 +39,39 @@ When a key is translated into every supported locale, remove its entry from this
 - Placeholder details: none.
 - Domain notes: The default changed from 10,000 to 5,000 lines; the valid range did not change.
 
+### settings.sshBufferLines
+
+- English value: "SSH buffer lines"
+- Namespace: `settings`
+- File/component: `src/settings/SshSettings.tsx`
+- UI role: input label
+- Surrounding user flow: Settings -> SSH -> SSH defaults lets the user configure the default SSH-specific terminal buffer size separately from local terminal scrollback.
+- Tone: concise settings label.
+- Placeholder details: none.
+- Domain notes: Applies to SSH terminal panes and AdminDeck-launched tmux pane history, not local terminal panes.
+
+### settings.sshBufferHint
+
+- English value: "Default is 5,000. Used for SSH terminal scrollback and tmux pane history."
+- Namespace: `settings`
+- File/component: `src/settings/SshSettings.tsx`
+- UI role: helper text
+- Surrounding user flow: Shown below the SSH buffer lines input to explain how the setting affects native SSH and tmux-backed SSH panes.
+- Tone: concise explanatory helper.
+- Placeholder details: none.
+- Domain notes: tmux can remain English as the terminal multiplexer command name.
+
+### settings.sshBufferRange
+
+- English value: "SSH buffer must be between 100 and 100000 lines."
+- Namespace: `settings`
+- File/component: `src/settings/SshSettings.tsx`
+- UI role: validation error
+- Surrounding user flow: Shown when saving SSH defaults with an SSH buffer size outside the accepted range.
+- Tone: direct validation message.
+- Placeholder details: none.
+- Domain notes: The valid range matches terminal scrollback limits.
+
 ### settings.sshKeyEmailDialogTitle
 
 - English value: "Generate SSH key"

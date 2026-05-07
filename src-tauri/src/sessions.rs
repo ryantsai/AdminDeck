@@ -56,6 +56,7 @@ pub struct StartTerminalSessionRequest {
     pub rows: Option<u16>,
     pub use_tmux: Option<bool>,
     pub tmux_session_id: Option<String>,
+    pub ssh_buffer_lines: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +85,7 @@ pub struct CaptureTmuxPaneRequest {
     #[serde(flatten)]
     pub connection: TmuxConnectionRequest,
     pub tmux_session_id: String,
+    pub buffer_lines: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -255,6 +257,7 @@ impl SessionManager {
                     initial_directory: request.initial_directory.clone(),
                     use_tmux: request.use_tmux.unwrap_or(false),
                     tmux_session_id: request.tmux_session_id.clone(),
+                    tmux_history_limit: ssh_buffer_lines_for(request.ssh_buffer_lines),
                 },
             ) {
                 Ok(session) => {
@@ -413,7 +416,10 @@ impl SessionManager {
             app,
             secrets,
             &request.connection,
-            tmux_capture_pane_command(&tmux_session_id),
+            tmux_capture_pane_command(
+                &tmux_session_id,
+                ssh_buffer_lines_for(request.buffer_lines),
+            ),
         )
     }
 
@@ -757,6 +763,7 @@ fn terminal_request_for_tmux(request: &TmuxConnectionRequest) -> StartTerminalSe
         rows: None,
         use_tmux: None,
         tmux_session_id: None,
+        ssh_buffer_lines: None,
     }
 }
 
@@ -870,12 +877,18 @@ fn tmux_close_command(tmux_session_id: &str) -> String {
     )
 }
 
-const DEFAULT_TMUX_CAPTURE_HISTORY_LINES: u32 = 5_000;
+const DEFAULT_SSH_BUFFER_LINES: u32 = 5_000;
 
-fn tmux_capture_pane_command(tmux_session_id: &str) -> String {
+fn ssh_buffer_lines_for(value: Option<u32>) -> u32 {
+    value
+        .filter(|lines| (100..=100_000).contains(lines))
+        .unwrap_or(DEFAULT_SSH_BUFFER_LINES)
+}
+
+fn tmux_capture_pane_command(tmux_session_id: &str, buffer_lines: u32) -> String {
     format!(
         "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -{} -t {}:",
-        DEFAULT_TMUX_CAPTURE_HISTORY_LINES,
+        ssh_buffer_lines_for(Some(buffer_lines)),
         shell_single_quote(tmux_session_id),
     )
 }
@@ -1053,6 +1066,7 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
                     command.arg(ssh::remote_tmux_resume_command(
                         initial_directory_for(request).as_deref(),
                         tmux_session_id,
+                        ssh_buffer_lines_for(request.ssh_buffer_lines),
                     ));
                 } else if let Some(directory) = initial_directory_for(request) {
                     command.arg(remote_shell_command_for_initial_directory(&directory));
@@ -1194,6 +1208,7 @@ mod tests {
             rows: None,
             use_tmux: None,
             tmux_session_id: None,
+            ssh_buffer_lines: None,
         }
     }
 
@@ -1245,7 +1260,7 @@ mod tests {
     #[test]
     fn tmux_capture_pane_command_targets_session_history() {
         assert_eq!(
-            tmux_capture_pane_command("admindeck-test"),
+            tmux_capture_pane_command("admindeck-test", 5_000),
             "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -5000 -t 'admindeck-test':"
         );
     }
@@ -1253,8 +1268,16 @@ mod tests {
     #[test]
     fn tmux_capture_pane_command_quotes_session_id() {
         assert_eq!(
-            tmux_capture_pane_command("admindeck-test'quoted"),
+            tmux_capture_pane_command("admindeck-test'quoted", 5_000),
             "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -5000 -t 'admindeck-test'\\''quoted':"
+        );
+    }
+
+    #[test]
+    fn tmux_capture_pane_command_uses_requested_history_limit() {
+        assert_eq!(
+            tmux_capture_pane_command("admindeck-test", 12_000),
+            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -12000 -t 'admindeck-test':"
         );
     }
 }

@@ -215,6 +215,7 @@ export interface SshSettings {
   defaultPort: number;
   defaultKeyPath?: string;
   defaultProxyJump?: string;
+  bufferLines: number;
 }
 
 export type SftpOverwriteBehavior = "fail" | "overwrite";

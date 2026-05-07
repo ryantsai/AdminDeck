@@ -88,6 +88,7 @@ export interface StartTerminalSessionRequest {
   rows?: number;
   useTmux?: boolean;
   tmuxSessionId?: string;
+  sshBufferLines?: number;
 }
 
 export interface TerminalSessionStarted {
@@ -807,6 +808,7 @@ type CommandMap = {
         authMethod?: "keyFile" | "password" | "agent";
         secretOwnerId?: string;
         tmuxSessionId: string;
+        bufferLines?: number;
       };
     };
     result: string;

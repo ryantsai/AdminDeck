@@ -4846,7 +4846,7 @@ progress {
 }
 
 .form-grid.ssh-default-basic-grid {
-  grid-template-columns: minmax(180px, 1fr) minmax(120px, 160px);
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 160px) minmax(150px, 190px);
 }
 
 .ai-provider-fields {

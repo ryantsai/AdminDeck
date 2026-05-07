@@ -12,6 +12,7 @@ function normalizeSshSettingsDraft(settings: SshSettingsType, t: TFunction): Ssh
   const defaultKeyPath = settings.defaultKeyPath?.trim() || undefined;
   const defaultProxyJump = settings.defaultProxyJump?.trim() || undefined;
   const defaultPort = Math.round(settings.defaultPort);
+  const bufferLines = Math.round(settings.bufferLines ?? 5000);
 
   if (!defaultUser) {
     throw new Error(t("settings.defaultSshUserRequired"));
@@ -19,12 +20,16 @@ function normalizeSshSettingsDraft(settings: SshSettingsType, t: TFunction): Ssh
   if (!Number.isFinite(defaultPort) || defaultPort < 1 || defaultPort > 65535) {
     throw new Error(t("settings.defaultSshPortRange"));
   }
+  if (!Number.isFinite(bufferLines) || bufferLines < 100 || bufferLines > 100_000) {
+    throw new Error(t("settings.sshBufferRange"));
+  }
 
   return {
     defaultUser,
     defaultPort,
     defaultKeyPath,
     defaultProxyJump,
+    bufferLines,
   };
 }
 
@@ -175,6 +180,24 @@ export function SshSettings() {
             value={sshDraft.defaultPort}
           />
           <small className="field-hint">{t("settings.defaultSshPortHint")}</small>
+        </label>
+        <label>
+          <span>{t("settings.sshBufferLines")}</span>
+          <input
+            inputMode="numeric"
+            max={100000}
+            min={100}
+            onChange={(event) => {
+              const bufferLines = Number(event.currentTarget.value);
+              setSshDraft((settings) => ({
+                ...settings,
+                bufferLines,
+              }));
+            }}
+            type="number"
+            value={sshDraft.bufferLines}
+          />
+          <small className="field-hint">{t("settings.sshBufferHint")}</small>
         </label>
       </div>
 

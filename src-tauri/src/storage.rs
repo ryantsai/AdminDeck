@@ -211,6 +211,8 @@ pub struct SshSettings {
     default_port: u16,
     default_key_path: Option<String>,
     default_proxy_jump: Option<String>,
+    #[serde(default = "default_ssh_buffer_lines")]
+    buffer_lines: u32,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -2821,7 +2823,12 @@ fn default_ssh_settings() -> SshSettings {
         default_port: 22,
         default_key_path: default_ssh_key_path(),
         default_proxy_jump: None,
+        buffer_lines: default_ssh_buffer_lines(),
     }
+}
+
+fn default_ssh_buffer_lines() -> u32 {
+    5_000
 }
 
 fn default_sftp_settings() -> SftpSettings {
@@ -2917,6 +2924,9 @@ fn validate_ssh_settings(mut settings: SshSettings) -> Result<SshSettings, Strin
 
     settings.default_key_path = trim_optional(settings.default_key_path);
     settings.default_proxy_jump = trim_optional(settings.default_proxy_jump);
+    if !(100..=100_000).contains(&settings.buffer_lines) {
+        return Err("SSH buffer must be between 100 and 100000 lines".to_string());
+    }
     Ok(settings)
 }
 
@@ -4068,6 +4078,7 @@ mod tests {
 
         let defaults = storage.ssh_settings().expect("default SSH settings load");
         assert_eq!(defaults.default_port, 22);
+        assert_eq!(defaults.buffer_lines, 5_000);
         assert!(defaults.default_key_path.is_some());
 
         let updated = storage
@@ -4076,6 +4087,7 @@ mod tests {
                 default_port: 2200,
                 default_key_path: Some("  C:\\Users\\ryan\\.ssh\\deploy_ed25519  ".to_string()),
                 default_proxy_jump: Some("  bastion.internal  ".to_string()),
+                buffer_lines: 12_000,
             })
             .expect("SSH settings update");
 
@@ -4087,6 +4099,7 @@ mod tests {
 
         let reloaded = storage.ssh_settings().expect("SSH settings reload");
         assert_eq!(reloaded.default_port, 2200);
+        assert_eq!(reloaded.buffer_lines, 12_000);
         assert_eq!(
             reloaded.default_proxy_jump.as_deref(),
             Some("bastion.internal")
