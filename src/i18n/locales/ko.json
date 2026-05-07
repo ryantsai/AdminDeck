@@ -895,8 +895,6 @@
     "noActiveSession": "활성 세션 없음",
     "openFromTree": "트리에서 연결을 열어주세요.",
     "newTab": "새 탭",
-    "localFirst": "로컬 우선",
-    "telemetryOff": "원격 측정 꺼짐",
     "uiReady": "UI 준비됨",
     "uiTimingPending": "UI 타이밍 보류 중",
     "localReady": "로컬 준비됨",

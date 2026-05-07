@@ -895,8 +895,6 @@
     "noActiveSession": "ไม่มีเซสชันที่ใช้งานอยู่",
     "openFromTree": "เปิดการเชื่อมต่อจากแผนผัง",
     "newTab": "แท็บใหม่",
-    "localFirst": "ภายในเครื่องก่อน",
-    "telemetryOff": "ปิดการวัดและส่งข้อมูลทางไกล",
     "uiReady": "UI พร้อมแล้ว",
     "uiTimingPending": "รอจังหวะ UI",
     "localReady": "ภายในเครื่องพร้อมแล้ว",

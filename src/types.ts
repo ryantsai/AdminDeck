@@ -294,6 +294,14 @@ export interface PerformanceSnapshot {
   lastSshTerminalReadyAtUnixSeconds?: number;
 }
 
+export interface HostUsageSnapshot {
+  cpuPercent?: number;
+  ramPercent?: number;
+  networkBytesPerSecond?: number;
+  sampledAtUnixSeconds: number;
+  source: string;
+}
+
 export interface TerminalStartMetric {
   kind: "local" | "ssh" | "telnet" | "serial";
   title: string;
@@ -306,9 +314,17 @@ export interface PerformanceMetrics {
   backendUptimeMs?: number;
   workingSetBytes?: number;
   memorySource?: string;
+  hostUsage?: HostUsageSnapshot;
   lastTerminalStart?: TerminalStartMetric;
   lastLocalTerminalStart?: TerminalStartMetric;
   lastSshTerminalStart?: TerminalStartMetric;
+}
+
+export interface WorkspaceStatusNotification {
+  id: number;
+  message: string;
+  tone: "success" | "info" | "warning" | "error";
+  expiresAt: number;
 }
 
 export type SecretKind =

@@ -895,8 +895,6 @@
     "noActiveSession": "Sin sesión activa",
     "openFromTree": "Abre una Conexión desde el árbol.",
     "newTab": "Nueva pestaña",
-    "localFirst": "Local primero",
-    "telemetryOff": "Telemetría desactivada",
     "uiReady": "Interfaz lista",
     "uiTimingPending": "Temporización de interfaz pendiente",
     "localReady": "Local listo",

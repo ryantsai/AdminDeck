@@ -1014,7 +1014,8 @@ h2 {
   align-items: center;
 }
 
-.status-bar span {
+.status-bar span,
+.host-metric {
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -3600,16 +3601,28 @@ progress {
 
 .status-bar {
   justify-content: flex-start;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 0 12px;
+  padding: 0 10px;
   overflow: hidden;
   color: var(--text-muted);
   background: var(--surface-muted);
   border-top: 1px solid var(--border);
 }
 
-.status-bar span {
+.host-metrics {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.host-metrics {
+  flex: 0 0 auto;
+  gap: 0;
+}
+
+.status-bar span,
+.host-metric {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -3617,16 +3630,115 @@ progress {
   white-space: nowrap;
 }
 
-.status-bar .metric-ok {
+.host-metric {
+  position: relative;
+  gap: 1px;
+  height: 20px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.host-metric + .host-metric {
+  margin-left: 14px;
+  padding-left: 15px;
+}
+
+.host-metric + .host-metric::before {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 1px;
+  content: "";
+  background: var(--border);
+}
+
+.host-metric svg {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+
+.host-metric-value {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.host-metric-percent .host-metric-value {
+  width: 4ch;
+}
+
+.host-metric-network .host-metric-value {
+  width: 9ch;
+}
+
+.status-notification {
+  flex: 1 1 auto;
+  color: var(--text);
+  opacity: 1;
+  transform: translateY(0);
+  will-change: opacity, transform;
+}
+
+.status-notification.is-entering {
+  animation: status-notification-in 180ms ease-out both;
+}
+
+.status-notification.is-exiting {
+  animation: status-notification-out 220ms ease-in both;
+}
+
+.status-notification.success {
   color: var(--green);
 }
 
-.status-bar .metric-over {
+.status-notification.warning {
   color: var(--amber);
 }
 
-.status-bar .metric-pending {
-  color: var(--text-muted);
+.status-notification.error {
+  color: var(--red);
+}
+
+.status-notification.info {
+  color: var(--accent);
+}
+
+@keyframes status-notification-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes status-notification-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-notification.is-entering,
+  .status-notification.is-exiting {
+    animation: none;
+  }
 }
 
 .dialog-backdrop {

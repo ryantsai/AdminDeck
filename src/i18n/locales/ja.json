@@ -895,8 +895,6 @@
     "noActiveSession": "アクティブなセッションはありません",
     "openFromTree": "ツリーから接続を開いてください。",
     "newTab": "新規タブ",
-    "localFirst": "ローカルファースト",
-    "telemetryOff": "テレメトリオフ",
     "uiReady": "UI準備完了",
     "uiTimingPending": "UIタイミング保留中",
     "localReady": "ローカル準備完了",

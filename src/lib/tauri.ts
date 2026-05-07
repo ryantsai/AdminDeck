@@ -15,6 +15,7 @@ import type {
   CustomFont,
   DatabaseBackupInfo,
   GeneralSettings,
+  HostUsageSnapshot,
   ImportedDatabaseSnapshot,
   CreateConnectionFolderRequest,
   CreateConnectionRequest,
@@ -667,6 +668,10 @@ type CommandMap = {
   get_performance_snapshot: {
     args: undefined;
     result: PerformanceSnapshot;
+  };
+  get_host_usage_snapshot: {
+    args: undefined;
+    result: HostUsageSnapshot;
   };
   create_diagnostics_bundle: {
     args: undefined;

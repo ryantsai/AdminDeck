@@ -271,6 +271,8 @@
     "transferSshPublicKeyHint": "Transfers only the selected public key to the remote user's authorized_keys using password authentication.",
     "transferSshPublicKeyComplete": "SSH public key transferred from {{path}}.",
     "transferSshPublicKeyProxyJumpUnsupported": "TransferSSH pub key does not support ProxyJump connections yet.",
+    "createConnectionComplete": "Connection \"{{name}}\" added.",
+    "deleteConnectionComplete": "Connection \"{{name}}\" deleted.",
     "expandFolder": "Expand folder",
     "collapseFolder": "Collapse folder",
     "folderTreeControls": "Folder tree controls",
@@ -334,7 +336,9 @@
       "newFolderNameLabel": "New folder name",
       "folderNameRequired": "Enter a folder name.",
       "noneSelected": "Select at least one row to import.",
-      "importCount": "Import {{count}}"
+      "importCount": "Import {{count}}",
+      "importFileComplete": "Imported {{count}} Connections from file.",
+      "importScanComplete": "Imported {{count}} Connections from scan."
     }
   },
   "terminal": {
@@ -895,8 +899,13 @@
     "noActiveSession": "No active session",
     "openFromTree": "Open a Connection from the tree.",
     "newTab": "New tab",
-    "localFirst": "Local-first",
-    "telemetryOff": "Telemetry off",
+    "hostUsage": "Host usage",
+    "cpu": "CPU",
+    "cpuUsage": "CPU usage",
+    "ram": "RAM",
+    "ramUsage": "RAM usage",
+    "network": "Network",
+    "networkUsage": "Network throughput",
     "uiReady": "UI ready",
     "uiTimingPending": "UI timing pending",
     "localReady": "Local ready",

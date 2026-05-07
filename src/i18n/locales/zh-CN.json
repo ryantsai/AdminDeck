@@ -895,8 +895,6 @@
     "noActiveSession": "无活动会话",
     "openFromTree": "从连接树打开一个连接。",
     "newTab": "新建标签页",
-    "localFirst": "本地优先",
-    "telemetryOff": "遥测关闭",
     "uiReady": "UI 就绪",
     "uiTimingPending": "UI 计时待确认",
     "localReady": "本地就绪",

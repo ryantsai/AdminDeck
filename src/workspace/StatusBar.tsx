@@ -1,89 +1,127 @@
-import { HardDrive } from "lucide-react";
+import { Cpu, MemoryStick, Network } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useWorkspaceStore } from "../store";
 
-const PERFORMANCE_BUDGETS = {
-  frontendReadyMs: 1_000,
-  localTerminalReadyMs: 100,
-  sshTerminalReadyMs: 150,
-  idleMemoryBytes: 150 * 1024 * 1024,
-} as const;
+const NOTIFICATION_FADE_MS = 220;
 
 export function StatusBar() {
   const { t } = useTranslation();
-  const performanceMetrics = useWorkspaceStore((state) => state.performanceMetrics);
-  const launchLabel = performanceMetrics.frontendLaunchMs
-    ? `${t("workspace.uiReady")} ${formatDuration(performanceMetrics.frontendLaunchMs)}`
-    : t("workspace.uiTimingPending");
-  const localSessionLabel = performanceMetrics.lastLocalTerminalStart
-    ? `${t("workspace.localReady")} ${formatDuration(performanceMetrics.lastLocalTerminalStart.durationMs)}`
-    : t("workspace.localTimingPending");
-  const sshSessionLabel = performanceMetrics.lastSshTerminalStart
-    ? `${t("workspace.sshReady")} ${formatDuration(performanceMetrics.lastSshTerminalStart.durationMs)}`
-    : t("workspace.sshTimingPending");
-  const memoryLabel = performanceMetrics.workingSetBytes
-    ? `${t("workspace.memory")} ${formatBytes(performanceMetrics.workingSetBytes)}`
-    : t("workspace.memoryPending");
+  const hostUsage = useWorkspaceStore((state) => state.performanceMetrics.hostUsage);
+  const notification = useWorkspaceStore((state) => state.workspaceStatusNotification);
+  const clearWorkspaceStatus = useWorkspaceStore((state) => state.clearWorkspaceStatus);
+  const [renderedNotification, setRenderedNotification] = useState(notification);
+  const [isNotificationExiting, setIsNotificationExiting] = useState(false);
+
+  useEffect(() => {
+    if (!notification) {
+      return;
+    }
+    setRenderedNotification(notification);
+    setIsNotificationExiting(false);
+    const remainingMs = Math.max(0, notification.expiresAt - Date.now());
+    const fadeDelayMs = Math.max(0, remainingMs - NOTIFICATION_FADE_MS);
+    const fadeTimeout = window.setTimeout(() => setIsNotificationExiting(true), fadeDelayMs);
+    const clearTimeout = window.setTimeout(() => clearWorkspaceStatus(notification.id), remainingMs);
+    return () => {
+      window.clearTimeout(fadeTimeout);
+      window.clearTimeout(clearTimeout);
+    };
+  }, [clearWorkspaceStatus, notification]);
+
+  useEffect(() => {
+    if (notification) {
+      return;
+    }
+    if (!isNotificationExiting) {
+      setRenderedNotification(undefined);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setRenderedNotification(undefined);
+      setIsNotificationExiting(false);
+    }, NOTIFICATION_FADE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [isNotificationExiting, notification]);
 
   return (
     <footer className="status-bar">
-      <span>
-        <HardDrive size={13} />
-        {t("workspace.localFirst")}
-      </span>
-      <span>{t("workspace.telemetryOff")}</span>
-      <span
-        className={budgetClass(performanceMetrics.frontendLaunchMs, PERFORMANCE_BUDGETS.frontendReadyMs)}
-        title={`${t("workspace.budgetPrefix")}: <= ${formatDuration(PERFORMANCE_BUDGETS.frontendReadyMs)}`}
-      >
-        {launchLabel}
-      </span>
-      <span
-        className={budgetClass(
-          performanceMetrics.lastLocalTerminalStart?.durationMs,
-          PERFORMANCE_BUDGETS.localTerminalReadyMs,
-        )}
-        title={`Budget: <= ${formatDuration(PERFORMANCE_BUDGETS.localTerminalReadyMs)} for new local terminal tabs`}
-      >
-        {localSessionLabel}
-      </span>
-      <span
-        className={budgetClass(
-          performanceMetrics.lastSshTerminalStart?.durationMs,
-          PERFORMANCE_BUDGETS.sshTerminalReadyMs,
-        )}
-        title={`Budget: <= ${formatDuration(PERFORMANCE_BUDGETS.sshTerminalReadyMs)} after SSH authentication, excluding network time`}
-      >
-        {sshSessionLabel}
-      </span>
-      <span
-        className={budgetClass(
-          performanceMetrics.workingSetBytes,
-          PERFORMANCE_BUDGETS.idleMemoryBytes,
-        )}
-        title={`${performanceMetrics.memorySource ?? "Memory source pending"} | Budget: <= ${formatBytes(
-          PERFORMANCE_BUDGETS.idleMemoryBytes,
-        )} idle working set`}
-      >
-        {memoryLabel}
-      </span>
+      <div className="host-metrics" aria-label={t("workspace.hostUsage")}>
+        <Metric
+          icon={<Cpu size={13} />}
+          label={t("workspace.cpu")}
+          metric="percent"
+          title={t("workspace.cpuUsage")}
+          value={formatPercent(hostUsage?.cpuPercent)}
+        />
+        <Metric
+          icon={<MemoryStick size={13} />}
+          label={t("workspace.ram")}
+          metric="percent"
+          title={t("workspace.ramUsage")}
+          value={formatPercent(hostUsage?.ramPercent)}
+        />
+        <Metric
+          icon={<Network size={13} />}
+          label={t("workspace.network")}
+          metric="network"
+          title={t("workspace.networkUsage")}
+          value={formatNetwork(hostUsage?.networkBytesPerSecond)}
+        />
+      </div>
+      {renderedNotification ? (
+        <span
+          className={`status-notification ${renderedNotification.tone} ${
+            isNotificationExiting ? "is-exiting" : "is-entering"
+          }`}
+          role="status"
+        >
+          {renderedNotification.message}
+        </span>
+      ) : null}
     </footer>
   );
 }
 
-function budgetClass(value: number | undefined, budget: number) {
+function Metric({
+  icon,
+  label,
+  metric,
+  title,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  metric: "network" | "percent";
+  title: string;
+  value: string;
+}) {
+  return (
+    <span className={`host-metric host-metric-${metric}`} aria-label={`${label} ${value}`} title={title}>
+      {icon}
+      <strong className="host-metric-value">{value}</strong>
+    </span>
+  );
+}
+
+function formatPercent(value: number | undefined) {
   if (value === undefined) {
-    return "metric-pending";
+    return "--%";
   }
-
-  return value <= budget ? "metric-ok" : "metric-over";
+  return `${Math.round(value)}%`;
 }
 
-function formatDuration(durationMs: number) {
-  return durationMs < 1000 ? `${durationMs} ms` : `${(durationMs / 1000).toFixed(1)} s`;
-}
-
-function formatBytes(bytes: number) {
-  const mib = bytes / (1024 * 1024);
-  return `${mib.toFixed(mib >= 100 ? 0 : 1)} MiB`;
+function formatNetwork(bytesPerSecond: number | undefined) {
+  if (bytesPerSecond === undefined) {
+    return "-- MB/s";
+  }
+  const mb = bytesPerSecond / 1_000_000;
+  if (mb < 10) {
+    return `${mb.toFixed(1)} MB/s`;
+  }
+  if (mb < 100) {
+    return `${Math.round(mb)} MB/s`;
+  }
+  return `${Math.min(9999, Math.round(mb))} MB/s`;
 }

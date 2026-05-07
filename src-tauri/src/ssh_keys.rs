@@ -229,24 +229,8 @@ fn required_field(label: &str, value: String) -> Result<String, String> {
 
 #[cfg(target_os = "windows")]
 fn secure_path_for_current_user(path: &Path, is_directory: bool) -> Result<(), String> {
-    let user_output = Command::new("whoami")
-        .output()
-        .map_err(|error| format!("failed to resolve current Windows user: {error}"))?;
-    if !user_output.status.success() {
-        return Err("failed to resolve current Windows user".to_string());
-    }
-    let user = String::from_utf8_lossy(&user_output.stdout)
-        .trim()
-        .to_string();
-    if user.is_empty() {
-        return Err("failed to resolve current Windows user".to_string());
-    }
-
-    let grant = if is_directory {
-        format!("{user}:(OI)(CI)F")
-    } else {
-        format!("{user}:R,W")
-    };
+    let user = windows_current_user_acl_identity()?;
+    let grant = windows_current_user_grant(&user, is_directory);
     let output = Command::new("icacls")
         .arg(path)
         .arg("/inheritance:r")
@@ -275,6 +259,47 @@ fn secure_path_for_current_user(path: &Path, is_directory: bool) -> Result<(), S
     }
 }
 
+#[cfg(target_os = "windows")]
+fn windows_current_user_acl_identity() -> Result<String, String> {
+    let user_output = Command::new("whoami")
+        .arg("/user")
+        .arg("/fo")
+        .arg("csv")
+        .arg("/nh")
+        .output()
+        .map_err(|error| format!("failed to resolve current Windows user: {error}"))?;
+    if !user_output.status.success() {
+        return Err("failed to resolve current Windows user".to_string());
+    }
+    let sid = parse_whoami_user_sid(&String::from_utf8_lossy(&user_output.stdout))
+        .ok_or_else(|| "failed to resolve current Windows user".to_string())?;
+    Ok(format!("*{sid}"))
+}
+
+#[cfg(target_os = "windows")]
+fn parse_whoami_user_sid(output: &str) -> Option<String> {
+    output
+        .lines()
+        .find_map(|line| {
+            let line = line.trim().trim_start_matches('\u{feff}');
+            if line.is_empty() {
+                return None;
+            }
+            line.rsplit_once(',')
+                .map(|(_, sid)| sid.trim().trim_matches('"').to_string())
+        })
+        .filter(|sid| sid.starts_with("S-1-"))
+}
+
+#[cfg(target_os = "windows")]
+fn windows_current_user_grant(user: &str, is_directory: bool) -> String {
+    if is_directory {
+        format!("{user}:(OI)(CI)F")
+    } else {
+        format!("{user}:(R,W)")
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 fn secure_path_for_current_user(path: &Path, is_directory: bool) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
@@ -285,4 +310,55 @@ fn secure_path_for_current_user(path: &Path, is_directory: bool) -> Result<(), S
             path.display()
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_key_path_appends_pub_suffix() {
+        assert_eq!(
+            public_key_path_for(Path::new("C:\\Users\\ryan\\.ssh\\id_ed25519")),
+            PathBuf::from("C:\\Users\\ryan\\.ssh\\id_ed25519.pub")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn parses_whoami_csv_sid() {
+        let output = "\"RYAN5080\\ryan\",\"S-1-5-21-111-222-333-1001\"\r\n";
+        assert_eq!(
+            parse_whoami_user_sid(output).as_deref(),
+            Some("S-1-5-21-111-222-333-1001")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn parses_whoami_csv_sid_with_utf8_bom() {
+        let output = "\u{feff}\"RYAN5080\\ryan\",\"S-1-5-21-111-222-333-1001\"\r\n";
+        assert_eq!(
+            parse_whoami_user_sid(output).as_deref(),
+            Some("S-1-5-21-111-222-333-1001")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_file_grant_uses_parenthesized_permissions() {
+        assert_eq!(
+            windows_current_user_grant("*S-1-5-21-111-222-333-1001", false),
+            "*S-1-5-21-111-222-333-1001:(R,W)"
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_directory_grant_keeps_inheritable_full_control() {
+        assert_eq!(
+            windows_current_user_grant("*S-1-5-21-111-222-333-1001", true),
+            "*S-1-5-21-111-222-333-1001:(OI)(CI)F"
+        );
+    }
 }

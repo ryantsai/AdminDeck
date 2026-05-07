@@ -895,8 +895,6 @@
     "noActiveSession": "無使用中的工作階段",
     "openFromTree": "從連線樹開啟一個連線。",
     "newTab": "新增分頁",
-    "localFirst": "本機優先",
-    "telemetryOff": "遙測關閉",
     "uiReady": "UI 就緒",
     "uiTimingPending": "UI 計時待確認",
     "localReady": "本機就緒",

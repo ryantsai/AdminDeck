@@ -22,7 +22,7 @@ type ImportDialogProps = {
   tree: ConnectionTree;
   sshSettings: SshSettings;
   onClose: () => void;
-  onImported: () => void;
+  onImported: (result: { count: number; source: "file" | "scan" }) => void;
 };
 
 type Stage = "menu" | "file" | "scan";
@@ -167,7 +167,7 @@ function FileImportPanel({
   onError: (message: string) => void;
   onClearError: () => void;
   onClose: () => void;
-  onImported: () => void;
+  onImported: (result: { count: number; source: "file" | "scan" }) => void;
 }) {
   const { t } = useTranslation();
   const [filePath, setFilePath] = useState("");
@@ -265,7 +265,7 @@ function ScanPanel({
   onError: (message: string) => void;
   onClearError: () => void;
   onClose: () => void;
-  onImported: () => void;
+  onImported: (result: { count: number; source: "file" | "scan" }) => void;
 }) {
   const { t } = useTranslation();
   const [target, setTarget] = useState("");
@@ -461,7 +461,7 @@ function ImportPreviewSection({
   onCancel: () => void;
   onCandidatesChange: (next: Candidate[]) => void;
   onError: (message: string) => void;
-  onImported: () => void;
+  onImported: (result: { count: number; source: "file" | "scan" }) => void;
   sshSettings: SshSettings;
   tree: ConnectionTree;
   warnings: string[];
@@ -638,7 +638,7 @@ function ImportPreviewSection({
         await storeImportedPassword(connection.id, password);
       }
 
-      onImported();
+      onImported({ count: selectedCount, source: format === "scan" ? "scan" : "file" });
     } catch (failure) {
       onError(failure instanceof Error ? failure.message : String(failure));
     } finally {

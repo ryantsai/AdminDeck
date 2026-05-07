@@ -133,11 +133,11 @@ export function ConnectionSidebar({
   const addConnectionToTerminalPane = useWorkspaceStore((state) => state.addConnectionToTerminalPane);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
+  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
   const [tree, setTree] = useState<ConnectionTree>(connectionTree);
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [formError, setFormError] = useState("");
   const [treeError, setTreeError] = useState("");
-  const [treeStatus, setTreeStatus] = useState("");
   const [quickConnectMenuOpen, setQuickConnectMenuOpen] = useState(false);
   const [recentConnectionIds, setRecentConnectionIds] = useState(loadRecentConnectionIds);
   const [dropTarget, setDropTarget] = useState("");
@@ -228,6 +228,12 @@ export function ConnectionSidebar({
     setTreeError("");
   }
 
+  function showConnectionSuccessStatus(message: string) {
+    showWorkspaceStatus(message, {
+      tone: "success",
+    });
+  }
+
   function handleConnectionReady(connection: Connection) {
     setTree((currentTree) => upsertRootConnection(currentTree, connection));
     rememberConnection(connection);
@@ -269,7 +275,6 @@ export function ConnectionSidebar({
     }
     const { connection, keyPath } = transferSshPublicKeyDialog;
     setTreeError("");
-    setTreeStatus("");
     setTransferSshPublicKeyError("");
     if (connection.proxyJump?.trim()) {
       setTransferSshPublicKeyError(t("connections.transferSshPublicKeyProxyJumpUnsupported"));
@@ -294,7 +299,7 @@ export function ConnectionSidebar({
         },
       });
       setTransferSshPublicKeyDialog(null);
-      setTreeStatus(t("connections.transferSshPublicKeyComplete", { path: result.publicKeyPath }));
+      showConnectionSuccessStatus(t("connections.transferSshPublicKeyComplete", { path: result.publicKeyPath }));
     } catch (error) {
       setTransferSshPublicKeyError(error instanceof Error ? error.message : String(error));
     }
@@ -403,6 +408,7 @@ export function ConnectionSidebar({
           },
           connectionRequest.folderId,
         );
+        showConnectionSuccessStatus(t("connections.createConnectionComplete", { name: connection.name }));
       } catch (error) {
         setFormError(error instanceof Error ? error.message : String(error));
       }
@@ -612,6 +618,7 @@ export function ConnectionSidebar({
         connectionId: connection.id,
       });
       await reloadConnectionGroups();
+      showConnectionSuccessStatus(t("connections.deleteConnectionComplete", { name: connection.name }));
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
@@ -1009,7 +1016,6 @@ export function ConnectionSidebar({
           <IconParkExpandTextInput size={13} />
         </button>
       </div>
-      {treeStatus ? <p className="tree-status">{treeStatus}</p> : null}
       {treeError ? <p className="form-error tree-error">{treeError}</p> : null}
 
       <div
@@ -1127,7 +1133,6 @@ export function ConnectionSidebar({
             setTreeContextMenu(null);
             if (menu.kind === "connection" && menu.connection.type === "ssh") {
               setTreeError("");
-              setTreeStatus("");
               setTransferSshPublicKeyDialog({
                 connection: menu.connection,
                 keyPath: menu.connection.keyPath ?? sshSettings.defaultKeyPath,
@@ -1167,9 +1172,17 @@ export function ConnectionSidebar({
           tree={tree}
           sshSettings={sshSettings}
           onClose={() => setImportDialogOpen(false)}
-          onImported={() => {
+          onImported={({ count, source }) => {
             setImportDialogOpen(false);
             void reloadConnectionGroups();
+            showConnectionSuccessStatus(
+              t(
+                source === "scan"
+                  ? "connections.import.importScanComplete"
+                  : "connections.import.importFileComplete",
+                { count },
+              ),
+            );
           }}
         />
       ) : null}

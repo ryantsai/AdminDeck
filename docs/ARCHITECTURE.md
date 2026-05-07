@@ -252,15 +252,15 @@ Workspace chrome layout is global state. Connection-specific live context may ch
 
 ## Frontend Module Map
 
-`src/App.tsx` is intentionally a small shell now. It owns page routing, global left/right panel layout, startup/bootstrap effects, Settings routing, and the activity rail. Workspace surfaces and connection UI live in feature modules so terminal, SFTP, URL, RDP/VNC, assistant, and connection-tree work can proceed independently without repeatedly touching the app shell.
+`src/App.tsx` is intentionally a small shell now. It owns page routing, global left/right panel layout, startup/bootstrap effects, Settings routing, the activity rail, and the low-frequency host-usage polling that feeds the workspace status bar. Workspace surfaces and connection UI live in feature modules so terminal, SFTP, URL, RDP/VNC, assistant, and connection-tree work can proceed independently without repeatedly touching the app shell.
 
-- `src/App.tsx` — `App`, `ActivityRail`, panel resize handles, global chrome layout persistence, Settings routing, startup performance polling.
+- `src/App.tsx` — `App`, `ActivityRail`, panel resize handles, global chrome layout persistence, Settings routing, frontend launch timestamping, and host usage polling.
 - `src/connections/ConnectionSidebar.tsx` — connection tree, search, drag/drop, CRUD, quick connect, connection dialog, connection glyphs, folder rows, tree context menu.
 - `src/connections/treeUtils.ts` — pure connection tree transforms, filtering, flattening, folder counts, and live status projection.
 - `src/connections/utils.tsx` — connection labels/icons, default ports, Quick Connect runtime ids, local shell options, and SSH host-key confirmation helpers shared by terminal/SFTP.
 - `src/workspace/WorkspaceCanvas.tsx` — `TabStrip` and `WorkspaceCanvas`, including active Tab dispatch to terminal, SFTP, URL, and remote desktop surfaces.
 - `src/workspace/ScreenshotMenu.tsx` — screenshot menu, Region overlay, screenshot-to-clipboard, and screenshot-to-AI handoff.
-- `src/workspace/StatusBar.tsx` — performance/budget status presentation.
+- `src/workspace/StatusBar.tsx` — bottom workspace status bar. It starts with left-aligned, low-frequency host usage metrics rendered as plain icon-plus-value items with fixed-width numeric columns so the row does not shift as values change. Transient workspace notifications appear after the metrics with a brief fade in/out. CPU, RAM, and network throughput come from low-overhead direct Windows APIs. It should not grow back into a debug timing strip; detailed performance measurements belong in diagnostics, scripts, or explicit release-measurement workflows.
 - `src/workspace/nativeOverlay.ts` — shared overlay suppression detection for native HWND-backed surfaces; update this when a new DOM menu, dialog, or overlay needs to appear above WebView2 or RDP.
 - `src/terminal/TerminalWorkspace.tsx` — terminal workspace, split layout view, pane host, tmux session tag/popover, terminal context menu, SSH tmux inspection helpers.
 - `src/terminal/renderer.ts` — renderer abstraction and xterm/WebGL renderer implementation.

@@ -1,32 +1,39 @@
 # AdminDeck Performance and Terminal Compatibility Checks
 
-AdminDeck performance checks are local-only. They use the app chrome status bar, manual observation, and local process memory data; they do not upload telemetry and they should not capture terminal contents.
+AdminDeck performance checks are local-only. They use manual observation, diagnostics snapshots, scripts, and local process memory data; they do not upload telemetry and they should not capture terminal contents.
+
+The app chrome status bar is no longer a performance-budget readout. It is intentionally reserved for:
+
+- low-frequency host usage metrics sampled about every 5 seconds. CPU uses `GetSystemTimes`, RAM uses `GlobalMemoryStatusEx` with `GetPerformanceInfo` fallback, and aggregate network throughput uses the IP Helper interface table with status-bar display rounded to MB/s.
+- transient workspace notifications, such as SSH public key transfer success, which appear after the metrics and disappear after a short timeout
+
+Do not add debug-only timing indicators back to the status bar. Use diagnostics, logs, DevTools, measurement scripts, or a purpose-built debug build when validating budgets.
 
 ## Budgets
 
 | Metric | Budget | Source |
 | --- | ---: | --- |
-| Cold launch to usable UI | <= 1,000 ms acceptable, <= 500 ms target | Status bar `UI ready` value after launch |
-| New local terminal tab ready | <= 100 ms | Status bar `Local ready` value after opening a local terminal |
-| SSH terminal ready after auth | <= 150 ms, excluding network/auth wait | Status bar `SSH ready` value after opening a native non-`ProxyJump` SSH Connection |
-| Idle memory | <= 150 MiB target | Status bar `Memory` value after the app is idle |
+| Cold launch to usable UI | <= 1,000 ms acceptable, <= 500 ms target | Release-measurement run or DevTools/performance instrumentation |
+| New local terminal tab ready | <= 100 ms | Release-measurement run or explicit local terminal timing instrumentation |
+| SSH terminal ready after auth | <= 150 ms, excluding network/auth wait | `npm run measure:ssh-readiness`, diagnostics snapshot, or release-measurement run |
+| Idle memory | <= 150 MiB target | Diagnostics snapshot or OS process working-set/private-bytes counters |
 
 ## Measurement Run
 
 Use a release-like Tauri build when possible. Development builds are still useful for regressions, but record that they are development measurements.
 
 1. Start AdminDeck and wait until the first workspace is usable.
-2. Record the `UI ready` value from the status bar.
+2. Record cold launch timing from the release-measurement harness, DevTools, or another explicit timing source.
 3. Let the app sit idle for at least 30 seconds with no active transfers.
-4. Record the `Memory` value and its tooltip source.
+4. Record memory from diagnostics, Task Manager, Process Explorer, or equivalent local OS counters.
 5. Open a new local terminal tab.
-6. Record the `Local ready` value.
+6. Record local terminal readiness from explicit timing instrumentation.
 7. Open a native non-`ProxyJump` SSH Connection that has already completed host-key trust.
-8. Record the `SSH ready` value after authentication completes. The value is measured in the Rust SSH path after verified connect/auth returns and covers terminal channel, PTY, shell, and initial directory setup.
+8. Record SSH readiness with `npm run measure:ssh-readiness` or diagnostics after authentication completes. The value is measured in the Rust SSH path after verified connect/auth returns and covers terminal channel, PTY, shell, and initial directory setup.
 
 Record the machine, OS, build type, date, and values in release notes or the validating issue before marking a milestone measurement item complete.
 
-The last native SSH post-auth readiness value is also kept in the local performance snapshot and diagnostics manifest as `lastSshTerminalReadyMs`, with no Connection name, host, terminal output, or secret material.
+The last native SSH post-auth readiness value is kept in the local performance snapshot and diagnostics manifest as `lastSshTerminalReadyMs`, with no Connection name, host, terminal output, or secret material.
 
 For repeatable SSH readiness checks without terminal output capture, use the ignored Rust measurement test through the package script:
 
@@ -63,13 +70,13 @@ Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `sr
 
 | Metric | Measurement | Budget | Status | Notes |
 | --- | ---: | ---: | --- | --- |
-| Cold launch to usable UI | 71 ms | <= 1,000 ms acceptable, <= 500 ms target | Pass | Read from the app chrome `UI ready` status value. External WebView2 CDP page availability was 247 ms. |
-| Idle memory | 27.9 MiB | <= 150 MiB target | Pass | Read from the app chrome `Memory` status value after 30 seconds idle. Process working set was 27.9 MiB and private bytes were 5.0 MiB. |
+| Cold launch to usable UI | 71 ms | <= 1,000 ms acceptable, <= 500 ms target | Pass | Historical measurement from the previous app chrome `UI ready` status value. External WebView2 CDP page availability was 247 ms. New runs should use explicit timing instrumentation because the status bar no longer shows this value. |
+| Idle memory | 27.9 MiB | <= 150 MiB target | Pass | Historical measurement from the previous app chrome `Memory` status value after 30 seconds idle. Process working set was 27.9 MiB and private bytes were 5.0 MiB. New runs should use diagnostics or OS process counters. |
 | Idle CPU | 0.000% | No formal budget | Informational | CPU delta over the 30 second idle window, normalized across 32 logical processors. |
-| New local terminal tab ready | 16 ms | <= 100 ms | Pass | Triggered the `New local terminal` button in the release app and read the app chrome `Local ready` value. |
+| New local terminal tab ready | 16 ms | <= 100 ms | Pass | Historical measurement from the previous app chrome `Local ready` value after triggering the `New local terminal` button in the release app. New runs should use explicit timing instrumentation. |
 | Working set after one local terminal | 29.4 MiB | No separate budget | Informational | Process private bytes were 6.5 MiB. Shell child-process memory is not included in this app-process value. |
 | Release executable size | 16.9 MiB | Not Electron-scale | Pass | Size of `src-tauri/target/release/admin-deck.exe`. |
-| SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | The app records native SSH post-auth terminal readiness in the status bar, performance snapshot, diagnostics manifest, and repeatable `npm run measure:ssh-readiness` helper. This run still requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
+| SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | The app records native SSH post-auth terminal readiness in performance snapshots and diagnostics manifests, and the repeatable `npm run measure:ssh-readiness` helper can measure it directly. This run still requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
 
 This run meets every measured performance budget. SSH readiness remains the only documented performance budget not validated by this run.
 

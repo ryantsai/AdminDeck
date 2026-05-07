@@ -112,7 +112,7 @@ function App() {
   const [wikiInitialPageId, setWikiInitialPageId] = useState<string | null>(null);
   const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
   const setFrontendLaunchMs = useWorkspaceStore((state) => state.setFrontendLaunchMs);
-  const setPerformanceSnapshot = useWorkspaceStore((state) => state.setPerformanceSnapshot);
+  const setHostUsageSnapshot = useWorkspaceStore((state) => state.setHostUsageSnapshot);
   const appShellRef = useRef<HTMLDivElement | null>(null);
   const resetAllLayouts = useWorkspaceStore((state) => state.resetAllLayouts);
   useBootstrapSettings();
@@ -203,24 +203,31 @@ function App() {
     }
 
     let disposed = false;
-    async function refreshPerformanceSnapshot() {
+    let refreshing = false;
+    async function refreshHostUsageSnapshot() {
+      if (refreshing) {
+        return;
+      }
+      refreshing = true;
       try {
-        const snapshot = await invokeCommand("get_performance_snapshot");
+        const snapshot = await invokeCommand("get_host_usage_snapshot");
         if (!disposed) {
-          setPerformanceSnapshot(snapshot);
+          setHostUsageSnapshot(snapshot);
         }
       } catch {
-        // Performance metrics are diagnostic only.
+        // Host usage is informational only.
+      } finally {
+        refreshing = false;
       }
     }
 
-    void refreshPerformanceSnapshot();
-    const interval = window.setInterval(() => void refreshPerformanceSnapshot(), 15_000);
+    void refreshHostUsageSnapshot();
+    const interval = window.setInterval(() => void refreshHostUsageSnapshot(), 5_000);
     return () => {
       disposed = true;
       window.clearInterval(interval);
     };
-  }, [setPerformanceSnapshot]);
+  }, [setHostUsageSnapshot]);
 
   useEffect(() => {
     const preventDefaultContextMenu = (event: globalThis.MouseEvent) => {

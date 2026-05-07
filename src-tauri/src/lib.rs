@@ -459,6 +459,13 @@ fn get_performance_snapshot(
 }
 
 #[tauri::command]
+fn get_host_usage_snapshot(
+    performance: tauri::State<'_, performance::PerformanceMonitor>,
+) -> performance::HostUsageSnapshot {
+    performance.host_usage_snapshot()
+}
+
+#[tauri::command]
 fn create_diagnostics_bundle(
     app: tauri::AppHandle,
     performance: tauri::State<'_, performance::PerformanceMonitor>,
@@ -1253,6 +1260,7 @@ pub fn run() {
             run_ai_agent,
             keychain_status,
             get_performance_snapshot,
+            get_host_usage_snapshot,
             create_diagnostics_bundle,
             capture_screenshot_to_clipboard,
             capture_screenshot_for_assistant,

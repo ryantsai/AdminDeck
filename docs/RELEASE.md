@@ -7,7 +7,7 @@ This document captures v0.1 release-facing posture that is not tied to a single 
 AdminDeck is local-first by default.
 
 - The app does not include analytics, automatic crash upload, or background telemetry.
-- Performance metrics shown in the status bar are local process measurements.
+- The status bar shows local host usage metrics and transient workspace notifications only. It does not upload telemetry and no longer presents debug timing budgets.
 - Terminal contents are not logged by default.
 - Durable Connection metadata is stored in local SQLite.
 - Secrets such as passwords, passphrases, and AI API keys are stored in the OS keychain.
