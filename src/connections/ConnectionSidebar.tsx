@@ -1,7 +1,8 @@
 import { ConnectionIcon } from "./ConnectionIcon";
+import { ImportDialog } from "./ImportDialog";
 import { defaultPortForConnectionType, connectionSubtitle, connectionTypeLabel, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
 import { collectConnectionFolderIds, countConnections, countFolders, filterConnectionTree, flattenConnections, flattenFolders, upsertRootConnection, withLiveConnectionStatuses } from "./treeUtils";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, PanelRight, Play, Plus, Save, Search, Server, Terminal, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Download, Folder, FolderPlus, PanelRight, Play, Plus, Save, Search, Server, Terminal, X } from "lucide-react";
 import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollapseTextInput, Delete as IconParkDelete, Edit as IconParkEdit, ExpandTextInput as IconParkExpandTextInput, FolderPlus as IconParkFolderPlus, Setting as IconParkSetting } from "@icon-park/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -140,6 +141,7 @@ export function ConnectionSidebar({
   const [pendingFolderDraft, setPendingFolderDraft] = useState<PendingFolderDraft | null>(null);
   const [treeContextMenu, setTreeContextMenu] = useState<TreeContextMenuState | null>(null);
   const [editConnection, setEditConnection] = useState<EditConnectionState | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<
     | { kind: "connection"; connection: Connection }
     | { kind: "folder"; folder: ConnectionFolder }
@@ -1088,7 +1090,27 @@ export function ConnectionSidebar({
             setFormMode(null);
             setFormError("");
           }}
+          onImportRequested={
+            formMode === "save"
+              ? () => {
+                  setFormMode(null);
+                  setFormError("");
+                  setImportDialogOpen(true);
+                }
+              : undefined
+          }
           onSubmit={handleConnectionSubmit}
+        />
+      ) : null}
+      {importDialogOpen ? (
+        <ImportDialog
+          tree={tree}
+          sshSettings={sshSettings}
+          onClose={() => setImportDialogOpen(false)}
+          onImported={() => {
+            setImportDialogOpen(false);
+            void reloadConnectionGroups();
+          }}
         />
       ) : null}
       {editConnection ? (
@@ -1721,6 +1743,7 @@ function ConnectionDialog({
   mode,
   sshSettings,
   onCancel,
+  onImportRequested,
   onSubmit,
 }: {
   error: string;
@@ -1730,6 +1753,7 @@ function ConnectionDialog({
   mode: "save" | "quick" | "edit";
   sshSettings: SshSettings;
   onCancel: () => void;
+  onImportRequested?: () => void;
   onSubmit: (request: ConnectionDialogRequest) => void | Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -1974,6 +1998,23 @@ function ConnectionDialog({
                   </span>
                 </button>
               ))}
+              {onImportRequested ? (
+                <button
+                  className="connection-type-tile"
+                  data-connection-type="import"
+                  key="import"
+                  onClick={onImportRequested}
+                  type="button"
+                >
+                  <span className="connection-type-icon">
+                    <Download size={22} />
+                  </span>
+                  <span className="connection-type-copy">
+                    <strong>{t("connections.import.tileTitle")}</strong>
+                    <small>{t("connections.import.tileSubtitle")}</small>
+                  </span>
+                </button>
+              ) : null}
             </div>
           </fieldset>
         )}

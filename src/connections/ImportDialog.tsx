@@ -1,0 +1,729 @@
+import { ChevronLeft, FileUp, Loader2, Network, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
+import {
+  invokeCommand,
+  selectConnectionImportFile,
+  type ImportFilePreview,
+  type ScanProgressEvent,
+  type ScanResultEntry,
+} from "../lib/tauri";
+import { defaultPortForConnectionType, uniqueRuntimeId } from "./utils";
+import { flattenFolders } from "./treeUtils";
+import type {
+  ConnectionTree,
+  ConnectionType,
+  CreateConnectionRequest,
+  SshSettings,
+} from "../types";
+
+type ImportDialogProps = {
+  tree: ConnectionTree;
+  sshSettings: SshSettings;
+  onClose: () => void;
+  onImported: () => void;
+};
+
+type Stage = "menu" | "file" | "scan";
+
+type Candidate = {
+  id: string;
+  selected: boolean;
+  name: string;
+  host: string;
+  user: string;
+  port?: number;
+  type: ConnectionType;
+  folderPath: string[];
+};
+
+const DEFAULT_PORTS: Array<{ port: number; labelKey: string }> = [
+  { port: 22, labelKey: "connections.import.portSsh" },
+  { port: 23, labelKey: "connections.import.portTelnet" },
+  { port: 3389, labelKey: "connections.import.portRdp" },
+];
+
+export function ImportDialog({ tree, sshSettings, onClose, onImported }: ImportDialogProps) {
+  const { t } = useTranslation();
+  const [stage, setStage] = useState<Stage>("menu");
+  const [error, setError] = useState("");
+
+  return (
+    <div className="dialog-backdrop connection-dialog-backdrop" role="presentation">
+      <div className="connection-dialog import-dialog">
+        <header className="connection-dialog-header compact">
+          <div className="import-dialog-header-text">
+            {stage !== "menu" ? (
+              <button
+                className="import-dialog-back"
+                onClick={() => {
+                  setStage("menu");
+                  setError("");
+                }}
+                title={t("connections.import.back")}
+                type="button"
+                aria-label={t("connections.import.back")}
+              >
+                <ChevronLeft size={16} />
+              </button>
+            ) : null}
+            <div>
+              <p className="panel-label">{t("connections.import.title")}</p>
+              <h2>
+                {stage === "menu"
+                  ? t("connections.import.chooseSource")
+                  : stage === "file"
+                    ? t("connections.import.fromFileTitle")
+                    : t("connections.import.scanTitle")}
+              </h2>
+            </div>
+          </div>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={t("connections.close")}
+            onClick={onClose}
+          >
+            <X size={15} />
+          </button>
+        </header>
+
+        {error ? <p className="form-error">{error}</p> : null}
+
+        {stage === "menu" ? (
+          <ImportMenu onPick={(next) => setStage(next)} />
+        ) : null}
+        {stage === "file" ? (
+          <FileImportPanel
+            tree={tree}
+            sshSettings={sshSettings}
+            onError={setError}
+            onClearError={() => setError("")}
+            onClose={onClose}
+            onImported={onImported}
+          />
+        ) : null}
+        {stage === "scan" ? (
+          <ScanPanel
+            tree={tree}
+            sshSettings={sshSettings}
+            onError={setError}
+            onClearError={() => setError("")}
+            onClose={onClose}
+            onImported={onImported}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ImportMenu({ onPick }: { onPick: (stage: "file" | "scan") => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="import-menu">
+      <button
+        className="import-menu-tile"
+        onClick={() => onPick("file")}
+        type="button"
+      >
+        <span className="import-menu-icon">
+          <FileUp size={20} />
+        </span>
+        <span className="import-menu-copy">
+          <strong>{t("connections.import.fromFileTitle")}</strong>
+          <small>{t("connections.import.fromFileSubtitle")}</small>
+        </span>
+      </button>
+      <button
+        className="import-menu-tile"
+        onClick={() => onPick("scan")}
+        type="button"
+      >
+        <span className="import-menu-icon">
+          <Network size={20} />
+        </span>
+        <span className="import-menu-copy">
+          <strong>{t("connections.import.scanTitle")}</strong>
+          <small>{t("connections.import.scanSubtitle")}</small>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function FileImportPanel({
+  tree,
+  sshSettings,
+  onError,
+  onClearError,
+  onClose,
+  onImported,
+}: {
+  tree: ConnectionTree;
+  sshSettings: SshSettings;
+  onError: (message: string) => void;
+  onClearError: () => void;
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const { t } = useTranslation();
+  const [filePath, setFilePath] = useState("");
+  const [preview, setPreview] = useState<ImportFilePreview | null>(null);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  async function handleBrowse() {
+    onClearError();
+    try {
+      const path = await selectConnectionImportFile();
+      if (!path) {
+        return;
+      }
+      setFilePath(path);
+      setLoading(true);
+      const result = await invokeCommand("parse_import_file", { request: { path } });
+      setPreview(result);
+      setCandidates(
+        result.drafts.map((draft, index) => ({
+          id: `${index}`,
+          selected: true,
+          name: draft.name,
+          host: draft.host,
+          user: draft.user,
+          port: draft.port,
+          type: draft.type,
+          folderPath: draft.folderPath,
+        })),
+      );
+    } catch (failure) {
+      onError(failure instanceof Error ? failure.message : String(failure));
+      setPreview(null);
+      setCandidates([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="import-panel">
+      <div className="import-file-row">
+        <button
+          className="approve-button"
+          disabled={loading}
+          onClick={() => void handleBrowse()}
+          type="button"
+        >
+          {loading ? (
+            <Loader2 className="spin" size={14} />
+          ) : (
+            <FileUp size={14} />
+          )}
+          <span>{t("connections.import.chooseFile")}</span>
+        </button>
+        <input
+          className="import-file-path"
+          placeholder={t("connections.import.noFileChosen")}
+          readOnly
+          type="text"
+          value={filePath}
+        />
+      </div>
+
+      <p className="import-hint">{t("connections.import.fileFormatsHint")}</p>
+
+      {preview ? (
+        <ImportPreviewSection
+          candidates={candidates}
+          format={preview.format}
+          onCancel={onClose}
+          onCandidatesChange={setCandidates}
+          onError={onError}
+          onImported={onImported}
+          sshSettings={sshSettings}
+          tree={tree}
+          warnings={preview.warnings}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ScanPanel({
+  tree,
+  sshSettings,
+  onError,
+  onClearError,
+  onClose,
+  onImported,
+}: {
+  tree: ConnectionTree;
+  sshSettings: SshSettings;
+  onError: (message: string) => void;
+  onClearError: () => void;
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const { t } = useTranslation();
+  const [target, setTarget] = useState("");
+  const [enabledPorts, setEnabledPorts] = useState<Set<number>>(
+    () => new Set(DEFAULT_PORTS.map((entry) => entry.port)),
+  );
+  const [scanning, setScanning] = useState(false);
+  const [progress, setProgress] = useState<ScanProgressEvent | null>(null);
+  const [results, setResults] = useState<ScanResultEntry[] | null>(null);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const scanIdRef = useRef("");
+
+  useEffect(() => {
+    let dispose: (() => void) | null = null;
+    let disposed = false;
+
+    void listen<ScanProgressEvent>("import-scan-progress", (event) => {
+      if (event.payload.scanId !== scanIdRef.current) {
+        return;
+      }
+      setProgress(event.payload);
+    }).then((unlisten) => {
+      if (disposed) {
+        unlisten();
+      } else {
+        dispose = unlisten;
+      }
+    });
+
+    return () => {
+      disposed = true;
+      dispose?.();
+    };
+  }, []);
+
+  function togglePort(port: number) {
+    setEnabledPorts((current) => {
+      const next = new Set(current);
+      if (next.has(port)) {
+        next.delete(port);
+      } else {
+        next.add(port);
+      }
+      return next;
+    });
+  }
+
+  async function handleStartScan() {
+    onClearError();
+    if (!target.trim()) {
+      onError(t("connections.import.scanTargetRequired"));
+      return;
+    }
+    if (enabledPorts.size === 0) {
+      onError(t("connections.import.scanPortRequired"));
+      return;
+    }
+    const scanId = uniqueRuntimeId("scan");
+    scanIdRef.current = scanId;
+    setScanning(true);
+    setProgress({ scanId, completed: 0, total: 0 });
+    setResults(null);
+    setCandidates([]);
+    try {
+      const response = await invokeCommand("scan_network_for_connections", {
+        request: {
+          scanId,
+          target: target.trim(),
+          ports: Array.from(enabledPorts).sort((left, right) => left - right),
+        },
+      });
+      setResults(response.results);
+      setCandidates(
+        response.results.map((entry, index) => ({
+          id: `${index}`,
+          selected: true,
+          name: entry.host,
+          host: entry.host,
+          user: "",
+          port: entry.port,
+          type: entry.type,
+          folderPath: [],
+        })),
+      );
+    } catch (failure) {
+      onError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  const progressPercent =
+    progress && progress.total > 0
+      ? Math.round((progress.completed / progress.total) * 100)
+      : 0;
+
+  return (
+    <div className="import-panel">
+      <label className="import-field">
+        <span>{t("connections.import.scanTargetLabel")}</span>
+        <input
+          autoFocus
+          onChange={(event) => setTarget(event.currentTarget.value)}
+          placeholder={t("connections.import.scanTargetPlaceholder")}
+          type="text"
+          value={target}
+        />
+      </label>
+      <p className="import-hint">{t("connections.import.scanTargetHint")}</p>
+
+      <fieldset className="import-port-list">
+        <legend>{t("connections.import.scanPortsLabel")}</legend>
+        {DEFAULT_PORTS.map((entry) => (
+          <label className="import-port-toggle" key={entry.port}>
+            <input
+              checked={enabledPorts.has(entry.port)}
+              onChange={() => togglePort(entry.port)}
+              type="checkbox"
+            />
+            <span>{`${t(entry.labelKey)} (${entry.port})`}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      <div className="import-scan-actions">
+        <button
+          className="approve-button"
+          disabled={scanning}
+          onClick={() => void handleStartScan()}
+          type="button"
+        >
+          {scanning ? (
+            <Loader2 className="spin" size={14} />
+          ) : (
+            <Network size={14} />
+          )}
+          <span>
+            {scanning
+              ? t("connections.import.scanRunning")
+              : t("connections.import.scanStart")}
+          </span>
+        </button>
+        {scanning || (progress && progress.total > 0) ? (
+          <div className="import-progress" aria-live="polite">
+            <div
+              className="import-progress-fill"
+              style={{ width: `${progressPercent}%` }}
+            />
+            <span className="import-progress-text">
+              {progress
+                ? `${progress.completed}/${progress.total} (${progressPercent}%)`
+                : ""}
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      {results && results.length === 0 ? (
+        <p className="import-empty">{t("connections.import.scanNoResults")}</p>
+      ) : null}
+
+      {results && results.length > 0 ? (
+        <ImportPreviewSection
+          candidates={candidates}
+          format="scan"
+          onCancel={onClose}
+          onCandidatesChange={setCandidates}
+          onError={onError}
+          onImported={onImported}
+          sshSettings={sshSettings}
+          tree={tree}
+          warnings={[]}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ImportPreviewSection({
+  candidates,
+  format,
+  onCancel,
+  onCandidatesChange,
+  onError,
+  onImported,
+  sshSettings,
+  tree,
+  warnings,
+}: {
+  candidates: Candidate[];
+  format: string;
+  onCancel: () => void;
+  onCandidatesChange: (next: Candidate[]) => void;
+  onError: (message: string) => void;
+  onImported: () => void;
+  sshSettings: SshSettings;
+  tree: ConnectionTree;
+  warnings: string[];
+}) {
+  const { t } = useTranslation();
+  const [folderTarget, setFolderTarget] = useState<string>("__new__");
+  const [newFolderName, setNewFolderName] = useState(
+    suggestFolderName(format),
+  );
+  const [importing, setImporting] = useState(false);
+
+  const folderOptions = useMemo(() => flattenFolders(tree.folders), [tree]);
+  const selectedCount = candidates.filter((row) => row.selected).length;
+
+  function toggleAll(value: boolean) {
+    onCandidatesChange(candidates.map((row) => ({ ...row, selected: value })));
+  }
+
+  function updateRow(index: number, patch: Partial<Candidate>) {
+    onCandidatesChange(
+      candidates.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, ...patch } : row,
+      ),
+    );
+  }
+
+  async function handleImport() {
+    if (selectedCount === 0) {
+      onError(t("connections.import.noneSelected"));
+      return;
+    }
+
+    setImporting(true);
+    try {
+      let targetFolderId: string | undefined;
+      if (folderTarget === "__new__") {
+        const trimmed = newFolderName.trim();
+        if (!trimmed) {
+          onError(t("connections.import.folderNameRequired"));
+          setImporting(false);
+          return;
+        }
+        const folder = await invokeCommand("create_connection_folder", {
+          request: { name: trimmed },
+        });
+        targetFolderId = folder.id;
+      } else if (folderTarget !== "__root__") {
+        targetFolderId = folderTarget;
+      }
+
+      for (const row of candidates) {
+        if (!row.selected) {
+          continue;
+        }
+        const port =
+          row.port ?? defaultPortForConnectionType(row.type, sshSettings);
+        const request: CreateConnectionRequest = {
+          name: row.name.trim() || row.host,
+          type: row.type,
+          host: row.host,
+          user: row.user,
+          folderId: targetFolderId,
+          port,
+        };
+        await invokeCommand("create_connection", { request });
+      }
+
+      onImported();
+    } catch (failure) {
+      onError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const allSelected = selectedCount === candidates.length && candidates.length > 0;
+
+  return (
+    <div className="import-preview">
+      <div className="import-preview-toolbar">
+        <strong>
+          {t("connections.import.previewHeading", {
+            count: candidates.length,
+            selected: selectedCount,
+          })}
+        </strong>
+        <div className="import-preview-toolbar-actions">
+          <button
+            className="toolbar-button"
+            onClick={() => toggleAll(true)}
+            type="button"
+            disabled={allSelected}
+          >
+            {t("connections.import.selectAll")}
+          </button>
+          <button
+            className="toolbar-button"
+            onClick={() => toggleAll(false)}
+            type="button"
+            disabled={selectedCount === 0}
+          >
+            {t("connections.import.selectNone")}
+          </button>
+        </div>
+      </div>
+
+      <div className="import-preview-table-wrapper">
+        <table className="import-preview-table">
+          <thead>
+            <tr>
+              <th aria-label={t("connections.import.selectColumn")} />
+              <th>{t("connections.import.colName")}</th>
+              <th>{t("connections.import.colType")}</th>
+              <th>{t("connections.import.colHost")}</th>
+              <th>{t("connections.import.colPort")}</th>
+              <th>{t("connections.import.colUser")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {candidates.map((row, index) => (
+              <tr key={row.id}>
+                <td>
+                  <input
+                    aria-label={t("connections.import.selectRow")}
+                    checked={row.selected}
+                    onChange={(event) =>
+                      updateRow(index, { selected: event.currentTarget.checked })
+                    }
+                    type="checkbox"
+                  />
+                </td>
+                <td>
+                  <input
+                    onChange={(event) =>
+                      updateRow(index, { name: event.currentTarget.value })
+                    }
+                    type="text"
+                    value={row.name}
+                  />
+                </td>
+                <td>
+                  <select
+                    onChange={(event) =>
+                      updateRow(index, {
+                        type: event.currentTarget.value as ConnectionType,
+                      })
+                    }
+                    value={row.type}
+                  >
+                    <option value="ssh">SSH</option>
+                    <option value="telnet">Telnet</option>
+                    <option value="rdp">RDP</option>
+                    <option value="vnc">VNC</option>
+                    <option value="serial">Serial</option>
+                    <option value="url">URL</option>
+                    <option value="local">Local</option>
+                  </select>
+                </td>
+                <td>
+                  <input
+                    onChange={(event) =>
+                      updateRow(index, { host: event.currentTarget.value })
+                    }
+                    type="text"
+                    value={row.host}
+                  />
+                </td>
+                <td>
+                  <input
+                    className="import-port-input"
+                    onChange={(event) => {
+                      const text = event.currentTarget.value.trim();
+                      const parsed = text ? Number.parseInt(text, 10) : NaN;
+                      updateRow(index, {
+                        port: Number.isFinite(parsed) ? parsed : undefined,
+                      });
+                    }}
+                    type="number"
+                    value={row.port ?? ""}
+                  />
+                </td>
+                <td>
+                  <input
+                    onChange={(event) =>
+                      updateRow(index, { user: event.currentTarget.value })
+                    }
+                    type="text"
+                    value={row.user}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {warnings.length > 0 ? (
+        <div className="import-warnings" role="status">
+          <strong>{t("connections.import.warningsHeading")}</strong>
+          <ul>
+            {warnings.map((message, index) => (
+              <li key={index}>{message}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <fieldset className="import-destination">
+        <legend>{t("connections.import.destinationLabel")}</legend>
+        <select
+          onChange={(event) => setFolderTarget(event.currentTarget.value)}
+          value={folderTarget}
+        >
+          <option value="__new__">{t("connections.import.destinationNewFolder")}</option>
+          <option value="__root__">{t("connections.import.destinationRoot")}</option>
+          {folderOptions.map((option) => (
+            <option key={option.folder.id} value={option.folder.id}>
+              {"  ".repeat(option.level)}
+              {option.folder.name}
+            </option>
+          ))}
+        </select>
+        {folderTarget === "__new__" ? (
+          <input
+            aria-label={t("connections.import.newFolderNameLabel")}
+            onChange={(event) => setNewFolderName(event.currentTarget.value)}
+            placeholder={t("connections.import.newFolderNameLabel")}
+            type="text"
+            value={newFolderName}
+          />
+        ) : null}
+      </fieldset>
+
+      <div className="dialog-actions">
+        <button
+          className="approve-button"
+          disabled={importing || selectedCount === 0}
+          onClick={() => void handleImport()}
+          type="button"
+        >
+          {importing ? <Loader2 className="spin" size={14} /> : null}
+          <span>
+            {t("connections.import.importCount", { count: selectedCount })}
+          </span>
+        </button>
+        <button className="toolbar-button" onClick={onCancel} type="button">
+          {t("connections.cancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function suggestFolderName(format: string) {
+  const today = new Date();
+  const stamp = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const label =
+    format === "scan"
+      ? "Scan"
+      : format === "rdcman"
+        ? "RDCMan"
+        : format === "mobaxterm"
+          ? "MobaXterm"
+          : format === "putty"
+            ? "PuTTY"
+            : "Imported";
+  return `${label} ${stamp}`;
+}

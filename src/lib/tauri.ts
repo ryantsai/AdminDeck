@@ -191,6 +191,40 @@ export interface SshConfigImportPreview {
   unsupportedDirectives: UnsupportedSshDirective[];
 }
 
+export type ImportFileFormat = "csv" | "tsv" | "rdcman" | "mobaxterm" | "putty";
+
+export interface ImportedConnectionDraft {
+  name: string;
+  host: string;
+  user: string;
+  port?: number;
+  type: "local" | "ssh" | "telnet" | "serial" | "url" | "rdp" | "vnc";
+  folderPath: string[];
+}
+
+export interface ImportFilePreview {
+  format: ImportFileFormat;
+  drafts: ImportedConnectionDraft[];
+  warnings: string[];
+}
+
+export interface ScanResultEntry {
+  host: string;
+  port: number;
+  type: "ssh" | "telnet" | "rdp" | "vnc";
+}
+
+export interface ScanNetworkResponse {
+  results: ScanResultEntry[];
+  scannedHosts: number;
+}
+
+export interface ScanProgressEvent {
+  scanId: string;
+  completed: number;
+  total: number;
+}
+
 export interface SshHostKeyPreview {
   host: string;
   port: number;
@@ -604,6 +638,20 @@ type CommandMap = {
     args: { request: { content: string; folderId?: string } };
     result: SshConfigImportPreview;
   };
+  parse_import_file: {
+    args: { request: { path: string } };
+    result: ImportFilePreview;
+  };
+  scan_network_for_connections: {
+    args: {
+      request: {
+        scanId: string;
+        target: string;
+        ports: number[];
+      };
+    };
+    result: ScanNetworkResponse;
+  };
   inspect_ssh_host_key: {
     args: { request: { host: string; port?: number } };
     result: SshHostKeyPreview;
@@ -924,6 +972,27 @@ export async function selectSettingsImportFile(options: {
     filters: [{ name: options.filterName, extensions: ["zip"] }],
     multiple: false,
     title: options.title,
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
+}
+
+export async function selectConnectionImportFile() {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+
+  const selectedPath = await openDialog({
+    directory: false,
+    multiple: false,
+    title: "Import connections from file",
+    filters: [
+      {
+        name: "Connection lists",
+        extensions: ["csv", "tsv", "txt", "rdg", "mxtsessions", "reg"],
+      },
+      { name: "All files", extensions: ["*"] },
+    ],
   });
 
   return typeof selectedPath === "string" ? selectedPath : null;

@@ -4726,6 +4726,303 @@ progress {
   line-height: 1.4;
 }
 
+.import-dialog {
+  width: min(820px, calc(100vw - 40px));
+}
+
+.import-dialog-header-text {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.import-dialog-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.import-dialog-back:hover {
+  background: var(--surface-muted);
+}
+
+.import-menu {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.import-menu-tile {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.import-menu-tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.import-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  color: var(--accent);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.import-menu-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.import-menu-copy small {
+  color: var(--text-muted);
+}
+
+.import-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.import-file-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.import-file-path {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.import-field {
+  display: grid;
+  gap: 4px;
+}
+
+.import-field span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.import-port-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  margin: 0;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.import-port-list legend {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.import-port-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.import-scan-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.import-progress {
+  position: relative;
+  flex: 1;
+  height: 18px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.import-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+.import-progress-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.import-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  background: var(--surface-muted);
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.import-preview {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.import-preview-toolbar {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.import-preview-toolbar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.import-preview-table-wrapper {
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.import-preview-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.import-preview-table th,
+.import-preview-table td {
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.import-preview-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-muted);
+  font-weight: 800;
+  z-index: 1;
+}
+
+.import-preview-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.import-preview-table input[type="text"],
+.import-preview-table input[type="number"],
+.import-preview-table select {
+  width: 100%;
+  min-width: 60px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.import-preview-table .import-port-input {
+  width: 80px;
+}
+
+.import-warnings {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.import-warnings ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.import-destination {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  margin: 0;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.import-destination legend {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.spin {
+  animation: import-spin 0.9s linear infinite;
+}
+
+@keyframes import-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tree-error {
   margin: -4px 0 10px;
 }

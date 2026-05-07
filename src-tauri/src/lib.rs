@@ -1,5 +1,6 @@
 mod ai;
 mod diagnostics;
+mod import;
 mod logging;
 mod performance;
 mod rdp;
@@ -364,6 +365,21 @@ fn import_ssh_config(
     request: ssh_config::ImportSshConfigRequest,
 ) -> Result<ssh_config::SshConfigImportPreview, String> {
     ssh_config::import_ssh_config(request)
+}
+
+#[tauri::command]
+fn parse_import_file(
+    request: import::ParseImportFileRequest,
+) -> Result<import::ImportFilePreview, String> {
+    import::parse_import_file(request)
+}
+
+#[tauri::command]
+fn scan_network_for_connections(
+    app: tauri::AppHandle,
+    request: import::ScanNetworkRequest,
+) -> Result<import::ScanNetworkResponse, String> {
+    import::scan_network(app, request)
 }
 
 #[tauri::command]
@@ -1009,6 +1025,8 @@ pub fn run() {
             capture_screenshot_for_assistant,
             ssh_transport_plan,
             import_ssh_config,
+            parse_import_file,
+            scan_network_for_connections,
             inspect_ssh_host_key,
             trust_ssh_host_key,
             store_secret,
