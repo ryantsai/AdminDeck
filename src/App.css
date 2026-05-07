@@ -4692,6 +4692,10 @@ progress {
   grid-template-columns: minmax(220px, 340px);
 }
 
+.form-grid.ssh-default-path-grid {
+  grid-template-columns: minmax(280px, 1.35fr) minmax(220px, 0.65fr);
+}
+
 .ai-provider-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

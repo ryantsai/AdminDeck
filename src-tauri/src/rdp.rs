@@ -94,6 +94,7 @@ mod platform {
     const SECURED_SETTINGS_PROPERTIES: &[&str] = &["SecuredSettings", "SecuredSettings2"];
 
     #[repr(transparent)]
+    #[derive(Clone)]
     struct IMsRdpClientNonScriptable(windows::core::IUnknown);
 
     unsafe impl Interface for IMsRdpClientNonScriptable {

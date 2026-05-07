@@ -6,6 +6,106 @@ When a key is translated into every supported locale, remove its entry from this
 
 ## Pending Strings
 
+### settings.defaultKeyPlaceholder
+- **English value:** C:\Users\ryan\.ssh\id_ed25519
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** placeholder
+- **Flow/context:** Settings → SSH → Default key input; shows an example Windows SSH private key path.
+- **Tone:** Example path, not prose.
+- **Placeholders:** None.
+- **Domain notes:** Keep the path format Windows-style; `id_ed25519` is a standard SSH key filename.
+
+### settings.defaultKeyHint
+- **English value:** Used for new SSH Connections that authenticate with a key file.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** field hint
+- **Flow/context:** Explains that the default key path pre-fills future SSH Connection forms only.
+- **Tone:** Concise explanatory settings text.
+- **Placeholders:** None.
+- **Domain notes:** Use Connection terminology; SSH and key file stay English.
+
+### settings.defaultSshUserHint
+- **English value:** Pre-fills new SSH and Telnet Connections.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** field hint
+- **Flow/context:** Shown under the default user field in Settings → SSH.
+- **Tone:** Short and practical.
+- **Placeholders:** None.
+- **Domain notes:** Use Connection terminology; SSH and Telnet stay English.
+
+### settings.defaultSshPortHint
+- **English value:** Used when an SSH Connection does not specify a port.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** field hint
+- **Flow/context:** Shown under the default SSH port field; clarifies fallback behavior for new/opened SSH Connections.
+- **Tone:** Short explanatory settings text.
+- **Placeholders:** None.
+- **Domain notes:** Use Connection terminology; SSH stays English.
+
+### settings.defaultSshUserRequired
+- **English value:** Default SSH user is required.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** validation error
+- **Flow/context:** Shown when saving Settings → SSH with a blank default user.
+- **Tone:** Direct validation message.
+- **Placeholders:** None.
+- **Domain notes:** SSH stays English.
+
+### settings.defaultSshPortRange
+- **English value:** Default SSH port must be between 1 and 65535.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** validation error
+- **Flow/context:** Shown when saving Settings → SSH with an invalid port value.
+- **Tone:** Direct validation message.
+- **Placeholders:** None.
+- **Domain notes:** Port range is the TCP/UDP numeric port range; keep numbers unchanged.
+
+### settings.sshDefaultsSaved
+- **English value:** SSH defaults saved.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** success status
+- **Flow/context:** Shown after saving Settings → SSH defaults, including SFTP overwrite behavior if changed.
+- **Tone:** Brief confirmation.
+- **Placeholders:** None.
+- **Domain notes:** SSH stays English.
+
+### settings.proxyJumpPlaceholder
+- **English value:** bastion.example.com
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** placeholder
+- **Flow/context:** Settings → SSH → ProxyJump field; shows an example bastion host.
+- **Tone:** Example host, not prose.
+- **Placeholders:** None.
+- **Domain notes:** ProxyJump is the OpenSSH option name and should stay English.
+
+### settings.proxyJumpHint
+- **English value:** Optional default ProxyJump host for new SSH Connections.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** field hint
+- **Flow/context:** Explains that ProxyJump is optional and pre-fills future SSH Connection forms.
+- **Tone:** Concise explanatory settings text.
+- **Placeholders:** None.
+- **Domain notes:** Use Connection terminology; ProxyJump and SSH stay English.
+
+### settings.sftpOverwriteHint
+- **English value:** Default behavior when an SFTP upload targets an existing remote file.
+- **Namespace:** `settings`
+- **File/component:** `src/settings/SshSettings.tsx`
+- **UI role:** field hint
+- **Flow/context:** Shown under the SFTP overwrite dropdown in Settings → SSH.
+- **Tone:** Concise explanatory settings text.
+- **Placeholders:** None.
+- **Domain notes:** SFTP stays English.
+
 ### settings.customFonts
 - **English value:** Custom fonts
 - **Namespace:** `settings`
