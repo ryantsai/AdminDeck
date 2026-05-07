@@ -43,9 +43,7 @@ pub struct ParseImportFileRequest {
     path: String,
 }
 
-pub fn parse_import_file(
-    request: ParseImportFileRequest,
-) -> Result<ImportFilePreview, String> {
+pub fn parse_import_file(request: ParseImportFileRequest) -> Result<ImportFilePreview, String> {
     let path = Path::new(&request.path);
     let bytes = fs::read(path).map_err(|err| format!("failed to read file: {err}"))?;
     let text = decode_text(&bytes);
@@ -122,17 +120,17 @@ fn parse_csv_or_tsv(text: &str) -> ImportFilePreview {
 
     let header_row = rows
         .first()
-        .map(|row| row.iter().map(|cell| cell.trim().to_ascii_lowercase()).collect::<Vec<_>>())
+        .map(|row| {
+            row.iter()
+                .map(|cell| cell.trim().to_ascii_lowercase())
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default();
 
     let header_indexes = header_indexes(&header_row);
     let has_header = !header_indexes.is_empty();
 
-    let data_rows: &[Vec<String>] = if has_header {
-        &rows[1..]
-    } else {
-        &rows[..]
-    };
+    let data_rows: &[Vec<String>] = if has_header { &rows[1..] } else { &rows[..] };
 
     for (index, row) in data_rows.iter().enumerate() {
         if row.iter().all(|cell| cell.trim().is_empty()) {
@@ -253,13 +251,21 @@ fn draft_from_row(
     indexes: &HeaderIndexes,
     has_header: bool,
 ) -> Result<Option<ImportedConnectionDraft>, String> {
-    let name_index = indexes.name.unwrap_or(if has_header { usize::MAX } else { 0 });
+    let name_index = indexes
+        .name
+        .unwrap_or(if has_header { usize::MAX } else { 0 });
     let type_index = indexes
         .connection_type
         .unwrap_or(if has_header { usize::MAX } else { 1 });
-    let host_index = indexes.host.unwrap_or(if has_header { usize::MAX } else { 2 });
-    let port_index = indexes.port.unwrap_or(if has_header { usize::MAX } else { 3 });
-    let user_index = indexes.user.unwrap_or(if has_header { usize::MAX } else { 4 });
+    let host_index = indexes
+        .host
+        .unwrap_or(if has_header { usize::MAX } else { 2 });
+    let port_index = indexes
+        .port
+        .unwrap_or(if has_header { usize::MAX } else { 3 });
+    let user_index = indexes
+        .user
+        .unwrap_or(if has_header { usize::MAX } else { 4 });
     let folder_index = indexes
         .folder
         .unwrap_or(if has_header { usize::MAX } else { 5 });
@@ -285,16 +291,14 @@ fn draft_from_row(
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| host.clone());
 
-    let port = row
-        .get(port_index)
-        .and_then(|value| {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                trimmed.parse::<u16>().ok()
-            }
-        });
+    let port = row.get(port_index).and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            trimmed.parse::<u16>().ok()
+        }
+    });
 
     let user = row
         .get(user_index)
@@ -591,7 +595,11 @@ fn parse_mobaxterm_session(
     }
 
     let params: Vec<&str> = after_type.split('%').collect();
-    let host = params.get(1).map(|value| value.trim()).unwrap_or("").to_string();
+    let host = params
+        .get(1)
+        .map(|value| value.trim())
+        .unwrap_or("")
+        .to_string();
     let port = params
         .get(2)
         .and_then(|value| value.trim().parse::<u16>().ok());
@@ -685,12 +693,7 @@ fn parse_putty_reg(text: &str) -> ImportFilePreview {
         }
     }
 
-    finalize_putty_session(
-        &mut drafts,
-        &mut warnings,
-        current_session,
-        current_values,
-    );
+    finalize_putty_session(&mut drafts, &mut warnings, current_session, current_values);
 
     ImportFilePreview {
         format: "putty",
@@ -744,9 +747,7 @@ fn putty_session_name(section_line: &str) -> Option<String> {
     let last_separator = inside.rfind('\\')?;
     let raw_name = &inside[last_separator + 1..];
     let parent = &inside[..last_separator];
-    if !parent.contains("PuTTY")
-        && !parent.contains("Sessions")
-        && !parent.contains("SimonTatham")
+    if !parent.contains("PuTTY") && !parent.contains("Sessions") && !parent.contains("SimonTatham")
     {
         return None;
     }
@@ -933,16 +934,15 @@ pub fn scan_network(
                     };
                     let address = format!("{host}:{port}");
                     let connect = TcpStream::connect(address.as_str());
-                    let result = match timeout(Duration::from_millis(SCAN_TIMEOUT_MS), connect)
-                        .await
-                    {
-                        Ok(Ok(_)) => Some(ScanResultEntry {
-                            host,
-                            port,
-                            connection_type: connection_type_for_port(port),
-                        }),
-                        _ => None,
-                    };
+                    let result =
+                        match timeout(Duration::from_millis(SCAN_TIMEOUT_MS), connect).await {
+                            Ok(Ok(_)) => Some(ScanResultEntry {
+                                host,
+                                port,
+                                connection_type: connection_type_for_port(port),
+                            }),
+                            _ => None,
+                        };
                     let done = completed.fetch_add(1, Ordering::SeqCst) + 1;
                     let _ = app.emit(
                         "import-scan-progress",
@@ -972,11 +972,7 @@ pub fn scan_network(
 }
 
 fn sanitized_ports(ports: &[u16]) -> Result<Vec<u16>, String> {
-    let mut sanitized: Vec<u16> = ports
-        .iter()
-        .copied()
-        .filter(|port| *port != 0)
-        .collect();
+    let mut sanitized: Vec<u16> = ports.iter().copied().filter(|port| *port != 0).collect();
     sanitized.sort_unstable();
     sanitized.dedup();
     if sanitized.is_empty() {
@@ -1012,8 +1008,7 @@ fn expand_targets(target: &str) -> Result<Vec<String>, String> {
     if let Some((start, end)) = trimmed.split_once('-') {
         let start = start.trim();
         let end = end.trim();
-        if let (Ok(start_addr), Ok(end_addr)) =
-            (Ipv4Addr::from_str(start), Ipv4Addr::from_str(end))
+        if let (Ok(start_addr), Ok(end_addr)) = (Ipv4Addr::from_str(start), Ipv4Addr::from_str(end))
         {
             return expand_range(start_addr, end_addr);
         }
@@ -1101,7 +1096,8 @@ mod tests {
 
     #[test]
     fn parses_quoted_csv_fields() {
-        let text = "name,type,host,port,user\n\"Comma, name\",ssh,\"host with \"\"quote\"\"\",22,me\n";
+        let text =
+            "name,type,host,port,user\n\"Comma, name\",ssh,\"host with \"\"quote\"\"\",22,me\n";
         let preview = parse_csv_or_tsv(text);
         assert_eq!(preview.drafts.len(), 1);
         assert_eq!(preview.drafts[0].name, "Comma, name");

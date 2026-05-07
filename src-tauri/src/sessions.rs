@@ -416,10 +416,7 @@ impl SessionManager {
             app,
             secrets,
             &request.connection,
-            tmux_capture_pane_command(
-                &tmux_session_id,
-                ssh_buffer_lines_for(request.buffer_lines),
-            ),
+            tmux_capture_pane_command(&tmux_session_id, ssh_buffer_lines_for(request.buffer_lines)),
         )
     }
 

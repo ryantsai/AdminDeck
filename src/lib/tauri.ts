@@ -678,6 +678,14 @@ type CommandMap = {
     args: undefined;
     result: DiagnosticsBundle;
   };
+  get_dont_sleep_enabled: {
+    args: undefined;
+    result: boolean;
+  };
+  set_dont_sleep_enabled: {
+    args: { enabled: boolean };
+    result: boolean;
+  };
   capture_screenshot_to_clipboard: {
     args: { request: CaptureScreenshotRequest };
     result: null;

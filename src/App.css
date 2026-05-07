@@ -258,8 +258,21 @@ button {
   position: relative;
 }
 
-.rail-button-settings {
+.rail-button-dont-sleep {
   margin-top: auto;
+}
+
+.rail-button-settings {
+  margin-top: 0;
+}
+
+.rail-button-dont-sleep.dont-sleep-enabled {
+  color: #fbbf24;
+}
+
+.rail-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .rail-button:hover,
@@ -1042,6 +1055,44 @@ h2 {
   min-width: 0;
   background: var(--surface-muted);
   border-bottom: 1px solid var(--border);
+}
+
+.tab-scroll-container {
+  display: flex;
+  align-items: end;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tab-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-scroll-arrow {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 37px;
+  color: var(--text-faint);
+  background: var(--surface-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.tab-scroll-arrow:hover {
+  color: var(--text);
+}
+
+.tab-scroll-left {
+  border-right: 1px solid var(--border);
+}
+
+.tab-scroll-right {
+  border-left: 1px solid var(--border);
 }
 
 .tab {

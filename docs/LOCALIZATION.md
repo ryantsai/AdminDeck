@@ -6,6 +6,72 @@ When a key is translated into every supported locale, remove its entry from this
 
 ## Pending Strings
 
+### app.dontSleep
+
+- English value: "Don't Sleep"
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: left navigation toggle tooltip
+- Surrounding user flow: The user hovers or focuses the rail control above Settings that toggles Don't Sleep mode for the current AdminDeck runtime.
+- Tone: compact tool name.
+- Placeholder details: none.
+- Domain notes: This is a Windows power-management tool name. Keep the apostrophe meaning "do not sleep"; it is not a literal sleep session.
+
+### app.dontSleepEnable
+
+- English value: "Enable Don't Sleep mode"
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: button aria-label/title
+- Surrounding user flow: The rail control is off and clicking it asks Windows to keep the system awake and block session shutdown while AdminDeck remains running.
+- Tone: direct action label.
+- Placeholder details: none.
+- Domain notes: The underlying Windows backend uses an execution-state request and shutdown block reason; "mode" refers to the app-level toggle state.
+
+### app.dontSleepDisable
+
+- English value: "Disable Don't Sleep mode"
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: button aria-label/title
+- Surrounding user flow: The rail control is on and clicking it releases the Windows power-management request and shutdown block reason.
+- Tone: direct action label.
+- Placeholder details: none.
+- Domain notes: Disabling returns Windows power behavior to the user's normal OS power settings.
+
+### app.dontSleepEnabled
+
+- English value: "Don't Sleep mode enabled."
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: transient status
+- Surrounding user flow: Appears in the bottom workspace status bar after the user turns on the Don't Sleep rail control.
+- Tone: brief success confirmation.
+- Placeholder details: none.
+- Domain notes: The status confirms the runtime toggle, not a persisted setting.
+
+### app.dontSleepDisabled
+
+- English value: "Don't Sleep mode disabled."
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: transient status
+- Surrounding user flow: Appears in the bottom workspace status bar after the user turns off the Don't Sleep rail control.
+- Tone: brief confirmation.
+- Placeholder details: none.
+- Domain notes: Disabling releases the temporary Windows power-management request.
+
+### app.dontSleepError
+
+- English value: "Could not change Don't Sleep mode: {{message}}"
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: transient error status
+- Surrounding user flow: Appears in the bottom workspace status bar if the backend cannot start or stop Don't Sleep mode.
+- Tone: concise error with implementation detail appended.
+- Placeholder details: `{{message}}` is the backend or runtime error text.
+- Domain notes: This is expected mainly when the Windows-only backend API is unavailable or the OS rejects the power/shutdown request.
+
 ### terminal.sendToAi
 
 - English value: "Send terminal buffer to AI Assistant"

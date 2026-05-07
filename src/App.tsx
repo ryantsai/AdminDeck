@@ -1,4 +1,12 @@
-import { BookOpen, ChevronLeft, ChevronRight, LayoutDashboard, Settings } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Coffee,
+  LayoutDashboard,
+  Moon,
+  Settings,
+} from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -418,6 +426,30 @@ function ActivityRail({
   onNavigate: (page: ActivePage) => void;
 }) {
   const { t } = useTranslation();
+  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const [dontSleepEnabled, setDontSleepEnabled] = useState(false);
+  const [dontSleepUpdating, setDontSleepUpdating] = useState(false);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    let disposed = false;
+    void invokeCommand("get_dont_sleep_enabled")
+      .then((enabled) => {
+        if (!disposed) {
+          setDontSleepEnabled(enabled);
+        }
+      })
+      .catch(() => {
+        // The rail should still render if the desktop-only helper is unavailable.
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   function handleConnectionsClick() {
     onNavigate("workspace");
@@ -425,6 +457,36 @@ function ActivityRail({
       onConnectionsRestore();
     }
   }
+
+  async function handleDontSleepClick() {
+    if (dontSleepUpdating) {
+      return;
+    }
+
+    const nextEnabled = !dontSleepEnabled;
+    setDontSleepUpdating(true);
+
+    try {
+      const enabled = isTauriRuntime()
+        ? await invokeCommand("set_dont_sleep_enabled", { enabled: nextEnabled })
+        : nextEnabled;
+      setDontSleepEnabled(enabled);
+      showWorkspaceStatus(
+        enabled ? t("app.dontSleepEnabled") : t("app.dontSleepDisabled"),
+        { tone: enabled ? "success" : "info" },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      showWorkspaceStatus(t("app.dontSleepError", { message }), { tone: "error" });
+    } finally {
+      setDontSleepUpdating(false);
+    }
+  }
+
+  const dontSleepLabel = dontSleepEnabled
+    ? t("app.dontSleepDisable")
+    : t("app.dontSleepEnable");
+  const DontSleepIcon = dontSleepEnabled ? Coffee : Moon;
 
   return (
     <nav className="activity-rail" aria-label={t("app.primaryNav")}>
@@ -448,6 +510,21 @@ function ActivityRail({
         <BookOpen size={18} />
         <span className="rail-tooltip" role="tooltip">
           {t("app.wiki")}
+        </span>
+      </button>
+      <button
+        className={`rail-button rail-button-dont-sleep ${
+          dontSleepEnabled ? "active dont-sleep-enabled" : ""
+        }`}
+        aria-label={dontSleepLabel}
+        aria-pressed={dontSleepEnabled}
+        disabled={dontSleepUpdating}
+        onClick={() => void handleDontSleepClick()}
+        title={dontSleepLabel}
+      >
+        <DontSleepIcon size={18} />
+        <span className="rail-tooltip" role="tooltip">
+          {t("app.dontSleep")}
         </span>
       </button>
       <button

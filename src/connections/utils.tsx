@@ -1,4 +1,4 @@
-import { Cable, Mouse, Columns2, Globe2, Laptop, Monitor, Network, Server, Terminal } from "lucide-react";
+import { Cable, Globe2, Laptop, Monitor, Mouse, Network, Server } from "lucide-react";
 import { invokeCommand, type SshHostKeyPreview } from "../lib/tauri";
 import i18next from "../i18n/config";
 import type { Connection, ConnectionType, SshSettings, WorkspaceTab } from "../types";
@@ -151,27 +151,19 @@ export function connectionIconForType(type: ConnectionType) {
   }
 }
 
-export function tabIconFor(tab: WorkspaceTab) {
-  if (tab.kind === "sftp") {
-    return Columns2;
+export function connectionTypeForTab(tab: WorkspaceTab): {
+  type: ConnectionType;
+  localShell?: string;
+} {
+  if (tab.connection) {
+    return {
+      type: tab.connection.type,
+      localShell: tab.connection.localShell,
+    };
   }
-  if (tab.kind === "terminal") {
-    const firstPane = tab.panes[0];
-    if (firstPane?.kind === "webview") {
-      return Globe2;
-    }
-    if (firstPane?.kind === "remoteDesktop") {
-      return connectionIconForType(firstPane.connection.type);
-    }
-  }
-  if (tab.kind === "webview") {
-    return Globe2;
-  }
-  if (tab.kind === "remoteDesktop") {
-    return connectionIconForType(tab.connection?.type ?? "rdp");
-  }
-  return Terminal;
+  return { type: "local" };
 }
+
 
 export function workspaceKindLabel(tab: WorkspaceTab) {
   switch (tab.kind) {

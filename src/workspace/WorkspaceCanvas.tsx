@@ -1,140 +1,116 @@
-import { QuickConnectMenu } from "../connections/ConnectionSidebar";
-import { localShellOptionsForPlatform, tabIconFor, uniqueRuntimeId, type LocalShellOption } from "../connections/utils";
+import { connectionTypeForTab } from "../connections/utils";
 import { RemoteDesktopWorkspace } from "../remote-desktop/RemoteDesktopWorkspace";
 import { SftpWorkspace } from "../sftp/SftpWorkspace";
 import { TerminalWorkspace } from "../terminal/TerminalWorkspace";
 import { WebViewWorkspace } from "../webview/WebViewWorkspace";
-import { Plus, Terminal, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ConnectionIcon } from "../connections/ConnectionIcon";
+import { ChevronLeft, ChevronRight, Terminal, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { dialogButtonAria } from "../lib/aria";
-import { invokeCommand } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
-import type { Connection } from "../types";
 
 export function TabStrip() {
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
   const tabs = useWorkspaceStore((state) => state.tabs);
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
-  const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const activateTab = useWorkspaceStore((state) => state.activateTab);
   const closeTab = useWorkspaceStore((state) => state.closeTab);
-  const openConnection = useWorkspaceStore((state) => state.openConnection);
-  const [quickConnectMenuOpen, setQuickConnectMenuOpen] = useState(false);
-  const quickConnectRef = useRef<HTMLDivElement | null>(null);
-  const shellOptions = useMemo(() => localShellOptionsForPlatform(), [i18n.language]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
   useEffect(() => {
-    if (!quickConnectMenuOpen) {
+    const el = scrollRef.current;
+    if (!el) {
       return;
     }
 
-    const handlePointerDown = (event: PointerEvent) => {
-      const node = quickConnectRef.current;
-      if (node && !node.contains(event.target as Node)) {
-        setQuickConnectMenuOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setQuickConnectMenuOpen(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
+    updateScroll();
+    const observer = new ResizeObserver(updateScroll);
+    observer.observe(el);
+    el.addEventListener("scroll", updateScroll, { passive: true });
     return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
+      observer.disconnect();
+      el.removeEventListener("scroll", updateScroll);
     };
-  }, [quickConnectMenuOpen]);
+  }, [tabs.length, updateScroll]);
 
-  function handleQuickLocalShell(option: LocalShellOption) {
-    setQuickConnectMenuOpen(false);
-    openConnection({
-      id: uniqueRuntimeId("quick"),
-      name: option.label,
-      host: "localhost",
-      user: "local",
-      type: "local",
-      localShell: option.value,
-      status: "idle",
-    });
-  }
-
-  async function handleQuickAdminShell(option: LocalShellOption) {
-    if (!option.value) {
+  function scrollLeft() {
+    const el = scrollRef.current;
+    if (!el) {
       return;
     }
 
-    setQuickConnectMenuOpen(false);
-    try {
-      await invokeCommand("launch_elevated_terminal", {
-        request: {
-          shell: option.value,
-        },
-      });
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : String(error));
-    }
+    el.scrollBy({ left: -200, behavior: "smooth" });
   }
 
-  function handleQuickSsh(connection: Connection) {
-    setQuickConnectMenuOpen(false);
-    openConnection(connection);
+  function scrollRight() {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+
+    el.scrollBy({ left: 200, behavior: "smooth" });
   }
 
   return (
     <div className="tab-strip" aria-label={t("workspace.tabs")}>
-      {tabs.map((tab) => (
-        <div className={tab.id === activeTabId ? "tab active" : "tab"} key={tab.id}>
-          <button className="tab-button" onClick={() => activateTab(tab.id)} type="button">
-            {(() => {
-              const Icon = tabIconFor(tab);
-              return <Icon size={14} />;
-            })()}
-            <span>{tab.title}</span>
-          </button>
-          <button
-            aria-label={`Close ${tab.title}`}
-            className="tab-close-button"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeTab(tab.id);
-            }}
-            title={`Close ${tab.title}`}
-            type="button"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      ))}
-      <div className="quick-connect-anchor tab-quick-connect-anchor" ref={quickConnectRef}>
+      {canScrollLeft ? (
         <button
-          {...dialogButtonAria(quickConnectMenuOpen)}
-          className="new-tab"
-          aria-label={t("workspace.newTab")}
-          onClick={() => setQuickConnectMenuOpen((isOpen) => !isOpen)}
-          title={t("workspace.newTab")}
+          aria-label="Scroll tabs left"
+          className="tab-scroll-arrow tab-scroll-left"
+          onClick={scrollLeft}
           type="button"
         >
-          <Plus size={15} />
+          <ChevronLeft size={16} />
         </button>
-        {quickConnectMenuOpen ? (
-          <QuickConnectMenu
-            recentConnections={[]}
-            shellOptions={shellOptions}
-            sshSettings={sshSettings}
-            onOpenConnection={(connection) => {
-              setQuickConnectMenuOpen(false);
-              openConnection(connection);
-            }}
-            onOpenElevatedShell={(option) => void handleQuickAdminShell(option)}
-            onOpenLocalShell={handleQuickLocalShell}
-            onOpenSsh={handleQuickSsh}
-          />
-        ) : null}
+      ) : null}
+      <div className="tab-scroll-container" ref={scrollRef}>
+        {tabs.map((tab) => (
+          <div className={tab.id === activeTabId ? "tab active" : "tab"} key={tab.id}>
+            <button className="tab-button" onClick={() => activateTab(tab.id)} type="button">
+              <ConnectionIcon
+                localShell={connectionTypeForTab(tab).localShell}
+                size={14}
+                type={connectionTypeForTab(tab).type}
+              />
+              <span>{tab.title}</span>
+            </button>
+            <button
+              aria-label={`Close ${tab.title}`}
+              className="tab-close-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                closeTab(tab.id);
+              }}
+              title={`Close ${tab.title}`}
+              type="button"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ))}
       </div>
+      {canScrollRight ? (
+        <button
+          aria-label="Scroll tabs right"
+          className="tab-scroll-arrow tab-scroll-right"
+          onClick={scrollRight}
+          type="button"
+        >
+          <ChevronRight size={16} />
+        </button>
+      ) : null}
     </div>
   );
 }

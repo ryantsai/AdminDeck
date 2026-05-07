@@ -258,10 +258,7 @@ pub fn delete_wiki_page(
     Ok(())
 }
 
-pub fn move_wiki_page(
-    storage: &Storage,
-    request: MoveWikiPageRequest,
-) -> Result<WikiTree, String> {
+pub fn move_wiki_page(storage: &Storage, request: MoveWikiPageRequest) -> Result<WikiTree, String> {
     let id = request.id;
     let new_parent = request.new_parent_id.filter(|value| !value.is_empty());
     let sort_order = request.sort_order;
@@ -438,7 +435,8 @@ pub fn delete_wiki_attachment(
     request: DeleteWikiAttachmentRequest,
 ) -> Result<(), String> {
     let attachment_id = request.attachment_id;
-    let attachment = storage.with_connection(|connection| load_attachment(connection, &attachment_id))?;
+    let attachment =
+        storage.with_connection(|connection| load_attachment(connection, &attachment_id))?;
     let stored_name = attachment
         .relative_path
         .rsplit('/')
@@ -447,9 +445,8 @@ pub fn delete_wiki_attachment(
         .to_string();
     let path = paths.page_dir(&attachment.page_id).join(stored_name);
     if path.exists() {
-        fs::remove_file(&path).map_err(|error| {
-            format!("failed to remove attachment {}: {error}", path.display())
-        })?;
+        fs::remove_file(&path)
+            .map_err(|error| format!("failed to remove attachment {}: {error}", path.display()))?;
     }
     storage.with_connection(|connection| {
         connection
@@ -482,8 +479,7 @@ pub fn export_wiki_zip(
             )
         })?;
     let mut zip = ZipWriter::new(zip_file);
-    let options =
-        SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     let mut id_to_path = std::collections::HashMap::<String, String>::new();
     for summary in &summaries {
@@ -529,17 +525,11 @@ pub fn export_wiki_zip(
                 continue;
             }
             let mut file = File::open(&source).map_err(|error| {
-                format!(
-                    "failed to read attachment {}: {error}",
-                    source.display()
-                )
+                format!("failed to read attachment {}: {error}", source.display())
             })?;
             let mut buffer = Vec::new();
             file.read_to_end(&mut buffer).map_err(|error| {
-                format!(
-                    "failed to read attachment {}: {error}",
-                    source.display()
-                )
+                format!("failed to read attachment {}: {error}", source.display())
             })?;
             let entry_name = attachment.relative_path.clone();
             zip.start_file(&entry_name, options).map_err(|error| {
@@ -619,10 +609,7 @@ fn list_all_summaries(connection: &SqliteConnection) -> Result<Vec<WikiPageSumma
     Ok(summaries)
 }
 
-fn build_tree(
-    summaries: Vec<WikiPageSummary>,
-    parent: Option<&str>,
-) -> Vec<WikiPageNode> {
+fn build_tree(summaries: Vec<WikiPageSummary>, parent: Option<&str>) -> Vec<WikiPageNode> {
     let parent_key = parent.map(|value| value.to_string());
     let (matches, others): (Vec<_>, Vec<_>) = summaries
         .into_iter()
@@ -792,10 +779,7 @@ fn ensure_no_descendant_cycle(
     Ok(())
 }
 
-fn next_sort_order(
-    connection: &SqliteConnection,
-    parent_id: Option<&str>,
-) -> Result<i64, String> {
+fn next_sort_order(connection: &SqliteConnection, parent_id: Option<&str>) -> Result<i64, String> {
     let next: Option<i64> = match parent_id {
         Some(parent) => connection
             .query_row(
@@ -903,9 +887,9 @@ fn extract_wiki_link_ids(body: &str) -> Vec<String> {
 
 fn is_safe_id(value: &str) -> bool {
     !value.is_empty()
-        && value
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_')
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '-' || character == '_'
+        })
 }
 
 fn summary_from_row(row: &Row<'_>) -> rusqlite::Result<WikiPageSummary> {
@@ -1011,8 +995,7 @@ fn sanitize_fts_query(value: &str) -> String {
             let cleaned: String = token
                 .chars()
                 .filter(|character| {
-                    character.is_alphanumeric()
-                        || matches!(character, '_' | '-' | '.' | '@' | '#')
+                    character.is_alphanumeric() || matches!(character, '_' | '-' | '.' | '@' | '#')
                 })
                 .collect();
             if cleaned.is_empty() {

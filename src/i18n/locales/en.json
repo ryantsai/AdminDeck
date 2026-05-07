@@ -2,6 +2,12 @@
   "app": {
     "connections": "Connections",
     "settings": "Settings",
+    "dontSleep": "Don't Sleep",
+    "dontSleepEnable": "Enable Don't Sleep mode",
+    "dontSleepDisable": "Disable Don't Sleep mode",
+    "dontSleepEnabled": "Don't Sleep mode enabled.",
+    "dontSleepDisabled": "Don't Sleep mode disabled.",
+    "dontSleepError": "Could not change Don't Sleep mode: {{message}}",
     "primaryNav": "Primary",
     "resizeConnections": "Resize Connections column",
     "resizeAiAssistant": "Resize AI Assistant panel",

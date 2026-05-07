@@ -540,15 +540,13 @@ fn build_agent_messages(
         let mut parts = vec![OpenAiCompatibleContentPart::Text {
             text: format!("{user_content}\n\nAttached image sources: {source_labels}"),
         }];
-        parts.extend(
-            image_contexts
-                .into_iter()
-                .map(|screenshot| OpenAiCompatibleContentPart::ImageUrl {
-                    image_url: OpenAiCompatibleImageUrl {
-                        url: screenshot.data_url,
-                    },
-                }),
-        );
+        parts.extend(image_contexts.into_iter().map(|screenshot| {
+            OpenAiCompatibleContentPart::ImageUrl {
+                image_url: OpenAiCompatibleImageUrl {
+                    url: screenshot.data_url,
+                },
+            }
+        }));
         OpenAiCompatibleContent::Parts(parts)
     } else {
         OpenAiCompatibleContent::Text(user_content)
@@ -628,7 +626,9 @@ fn supports_image_input(provider_kind: &str, model: &str) -> bool {
 
     match provider_kind {
         "openai" | "azure-openai" => normalized_model.starts_with("gpt-5"),
-        "grok" => normalized_model.starts_with("grok-4") && !normalized_model.starts_with("grok-code"),
+        "grok" => {
+            normalized_model.starts_with("grok-4") && !normalized_model.starts_with("grok-code")
+        }
         "anthropic" => true,
         _ => image_input_model(&normalized_model) || image_input_model(unprefixed_model),
     }
@@ -1025,7 +1025,9 @@ mod tests {
                 assert!(content.contains("User request"));
                 assert!(!content.contains("Attached screenshot source"));
             }
-            OpenAiCompatibleContent::Parts(_) => panic!("text-only models must not receive image parts"),
+            OpenAiCompatibleContent::Parts(_) => {
+                panic!("text-only models must not receive image parts")
+            }
         }
     }
 

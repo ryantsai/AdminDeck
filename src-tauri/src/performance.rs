@@ -169,9 +169,14 @@ fn cpu_usage_between(previous: SystemCpuTimes, current: SystemCpuTimes) -> Optio
     Some((busy as f64 / total as f64) * 100.0)
 }
 
-fn network_bytes_per_second_between(previous: NetworkSample, current: NetworkSample) -> Option<f64> {
+fn network_bytes_per_second_between(
+    previous: NetworkSample,
+    current: NetworkSample,
+) -> Option<f64> {
     let bytes = current.bytes.checked_sub(previous.bytes)?;
-    let elapsed = current.sampled_at.checked_duration_since(previous.sampled_at)?;
+    let elapsed = current
+        .sampled_at
+        .checked_duration_since(previous.sampled_at)?;
     let seconds = elapsed.as_secs_f64();
     if seconds <= 0.0 {
         return None;
@@ -208,10 +213,7 @@ fn windows_memory_percent() -> Option<f64> {
 #[cfg(target_os = "windows")]
 fn windows_cpu_times() -> Option<SystemCpuTimes> {
     use std::mem::zeroed;
-    use windows_sys::Win32::{
-        Foundation::FILETIME,
-        System::Threading::GetSystemTimes,
-    };
+    use windows_sys::Win32::{Foundation::FILETIME, System::Threading::GetSystemTimes};
 
     unsafe {
         let mut idle: FILETIME = zeroed();
@@ -236,7 +238,9 @@ fn filetime_to_u64(filetime: windows_sys::Win32::Foundation::FILETIME) -> u64 {
 #[cfg(target_os = "windows")]
 fn windows_network_sample() -> Option<NetworkSample> {
     use std::{ptr::null_mut, slice};
-    use windows_sys::Win32::NetworkManagement::IpHelper::{FreeMibTable, GetIfTable2, MIB_IF_TABLE2};
+    use windows_sys::Win32::NetworkManagement::IpHelper::{
+        FreeMibTable, GetIfTable2, MIB_IF_TABLE2,
+    };
 
     unsafe {
         let mut table: *mut MIB_IF_TABLE2 = null_mut();
@@ -344,7 +348,10 @@ mod tests {
             user: 200,
         };
 
-        assert_eq!(cpu_usage_between(previous, current), Some(250.0 / 300.0 * 100.0));
+        assert_eq!(
+            cpu_usage_between(previous, current),
+            Some(250.0 / 300.0 * 100.0)
+        );
     }
 
     #[test]

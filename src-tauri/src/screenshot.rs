@@ -182,11 +182,7 @@ mod platform {
         pub height: u32,
     }
 
-    pub fn dib_to_jpeg_data_url(
-        dib: &[u8],
-        width: u32,
-        height: u32,
-    ) -> Result<JpegResult, String> {
+    pub fn dib_to_jpeg_data_url(dib: &[u8], width: u32, height: u32) -> Result<JpegResult, String> {
         let header_size = mem::size_of::<BITMAPINFOHEADER>();
         let expected_len = header_size + width as usize * height as usize * 4;
         if dib.len() < expected_len {

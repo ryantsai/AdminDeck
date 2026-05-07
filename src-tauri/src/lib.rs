@@ -3,6 +3,7 @@ mod diagnostics;
 mod import;
 mod logging;
 mod performance;
+mod power;
 mod rdp;
 mod screenshot;
 mod secrets;
@@ -471,6 +472,19 @@ fn create_diagnostics_bundle(
     performance: tauri::State<'_, performance::PerformanceMonitor>,
 ) -> Result<diagnostics::DiagnosticsBundle, String> {
     diagnostics::create_bundle(&app, &performance)
+}
+
+#[tauri::command]
+fn get_dont_sleep_enabled(power: tauri::State<'_, power::DontSleepManager>) -> bool {
+    power.is_enabled()
+}
+
+#[tauri::command]
+fn set_dont_sleep_enabled(
+    power: tauri::State<'_, power::DontSleepManager>,
+    enabled: bool,
+) -> Result<bool, String> {
+    power.set_enabled(enabled)
 }
 
 #[tauri::command]
@@ -1063,9 +1077,7 @@ fn send_vnc_ctrl_alt_delete(
 }
 
 #[tauri::command]
-fn list_wiki_tree(
-    storage: tauri::State<'_, storage::Storage>,
-) -> Result<wiki::WikiTree, String> {
+fn list_wiki_tree(storage: tauri::State<'_, storage::Storage>) -> Result<wiki::WikiTree, String> {
     wiki::list_wiki_tree(&storage)
 }
 
@@ -1155,9 +1167,7 @@ fn export_wiki_zip(
 }
 
 #[tauri::command]
-fn get_wiki_attachments_folder(
-    paths: tauri::State<'_, wiki::WikiPaths>,
-) -> Result<String, String> {
+fn get_wiki_attachments_folder(paths: tauri::State<'_, wiki::WikiPaths>) -> Result<String, String> {
     Ok(paths.root().display().to_string())
 }
 
@@ -1170,12 +1180,9 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|error| {
-                    setup_error(format!("failed to resolve app data directory: {error}"))
-                })?;
+            let app_data_dir = app.path().app_data_dir().map_err(|error| {
+                setup_error(format!("failed to resolve app data directory: {error}"))
+            })?;
             let db_path = app_data_dir.join("admin-deck.sqlite3");
             let wiki_paths = wiki::WikiPaths::new(app_data_dir);
             let storage = storage::Storage::open(db_path).map_err(setup_error)?;
@@ -1190,6 +1197,7 @@ pub fn run() {
             }
             app.manage(storage);
             app.manage(performance::PerformanceMonitor::new());
+            app.manage(power::DontSleepManager::new());
             app.manage(secrets::Secrets::new());
             app.manage(sessions::SessionManager::new());
             app.manage(sftp::SftpSessionManager::new());
@@ -1262,6 +1270,8 @@ pub fn run() {
             get_performance_snapshot,
             get_host_usage_snapshot,
             create_diagnostics_bundle,
+            get_dont_sleep_enabled,
+            set_dont_sleep_enabled,
             capture_screenshot_to_clipboard,
             capture_screenshot_for_assistant,
             ssh_transport_plan,
