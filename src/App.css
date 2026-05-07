@@ -5094,32 +5094,64 @@ progress {
   margin: -4px 0 10px;
 }
 
+.webview-workspace {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.webview-workspace .workspace-toolbar {
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.webview-workspace .workspace-toolbar > div:first-child {
+  flex: 0 1 220px;
+}
+
+.webview-workspace .toolbar-cluster {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
 .webview-toolbar-form {
   display: flex;
-  flex: 1;
+  flex: 1 1 260px;
+  min-width: 0;
 }
 
 .webview-address-input {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 auto;
+  min-width: 160px;
 }
 
 .webview-toolbar-status {
+  flex: 0 1 auto;
+  max-width: 220px;
+  overflow: hidden;
   color: var(--muted);
   font-size: 12px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .webview-placeholder {
-  flex: 1;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  place-items: center;
 }
 
 .webview-placeholder-message {
   padding: 24px;
+  text-align: center;
 }
 
 .webview-placeholder-error {
+  justify-self: stretch;
   padding: 12px;
 }
 

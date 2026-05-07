@@ -503,7 +503,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
 
   return (
     <section
-      className={isActive ? "terminal-workspace active" : "terminal-workspace"}
+      className={isActive ? "terminal-workspace webview-workspace active" : "terminal-workspace webview-workspace"}
       ref={workspaceRef}
     >
       <div className="workspace-toolbar">
