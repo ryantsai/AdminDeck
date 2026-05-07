@@ -147,6 +147,38 @@ fn upsert_url_credential(
 }
 
 #[tauri::command]
+fn list_url_credentials(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<Vec<storage::UrlCredentialSummary>, String> {
+    storage.list_url_credentials()
+}
+
+#[tauri::command]
+fn delete_url_credential(
+    storage: tauri::State<'_, storage::Storage>,
+    secrets: tauri::State<'_, secrets::Secrets>,
+    connection_id: String,
+) -> Result<(), String> {
+    storage.delete_url_credential(connection_id.clone())?;
+    secrets.delete_secret(secrets::SecretReferenceRequest::url_password(connection_id))
+}
+
+#[tauri::command]
+fn list_url_data_partitions(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<Vec<storage::UrlDataPartitionSummary>, String> {
+    storage.list_url_data_partitions()
+}
+
+#[tauri::command]
+fn clear_url_data_partition(
+    storage: tauri::State<'_, storage::Storage>,
+    name: String,
+) -> Result<(), String> {
+    storage.clear_url_data_partition(name)
+}
+
+#[tauri::command]
 fn get_terminal_settings(
     storage: tauri::State<'_, storage::Storage>,
 ) -> Result<storage::TerminalSettings, String> {
@@ -691,10 +723,14 @@ fn webview_go_forward(
 #[tauri::command]
 fn fill_webview_credential(
     webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    storage: tauri::State<'_, storage::Storage>,
     secrets: tauri::State<'_, secrets::Secrets>,
     request: FillWebviewCredentialRequest,
 ) -> Result<(), String> {
-    let username = request.username.trim().to_string();
+    let credential = storage
+        .url_credential_fill(&request.secret_owner_id)?
+        .ok_or_else(|| "stored URL credential was not found".to_string())?;
+    let username = credential.username.trim().to_string();
     if username.is_empty() {
         return Err("URL credential username is required".to_string());
     }
@@ -706,7 +742,17 @@ fn fill_webview_credential(
         session_id: request.session_id,
         username,
         password,
+        username_selector: credential.username_selector,
+        password_selector: credential.password_selector,
     })
+}
+
+#[tauri::command]
+fn capture_webview_credential(
+    webviews: tauri::State<'_, webview::WebviewSessionManager>,
+    request: webview::WebviewSimpleRequest,
+) -> Result<(), String> {
+    webviews.capture_credential(request)
 }
 
 #[tauri::command]
@@ -998,6 +1044,7 @@ pub fn run() {
             webview_go_back,
             webview_go_forward,
             fill_webview_credential,
+            capture_webview_credential,
             close_webview_session,
             start_rdp_session,
             update_rdp_bounds,

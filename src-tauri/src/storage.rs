@@ -12,7 +12,7 @@ use std::{
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
-const SCHEMA_USER_VERSION: i32 = 5;
+const SCHEMA_USER_VERSION: i32 = 6;
 
 const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS connection_tags (
 CREATE TABLE IF NOT EXISTS url_credentials (
     connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE,
     username TEXT NOT NULL,
+    page_url TEXT,
+    username_selector TEXT,
+    password_selector TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -323,6 +326,38 @@ pub struct MoveConnectionRequest {
 pub struct UpsertUrlCredentialRequest {
     connection_id: String,
     username: String,
+    #[serde(default)]
+    page_url: Option<String>,
+    #[serde(default)]
+    username_selector: Option<String>,
+    #[serde(default)]
+    password_selector: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UrlCredentialSummary {
+    connection_id: String,
+    connection_name: String,
+    url: Option<String>,
+    username: String,
+    username_selector: Option<String>,
+    password_selector: Option<String>,
+    updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UrlDataPartitionSummary {
+    name: String,
+    connection_count: u32,
+}
+
+#[derive(Clone)]
+pub(crate) struct UrlCredentialFill {
+    pub(crate) username: String,
+    pub(crate) username_selector: Option<String>,
+    pub(crate) password_selector: Option<String>,
 }
 
 impl Storage {
@@ -1034,6 +1069,9 @@ impl Storage {
     ) -> Result<SavedConnection, String> {
         let connection_id = required_field("connection id", request.connection_id)?;
         let username = required_field("URL credential username", request.username)?;
+        let page_url = normalize_optional_text(request.page_url);
+        let username_selector = normalize_optional_text(request.username_selector);
+        let password_selector = normalize_optional_text(request.password_selector);
         let connection = self.lock()?;
         let connection_type = connection
             .query_row(
@@ -1050,16 +1088,115 @@ impl Storage {
 
         connection
             .execute(
-                "INSERT INTO url_credentials (connection_id, username, updated_at)
-                 VALUES (?1, ?2, CURRENT_TIMESTAMP)
+                "INSERT INTO url_credentials (connection_id, username, page_url, username_selector, password_selector, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
                  ON CONFLICT(connection_id) DO UPDATE SET
                     username = excluded.username,
+                    page_url = excluded.page_url,
+                    username_selector = excluded.username_selector,
+                    password_selector = excluded.password_selector,
                     updated_at = CURRENT_TIMESTAMP",
-                params![&connection_id, &username],
+                params![&connection_id, &username, page_url, username_selector, password_selector],
             )
             .map_err(to_storage_error)?;
 
         get_connection_by_id(&connection, &connection_id)
+    }
+
+    pub(crate) fn url_credential_fill(
+        &self,
+        connection_id: &str,
+    ) -> Result<Option<UrlCredentialFill>, String> {
+        let connection = self.lock()?;
+        connection
+            .query_row(
+                "SELECT username, username_selector, password_selector FROM url_credentials WHERE connection_id = ?1",
+                params![connection_id],
+                |row| {
+                    Ok(UrlCredentialFill {
+                        username: row.get(0)?,
+                        username_selector: row.get(1)?,
+                        password_selector: row.get(2)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(to_storage_error)
+    }
+
+    pub fn list_url_credentials(&self) -> Result<Vec<UrlCredentialSummary>, String> {
+        let connection = self.lock()?;
+        let mut statement = connection
+            .prepare(
+                "SELECT connections.id, connections.name, connections.url, url_credentials.username,
+                        url_credentials.username_selector, url_credentials.password_selector, url_credentials.updated_at
+                 FROM url_credentials
+                 INNER JOIN connections ON connections.id = url_credentials.connection_id
+                 ORDER BY lower(connections.name), lower(url_credentials.username)",
+            )
+            .map_err(to_storage_error)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(UrlCredentialSummary {
+                    connection_id: row.get(0)?,
+                    connection_name: row.get(1)?,
+                    url: row.get(2)?,
+                    username: row.get(3)?,
+                    username_selector: row.get(4)?,
+                    password_selector: row.get(5)?,
+                    updated_at: row.get(6)?,
+                })
+            })
+            .map_err(to_storage_error)?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)
+    }
+
+    pub fn delete_url_credential(&self, connection_id: String) -> Result<(), String> {
+        let connection_id = required_field("connection id", connection_id)?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "DELETE FROM url_credentials WHERE connection_id = ?1",
+                params![connection_id],
+            )
+            .map_err(to_storage_error)?;
+        Ok(())
+    }
+
+    pub fn list_url_data_partitions(&self) -> Result<Vec<UrlDataPartitionSummary>, String> {
+        let connection = self.lock()?;
+        let mut statement = connection
+            .prepare(
+                "SELECT data_partition, COUNT(*)
+                 FROM connections
+                 WHERE connection_type = 'url' AND data_partition IS NOT NULL AND trim(data_partition) <> ''
+                 GROUP BY data_partition
+                 ORDER BY lower(data_partition)",
+            )
+            .map_err(to_storage_error)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(UrlDataPartitionSummary {
+                    name: row.get(0)?,
+                    connection_count: row.get::<_, i64>(1)?.max(0) as u32,
+                })
+            })
+            .map_err(to_storage_error)?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(to_storage_error)
+    }
+
+    pub fn clear_url_data_partition(&self, name: String) -> Result<(), String> {
+        let name = required_field("URL data shard", name)?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "UPDATE connections SET data_partition = NULL WHERE connection_type = 'url' AND data_partition = ?1",
+                params![name],
+            )
+            .map_err(to_storage_error)?;
+        Ok(())
     }
 
     pub fn create_connection_folder(
@@ -1934,6 +2071,10 @@ fn run_migrations(connection: &mut SqliteConnection) -> Result<(), String> {
         rebuild_connections_for_telnet_serial_kinds(connection)?;
     }
 
+    if current < 6 {
+        ensure_url_credential_capture_columns(connection)?;
+    }
+
     connection
         .execute_batch(&format!("PRAGMA user_version = {SCHEMA_USER_VERSION}"))
         .map_err(to_storage_error)?;
@@ -2151,6 +2292,9 @@ fn ensure_url_credentials_table(connection: &mut SqliteConnection) -> Result<(),
             CREATE TABLE IF NOT EXISTS url_credentials (
                 connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE,
                 username TEXT NOT NULL,
+                page_url TEXT,
+                username_selector TEXT,
+                password_selector TEXT,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -2159,6 +2303,20 @@ fn ensure_url_credentials_table(connection: &mut SqliteConnection) -> Result<(),
             "#,
         )
         .map_err(to_storage_error)
+}
+
+fn ensure_url_credential_capture_columns(connection: &mut SqliteConnection) -> Result<(), String> {
+    ensure_url_credentials_table(connection)?;
+    for column in ["page_url", "username_selector", "password_selector"] {
+        if column_missing(connection, "url_credentials", column)? {
+            connection
+                .execute_batch(&format!(
+                    "ALTER TABLE url_credentials ADD COLUMN {column} TEXT;"
+                ))
+                .map_err(to_storage_error)?;
+        }
+    }
+    Ok(())
 }
 
 fn ensure_tmux_connection_columns(connection: &mut SqliteConnection) -> Result<(), String> {
@@ -2430,6 +2588,12 @@ fn folder_name_for(folder_id: &str) -> &str {
         "manual" => "Manual",
         other => other,
     }
+}
+
+fn normalize_optional_text(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn normalize_optional_id(value: Option<String>) -> Option<String> {

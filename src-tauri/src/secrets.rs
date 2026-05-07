@@ -33,6 +33,15 @@ pub struct SecretReferenceRequest {
     owner_id: String,
 }
 
+impl SecretReferenceRequest {
+    pub(crate) fn url_password(owner_id: String) -> Self {
+        Self {
+            kind: SecretKind::UrlPassword,
+            owner_id,
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretPresence {

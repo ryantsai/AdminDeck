@@ -4766,3 +4766,66 @@ progress {
 .webview-nav-icon-forward {
   transform: rotate(-90deg);
 }
+
+.settings-subsection {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.settings-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.settings-list-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-list-row strong,
+.settings-list-row span,
+.settings-list-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-list-row strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settings-list-row span,
+.settings-list-row small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settings-empty-state {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}

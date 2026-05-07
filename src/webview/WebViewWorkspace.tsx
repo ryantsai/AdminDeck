@@ -1,8 +1,9 @@
 import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
 import { documentHasWebviewOverlay } from "../workspace/nativeOverlay";
-import { ArrowDown, KeyRound, RefreshCw } from "lucide-react";
+import { ArrowDown, KeyRound, RefreshCw, Save } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { FormEvent } from "react";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
@@ -108,7 +109,20 @@ function releaseWebviewSession(sessionId: string) {
   }, 50);
 }
 
+type CapturedCredentialPayload = {
+  ok: boolean;
+  reason?: string;
+  url?: string;
+  username?: string;
+  password?: string;
+  usernameSelector?: string;
+  passwordSelector?: string;
+};
+
+const CREDENTIAL_TITLE_PREFIX = "__ADMINDECK_URL_CREDENTIAL__";
+
 export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
+  const { t } = useTranslation();
   const updateWebviewTabMetadata = useWorkspaceStore((state) => state.updateWebviewTabMetadata);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const placeholderRef = useRef<HTMLDivElement | null>(null);
@@ -124,8 +138,10 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
   const [addressInput, setAddressInput] = useState(tab.url ?? "");
 
   const initialUrl = tab.url ?? "";
-  const urlCredentialUsername = tab.connection?.urlCredentialUsername;
-  const canFillCredential = Boolean(tab.connection?.hasUrlCredential && urlCredentialUsername);
+  const [savedCredentialUsername, setSavedCredentialUsername] = useState(tab.connection?.urlCredentialUsername ?? "");
+  const [hasSavedCredential, setHasSavedCredential] = useState(Boolean(tab.connection?.hasUrlCredential));
+  const urlCredentialUsername = savedCredentialUsername || tab.connection?.urlCredentialUsername;
+  const canFillCredential = Boolean(hasSavedCredential && urlCredentialUsername);
 
   const computeBounds = () => {
     const node = placeholderRef.current;
@@ -339,6 +355,10 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
           return;
         }
         const title = event.payload.title.trim();
+        if (title.startsWith(CREDENTIAL_TITLE_PREFIX)) {
+          void handleCapturedCredential(title.slice(CREDENTIAL_TITLE_PREFIX.length));
+          return;
+        }
         if (title) {
           updateWebviewTabMetadata(tab.id, { title });
         }
@@ -348,11 +368,11 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
           return;
         }
         if (event.payload.status === "requested") {
-          setFillStatus("Download started");
+          setFillStatus(t("webview.downloadStarted"));
           return;
         }
         if (event.payload.status === "finished") {
-          setFillStatus(event.payload.success ? "Download complete" : "Download failed");
+          setFillStatus(event.payload.success ? t("webview.downloadComplete") : t("webview.downloadFailed"));
         }
       }),
     ]).then((unlistenFns) => {
@@ -367,7 +387,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
       disposed = true;
       disposers.forEach((dispose) => dispose());
     };
-  }, [tab.id, updateWebviewTabMetadata]);
+  }, [tab.id, t, updateWebviewTabMetadata]);
 
   function handleNavigate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -393,12 +413,80 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
     });
   }
 
+  function handleCapturedCredential(rawPayload: string) {
+    if (!tab.connection) {
+      return;
+    }
+    let payload: CapturedCredentialPayload;
+    try {
+      payload = JSON.parse(rawPayload) as CapturedCredentialPayload;
+    } catch {
+      setFillStatus("");
+      setNavError(t("webview.savePasswordInvalidCapture"));
+      return;
+    }
+    if (!payload.ok || !payload.username || !payload.password) {
+      setFillStatus("");
+      const reason = payload.reason === "no-password-field"
+        ? t("webview.savePasswordNoPasswordField")
+        : payload.reason === "empty-password"
+          ? t("webview.savePasswordEmptyPassword")
+          : payload.reason === "empty-username"
+            ? t("webview.savePasswordEmptyUsername")
+            : t("webview.savePasswordFailed");
+      setNavError(reason);
+      return;
+    }
+    setNavError("");
+    setFillStatus(t("webview.savingPassword"));
+    void invokeCommand("store_secret", {
+      request: {
+        kind: "urlPassword",
+        ownerId: tab.connection.id,
+        secret: payload.password,
+      },
+    })
+      .then(() => invokeCommand("upsert_url_credential", {
+        request: {
+          connectionId: tab.connection!.id,
+          username: payload.username!,
+          pageUrl: payload.url,
+          usernameSelector: payload.usernameSelector,
+          passwordSelector: payload.passwordSelector,
+        },
+      }))
+      .then(() => {
+        setSavedCredentialUsername(payload.username ?? "");
+        setHasSavedCredential(true);
+        setFillStatus(t("webview.passwordSaved"));
+        window.dispatchEvent(new CustomEvent("admindeck:connection-tree-invalidated"));
+      })
+      .catch((error) => {
+        setFillStatus("");
+        setNavError(error instanceof Error ? error.message : String(error));
+      });
+  }
+
+  function handleSaveCredential() {
+    if (!isTauriRuntime() || !sessionStartedRef.current || !tab.connection) {
+      return;
+    }
+    setNavError("");
+    setFillStatus(t("webview.capturingPassword"));
+    void invokeCommand("capture_webview_credential", {
+      request: { sessionId: sessionIdRef.current },
+    }).catch((error) => {
+      setFillStatus("");
+      setNavError(error instanceof Error ? error.message : String(error));
+    });
+  }
+
   function handleFillCredential() {
     if (!isTauriRuntime() || !sessionStartedRef.current || !tab.connection || !urlCredentialUsername) {
       return;
     }
     setNavError("");
-    setFillStatus("Filling credential");
+    setFillStatus(t("webview.fillingCredential"));
     void invokeCommand("fill_webview_credential", {
       request: {
         sessionId: sessionIdRef.current,
@@ -406,7 +494,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
         username: urlCredentialUsername,
       },
     })
-      .then(() => setFillStatus("Credential filled"))
+      .then(() => setFillStatus(t("webview.credentialFilled")))
       .catch((error) => {
         setFillStatus("");
         setNavError(error instanceof Error ? error.message : String(error));
@@ -426,61 +514,70 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
         <div className="toolbar-cluster">
           <button
             className="icon-button"
-            aria-label="Go back"
+            aria-label={t("webview.goBack")}
             onClick={() => handleSimple("webview_go_back")}
-            title="Back"
+            title={t("webview.back")}
             type="button"
           >
             <ArrowDown className="webview-nav-icon-back" size={15} />
           </button>
           <button
             className="icon-button"
-            aria-label="Go forward"
+            aria-label={t("webview.goForward")}
             onClick={() => handleSimple("webview_go_forward")}
-            title="Forward"
+            title={t("webview.forward")}
             type="button"
           >
             <ArrowDown className="webview-nav-icon-forward" size={15} />
           </button>
           <button
             className="icon-button"
-            aria-label="Reload"
+            aria-label={t("webview.reload")}
             onClick={() => handleSimple("webview_reload")}
-            title="Reload"
+            title={t("webview.reload")}
             type="button"
           >
             <RefreshCw size={15} />
           </button>
           <form className="webview-toolbar-form" onSubmit={handleNavigate}>
             <input
-              aria-label="Address"
+              aria-label={t("webview.address")}
               className="webview-address-input"
               onChange={(event) => setAddressInput(event.currentTarget.value)}
-              placeholder="https://example.com"
+              placeholder={t("webview.urlPlaceholder")}
               value={addressInput}
             />
           </form>
           <button
             className="toolbar-button"
+            onClick={handleSaveCredential}
+            title={t("webview.savePasswordTitle")}
+            type="button"
+          >
+            <Save size={15} />
+            {t("webview.savePassword")}
+          </button>
+          <button
+            className="toolbar-button"
             disabled={!canFillCredential}
             onClick={handleFillCredential}
-            title={canFillCredential ? "Fill saved credential" : "No saved URL credential"}
+            title={canFillCredential ? t("webview.fillSavedCredential") : t("webview.noSavedCredential")}
             type="button"
           >
             <KeyRound size={15} />
-            Fill
+            {t("webview.fill")}
           </button>
-          <ScreenshotMenu targetLabel={`${tab.title} URL view`} targetRef={workspaceRef} />
+          <ScreenshotMenu targetLabel={t("webview.screenshotTarget", { title: tab.title })} targetRef={workspaceRef} />
           {fillStatus ? <span className="webview-toolbar-status">{fillStatus}</span> : null}
         </div>
       </div>
 
       <div ref={placeholderRef} className="webview-placeholder">
         {!initialUrl ? (
-          <p className="webview-placeholder-message">This URL connection has no URL configured.</p>
+          <p className="webview-placeholder-message">{t("webview.noUrlConfigured")}</p>
         ) : !isTauriRuntime() ? (
           <p className="webview-placeholder-message">
-            Embedded browser only available in the desktop runtime. Open <code>{initialUrl}</code> externally.
+            {t("webview.desktopRuntimeOnly")} <code>{initialUrl}</code>
           </p>
         ) : null}
         {navError ? <p className="form-error webview-placeholder-error">{navError}</p> : null}

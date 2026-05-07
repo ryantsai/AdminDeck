@@ -14,14 +14,15 @@ const DEFAULT_PARTITION: &str = "shared";
 const HIDDEN_WEBVIEW_POSITION: f64 = -32_000.0;
 const AUTOFILL_AGENT: &str = r#"
 (() => {
+  const TITLE_CHANNEL = "__ADMINDECK_URL_CREDENTIAL__";
   const agent = {
     fill(credential) {
-      const passwordInput = findPasswordInput();
+      const passwordInput = inputFromSelector(credential.passwordSelector) || findPasswordInput(false);
       if (!passwordInput) {
         return { filled: false, reason: "no-password-field" };
       }
 
-      const usernameInput = findUsernameInput(passwordInput);
+      const usernameInput = inputFromSelector(credential.usernameSelector) || findUsernameInput(passwordInput);
       if (usernameInput && credential.username) {
         setInputValue(usernameInput, credential.username);
       }
@@ -29,10 +30,61 @@ const AUTOFILL_AGENT: &str = r#"
       passwordInput.focus({ preventScroll: true });
       return { filled: true, usernameFilled: Boolean(usernameInput && credential.username) };
     },
+    capture() {
+      const passwordInput = findPasswordInput(true);
+      if (!passwordInput) {
+        publish({ ok: false, reason: "no-password-field", url: window.location.href });
+        return;
+      }
+      const password = passwordInput.value || "";
+      if (!password) {
+        publish({ ok: false, reason: "empty-password", url: window.location.href });
+        return;
+      }
+      const usernameInput = findUsernameInput(passwordInput);
+      const username = usernameInput?.value || "";
+      if (!username) {
+        publish({ ok: false, reason: "empty-username", url: window.location.href });
+        return;
+      }
+      publish({
+        ok: true,
+        url: window.location.href,
+        username,
+        password,
+        usernameSelector: usernameInput ? selectorFor(usernameInput) : undefined,
+        passwordSelector: selectorFor(passwordInput),
+      });
+    },
   };
 
-  function findPasswordInput() {
-    return Array.from(document.querySelectorAll("input[type='password']")).find(isUsableInput);
+  function publish(payload) {
+    const previousTitle = document.title;
+    document.title = `${TITLE_CHANNEL}${JSON.stringify(payload)}`;
+    window.setTimeout(() => {
+      if (document.title.startsWith(TITLE_CHANNEL)) {
+        document.title = previousTitle;
+      }
+    }, 150);
+  }
+
+  function inputFromSelector(selector) {
+    if (!selector) {
+      return undefined;
+    }
+    try {
+      const input = document.querySelector(selector);
+      return isUsableInput(input) ? input : undefined;
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  function findPasswordInput(requireValue) {
+    return Array.from(document.querySelectorAll("input[type='password']"))
+      .filter(isUsableInput)
+      .filter((input) => !requireValue || input.value)
+      .sort((left, right) => visibleScore(right) - visibleScore(left))[0];
   }
 
   function findUsernameInput(passwordInput) {
@@ -48,11 +100,11 @@ const AUTOFILL_AGENT: &str = r#"
       return undefined;
     }
     return candidates
-      .map((input, index) => ({ input, index, score: usernameScore(input, index) }))
+      .map((input, index) => ({ input, index, score: usernameScore(input, index, passwordInput) }))
       .sort((left, right) => right.score - left.score || right.index - left.index)[0].input;
   }
 
-  function usernameScore(input, index) {
+  function usernameScore(input, index, passwordInput) {
     const label = [
       input.name,
       input.id,
@@ -64,13 +116,24 @@ const AUTOFILL_AGENT: &str = r#"
       .join(" ")
       .toLowerCase();
     let score = index;
+    if (input.value) {
+      score += 40;
+    }
     if (/user|email|login|account|name/.test(label)) {
       score += 100;
     }
     if (/one-time|otp|code|search/.test(label)) {
       score -= 100;
     }
+    if (input.compareDocumentPosition(passwordInput) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      score += 20;
+    }
     return score;
+  }
+
+  function visibleScore(input) {
+    const rect = input.getBoundingClientRect();
+    return Math.max(0, rect.width) * Math.max(0, rect.height);
   }
 
   function isUsableInput(input) {
@@ -88,13 +151,31 @@ const AUTOFILL_AGENT: &str = r#"
     input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  function selectorFor(input) {
+    const stable = ["id", "name", "autocomplete", "aria-label", "placeholder"];
+    for (const attr of stable) {
+      const value = input.getAttribute(attr);
+      if (value) {
+        const selector = `input[${CSS.escape(attr)}=${JSON.stringify(value)}]`;
+        try {
+          if (document.querySelector(selector) === input) {
+            return selector;
+          }
+        } catch (_) {}
+      }
+    }
+    const type = input.getAttribute("type") || "text";
+    const inputs = Array.from(document.querySelectorAll(`input[type='${CSS.escape(type)}']`));
+    const index = inputs.indexOf(input);
+    return index >= 0 ? `input[type='${CSS.escape(type)}']:nth-of-type(${index + 1})` : "input";
+  }
+
   Object.defineProperty(window, "__ADMINDECK_URL_AUTOFILL__", {
     configurable: true,
     value: agent,
   });
 })();
 "#;
-
 pub struct WebviewSessionManager {
     sessions: Mutex<HashMap<String, Webview>>,
     starting_sessions: Mutex<HashSet<String>>,
@@ -158,6 +239,8 @@ pub(crate) struct WebviewFillCredentialRequest {
     pub(crate) session_id: String,
     pub(crate) username: String,
     pub(crate) password: String,
+    pub(crate) username_selector: Option<String>,
+    pub(crate) password_selector: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -439,6 +522,8 @@ impl WebviewSessionManager {
         let payload = serde_json::json!({
             "username": request.username,
             "password": request.password,
+            "usernameSelector": request.username_selector,
+            "passwordSelector": request.password_selector,
         });
         let payload = serde_json::to_string(&payload)
             .map_err(|error| format!("failed to prepare URL credential payload: {error}"))?;
@@ -451,6 +536,16 @@ impl WebviewSessionManager {
                 "window.__ADMINDECK_URL_AUTOFILL__?.fill({payload});"
             ))
             .map_err(|error| format!("failed to fill webview credential: {error}"))
+    }
+
+    pub fn capture_credential(&self, request: WebviewSimpleRequest) -> Result<(), String> {
+        let sessions = self.lock()?;
+        let webview = sessions
+            .get(&request.session_id)
+            .ok_or_else(|| format!("webview session '{}' was not found", request.session_id))?;
+        webview
+            .eval("window.__ADMINDECK_URL_AUTOFILL__?.capture();")
+            .map_err(|error| format!("failed to capture webview credential: {error}"))
     }
 
     pub fn close_session(&self, request: WebviewSimpleRequest) -> Result<(), String> {

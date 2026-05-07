@@ -316,6 +316,21 @@ export interface KeychainStatus {
   backend: string;
 }
 
+export interface UrlCredentialSummary {
+  connectionId: string;
+  connectionName: string;
+  url?: string;
+  username: string;
+  usernameSelector?: string;
+  passwordSelector?: string;
+  updatedAt: string;
+}
+
+export interface UrlDataPartitionSummary {
+  name: string;
+  connectionCount: number;
+}
+
 export interface SecretReferenceRequest {
   kind: SecretKind;
   ownerId: string;

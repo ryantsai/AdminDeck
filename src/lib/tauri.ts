@@ -31,6 +31,8 @@ import type {
   StoreSecretRequest,
   TerminalSettings,
   UpdateConnectionRequest,
+  UrlCredentialSummary,
+  UrlDataPartitionSummary,
 } from "../types";
 
 type BrowserFileHandle = {
@@ -471,8 +473,32 @@ type CommandMap = {
     result: ConnectionTree;
   };
   upsert_url_credential: {
-    args: { request: { connectionId: string; username: string } };
+    args: {
+      request: {
+        connectionId: string;
+        username: string;
+        pageUrl?: string;
+        usernameSelector?: string;
+        passwordSelector?: string;
+      };
+    };
     result: Connection;
+  };
+  list_url_credentials: {
+    args: undefined;
+    result: UrlCredentialSummary[];
+  };
+  delete_url_credential: {
+    args: { connectionId: string };
+    result: null;
+  };
+  list_url_data_partitions: {
+    args: undefined;
+    result: UrlDataPartitionSummary[];
+  };
+  clear_url_data_partition: {
+    args: { name: string };
+    result: null;
   };
   get_general_settings: {
     args: undefined;
@@ -802,6 +828,10 @@ type CommandMap = {
   };
   fill_webview_credential: {
     args: { request: FillWebviewCredentialRequest };
+    result: null;
+  };
+  capture_webview_credential: {
+    args: { request: WebviewSimpleRequest };
     result: null;
   };
   close_webview_session: {

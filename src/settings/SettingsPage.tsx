@@ -4,6 +4,7 @@ import {
   Bot,
   Info,
   Monitor,
+  Globe,
   Network,
   Palette,
   Server,
@@ -19,6 +20,7 @@ import { GeneralSettings } from "./GeneralSettings";
 import { RdpSettings } from "./RdpSettings";
 import { SshSettings } from "./SshSettings";
 import { TerminalSettings as TerminalSettingsPage } from "./TerminalSettings";
+import { UrlSettings } from "./UrlSettings";
 import { VncSettings } from "./VncSettings";
 
 export { AI_PROVIDER_SECRET_OWNER_ID };
@@ -29,6 +31,7 @@ type SettingsSectionId =
   | "assistant-settings"
   | "ssh-settings"
   | "terminal-settings"
+  | "url-settings"
   | "rdp-settings"
   | "vnc-settings"
   | "about-settings";
@@ -100,6 +103,14 @@ export function SettingsPage({
             <span>{t("settings.sectionTerminal")}</span>
           </button>
           <button
+            className={settingsNavItemClass("url-settings", activeSectionId)}
+            onClick={() => setActiveSectionId("url-settings")}
+            type="button"
+          >
+            <Globe size={16} />
+            <span>{t("settings.sectionUrl")}</span>
+          </button>
+          <button
             className={settingsNavItemClass("rdp-settings", activeSectionId)}
             onClick={() => setActiveSectionId("rdp-settings")}
             type="button"
@@ -133,6 +144,7 @@ export function SettingsPage({
           {activeSectionId === "assistant-settings" && <AiSettings />}
           {activeSectionId === "ssh-settings" && <SshSettings />}
           {activeSectionId === "terminal-settings" && <TerminalSettingsPage />}
+          {activeSectionId === "url-settings" && <UrlSettings />}
           {activeSectionId === "rdp-settings" && <RdpSettings />}
           {activeSectionId === "vnc-settings" && <VncSettings />}
           {activeSectionId === "about-settings" && <AboutSettings />}
