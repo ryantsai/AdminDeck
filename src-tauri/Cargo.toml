@@ -1,6 +1,6 @@
 [package]
 name = "admin-deck"
-version = "0.1.5"
+version = "0.1.6"
 description = "Fast local-first administration workspace for terminals, SSH, SFTP, and approval-based command assistance."
 authors = ["Ryan Tsai"]
 license = "Apache-2.0"
@@ -45,6 +45,7 @@ zip = "2"
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Ole", "Win32_System_Variant", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_System_DataExchange", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Ole", "Win32_System_Power", "Win32_System_ProcessStatus", "Win32_System_Shutdown", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 windows-native-keyring-store = "1.0.0"
+
 
 
 
