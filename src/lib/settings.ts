@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { useWorkspaceStore } from "../store";
+import { listCustomFontOptions, normalizeAvailableAppearance } from "./customFonts";
 import { invokeCommand, isTauriRuntime } from "./tauri";
 
 // Stable keychain owner id for the OpenAI-compatible AI API key. Lives in the
@@ -53,9 +54,13 @@ export function useBootstrapSettings() {
       })
       .catch(swallow);
 
-    void invokeCommand("get_appearance_settings")
-      .then((settings) => {
-        if (!disposed) setAppearanceSettings(settings);
+    void Promise.all([invokeCommand("get_appearance_settings"), listCustomFontOptions()])
+      .then(([settings, customFonts]) => {
+        const normalized = normalizeAvailableAppearance(settings, customFonts);
+        if (!disposed) setAppearanceSettings(normalized);
+        if (JSON.stringify(normalized) !== JSON.stringify(settings)) {
+          void invokeCommand("update_appearance_settings", { request: normalized }).catch(swallow);
+        }
       })
       .catch(swallow);
 

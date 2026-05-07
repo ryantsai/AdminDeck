@@ -201,6 +201,13 @@ export type ColorScheme =
 export interface AppearanceSettings {
   appFontFamily: string;
   colorScheme: ColorScheme;
+  customFontPath?: string;
+}
+
+export interface CustomFont {
+  name: string;
+  path: string;
+  extension: string;
 }
 
 export interface SshSettings {

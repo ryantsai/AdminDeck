@@ -131,6 +131,8 @@ pub struct TerminalSettings {
 pub struct AppearanceSettings {
     app_font_family: String,
     color_scheme: String,
+    #[serde(default)]
+    custom_font_path: Option<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -2639,6 +2641,7 @@ fn default_appearance_settings() -> AppearanceSettings {
     AppearanceSettings {
         app_font_family: "\"Satoshi\", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif".to_string(),
         color_scheme: "default".to_string(),
+        custom_font_path: None,
     }
 }
 
@@ -2720,6 +2723,7 @@ fn validate_appearance_settings(
 ) -> Result<AppearanceSettings, String> {
     settings.app_font_family = required_field("app font family", settings.app_font_family)?;
     settings.color_scheme = required_field("color scheme", settings.color_scheme)?;
+    settings.custom_font_path = trim_optional(settings.custom_font_path);
     settings.color_scheme = match settings.color_scheme.to_lowercase().as_str() {
         "default" | "dark" | "light" | "mac" | "orange" | "purple" | "pink" => {
             settings.color_scheme.to_lowercase()
@@ -3863,16 +3867,19 @@ mod tests {
 
         let updated = storage
             .update_appearance_settings(AppearanceSettings {
-                app_font_family:
-                    "  \"JF Open Huninn\", \"Microsoft JhengHei UI\", \"Segoe UI\", sans-serif  "
-                        .to_string(),
+                app_font_family: "  \"Custom UI Font\", \"Segoe UI\", sans-serif  ".to_string(),
                 color_scheme: "dark".to_string(),
+                custom_font_path: Some("  C:/AdminDeck/fonts/custom.ttf  ".to_string()),
             })
             .expect("appearance settings update");
 
         assert_eq!(
             updated.app_font_family,
-            "\"JF Open Huninn\", \"Microsoft JhengHei UI\", \"Segoe UI\", sans-serif"
+            "\"Custom UI Font\", \"Segoe UI\", sans-serif"
+        );
+        assert_eq!(
+            updated.custom_font_path.as_deref(),
+            Some("C:/AdminDeck/fonts/custom.ttf")
         );
 
         drop(storage);

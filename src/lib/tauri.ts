@@ -12,6 +12,7 @@ import type {
   Connection,
   ConnectionFolder,
   ConnectionTree,
+  CustomFont,
   DatabaseBackupInfo,
   GeneralSettings,
   ImportedDatabaseSnapshot,
@@ -569,6 +570,14 @@ type CommandMap = {
   update_appearance_settings: {
     args: { request: AppearanceSettings };
     result: AppearanceSettings;
+  };
+  get_custom_fonts_folder: {
+    args: undefined;
+    result: string;
+  };
+  list_custom_fonts: {
+    args: undefined;
+    result: CustomFont[];
   };
   get_ssh_settings: {
     args: undefined;

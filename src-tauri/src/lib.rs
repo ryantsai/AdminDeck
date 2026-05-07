@@ -18,6 +18,8 @@ mod webview;
 mod window_state;
 
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 use tauri::Manager;
 
 #[derive(Serialize)]
@@ -28,6 +30,14 @@ struct AppBootstrap {
     log_status: String,
     storage_status: String,
     keychain_status: secrets::KeychainStatus,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CustomFontEntry {
+    name: String,
+    path: String,
+    extension: String,
 }
 
 #[derive(Deserialize)]
@@ -50,6 +60,83 @@ fn app_bootstrap(
         storage_status: storage.status(),
         keychain_status: secrets.status(),
     }
+}
+
+#[tauri::command]
+fn get_custom_fonts_folder() -> Result<String, String> {
+    let folder = custom_fonts_folder()?;
+    fs::create_dir_all(&folder).map_err(|error| {
+        format!(
+            "failed to create custom fonts folder {}: {error}",
+            folder.display()
+        )
+    })?;
+    Ok(folder.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn list_custom_fonts() -> Result<Vec<CustomFontEntry>, String> {
+    let folder = custom_fonts_folder()?;
+    fs::create_dir_all(&folder).map_err(|error| {
+        format!(
+            "failed to create custom fonts folder {}: {error}",
+            folder.display()
+        )
+    })?;
+
+    let mut fonts = fs::read_dir(&folder)
+        .map_err(|error| {
+            format!(
+                "failed to read custom fonts folder {}: {error}",
+                folder.display()
+            )
+        })?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| custom_font_entry(entry.path()))
+        .collect::<Vec<_>>();
+
+    fonts.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(fonts)
+}
+
+fn custom_fonts_folder() -> Result<PathBuf, String> {
+    let exe_path = std::env::current_exe()
+        .map_err(|error| format!("failed to resolve app executable path: {error}"))?;
+    let exe_folder = exe_path
+        .parent()
+        .ok_or_else(|| "failed to resolve app executable folder".to_string())?;
+    Ok(exe_folder.join("fonts"))
+}
+
+fn custom_font_entry(path: PathBuf) -> Option<CustomFontEntry> {
+    if !path.is_file() {
+        return None;
+    }
+
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.to_lowercase())?;
+
+    if !is_supported_font_extension(&extension) {
+        return None;
+    }
+
+    let name = path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .or_else(|| path.file_name().and_then(|name| name.to_str()))?
+        .to_string();
+
+    Some(CustomFontEntry {
+        name,
+        path: path.to_string_lossy().into_owned(),
+        extension,
+    })
+}
+
+fn is_supported_font_extension(extension: &str) -> bool {
+    matches!(extension, "ttf" | "otf" | "woff" | "woff2")
 }
 
 #[tauri::command]
@@ -1010,6 +1097,8 @@ pub fn run() {
             update_terminal_settings,
             get_appearance_settings,
             update_appearance_settings,
+            get_custom_fonts_folder,
+            list_custom_fonts,
             get_ssh_settings,
             update_ssh_settings,
             get_sftp_settings,

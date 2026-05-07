@@ -1,6 +1,12 @@
-import { RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FolderOpen, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { invokeCommand, isTauriRuntime } from "../lib/tauri";
+import {
+  listCustomFontOptions,
+  normalizeAvailableAppearance,
+  type CustomFontOption,
+} from "../lib/customFonts";
+import { invokeCommand, isTauriRuntime, openFilesystemPath } from "../lib/tauri";
 import { defaultAppearanceSettings } from "../sample-data";
 import { useWorkspaceStore } from "../store";
 import type { AppearanceSettings as AppearanceSettingsType, ColorScheme } from "../types";
@@ -9,10 +15,6 @@ const APP_UI_FONT_OPTIONS = [
   {
     labelKey: "settings.satoshiDefault",
     value: defaultAppearanceSettings.appFontFamily,
-  },
-  {
-    labelKey: "settings.jfOpenHuninn",
-    value: '"JF Open Huninn", "Microsoft JhengHei UI", "Microsoft YaHei UI", "Segoe UI", sans-serif',
   },
   {
     labelKey: "settings.segoeUi",
@@ -74,6 +76,7 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
   const { t } = useTranslation();
   const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
   const setAppearanceSettings = useWorkspaceStore((state) => state.setAppearanceSettings);
+  const [customFonts, setCustomFonts] = useState<CustomFontOption[]>([]);
 
   async function applyAppearance(settings: AppearanceSettingsType) {
     setAppearanceSettings(settings);
@@ -82,7 +85,41 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
     }
   }
 
+  useEffect(() => {
+    let disposed = false;
+    if (!isTauriRuntime()) {
+      return () => {
+        disposed = true;
+      };
+    }
+
+    void listCustomFontOptions()
+      .then((fonts) => {
+        if (disposed) return;
+        setCustomFonts(fonts);
+        const normalized = normalizeAvailableAppearance(appearanceSettings, fonts);
+        if (JSON.stringify(normalized) !== JSON.stringify(appearanceSettings)) {
+          void applyAppearance(normalized);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      disposed = true;
+    };
+  }, [appearanceSettings]);
+
+  async function handleOpenCustomFontsFolder() {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    const folder = await invokeCommand("get_custom_fonts_folder");
+    await openFilesystemPath(folder);
+  }
+
   const previewColors = SCHEME_PREVIEW_COLORS[appearanceSettings.colorScheme];
+  const knownFontSelected = APP_UI_FONT_OPTIONS.some((option) => option.value === appearanceSettings.appFontFamily);
+  const customFontSelected = customFonts.some((font) => font.cssValue === appearanceSettings.appFontFamily);
 
   return (
     <section className="settings-card settings-section">
@@ -95,25 +132,47 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
       <div className="form-grid appearance-font-grid">
         <label>
           <span>{t("settings.appUiFontFamily")}</span>
-          <select
-            onChange={(event) => {
-              const appFontFamily = event.currentTarget.value;
-              void applyAppearance({
-                ...appearanceSettings,
-                appFontFamily,
-              });
-            }}
-            value={appearanceSettings.appFontFamily}
-          >
-            {APP_UI_FONT_OPTIONS.some((option) => option.value === appearanceSettings.appFontFamily) ? null : (
-              <option value={appearanceSettings.appFontFamily}>{t("settings.customFont")}</option>
-            )}
-            {APP_UI_FONT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {t(option.labelKey)}
-              </option>
-            ))}
-          </select>
+          <div className="input-with-button">
+            <select
+              onChange={(event) => {
+                const selectedValue = event.currentTarget.value;
+                const selectedCustomFont = customFonts.find((font) => font.cssValue === selectedValue);
+                void applyAppearance({
+                  ...appearanceSettings,
+                  appFontFamily: selectedValue,
+                  customFontPath: selectedCustomFont?.path,
+                });
+              }}
+              value={appearanceSettings.appFontFamily}
+            >
+              {knownFontSelected || customFontSelected ? null : (
+                <option value={appearanceSettings.appFontFamily}>{t("settings.customFont")}</option>
+              )}
+              {APP_UI_FONT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </option>
+              ))}
+              {customFonts.length > 0 ? <optgroup label={t("settings.customFonts")}>{customFonts.map((font) => (
+                <option key={font.path} value={font.cssValue}>
+                  {font.name}
+                </option>
+              ))}</optgroup> : null}
+            </select>
+            <button
+              aria-label={t("settings.openCustomFontsFolder")}
+              className="toolbar-button"
+              onClick={() => void handleOpenCustomFontsFolder()}
+              title={t("settings.openCustomFontsFolder")}
+              type="button"
+            >
+              <FolderOpen size={15} />
+              {t("settings.openCustomFontsFolder")}
+            </button>
+          </div>
+          <small className="field-hint">
+            {customFonts.length > 0 ? t("settings.customFontsHint") : t("settings.noCustomFonts")}
+          </small>
         </label>
         <label>
           <span>{t("settings.colorScheme")}</span>
