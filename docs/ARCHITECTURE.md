@@ -175,6 +175,21 @@ Parses SSH config and creates draft connections. It should preserve supported di
 
 Current implementation note: the importer supports `Host`, `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump`. It skips wildcard-only host patterns and reports unsupported global or host-scoped directives with line numbers through the typed Tauri command. The previous top chrome import button has been removed; a future visible entry point should live in the connection tree or Settings rather than a standalone global button bar.
 
+### Connection Batch Importer
+
+Owns the cross-format Connection import flow surfaced as the **Import** tile in the New Connection wizard (`src/connections/ConnectionSidebar.tsx`) and rendered as the two-mode dialog `src/connections/ImportDialog.tsx`. The dialog has a single source-picker step that branches to either a file-import step or a network-scan step, then funnels both into the same editable preview table before persisting.
+
+Backend lives in `src-tauri/src/import.rs` and is exposed through two typed Tauri commands:
+
+- `parseImportFile` — reads a user-picked file from disk, dispatches by extension or content sniff, and returns a list of `ImportedConnectionDraft` rows plus parser warnings. Supported formats: CSV/TSV/text (column-aware via header row when present), RDCMan `.rdg` (XML, preserves folder hierarchy as `folderPath`), MobaXterm `.mxtsessions` (INI bookmarks with protocol id mapping), and PuTTY `.reg` (Windows Registry export of `Software\SimonTatham\PuTTY\Sessions`). Each draft carries `name`, `host`, `user`, optional `port`, `connectionType`, and optional `folderPath` for nested folder reconstruction.
+- `scanNetworkForConnections` — performs a light TCP port probe over a single host, hyphen range, or CIDR, capped at `MAX_SCAN_HOSTS = 1024` per call with `SCAN_CONCURRENCY = 64` and a 500 ms per-port timeout. Each open port becomes a draft whose `connectionType` is mapped from the well-known port (22 → SSH, 23 → Telnet, 3389 → RDP). Progress events are emitted on the app handle so the dialog can render an in-flight status without blocking the UI thread.
+
+The frontend preview table lets the user toggle individual rows, edit `name`/`host`/`port`/`type`/`user`, bulk-fill or overwrite usernames across the current selection, optionally bulk-set passwords for the current selection (stored only after import via the keychain path), and choose a destination — a new ConnectionFolder, the connection tree root, or any existing folder. RDCMan and MobaXterm imports preserve nested folder paths as `folderPath`, which the frontend reconstructs as ConnectionFolders under the chosen destination.
+
+Secrets boundary: imported passwords are not persisted into SQLite alongside the draft. They are routed through the existing keychain owner used by Connection secrets, mirroring the rest of the connection storage model. Drafts without a typed password store no secret and behave like any other Connection without saved credentials. Bulk-clearing a password leaves no keychain entry for that imported Connection.
+
+Out-of-scope vs. SSH config import: this importer does **not** parse `~/.ssh/config`. SSH config remains the responsibility of the SSH Config Importer described above; the two flows share no parser state.
+
 ### AI Assistant
 
 Owns provider adapters, prompt construction, command proposal, approval flow, command execution handoff, and output capture.

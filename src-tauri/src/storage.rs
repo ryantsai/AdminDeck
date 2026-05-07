@@ -3315,6 +3315,9 @@ mod tests {
             .upsert_url_credential(UpsertUrlCredentialRequest {
                 connection_id: created.id.clone(),
                 username: "admin".to_string(),
+                page_url: None,
+                username_selector: None,
+                password_selector: None,
             })
             .expect("URL credential metadata is stored");
         assert!(updated.has_url_credential);
@@ -3340,6 +3343,9 @@ mod tests {
         let error = match storage.upsert_url_credential(UpsertUrlCredentialRequest {
             connection_id: connection.id,
             username: "admin".to_string(),
+            page_url: None,
+            username_selector: None,
+            password_selector: None,
         }) {
             Ok(_) => panic!("SSH connections cannot store URL credentials"),
             Err(error) => error,

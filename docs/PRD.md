@@ -25,6 +25,9 @@ The product will be light chrome with dark terminal panes by default, optimized 
 9. As an SSH user, I want to import entries from my SSH config, so that AdminDeck can bootstrap my existing workflow.
 10. As an SSH user, I want imported SSH config entries to preserve host, user, port, identity file, and proxy jump when possible, so that imported connections behave as expected.
 11. As an SSH user, I want unsupported SSH config directives to be visible, so that I understand what may need manual adjustment.
+11a. As an operator migrating from another tool, I want to import Connections in bulk from CSV/TSV, RDCMan `.rdg`, MobaXterm `.mxtsessions`, or PuTTY `.reg` exports, so that I can populate AdminDeck without retyping every host. Imported nested folders should round-trip as ConnectionFolders.
+11b. As an operator on a new network, I want a light TCP port scan over a single host, hyphen range, or CIDR (capped per scan) with SSH/Telnet/RDP probes, so that I can seed Connection drafts from what is actually reachable.
+11c. As an operator, I want an editable preview before imported Connections are persisted, with bulk username and optional bulk password actions across the current selection, so that I can fix placeholder values once instead of per row.
 12. As a terminal user, I want local terminal tabs, so that AdminDeck can replace my daily terminal for common work.
 13. As a terminal user, I want local terminal connections to require no host details, so that launching the default shell is fast and obvious.
 14. As a Windows user, I want saved local terminal options for PowerShell, Command Prompt, and WSL, so that local terminals match the shell I need.
@@ -149,8 +152,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - Settings sync.
 - Global command palette or command launcher.
 - Silent, portable ZIP, rollback/downgrade, preview-channel, managed-server, or cross-platform auto-update behavior.
-- MobaXterm or RDCMan import.
-- Dynamic inventory from files, cloud APIs, Terraform, CMDB, or other external sources.
+- Dynamic inventory from cloud APIs, Terraform, CMDB, or other external sources beyond the supported file imports (CSV/TSV, RDCMan `.rdg`, MobaXterm `.mxtsessions`, PuTTY `.reg`) and the bundled light TCP port scan.
 - Folder sync, diff/compare, transfer resume, archive/extract, and remote file editing in SFTP.
 - Fully autonomous AI agent execution.
 - Editable keybinding UI.
