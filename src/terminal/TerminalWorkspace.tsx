@@ -1,4 +1,4 @@
-import { confirmTrustedSshHostKey, uniqueRuntimeId, usesNativeSshHostKeyVerification } from "../connections/utils";
+import { confirmTrustedSshHostKey, connectionToolbarTitle, uniqueRuntimeId, usesNativeSshHostKeyVerification } from "../connections/utils";
 import { readFromClipboard, writeToClipboard } from "../lib/clipboard";
 import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
 import { WikiPagesButton } from "../wiki/WikiPagesButton";
@@ -1273,6 +1273,7 @@ function TerminalPaneView({
         : t("terminal.noResults")
     : "";
   const isSshPane = pane.connection?.type === "ssh";
+  const paneToolbarTitle = pane.toolbarTitle ?? (pane.connection ? connectionToolbarTitle(pane.connection) : pane.title);
 
   return (
     <article
@@ -1289,7 +1290,7 @@ function TerminalPaneView({
       <header>
         <span>
           <Circle size={9} fill="currentColor" />
-          {pane.title}
+          {paneToolbarTitle}
         </span>
         <div className="terminal-pane-actions">
           {pane.connection ? (

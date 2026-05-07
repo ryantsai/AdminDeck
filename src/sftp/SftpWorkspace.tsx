@@ -1,4 +1,4 @@
-import { confirmTrustedSshHostKey, uniqueRuntimeId, usesNativeSshHostKeyVerification } from "../connections/utils";
+import { confirmTrustedSshHostKey, connectionToolbarTitle, uniqueRuntimeId, usesNativeSshHostKeyVerification } from "../connections/utils";
 import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
 import { WikiPagesButton } from "../wiki/WikiPagesButton";
 import { ArrowDown, ChevronDown, Download, FolderPlus, Pencil, RefreshCw, Terminal, Trash2, Upload, X } from "lucide-react";
@@ -876,6 +876,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
   const clearableTransferCount = transfers.filter((transfer) =>
     TRANSFER_HISTORY_STATES.includes(transfer.state),
   ).length;
+  const toolbarTitle = tab.toolbarTitle ?? (connection ? connectionToolbarTitle(connection) : tab.title);
 
   return (
     <section
@@ -884,7 +885,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
     >
       <div className="workspace-toolbar">
         <div>
-          <strong>{tab.title}</strong>
+          <strong>{toolbarTitle}</strong>
           <span>{status === "Connected" ? tab.subtitle : status}</span>
         </div>
         <div className="toolbar-cluster">

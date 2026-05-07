@@ -102,6 +102,7 @@ export interface TerminalPane {
   kind?: "terminal";
   id: string;
   title: string;
+  toolbarTitle?: string;
   cwd: string;
   buffer: string;
   connection?: Connection;
@@ -112,6 +113,7 @@ export interface UrlPane {
   kind: "webview";
   id: string;
   title: string;
+  toolbarTitle?: string;
   connection: Connection;
   url: string;
   dataPartition?: string;
@@ -121,6 +123,7 @@ export interface RemoteDesktopPane {
   kind: "remoteDesktop";
   id: string;
   title: string;
+  toolbarTitle?: string;
   connection: Connection;
 }
 
@@ -253,6 +256,7 @@ export interface AiProviderSettings {
 export interface WorkspaceTab {
   id: string;
   title: string;
+  toolbarTitle?: string;
   subtitle: string;
   kind: "terminal" | "sftp" | "webview" | "remoteDesktop";
   panes: WorkspacePane[];

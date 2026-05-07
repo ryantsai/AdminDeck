@@ -1203,8 +1203,8 @@ h2 {
   background: var(--chrome-strong);
 }
 
-.embedded-workspace-pane > .terminal-workspace > .workspace-toolbar {
-  padding-right: 34px;
+.embedded-workspace-pane > .webview-workspace .webview-pane > header {
+  padding-right: 40px;
 }
 
 .embedded-workspace-pane > .remote-desktop-shell .remote-desktop-pane > header {
@@ -1237,6 +1237,20 @@ h2 {
 }
 
 .embedded-workspace-pane:has(> .remote-desktop-shell) .embedded-pane-close:hover {
+  color: #ff7070;
+  background: rgba(255, 100, 100, 0.12);
+  border-color: rgba(255, 112, 112, 0.28);
+}
+
+.embedded-workspace-pane:has(> .webview-workspace) .embedded-pane-close {
+  top: 5px;
+  color: #95a7bb;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(128, 153, 184, 0.18);
+  border-radius: 5px;
+}
+
+.embedded-workspace-pane:has(> .webview-workspace) .embedded-pane-close:hover {
   color: #ff7070;
   background: rgba(255, 100, 100, 0.12);
   border-color: rgba(255, 112, 112, 0.28);
@@ -1694,6 +1708,7 @@ h2 {
 
 .terminal-pane pre,
 .approval-card pre,
+.assistant-message-text-attachment pre,
 .assistant-selection-context pre,
 .proposal-context-details pre {
   margin: 0;
@@ -2640,6 +2655,40 @@ progress {
 .assistant-message.user .assistant-message-actions {
   justify-self: end;
   justify-content: flex-end;
+}
+
+.assistant-message-text-attachments {
+  display: grid;
+  gap: 7px;
+  width: min(100%, 360px);
+  margin-left: auto;
+  margin-bottom: 7px;
+  text-align: left;
+}
+
+.assistant-message-text-attachment {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+}
+
+.assistant-message-text-attachment figcaption {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-message-text-attachment pre {
+  max-height: 132px;
+  padding: 8px;
+  color: #dce7f5;
+  background: var(--terminal);
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 .assistant-message-attachments {
@@ -5260,42 +5309,74 @@ progress {
 }
 
 .webview-workspace {
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  padding: 14px;
 }
 
-.webview-workspace .workspace-toolbar {
-  gap: 10px;
-  margin-bottom: 0;
+.webview-pane {
+  grid-template-rows: 34px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
 }
 
-.webview-workspace .workspace-toolbar > div:first-child {
-  flex: 0 1 220px;
+.webview-pane > header {
+  gap: 8px;
 }
 
-.webview-workspace .toolbar-cluster {
-  flex: 1 1 auto;
-  min-width: 0;
-  justify-content: flex-end;
-}
-
-.webview-toolbar-form {
+.webview-nav-group {
   display: flex;
-  flex: 1 1 260px;
+  gap: 6px;
+  align-items: center;
   min-width: 0;
+  flex-shrink: 1;
 }
 
-.webview-address-input {
+.webview-nav-globe {
+  margin-right: 4px;
+  color: #95a7bb;
+  flex-shrink: 0;
+}
+
+.webview-nav-group .webview-toolbar-form {
+  display: flex;
+  flex: 1 1 960px;
+  min-width: 200px;
+  height: 24px;
+}
+
+.webview-nav-group .webview-address-input {
   flex: 1 1 auto;
-  min-width: 160px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  color: #d9e2ef;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(128, 153, 184, 0.28);
+  border-radius: 5px;
+  outline: none;
 }
 
-.webview-toolbar-status {
-  flex: 0 1 auto;
+.webview-nav-group .webview-address-input:focus {
+  border-color: rgba(86, 166, 255, 0.45);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.webview-title-center {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webview-pane .terminal-pane-actions {
+  flex-shrink: 0;
+}
+
+.webview-pane .webview-toolbar-status {
   max-width: 220px;
   overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -5318,14 +5399,6 @@ progress {
 .webview-placeholder-error {
   justify-self: stretch;
   padding: 12px;
-}
-
-.webview-nav-icon-back {
-  transform: rotate(90deg);
-}
-
-.webview-nav-icon-forward {
-  transform: rotate(-90deg);
 }
 
 .settings-subsection {

@@ -355,6 +355,7 @@ function buildPanesForConnection(
           ? `pane-${baseId}`
           : `pane-${baseId}-${index}-${Date.now()}`,
       title: index === 0 ? baseTitle : `${baseTitle} ${index + 1}`,
+      toolbarTitle: toolbarTitleForConnection(connection),
       cwd: baseCwd,
       buffer: "",
       connection,
@@ -381,6 +382,7 @@ function buildPanesFromStoredLayout(
     return {
       ...pane,
       title: storedPane.title?.trim() || pane.title,
+      toolbarTitle: toolbarTitleForConnection(storedPane.connection),
       cwd: storedPane.cwd?.trim() || pane.cwd,
       connection: storedPane.connection,
       tmuxSessionId: storedPane.tmuxSessionId,
@@ -396,6 +398,39 @@ function titleForConnectionPane(connection: Connection) {
     return connection.name;
   }
   return terminalPaneTitleForConnection(connection);
+}
+
+function toolbarTitleForConnection(connection: Connection) {
+  if (connection.type === "url") {
+    return connection.name;
+  }
+  if (connection.type === "serial") {
+    return connection.serialLine?.trim() || connection.host || connection.name;
+  }
+  if (connection.type === "local") {
+    return localTerminalToolbarTitle(connection);
+  }
+  return formatConnectionAddress(connection);
+}
+
+function localTerminalToolbarTitle(connection: Connection) {
+  const shell = connection.localShell?.trim();
+  const normalizedShell = shell?.toLowerCase() ?? "";
+  if (normalizedShell.endsWith("cmd.exe") || normalizedShell === "cmd") {
+    return i18next.t("settings.commandPrompt");
+  }
+  if (
+    normalizedShell.endsWith("powershell.exe") ||
+    normalizedShell === "powershell" ||
+    normalizedShell.endsWith("pwsh.exe") ||
+    normalizedShell === "pwsh"
+  ) {
+    return i18next.t("settings.powerShell");
+  }
+  if (normalizedShell.endsWith("wsl.exe") || normalizedShell === "wsl") {
+    return i18next.t("settings.wsl");
+  }
+  return shell || connection.name;
 }
 
 function terminalPaneTitleForConnection(connection: Connection) {
@@ -424,6 +459,7 @@ function buildPaneForConnection(
       kind: "webview",
       id: `pane-${connection.id}-${Date.now()}`,
       title: titleForConnectionPane(connection),
+      toolbarTitle: toolbarTitleForConnection(connection),
       connection,
       url: connection.url,
       dataPartition: connection.dataPartition,
@@ -435,6 +471,7 @@ function buildPaneForConnection(
       kind: "remoteDesktop",
       id: `pane-${connection.id}-${Date.now()}`,
       title: titleForConnectionPane(connection),
+      toolbarTitle: toolbarTitleForConnection(connection),
       connection,
     };
   }
@@ -443,6 +480,7 @@ function buildPaneForConnection(
     kind: "terminal",
     id: `pane-${connection.id}-${Date.now()}`,
     title: titleForConnectionPane(connection),
+    toolbarTitle: toolbarTitleForConnection(connection),
     cwd: inheritedTerminalCwdForConnection(connection, focusedPane),
     buffer: "",
     connection,
@@ -540,6 +578,7 @@ interface WorkspaceState {
     tabId: string,
     metadata: { title?: string; subtitle?: string; url?: string },
   ) => void;
+  refreshOpenConnectionMetadata: (connection: Connection) => void;
   markConnectionSessionStarted: (connectionId: string) => void;
   markConnectionSessionEnded: (connectionId: string) => void;
   closeAllTabs: () => void;
@@ -690,6 +729,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab: WorkspaceTab = {
       id: `tab-${connection.id}`,
       title: connection.name,
+      toolbarTitle: toolbarTitleForConnection(connection),
       subtitle: terminalConnectionSubtitle(connection),
       kind: "terminal",
       panes,
@@ -723,6 +763,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab: WorkspaceTab = {
       id: `tab-${connection.id}`,
       title: connection.name,
+      toolbarTitle: toolbarTitleForConnection(connection),
       subtitle: remoteDesktopSubtitle(connection),
       kind: "terminal",
       panes: [pane],
@@ -759,6 +800,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab: WorkspaceTab = {
       id: `tab-${connection.id}`,
       title: connection.name,
+      toolbarTitle: toolbarTitleForConnection(connection),
       subtitle,
       kind: "terminal",
       panes: [
@@ -766,6 +808,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           kind: "webview",
           id: `pane-${connection.id}-${Date.now()}`,
           title: connection.name,
+          toolbarTitle: toolbarTitleForConnection(connection),
           connection,
           url: connection.url,
           dataPartition: connection.dataPartition,
@@ -798,6 +841,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab: WorkspaceTab = {
       id: tabId,
       title: `${connection.name} SFTP`,
+      toolbarTitle: toolbarTitleForConnection(connection),
       subtitle: `${connection.user}@${connection.host}`,
       kind: "sftp",
       panes: [],
@@ -815,12 +859,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab: WorkspaceTab = {
       id: tabId,
       title: `${connection.name} terminal`,
+      toolbarTitle: toolbarTitleForConnection(connection),
       subtitle: `${connection.user}@${connection.host}:${normalizedPath}`,
       kind: "terminal",
       panes: [
         {
           id: `pane-${connection.id}-terminal-${Date.now()}`,
           title: "ssh",
+          toolbarTitle: toolbarTitleForConnection(connection),
           cwd: normalizedPath,
           buffer: "",
           connection,
@@ -971,6 +1017,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const newPane: TerminalPane = {
           id: `pane-${connection.id}-${Date.now()}`,
           title: tmuxSessionId,
+          toolbarTitle: toolbarTitleForConnection(connection),
           cwd: focusedPane.cwd,
           buffer: "",
           connection,
@@ -1101,6 +1148,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }),
     }));
   },
+  refreshOpenConnectionMetadata: (connection) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => refreshTabConnectionMetadata(tab, connection)),
+    }));
+  },
   markConnectionSessionStarted: (connectionId) => {
     set((state) => ({
       activeSessionCounts: {
@@ -1127,6 +1179,72 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
   },
 }));
+
+function refreshTabConnectionMetadata(tab: WorkspaceTab, connection: Connection): WorkspaceTab {
+  const tabConnectionMatches = tab.connection?.id === connection.id;
+  const toolbarTitle = toolbarTitleForConnection(connection);
+  const panes = tab.panes.map((pane) => {
+    if (pane.connection?.id !== connection.id) {
+      return pane;
+    }
+    return {
+      ...pane,
+      title: refreshedPaneTitle(pane, connection),
+      toolbarTitle,
+    };
+  });
+  const panesChanged = panes.some((pane, index) => pane !== tab.panes[index]);
+  if (!tabConnectionMatches && !panesChanged) {
+    return tab;
+  }
+
+  if (!tabConnectionMatches) {
+    return { ...tab, panes };
+  }
+
+  return {
+    ...tab,
+    title: refreshedTabTitle(tab, connection),
+    toolbarTitle,
+    subtitle: refreshedTabSubtitle(tab, connection),
+    panes,
+  };
+}
+
+function refreshedTabTitle(tab: WorkspaceTab, connection: Connection) {
+  if (tab.kind === "sftp") {
+    return `${connection.name} SFTP`;
+  }
+  if (tab.id.startsWith(`tab-${connection.id}-terminal-`)) {
+    return `${connection.name} terminal`;
+  }
+  return connection.name;
+}
+
+function refreshedTabSubtitle(tab: WorkspaceTab, connection: Connection) {
+  if (tab.kind === "sftp") {
+    return `${connection.user}@${connection.host}`;
+  }
+  if (tab.kind === "webview") {
+    return tab.subtitle;
+  }
+  if (tab.id.startsWith(`tab-${connection.id}-terminal-`)) {
+    const firstPane = tab.panes.find((pane): pane is TerminalPane => isTerminalPane(pane));
+    const path = firstPane?.cwd?.trim() || ".";
+    return `${connection.user}@${formatConnectionAddress(connection)}:${path}`;
+  }
+  if (tab.panes[0]?.kind === "remoteDesktop") {
+    return remoteDesktopSubtitle(connection);
+  }
+  return terminalConnectionSubtitle(connection);
+}
+
+function refreshedPaneTitle(pane: WorkspacePane, connection: Connection) {
+  if (pane.kind === "webview" || pane.kind === "remoteDesktop") {
+    return connection.name;
+  }
+  return pane.title;
+}
 
 function formatConnectionAddress(connection: Connection) {
   return connection.port

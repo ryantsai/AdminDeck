@@ -1,7 +1,7 @@
 import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
 import { WikiPagesButton } from "../wiki/WikiPagesButton";
 import { documentHasWebviewOverlay } from "../workspace/nativeOverlay";
-import { ArrowDown, KeyRound, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Globe2, KeyRound, RefreshCw, Save } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -507,89 +507,94 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
       className={isActive ? "terminal-workspace webview-workspace active" : "terminal-workspace webview-workspace"}
       ref={workspaceRef}
     >
-      <div className="workspace-toolbar">
-        <div>
-          <strong>{tab.title}</strong>
-          <span>{tab.subtitle}</span>
-        </div>
-        <div className="toolbar-cluster">
-          <button
-            className="icon-button"
-            aria-label={t("webview.goBack")}
-            onClick={() => handleSimple("webview_go_back")}
-            title={t("webview.back")}
-            type="button"
-          >
-            <ArrowDown className="webview-nav-icon-back" size={15} />
-          </button>
-          <button
-            className="icon-button"
-            aria-label={t("webview.goForward")}
-            onClick={() => handleSimple("webview_go_forward")}
-            title={t("webview.forward")}
-            type="button"
-          >
-            <ArrowDown className="webview-nav-icon-forward" size={15} />
-          </button>
-          <button
-            className="icon-button"
-            aria-label={t("webview.reload")}
-            onClick={() => handleSimple("webview_reload")}
-            title={t("webview.reload")}
-            type="button"
-          >
-            <RefreshCw size={15} />
-          </button>
-          <form className="webview-toolbar-form" onSubmit={handleNavigate}>
-            <input
-              aria-label={t("webview.address")}
-              className="webview-address-input"
-              onChange={(event) => setAddressInput(event.currentTarget.value)}
-              placeholder={t("webview.urlPlaceholder")}
-              value={addressInput}
+      <article className="terminal-pane webview-pane">
+        <header>
+          <div className="webview-nav-group">
+            <Globe2 className="webview-nav-globe" size={13} />
+            <button
+              className="terminal-pane-action"
+              aria-label={t("webview.goBack")}
+              onClick={() => handleSimple("webview_go_back")}
+              title={t("webview.back")}
+              type="button"
+            >
+              <ArrowLeft size={13} />
+            </button>
+            <button
+              className="terminal-pane-action"
+              aria-label={t("webview.goForward")}
+              onClick={() => handleSimple("webview_go_forward")}
+              title={t("webview.forward")}
+              type="button"
+            >
+              <ArrowRight size={13} />
+            </button>
+            <button
+              className="terminal-pane-action"
+              aria-label={t("webview.reload")}
+              onClick={() => handleSimple("webview_reload")}
+              title={t("webview.reload")}
+              type="button"
+            >
+              <RefreshCw size={13} />
+            </button>
+            <form className="webview-toolbar-form" onSubmit={handleNavigate}>
+              <input
+                aria-label={t("webview.address")}
+                className="webview-address-input"
+                onChange={(event) => setAddressInput(event.currentTarget.value)}
+                placeholder={t("webview.urlPlaceholder")}
+                value={addressInput}
+              />
+            </form>
+          </div>
+          <span className="webview-title-center">
+            {tab.title}
+          </span>
+          <div className="terminal-pane-actions">
+            {fillStatus ? <span className="webview-toolbar-status">{fillStatus}</span> : null}
+            <button
+              className="terminal-pane-action"
+              onClick={handleSaveCredential}
+              title={t("webview.savePasswordTitle")}
+              type="button"
+            >
+              <Save size={13} />
+            </button>
+            <button
+              className="terminal-pane-action"
+              disabled={!canFillCredential}
+              onClick={handleFillCredential}
+              title={canFillCredential ? t("webview.fillSavedCredential") : t("webview.noSavedCredential")}
+              type="button"
+            >
+              <KeyRound size={13} />
+            </button>
+            <ScreenshotMenu
+              buttonClassName="terminal-pane-action"
+              targetLabel={t("webview.screenshotTarget", { title: tab.title })}
+              targetRef={workspaceRef}
             />
-          </form>
-          <button
-            className="toolbar-button"
-            onClick={handleSaveCredential}
-            title={t("webview.savePasswordTitle")}
-            type="button"
-          >
-            <Save size={15} />
-            {t("webview.savePassword")}
-          </button>
-          <button
-            className="toolbar-button"
-            disabled={!canFillCredential}
-            onClick={handleFillCredential}
-            title={canFillCredential ? t("webview.fillSavedCredential") : t("webview.noSavedCredential")}
-            type="button"
-          >
-            <KeyRound size={15} />
-            {t("webview.fill")}
-          </button>
-          <ScreenshotMenu targetLabel={t("webview.screenshotTarget", { title: tab.title })} targetRef={workspaceRef} />
-          {tab.connection ? (
-            <WikiPagesButton
-              buttonClassName="toolbar-button toolbar-icon-button"
-              connectionId={tab.connection.id}
-              iconSize={15}
-            />
+            {tab.connection ? (
+              <WikiPagesButton
+                buttonClassName="terminal-pane-action"
+                connectionId={tab.connection.id}
+                iconSize={13}
+              />
+            ) : null}
+          </div>
+        </header>
+        <div ref={placeholderRef} className="webview-placeholder">
+          {!initialUrl ? (
+            <p className="webview-placeholder-message">{t("webview.noUrlConfigured")}</p>
+          ) : !isTauriRuntime() ? (
+            <p className="webview-placeholder-message">
+              {t("webview.desktopRuntimeOnly")} <code>{initialUrl}</code>
+            </p>
           ) : null}
-          {fillStatus ? <span className="webview-toolbar-status">{fillStatus}</span> : null}
+          {navError ? <p className="form-error webview-placeholder-error">{navError}</p> : null}
         </div>
-      </div>
-
-      <div ref={placeholderRef} className="webview-placeholder">
-        {!initialUrl ? (
-          <p className="webview-placeholder-message">{t("webview.noUrlConfigured")}</p>
-        ) : !isTauriRuntime() ? (
-          <p className="webview-placeholder-message">
-            {t("webview.desktopRuntimeOnly")} <code>{initialUrl}</code>
-          </p>
-        ) : null}
-        {navError ? <p className="form-error webview-placeholder-error">{navError}</p> : null}
-      </div>
+      </article>
     </section>
   );
 }

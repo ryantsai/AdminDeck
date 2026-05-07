@@ -1,8 +1,8 @@
-import { connectionIconForType, connectionSubtitle, connectionTypeLabel } from "../connections/utils";
-import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
+import { connectionIconForType, connectionSubtitle, connectionToolbarTitle, connectionTypeLabel } from "../connections/utils";
+import { ScreenshotToolbarButtons } from "../workspace/ScreenshotMenu";
 import { WikiPagesButton } from "../wiki/WikiPagesButton";
 import { documentHasWebviewOverlay } from "../workspace/nativeOverlay";
-import { Keyboard, Monitor, RotateCcw } from "lucide-react";
+import { Bot, Keyboard, Monitor, RotateCcw } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -63,6 +63,7 @@ export function RemoteDesktopWorkspace({
   const connection = tab.connection;
   const typeLabel = connection ? connectionTypeLabel(connection.type) : t("remoteDesktop.typeLabel");
   const Icon = connection ? connectionIconForType(connection.type) : Monitor;
+  const toolbarTitle = tab.toolbarTitle ?? (connection ? connectionToolbarTitle(connection) : tab.title);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -86,6 +87,10 @@ export function RemoteDesktopWorkspace({
     (state) => state.markConnectionSessionStarted,
   );
   const markConnectionSessionEnded = useWorkspaceStore((state) => state.markConnectionSessionEnded);
+  const setAssistantContextSnippet = useWorkspaceStore(
+    (state) => state.setAssistantContextSnippet,
+  );
+  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
   const rdpPreCaptureSignal = useWorkspaceStore((state) => state.rdpPreCaptureSignal);
   const [suppressed, setSuppressed] = useState(false);
   const [rdpError, setRdpError] = useState("");
@@ -167,6 +172,49 @@ export function RemoteDesktopWorkspace({
     return invokeCommand("capture_screenshot_for_assistant", {
       request: bounds,
     });
+  };
+
+  const captureTargetScreenshotForAssistant = async () => {
+    if (!isTauriRuntime()) {
+      showWorkspaceStatus(t("workspace.screenshotsRequireRuntime"), { tone: "warning" });
+      return;
+    }
+    const target = hostRef.current;
+    if (!target) {
+      return;
+    }
+    const bounds = target.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      return;
+    }
+
+    try {
+      const screenshot = await invokeCommand("capture_screenshot_for_assistant", {
+        request: {
+          x: Math.max(0, Math.round(bounds.left)),
+          y: Math.max(0, Math.round(bounds.top)),
+          width: Math.max(1, Math.round(bounds.width)),
+          height: Math.max(1, Math.round(bounds.height)),
+        },
+      });
+      setAssistantContextSnippet({
+        id: `remote-desktop-screenshot-${Date.now()}`,
+        kind: "screenshot",
+        sourceLabel: `${tab.title} ${typeLabel} ${t("workspace.screenshot")}`,
+        imageDataUrl: screenshot.dataUrl,
+        width: screenshot.width,
+        height: screenshot.height,
+        capturedAt: new Date().toISOString(),
+      });
+      showWorkspaceStatus(t("workspace.sentToAi"), { tone: "success" });
+    } catch (error) {
+      showWorkspaceStatus(
+        t("workspace.screenshotCaptureError", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+        { tone: "error" },
+      );
+    }
   };
 
   const triggerPreCapture = () => {
@@ -969,7 +1017,7 @@ export function RemoteDesktopWorkspace({
         <header>
           <span>
             <Icon size={13} />
-            {tab.title}
+            {toolbarTitle}
           </span>
           <div className="terminal-pane-actions">
             {tab.subtitle ? <small>{tab.subtitle}</small> : null}
@@ -998,12 +1046,22 @@ export function RemoteDesktopWorkspace({
               <RotateCcw size={13} />
             </button>
           ) : null}
-          <ScreenshotMenu
+          <ScreenshotToolbarButtons
             buttonClassName="terminal-pane-action"
-            targetLabel={`${tab.title} ${typeLabel} view`}
             targetRef={connection?.type === "rdp" || connection?.type === "vnc" ? hostRef : workspaceRef}
-            onPreCapture={triggerPreCapture}
           />
+          {canStartRdp || canStartVnc ? (
+            <button
+              aria-label={t("workspace.sendEntirePanelToAi")}
+              className="terminal-pane-action"
+              disabled={!isTauriRuntime()}
+              onClick={() => void captureTargetScreenshotForAssistant()}
+              title={t("workspace.sendEntirePanelToAi")}
+              type="button"
+            >
+              <Bot size={13} />
+            </button>
+          ) : null}
           {connection ? (
             <WikiPagesButton
               buttonClassName="terminal-pane-action"

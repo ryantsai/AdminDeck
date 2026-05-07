@@ -1,9 +1,10 @@
-import { Camera } from "lucide-react";
+import { Camera, ScanLine } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { menuButtonAria } from "../lib/aria";
 import { invokeCommand, isTauriRuntime, type CaptureScreenshotRequest } from "../lib/tauri";
+import { useWorkspaceStore } from "../store";
 
 type ScreenshotRect = CaptureScreenshotRequest;
 
@@ -215,6 +216,190 @@ export function ScreenshotMenu({
           </div>
         ) : null}
       </div>
+      {regionState ? (
+        <div
+          aria-label={t("workspace.selectRegion")}
+          className="screenshot-region-overlay"
+          onKeyDown={handleRegionKeyDown}
+          onPointerDown={handleRegionPointerDown}
+          onPointerMove={handleRegionPointerMove}
+          onPointerUp={handleRegionPointerUp}
+          role="application"
+          tabIndex={-1}
+        >
+          <div className="screenshot-region-target" ref={regionTargetRef} />
+          {selectionRect ? (
+            <div className="screenshot-region-selection" ref={regionSelectionRef} />
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+export function ScreenshotToolbarButtons({
+  buttonClassName = "icon-button",
+  targetRef,
+}: {
+  buttonClassName?: string;
+  targetRef: RefObject<HTMLElement | null>;
+}) {
+  const { t } = useTranslation();
+  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const [regionState, setRegionState] = useState<ScreenshotRegionState | null>(null);
+  const [copiedStatus, setCopiedStatus] = useState("");
+  const regionTargetRef = useRef<HTMLDivElement | null>(null);
+  const regionSelectionRef = useRef<HTMLDivElement | null>(null);
+
+  async function captureRect(rect: ScreenshotRect) {
+    if (!isTauriRuntime()) {
+      showWorkspaceStatus(t("workspace.screenshotsRequireRuntime"), { tone: "warning" });
+      return;
+    }
+
+    try {
+      await waitForScreenshotSurface();
+      await invokeCommand("capture_screenshot_to_clipboard", { request: rect });
+      setCopiedStatus(t("workspace.copied"));
+      showWorkspaceStatus(t("workspace.copied"), { tone: "success" });
+      window.setTimeout(() => setCopiedStatus(""), 1600);
+    } catch (error) {
+      showWorkspaceStatus(
+        t("workspace.screenshotCaptureError", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+        { tone: "error" },
+      );
+    }
+  }
+
+  function targetBounds() {
+    const target = targetRef.current;
+    if (!target) {
+      return null;
+    }
+    const bounds = target.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      return null;
+    }
+    return bounds;
+  }
+
+  function handleEntirePanel() {
+    const bounds = targetBounds();
+    if (!bounds) {
+      return;
+    }
+    void captureRect(rectFromBounds(bounds));
+  }
+
+  function handleRegion() {
+    const bounds = targetBounds();
+    if (!bounds) {
+      return;
+    }
+    setRegionState({ bounds });
+  }
+
+  function handleRegionPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!regionState || !pointInBounds(event.clientX, event.clientY, regionState.bounds)) {
+      return;
+    }
+    const point = clampPointToBounds(event.clientX, event.clientY, regionState.bounds);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setRegionState({
+      ...regionState,
+      pointerId: event.pointerId,
+      start: point,
+      current: point,
+    });
+  }
+
+  function handleRegionPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!regionState?.start || regionState.pointerId !== event.pointerId) {
+      return;
+    }
+    setRegionState({
+      ...regionState,
+      current: clampPointToBounds(event.clientX, event.clientY, regionState.bounds),
+    });
+  }
+
+  function handleRegionPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!regionState?.start || regionState.pointerId !== event.pointerId) {
+      return;
+    }
+    const current = clampPointToBounds(event.clientX, event.clientY, regionState.bounds);
+    const rect = rectFromPoints(regionState.start, current);
+    setRegionState(null);
+
+    if (rect.width < 4 || rect.height < 4) {
+      return;
+    }
+    void captureRect(rect);
+  }
+
+  function handleRegionKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setRegionState(null);
+    }
+  }
+
+  const selectionRect =
+    regionState?.start && regionState.current
+      ? rectFromPoints(regionState.start, regionState.current)
+      : null;
+
+  useLayoutEffect(() => {
+    const node = regionTargetRef.current;
+    if (!node || !regionState) {
+      return;
+    }
+
+    node.style.height = `${regionState.bounds.height}px`;
+    node.style.left = `${regionState.bounds.left}px`;
+    node.style.top = `${regionState.bounds.top}px`;
+    node.style.width = `${regionState.bounds.width}px`;
+  }, [
+    regionState?.bounds.height,
+    regionState?.bounds.left,
+    regionState?.bounds.top,
+    regionState?.bounds.width,
+  ]);
+
+  useLayoutEffect(() => {
+    const node = regionSelectionRef.current;
+    if (!node || !selectionRect) {
+      return;
+    }
+
+    node.style.height = `${selectionRect.height}px`;
+    node.style.left = `${selectionRect.x}px`;
+    node.style.top = `${selectionRect.y}px`;
+    node.style.width = `${selectionRect.width}px`;
+  }, [selectionRect?.height, selectionRect?.width, selectionRect?.x, selectionRect?.y]);
+
+  return (
+    <>
+      <button
+        aria-label={t("workspace.copyRegion")}
+        className={buttonClassName}
+        onClick={handleRegion}
+        title={t("workspace.copyRegion")}
+        type="button"
+      >
+        <ScanLine size={13} />
+      </button>
+      <button
+        aria-label={t("workspace.copyEntirePanel")}
+        className={buttonClassName}
+        onClick={handleEntirePanel}
+        title={copiedStatus || t("workspace.copyEntirePanel")}
+        type="button"
+      >
+        <Camera size={13} />
+      </button>
       {regionState ? (
         <div
           aria-label={t("workspace.selectRegion")}

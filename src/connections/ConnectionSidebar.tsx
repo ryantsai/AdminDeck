@@ -128,6 +128,7 @@ export function ConnectionSidebar({
   const query = useWorkspaceStore((state) => state.query);
   const setQuery = useWorkspaceStore((state) => state.setQuery);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
+  const refreshOpenConnectionMetadata = useWorkspaceStore((state) => state.refreshOpenConnectionMetadata);
   const tabs = useWorkspaceStore((state) => state.tabs);
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
   const addConnectionToTerminalPane = useWorkspaceStore((state) => state.addConnectionToTerminalPane);
@@ -481,6 +482,17 @@ export function ConnectionSidebar({
       if (connection.type === "url" && urlCredentialUsername) {
         await upsertUrlCredential(connection.id, urlCredentialUsername);
       }
+      refreshOpenConnectionMetadata({
+        ...connection,
+        hasPassword: connection.hasPassword || Boolean(password),
+        urlCredentialUsername:
+          connection.type === "url" && urlCredentialUsername
+            ? urlCredentialUsername
+            : connection.urlCredentialUsername,
+        hasUrlCredential:
+          connection.hasUrlCredential ||
+          (connection.type === "url" && Boolean(urlCredentialUsername && urlPassword)),
+      });
       await reloadConnectionGroups();
       setEditConnection(null);
     } catch (error) {
@@ -568,9 +580,10 @@ export function ConnectionSidebar({
 
     try {
       setTreeError("");
-      await invokeCommand("rename_connection", {
+      const renamedConnection = await invokeCommand("rename_connection", {
         request: { id: connection.id, name },
       });
+      refreshOpenConnectionMetadata(renamedConnection);
       await reloadConnectionGroups();
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));

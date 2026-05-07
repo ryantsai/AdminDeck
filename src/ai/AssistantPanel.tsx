@@ -47,6 +47,7 @@ type AssistantChatMessage = {
   id: string;
   role: "assistant" | "user";
   content: string;
+  textAttachments?: AssistantTextAttachment[];
   imageAttachments?: AssistantImageAttachment[];
   intent?: AssistantPromptIntent;
   createdAt: string;
@@ -62,6 +63,13 @@ type AssistantChatThread = {
 };
 
 type AssistantPromptIntent = "chat" | "extensionCreation";
+
+type AssistantTextAttachment = {
+  id: string;
+  sourceLabel: string;
+  text: string;
+  capturedAt: string;
+};
 
 type AssistantImageAttachment = {
   id: string;
@@ -87,12 +95,14 @@ function createAssistantChatMessage(
   role: AssistantChatMessage["role"],
   content: string,
   intent?: AssistantPromptIntent,
+  textAttachments?: AssistantTextAttachment[],
   imageAttachments?: AssistantImageAttachment[],
 ): AssistantChatMessage {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     content,
+    textAttachments,
     imageAttachments,
     intent,
     createdAt: new Date().toISOString(),
@@ -241,6 +251,37 @@ function normalizeImageAttachments(value: unknown): AssistantImageAttachment[] {
   });
 }
 
+function normalizeTextAttachments(value: unknown): AssistantTextAttachment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const candidate = item as Partial<AssistantTextAttachment>;
+    if (
+      typeof candidate.sourceLabel !== "string" ||
+      !candidate.sourceLabel.trim() ||
+      typeof candidate.text !== "string" ||
+      !candidate.text.trim()
+    ) {
+      return [];
+    }
+    return [
+      {
+        id:
+          typeof candidate.id === "string" && candidate.id
+            ? candidate.id
+            : `assistant-text-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        sourceLabel: candidate.sourceLabel.trim(),
+        text: candidate.text,
+        capturedAt: normalizeDateString(candidate.capturedAt) ?? new Date().toISOString(),
+      },
+    ];
+  });
+}
+
 function sortedAssistantThreads(threads: AssistantChatThread[]) {
   return [...threads].sort(
     (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
@@ -344,6 +385,7 @@ function normalizeAssistantChatMessage(value: unknown): AssistantChatMessage[] {
       id: typeof candidate.id === "string" && candidate.id ? candidate.id : `${candidate.role}-${Date.now()}`,
       role: candidate.role,
       content: candidate.content,
+      textAttachments: normalizeTextAttachments(candidate.textAttachments),
       imageAttachments: normalizeImageAttachments(candidate.imageAttachments),
       intent:
         candidate.intent === "chat" || candidate.intent === "extensionCreation"
@@ -630,7 +672,13 @@ export function AssistantPanel({
   }
 
   async function handleCopyMessage(message: AssistantChatMessage) {
-    await writeToClipboard(message.content);
+    const attachmentText =
+      message.textAttachments
+        ?.map((attachment) => `${attachment.sourceLabel}\n\n${attachment.text}`)
+        .join("\n\n") ?? "";
+    await writeToClipboard(
+      attachmentText ? `${message.content}\n\n${attachmentText}` : message.content,
+    );
   }
 
   async function handleCopyCode(code: string) {
@@ -713,6 +761,17 @@ export function AssistantPanel({
     }
     const requestIntent = assistantIntentForPrompt(assistantIntent, normalizedPrompt);
     setAssistantIntent(requestIntent);
+    const textAttachments: AssistantTextAttachment[] =
+      assistantContextSnippet?.kind === "text"
+        ? [
+            {
+              id: assistantContextSnippet.id,
+              sourceLabel: assistantContextSnippet.sourceLabel,
+              text: assistantContextSnippet.text,
+              capturedAt: assistantContextSnippet.capturedAt,
+            },
+          ]
+        : [];
     let imageAttachments: AssistantImageAttachment[] = [];
     if (currentModelSupportsImageInput) {
       imageAttachments = [...pastedImageContexts];
@@ -735,6 +794,7 @@ export function AssistantPanel({
       "user",
       normalizedPrompt,
       requestIntent,
+      textAttachments.length > 0 ? textAttachments : undefined,
       imageAttachments.length > 0 ? imageAttachments : undefined,
     );
     const previousMessages = messages;
@@ -756,7 +816,7 @@ export function AssistantPanel({
       setPrompt("");
       setPastedImageContexts([]);
       setImagePasteRejected(false);
-      if (assistantContextSnippet?.kind === "screenshot") {
+      if (assistantContextSnippet) {
         clearAssistantContextSnippet();
       }
       setChatError("");
@@ -773,7 +833,7 @@ export function AssistantPanel({
     setPrompt("");
     setPastedImageContexts([]);
     setImagePasteRejected(false);
-    if (assistantContextSnippet?.kind === "screenshot") {
+    if (assistantContextSnippet) {
       clearAssistantContextSnippet();
     }
     setChatError("");
@@ -805,8 +865,7 @@ export function AssistantPanel({
           prompt: normalizedPrompt,
           contextLabel,
           intent: requestIntent,
-          selectedOutput:
-            assistantContextSnippet?.kind === "text" ? assistantContextSnippet.text : undefined,
+          selectedOutput: textAttachments[0]?.text,
           screenshots: imageAttachments.map((attachment) => ({
             sourceLabel: attachment.sourceLabel,
             dataUrl: attachment.imageDataUrl,
@@ -1314,6 +1373,18 @@ function AssistantMessageView({
         <div
           className={`assistant-message-bubble${shouldTruncateUserMessage && !isUserMessageExpanded ? " assistant-message-bubble-truncated" : ""}`}
         >
+          {message.textAttachments?.length ? (
+            <div className="assistant-message-text-attachments">
+              {message.textAttachments.map((attachment) => (
+                <figure className="assistant-message-text-attachment" key={attachment.id}>
+                  <figcaption>{attachment.sourceLabel}</figcaption>
+                  <pre>
+                    <code>{attachment.text}</code>
+                  </pre>
+                </figure>
+              ))}
+            </div>
+          ) : null}
           {message.imageAttachments?.length ? (
             <div className="assistant-message-attachments">
               {message.imageAttachments.map((image) => (
