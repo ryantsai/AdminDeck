@@ -1,3 +1,4 @@
+import i18next from "../i18n/config";
 import { AI_PROVIDER_DEFINITIONS } from "./providerRegistry";
 import type { AiAssistantToolSettings, AiProviderKind, AiProviderSettings, AiReasoningEffort } from "../types";
 export { AI_PROVIDER_DEFINITIONS, modelSupportsImageInput } from "./providerRegistry";
@@ -50,10 +51,10 @@ export function normalizeAiProviderDraft(draft: AiProviderSettings): AiProviderS
   );
 
   if (!baseUrl) {
-    throw new Error("Provider endpoint is required.");
+    throw new Error(i18next.t("ai.providerEndpointRequired"));
   }
   if (!model) {
-    throw new Error("Model is required.");
+    throw new Error(i18next.t("ai.modelRequired"));
   }
 
   return {
@@ -80,7 +81,7 @@ export function validateAiProviderForChat(
   const normalized = normalizeAiProviderDraft(settings);
   const definition = getAiProviderDefinition(normalized.providerKind);
   if (definition.requiresApiKey && !hasApiKey) {
-    throw new Error(`${definition.label} needs an API key before AI Assistant can chat.`);
+    throw new Error(i18next.t("ai.apiKeyRequired", { provider: definition.label }));
   }
   return normalized;
 }

@@ -6,7 +6,15 @@
     "resizeConnections": "ปรับขนาดคอลัมน์การเชื่อมต่อ",
     "resizeAiAssistant": "ปรับขนาดแผงผู้ช่วย AI",
     "aiAssistant": "ผู้ช่วย AI",
-    "wiki": "วิกิ"
+    "wiki": "วิกิ",
+    "dontSleep": "Don't Sleep",
+    "dontSleepEnable": "Enable Don't Sleep mode",
+    "dontSleepDisable": "Disable Don't Sleep mode",
+    "dontSleepEnabled": "Don't Sleep mode enabled.",
+    "dontSleepDisabled": "Don't Sleep mode disabled.",
+    "dontSleepError": "Could not change Don't Sleep mode: {{message}}",
+    "connectedConnectionsRail": "Connected Connections",
+    "openConnectedConnection": "Open {{name}}"
   },
   "settings": {
     "title": "การตั้งค่า",
@@ -178,7 +186,53 @@
     "urlDataShardConnectionCount": "คอนเนคชัน URL {{count}} รายการ",
     "urlDataShardConnectionCountPlural": "คอนเนคชัน URL {{count}} รายการ",
     "clearShard": "ล้างพาร์ติชัน",
-    "urlDataShardCleared": "ล้างพาร์ติชันข้อมูล URL {{name}} แล้ว"
+    "urlDataShardCleared": "ล้างพาร์ติชันข้อมูล URL {{name}} แล้ว",
+    "navToolbar": "Nav toolbar",
+    "toolbarText": "Toolbar text",
+    "sshBufferLines": "SSH buffer lines",
+    "sshBufferHint": "Default is 5,000. Used for SSH terminal scrollback and tmux pane history.",
+    "sshBufferRange": "SSH buffer must be between 100 and 100000 lines.",
+    "sshKeyEmailDialogTitle": "Generate SSH key",
+    "sshKeyEmailDialogHint": "Add an email address as the public key comment so the key is easy to recognize later.",
+    "sshKeyEmailPlaceholder": "admin@example.com",
+    "sshKeyGenerating": "Generating...",
+    "urlSecurity": "URL security",
+    "urlSecurityHint": "Controls certificate handling for URL Connections. Keep bypass off unless you trust the internal site and network.",
+    "ignoreCertificateErrors": "Ignore invalid HTTPS certificates",
+    "ignoreCertificateErrorsHint": "Loads URL Connections with self-signed or untrusted certificates without the browser warning. Applies to newly opened URL tabs.",
+    "urlSettingsSaved": "URL settings saved.",
+    "aiToolsTitle": "Assistant tools",
+    "aiToolsDescription": "Choose which built-in tools the AI Assistant may call while answering. Keep risky tools off unless you need them.",
+    "aiToolsSafety": "Safeguards: file tools are confined to AdminDeck app data, shell commands run from app data only, and deletion/destructive requests are blocked until a future explicit approval prompt can review them.",
+    "aiTools": {
+      "currentTime": {
+        "label": "Current time",
+        "description": "Get the current local and UTC time for scheduling and log correlation."
+      },
+      "webSearch": {
+        "label": "Web search",
+        "description": "Search the web and return compact result titles, links, and snippets."
+      },
+      "webFetch": {
+        "label": "Fetch web page",
+        "description": "Read a single http/https page and summarize text-sized content."
+      },
+      "appDataFileSearch": {
+        "label": "Search app data files",
+        "description": "Find files by name inside AdminDeck-owned app data only."
+      },
+      "appDataFileRead": {
+        "label": "Read app data file",
+        "description": "Read small text files inside AdminDeck-owned app data only."
+      },
+      "shellCommand": {
+        "label": "PowerShell / batch commands",
+        "description": "Run non-destructive PowerShell or batch commands from AdminDeck app data only."
+      }
+    },
+    "connectedConnectionsRail": "Show connected Connection icons in the left rail",
+    "connectedConnectionsRailHint": "Adds an icon for each connected Connection to the left rail so you can switch back to it quickly.",
+    "connectedConnectionsRailSaved": "Connected Connection icons setting saved."
   },
   "connections": {
     "title": "การเชื่อมต่อ",
@@ -319,23 +373,40 @@
       "bulkUserPlaceholder": "ชื่อผู้ใช้สำหรับแถวที่เลือก",
       "bulkUserRequired": "กรุณากรอกชื่อผู้ใช้ที่จะใช้",
       "bulkPasswordLabel": "รหัสผ่าน (ไม่บังคับ)",
-        "bulkPasswordPlaceholder": "รหัสผ่านสำหรับแถวที่เลือก",
-        "setUsernameButton": "ตั้งชื่อผู้ใช้",
-        "setPasswordButton": "ตั้งรหัสผ่าน",
-        "bulkScopeAll": "ใช้กับทั้งหมดที่เลือก",
-        "bulkScopeUnfilled": "เติมเฉพาะรายการที่ยังไม่กรอก",
-        "bulkApply": "ใช้",
-        "bulkCancel": "ยกเลิก",
-        "bulkPasswordRequired": "กรุณากรอกรหัสผ่านที่จะใช้",
-        "warningsHeading": "คำเตือน",
+      "bulkPasswordPlaceholder": "รหัสผ่านสำหรับแถวที่เลือก",
+      "setUsernameButton": "ตั้งชื่อผู้ใช้",
+      "setPasswordButton": "ตั้งรหัสผ่าน",
+      "bulkScopeAll": "ใช้กับทั้งหมดที่เลือก",
+      "bulkScopeUnfilled": "เติมเฉพาะรายการที่ยังไม่กรอก",
+      "bulkApply": "ใช้",
+      "bulkCancel": "ยกเลิก",
+      "bulkPasswordRequired": "กรุณากรอกรหัสผ่านที่จะใช้",
+      "warningsHeading": "คำเตือน",
       "destinationLabel": "ปลายทาง",
       "destinationNewFolder": "สร้างโฟลเดอร์ใหม่",
       "destinationRoot": "ราก",
       "newFolderNameLabel": "ชื่อโฟลเดอร์ใหม่",
       "folderNameRequired": "กรุณากรอกชื่อโฟลเดอร์",
       "noneSelected": "กรุณาเลือกอย่างน้อยหนึ่งแถวเพื่อนำเข้า",
-      "importCount": "นำเข้า {{count}} รายการ"
-    }
+      "importCount": "นำเข้า {{count}} รายการ",
+      "importFileComplete": "Imported {{count}} Connections from file.",
+      "importScanComplete": "Imported {{count}} Connections from scan.",
+      "bookmarksTitle": "Import browser bookmarks",
+      "bookmarksSubtitle": "Edge, Chrome, Firefox URL bookmarks",
+      "bookmarksLoading": "Looking for browser bookmark sources...",
+      "bookmarksNoSources": "No Edge, Chrome, or Firefox bookmark sources were found on this device.",
+      "bookmarksSourceLabel": "Browser profile",
+      "bookmarksSourcePath": "Source file: {{path}}",
+      "bookmarksTreeLabel": "Bookmark folders and links",
+      "bookmarksPreview": "Preview {{count}} selected",
+      "bookmarksSourceRequired": "Choose a browser bookmark source.",
+      "bookmarksSelectionRequired": "Select at least one folder or bookmark to import.",
+      "bookmarksNoImportable": "The selected bookmarks did not include any http or https URLs.",
+      "bookmarkFallbackName": "Imported bookmark",
+      "importBookmarksComplete": "Imported {{count}} Connections from bookmarks."
+    },
+    "createConnectionComplete": "Connection \"{{name}}\" added.",
+    "deleteConnectionComplete": "Connection \"{{name}}\" deleted."
   },
   "terminal": {
     "openSftp": "เปิดเบราว์เซอร์ SFTP",
@@ -400,7 +471,8 @@
     "logFiles": "ไฟล์บันทึก",
     "textFiles": "ไฟล์ข้อความ",
     "tauriRequired": "รันไทม์ Tauri ไม่พร้อมใช้งาน",
-    "noSaveDialog": "ไม่มีไดอะล็อกบันทึกในรันไทม์นี้"
+    "noSaveDialog": "ไม่มีไดอะล็อกบันทึกในรันไทม์นี้",
+    "terminalBuffer": "terminal buffer"
   },
   "sftp": {
     "connecting": "กำลังเชื่อมต่อ",
@@ -922,7 +994,14 @@
     "localTerminalSession": "เซสชันเทอร์มินัลภายในเครื่อง",
     "workspace": "พื้นที่ทำงาน",
     "terminal": "เทอร์มินัล",
-    "connectionKind": "คอนเนคชัน {{type}}"
+    "connectionKind": "คอนเนคชัน {{type}}",
+    "hostUsage": "Host usage",
+    "cpu": "CPU",
+    "cpuUsage": "CPU usage",
+    "ram": "RAM",
+    "ramUsage": "RAM usage",
+    "network": "Network",
+    "networkUsage": "Network throughput"
   },
   "common": {
     "save": "บันทึก",
@@ -969,7 +1048,8 @@
     "ja": "日本語",
     "ko": "한국어",
     "th": "ไทย",
-    "id": "Bahasa Indonesia"
+    "id": "Bahasa Indonesia",
+    "vi": "Tiếng Việt"
   },
   "wiki": {
     "title": "วิกิ",
@@ -1017,6 +1097,13 @@
     "noSelection": "เลือกหน้าจากแผนผังเพื่อเริ่มแก้ไข",
     "createFirstPage": "สร้างหน้าแรกของคุณ",
     "movePage": "ย้าย",
-    "noConnections": "ไม่มีการเชื่อมต่อ"
+    "noConnections": "ไม่มีการเชื่อมต่อ",
+    "deletePageTitle": "Delete wiki page?",
+    "backlinks": "Backlinks",
+    "noBacklinks": "No backlinks yet.",
+    "tags": "Tags",
+    "noTags": "No tags in this page.",
+    "filterByTag": "Filter wiki by #{{tag}}",
+    "viewMode": "View"
   }
 }

@@ -209,19 +209,19 @@ export async function confirmTrustedSshHostKey(preview: SshHostKeyPreview) {
 
   if (preview.status === "changed") {
     throw new Error(
-      `SSH host key for ${preview.host}:${preview.port} changed. Presented ${preview.algorithm} ${preview.fingerprint}.`,
+      i18next.t("terminal.sshHostKeyChangeDetail", {
+        host: `${preview.host}:${preview.port}`,
+        algorithm: preview.algorithm,
+        fingerprint: preview.fingerprint,
+      }),
     );
   }
 
   const shouldTrust = window.confirm(
-    [
-      `Trust SSH host key for ${preview.host}:${preview.port}?`,
-      "",
-      `${preview.algorithm} ${preview.fingerprint}`,
-    ].join("\n"),
+    `${i18next.t("terminal.trustHostKey")} ${preview.host}:${preview.port}\n\n${preview.algorithm} ${preview.fingerprint}`,
   );
   if (!shouldTrust) {
-    throw new Error("SSH host key was not trusted");
+    throw new Error(i18next.t("terminal.hostKeyNotTrusted"));
   }
 
   await invokeCommand("trust_ssh_host_key", {

@@ -6,7 +6,15 @@
     "resizeConnections": "연결 열 크기 조정",
     "resizeAiAssistant": "AI 어시스턴트 패널 크기 조정",
     "aiAssistant": "AI 어시스턴트",
-    "wiki": "위키"
+    "wiki": "위키",
+    "dontSleep": "Don't Sleep",
+    "dontSleepEnable": "Enable Don't Sleep mode",
+    "dontSleepDisable": "Disable Don't Sleep mode",
+    "dontSleepEnabled": "Don't Sleep mode enabled.",
+    "dontSleepDisabled": "Don't Sleep mode disabled.",
+    "dontSleepError": "Could not change Don't Sleep mode: {{message}}",
+    "connectedConnectionsRail": "Connected Connections",
+    "openConnectedConnection": "Open {{name}}"
   },
   "settings": {
     "title": "설정",
@@ -178,7 +186,53 @@
     "urlDataShardConnectionCount": "URL 연결 {{count}}개",
     "urlDataShardConnectionCountPlural": "URL 연결 {{count}}개",
     "clearShard": "샤드 지우기",
-    "urlDataShardCleared": "URL 데이터 샤드 {{name}}을(를) 지웠습니다."
+    "urlDataShardCleared": "URL 데이터 샤드 {{name}}을(를) 지웠습니다.",
+    "navToolbar": "Nav toolbar",
+    "toolbarText": "Toolbar text",
+    "sshBufferLines": "SSH buffer lines",
+    "sshBufferHint": "Default is 5,000. Used for SSH terminal scrollback and tmux pane history.",
+    "sshBufferRange": "SSH buffer must be between 100 and 100000 lines.",
+    "sshKeyEmailDialogTitle": "Generate SSH key",
+    "sshKeyEmailDialogHint": "Add an email address as the public key comment so the key is easy to recognize later.",
+    "sshKeyEmailPlaceholder": "admin@example.com",
+    "sshKeyGenerating": "Generating...",
+    "urlSecurity": "URL security",
+    "urlSecurityHint": "Controls certificate handling for URL Connections. Keep bypass off unless you trust the internal site and network.",
+    "ignoreCertificateErrors": "Ignore invalid HTTPS certificates",
+    "ignoreCertificateErrorsHint": "Loads URL Connections with self-signed or untrusted certificates without the browser warning. Applies to newly opened URL tabs.",
+    "urlSettingsSaved": "URL settings saved.",
+    "aiToolsTitle": "Assistant tools",
+    "aiToolsDescription": "Choose which built-in tools the AI Assistant may call while answering. Keep risky tools off unless you need them.",
+    "aiToolsSafety": "Safeguards: file tools are confined to AdminDeck app data, shell commands run from app data only, and deletion/destructive requests are blocked until a future explicit approval prompt can review them.",
+    "aiTools": {
+      "currentTime": {
+        "label": "Current time",
+        "description": "Get the current local and UTC time for scheduling and log correlation."
+      },
+      "webSearch": {
+        "label": "Web search",
+        "description": "Search the web and return compact result titles, links, and snippets."
+      },
+      "webFetch": {
+        "label": "Fetch web page",
+        "description": "Read a single http/https page and summarize text-sized content."
+      },
+      "appDataFileSearch": {
+        "label": "Search app data files",
+        "description": "Find files by name inside AdminDeck-owned app data only."
+      },
+      "appDataFileRead": {
+        "label": "Read app data file",
+        "description": "Read small text files inside AdminDeck-owned app data only."
+      },
+      "shellCommand": {
+        "label": "PowerShell / batch commands",
+        "description": "Run non-destructive PowerShell or batch commands from AdminDeck app data only."
+      }
+    },
+    "connectedConnectionsRail": "Show connected Connection icons in the left rail",
+    "connectedConnectionsRailHint": "Adds an icon for each connected Connection to the left rail so you can switch back to it quickly.",
+    "connectedConnectionsRailSaved": "Connected Connection icons setting saved."
   },
   "connections": {
     "title": "연결",
@@ -334,8 +388,25 @@
       "newFolderNameLabel": "새 폴더 이름",
       "folderNameRequired": "폴더 이름을 입력하세요.",
       "noneSelected": "가져올 행을 하나 이상 선택하세요.",
-      "importCount": "{{count}}개 가져오기"
-    }
+      "importCount": "{{count}}개 가져오기",
+      "importFileComplete": "Imported {{count}} Connections from file.",
+      "importScanComplete": "Imported {{count}} Connections from scan.",
+      "bookmarksTitle": "Import browser bookmarks",
+      "bookmarksSubtitle": "Edge, Chrome, Firefox URL bookmarks",
+      "bookmarksLoading": "Looking for browser bookmark sources...",
+      "bookmarksNoSources": "No Edge, Chrome, or Firefox bookmark sources were found on this device.",
+      "bookmarksSourceLabel": "Browser profile",
+      "bookmarksSourcePath": "Source file: {{path}}",
+      "bookmarksTreeLabel": "Bookmark folders and links",
+      "bookmarksPreview": "Preview {{count}} selected",
+      "bookmarksSourceRequired": "Choose a browser bookmark source.",
+      "bookmarksSelectionRequired": "Select at least one folder or bookmark to import.",
+      "bookmarksNoImportable": "The selected bookmarks did not include any http or https URLs.",
+      "bookmarkFallbackName": "Imported bookmark",
+      "importBookmarksComplete": "Imported {{count}} Connections from bookmarks."
+    },
+    "createConnectionComplete": "Connection \"{{name}}\" added.",
+    "deleteConnectionComplete": "Connection \"{{name}}\" deleted."
   },
   "terminal": {
     "openSftp": "SFTP 브라우저 열기",
@@ -400,7 +471,8 @@
     "logFiles": "로그 파일",
     "textFiles": "텍스트 파일",
     "tauriRequired": "Tauri 런타임 사용 불가",
-    "noSaveDialog": "이 런타임에서는 저장 대화상자를 사용할 수 없습니다"
+    "noSaveDialog": "이 런타임에서는 저장 대화상자를 사용할 수 없습니다",
+    "terminalBuffer": "terminal buffer"
   },
   "sftp": {
     "connecting": "연결 중",
@@ -922,7 +994,14 @@
     "localTerminalSession": "로컬 터미널 세션",
     "workspace": "워크스페이스",
     "terminal": "터미널",
-    "connectionKind": "{{type}} 연결"
+    "connectionKind": "{{type}} 연결",
+    "hostUsage": "Host usage",
+    "cpu": "CPU",
+    "cpuUsage": "CPU usage",
+    "ram": "RAM",
+    "ramUsage": "RAM usage",
+    "network": "Network",
+    "networkUsage": "Network throughput"
   },
   "common": {
     "save": "저장",
@@ -969,7 +1048,8 @@
     "ja": "日本語",
     "ko": "한국어",
     "th": "ไทย",
-    "id": "Bahasa Indonesia"
+    "id": "Bahasa Indonesia",
+    "vi": "Tiếng Việt"
   },
   "wiki": {
     "title": "위키",
@@ -1017,6 +1097,13 @@
     "noSelection": "트리에서 페이지를 선택하여 편집을 시작하세요.",
     "createFirstPage": "첫 페이지 만들기",
     "movePage": "이동",
-    "noConnections": "사용 가능한 연결이 없습니다"
+    "noConnections": "사용 가능한 연결이 없습니다",
+    "deletePageTitle": "Delete wiki page?",
+    "backlinks": "Backlinks",
+    "noBacklinks": "No backlinks yet.",
+    "tags": "Tags",
+    "noTags": "No tags in this page.",
+    "filterByTag": "Filter wiki by #{{tag}}",
+    "viewMode": "View"
   }
 }

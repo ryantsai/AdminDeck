@@ -79,16 +79,16 @@ type AssistantImageAttachment = {
   height: number;
 };
 
-const EXTENSION_DRAFT_PROMPT = "Create an AdminDeck extension draft for: ";
+const EXTENSION_DRAFT_PROMPT = i18next.t("ai.extensionDraftPrompt");
 const ASSISTANT_IMAGE_MAX_EDGE = 1280;
 const ASSISTANT_IMAGE_JPEG_QUALITY = 0.72;
 
 function randomAssistantWaitingPhrase() {
   const phrases = i18next.t("ai.waitingPhrases", { returnObjects: true }) as readonly string[];
   if (!Array.isArray(phrases) || phrases.length === 0) {
-    return "Charging the answer beacon";
+    return i18next.t("ai.chargingBeacon");
   }
-  return phrases[Math.floor(Math.random() * phrases.length)] ?? "Charging the answer beacon";
+  return phrases[Math.floor(Math.random() * phrases.length)] ?? i18next.t("ai.chargingBeacon");
 }
 
 function createAssistantChatMessage(
@@ -146,8 +146,8 @@ function formatAssistantMessageTime(value: string) {
   const hours = date.getHours();
   const hour12 = hours % 12 || 12;
   const minutes = String(date.getMinutes()).padStart(2, "0");
-  const period = hours >= 12 ? "PM" : "AM";
-  return `${hour12}:${minutes}${period}`;
+  const period = hours >= 12 ? i18next.t("common.pm") : i18next.t("common.am");
+  return `${hour12}:${minutes} ${period}`;
 }
 
 function readImageFileAsDataUrl(file: File): Promise<string> {

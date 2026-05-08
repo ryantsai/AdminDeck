@@ -21,7 +21,7 @@ function OpenSourceComponentGroup({
   return (
     <section className="open-source-group">
       <h3>{label}</h3>
-      <div className="open-source-table" role="table" aria-label={`${label} components`}>
+      <div className="open-source-table" role="table" aria-label={t("settings.openSourceComponents")}>
         <div className="open-source-table-row header" role="row">
           <span role="columnheader">{t("settings.component")}</span>
           <span role="columnheader">{t("settings.version")}</span>
@@ -65,7 +65,7 @@ export function AboutSettings() {
       <div className="about-hero">
         <div>
           <strong>{ABOUT_PRODUCT.name}</strong>
-          <span>{ABOUT_PRODUCT.slogan}</span>
+          <span>{t("settings.appSlogan")}</span>
         </div>
         <PackageOpen size={34} />
       </div>
@@ -85,7 +85,7 @@ export function AboutSettings() {
               {t("settings.openSourceComponents")}
             </span>
           </div>
-          <span>{openSourceComponentCount()} components</span>
+          <span>{t("settings.openSourceComponentCount", { count: openSourceComponentCount() })}</span>
         </div>
         <div className="open-source-groups">
           {OPEN_SOURCE_COMPONENT_GROUPS.map((group) => (

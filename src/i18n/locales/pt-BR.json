@@ -6,7 +6,15 @@
     "resizeConnections": "Redimensionar coluna de Conexões",
     "resizeAiAssistant": "Redimensionar painel do Assistente IA",
     "aiAssistant": "Assistente IA",
-    "wiki": "Wiki"
+    "wiki": "Wiki",
+    "dontSleep": "Don't Sleep",
+    "dontSleepEnable": "Enable Don't Sleep mode",
+    "dontSleepDisable": "Disable Don't Sleep mode",
+    "dontSleepEnabled": "Don't Sleep mode enabled.",
+    "dontSleepDisabled": "Don't Sleep mode disabled.",
+    "dontSleepError": "Could not change Don't Sleep mode: {{message}}",
+    "connectedConnectionsRail": "Connected Connections",
+    "openConnectedConnection": "Open {{name}}"
   },
   "settings": {
     "title": "Configurações",
@@ -178,7 +186,53 @@
     "urlDataShardConnectionCount": "{{count}} conexão URL",
     "urlDataShardConnectionCountPlural": "{{count}} conexões URL",
     "clearShard": "Limpar partição",
-    "urlDataShardCleared": "Partição de dados URL {{name}} limpa."
+    "urlDataShardCleared": "Partição de dados URL {{name}} limpa.",
+    "navToolbar": "Nav toolbar",
+    "toolbarText": "Toolbar text",
+    "sshBufferLines": "SSH buffer lines",
+    "sshBufferHint": "Default is 5,000. Used for SSH terminal scrollback and tmux pane history.",
+    "sshBufferRange": "SSH buffer must be between 100 and 100000 lines.",
+    "sshKeyEmailDialogTitle": "Generate SSH key",
+    "sshKeyEmailDialogHint": "Add an email address as the public key comment so the key is easy to recognize later.",
+    "sshKeyEmailPlaceholder": "admin@example.com",
+    "sshKeyGenerating": "Generating...",
+    "urlSecurity": "URL security",
+    "urlSecurityHint": "Controls certificate handling for URL Connections. Keep bypass off unless you trust the internal site and network.",
+    "ignoreCertificateErrors": "Ignore invalid HTTPS certificates",
+    "ignoreCertificateErrorsHint": "Loads URL Connections with self-signed or untrusted certificates without the browser warning. Applies to newly opened URL tabs.",
+    "urlSettingsSaved": "URL settings saved.",
+    "aiToolsTitle": "Assistant tools",
+    "aiToolsDescription": "Choose which built-in tools the AI Assistant may call while answering. Keep risky tools off unless you need them.",
+    "aiToolsSafety": "Safeguards: file tools are confined to AdminDeck app data, shell commands run from app data only, and deletion/destructive requests are blocked until a future explicit approval prompt can review them.",
+    "aiTools": {
+      "currentTime": {
+        "label": "Current time",
+        "description": "Get the current local and UTC time for scheduling and log correlation."
+      },
+      "webSearch": {
+        "label": "Web search",
+        "description": "Search the web and return compact result titles, links, and snippets."
+      },
+      "webFetch": {
+        "label": "Fetch web page",
+        "description": "Read a single http/https page and summarize text-sized content."
+      },
+      "appDataFileSearch": {
+        "label": "Search app data files",
+        "description": "Find files by name inside AdminDeck-owned app data only."
+      },
+      "appDataFileRead": {
+        "label": "Read app data file",
+        "description": "Read small text files inside AdminDeck-owned app data only."
+      },
+      "shellCommand": {
+        "label": "PowerShell / batch commands",
+        "description": "Run non-destructive PowerShell or batch commands from AdminDeck app data only."
+      }
+    },
+    "connectedConnectionsRail": "Show connected Connection icons in the left rail",
+    "connectedConnectionsRailHint": "Adds an icon for each connected Connection to the left rail so you can switch back to it quickly.",
+    "connectedConnectionsRailSaved": "Connected Connection icons setting saved."
   },
   "connections": {
     "title": "Conexões",
@@ -319,23 +373,40 @@
       "bulkUserPlaceholder": "Nome de usuário para as linhas selecionadas",
       "bulkUserRequired": "Digite um nome de usuário para aplicar.",
       "bulkPasswordLabel": "Senha (opcional)",
-       "bulkPasswordPlaceholder": "Senha para as linhas selecionadas",
-       "setUsernameButton": "Definir usuário",
-       "setPasswordButton": "Definir senha",
-       "bulkScopeAll": "Aplicar a todos os selecionados",
-       "bulkScopeUnfilled": "Preencher apenas entradas vazias",
-       "bulkApply": "Aplicar",
-       "bulkCancel": "Cancelar",
-       "bulkPasswordRequired": "Digite uma senha para aplicar.",
-       "warningsHeading": "Avisos",
+      "bulkPasswordPlaceholder": "Senha para as linhas selecionadas",
+      "setUsernameButton": "Definir usuário",
+      "setPasswordButton": "Definir senha",
+      "bulkScopeAll": "Aplicar a todos os selecionados",
+      "bulkScopeUnfilled": "Preencher apenas entradas vazias",
+      "bulkApply": "Aplicar",
+      "bulkCancel": "Cancelar",
+      "bulkPasswordRequired": "Digite uma senha para aplicar.",
+      "warningsHeading": "Avisos",
       "destinationLabel": "Destino",
       "destinationNewFolder": "Criar nova pasta",
       "destinationRoot": "Raiz",
       "newFolderNameLabel": "Nome da nova pasta",
       "folderNameRequired": "Digite um nome para a pasta.",
       "noneSelected": "Selecione pelo menos uma linha para importar.",
-      "importCount": "Importar {{count}}"
-    }
+      "importCount": "Importar {{count}}",
+      "importFileComplete": "Imported {{count}} Connections from file.",
+      "importScanComplete": "Imported {{count}} Connections from scan.",
+      "bookmarksTitle": "Import browser bookmarks",
+      "bookmarksSubtitle": "Edge, Chrome, Firefox URL bookmarks",
+      "bookmarksLoading": "Looking for browser bookmark sources...",
+      "bookmarksNoSources": "No Edge, Chrome, or Firefox bookmark sources were found on this device.",
+      "bookmarksSourceLabel": "Browser profile",
+      "bookmarksSourcePath": "Source file: {{path}}",
+      "bookmarksTreeLabel": "Bookmark folders and links",
+      "bookmarksPreview": "Preview {{count}} selected",
+      "bookmarksSourceRequired": "Choose a browser bookmark source.",
+      "bookmarksSelectionRequired": "Select at least one folder or bookmark to import.",
+      "bookmarksNoImportable": "The selected bookmarks did not include any http or https URLs.",
+      "bookmarkFallbackName": "Imported bookmark",
+      "importBookmarksComplete": "Imported {{count}} Connections from bookmarks."
+    },
+    "createConnectionComplete": "Connection \"{{name}}\" added.",
+    "deleteConnectionComplete": "Connection \"{{name}}\" deleted."
   },
   "terminal": {
     "openSftp": "Abrir navegador SFTP",
@@ -400,7 +471,8 @@
     "logFiles": "Arquivos de log",
     "textFiles": "Arquivos de texto",
     "tauriRequired": "Ambiente Tauri indisponível",
-    "noSaveDialog": "Nenhum diálogo de salvamento disponível neste ambiente"
+    "noSaveDialog": "Nenhum diálogo de salvamento disponível neste ambiente",
+    "terminalBuffer": "terminal buffer"
   },
   "sftp": {
     "connecting": "Conectando",
@@ -922,7 +994,14 @@
     "localTerminalSession": "Sessão de terminal local",
     "workspace": "Área de trabalho",
     "terminal": "Terminal",
-    "connectionKind": "Conexão {{type}}"
+    "connectionKind": "Conexão {{type}}",
+    "hostUsage": "Host usage",
+    "cpu": "CPU",
+    "cpuUsage": "CPU usage",
+    "ram": "RAM",
+    "ramUsage": "RAM usage",
+    "network": "Network",
+    "networkUsage": "Network throughput"
   },
   "common": {
     "save": "Salvar",
@@ -969,7 +1048,8 @@
     "ja": "日本語",
     "ko": "한국어",
     "th": "ไทย",
-    "id": "Bahasa Indonesia"
+    "id": "Bahasa Indonesia",
+    "vi": "Tiếng Việt"
   },
   "wiki": {
     "title": "Wiki",
@@ -1017,6 +1097,13 @@
     "noSelection": "Selecione uma página da árvore para começar a editar.",
     "createFirstPage": "Criar sua primeira página",
     "movePage": "Mover",
-    "noConnections": "Nenhuma conexão disponível"
+    "noConnections": "Nenhuma conexão disponível",
+    "deletePageTitle": "Delete wiki page?",
+    "backlinks": "Backlinks",
+    "noBacklinks": "No backlinks yet.",
+    "tags": "Tags",
+    "noTags": "No tags in this page.",
+    "filterByTag": "Filter wiki by #{{tag}}",
+    "viewMode": "View"
   }
 }

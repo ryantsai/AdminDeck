@@ -7,6 +7,7 @@ import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollap
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
+import i18next from "../i18n/config";
 import { ariaExpanded, dialogButtonAria } from "../lib/aria";
 import { invokeCommand, isTauriRuntime, selectKeyFile } from "../lib/tauri";
 import { connectionTree } from "../sample-data";
@@ -418,7 +419,7 @@ export function ConnectionSidebar({
 
     const connection: Connection = {
       id: `quick-${Date.now()}`,
-      name: connectionRequest.name || connectionRequest.host || connectionRequest.url || "Quick session",
+      name: connectionRequest.name || connectionRequest.host || connectionRequest.url || i18next.t("connections.quickSessionFallbackName"),
       host: connectionRequest.host ?? "",
       user: connectionRequest.user ?? "",
       port: connectionRequest.port,
@@ -544,7 +545,7 @@ export function ConnectionSidebar({
   }
 
   async function handleRenameFolder(folder: ConnectionFolder) {
-    const name = window.prompt("Rename folder", folder.name)?.trim();
+    const name = window.prompt(i18next.t("connections.renameFolder"), folder.name)?.trim();
     if (!name || name === folder.name) {
       return;
     }
@@ -573,7 +574,7 @@ export function ConnectionSidebar({
   }
 
   async function handleRenameConnection(connection: Connection) {
-    const name = window.prompt("Rename connection", connection.name)?.trim();
+    const name = window.prompt(i18next.t("connections.renameConnection"), connection.name)?.trim();
     if (!name || name === connection.name) {
       return;
     }
@@ -1429,6 +1430,7 @@ function NewFolderDraftRow({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isSettledRef = useRef(false);
   const groupRef = useRef<HTMLDivElement | null>(null);
+  const { t } = useTranslation();
 
   useLayoutEffect(() => {
     inputRef.current?.focus();
@@ -1459,7 +1461,7 @@ function NewFolderDraftRow({
           <ChevronDown size={14} />
           <Folder size={15} />
           <input
-            aria-label="New folder name"
+            aria-label={t("connections.newFolderName")}
             className="pending-folder-input"
             onBlur={(event) => settle(event.currentTarget.value)}
             onKeyDown={(event) => {

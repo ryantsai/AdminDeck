@@ -9,6 +9,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
+import i18next from "../i18n/config";
 import { dialogButtonAria, menuButtonAria } from "../lib/aria";
 import { invokeCommand, isTauriRuntime, saveTextFile, type TerminalOutput, type TmuxSession } from "../lib/tauri";
 import { defaultTerminalSettings } from "../sample-data";
@@ -59,6 +60,8 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
   const setFocusedPane = useWorkspaceStore((state) => state.setFocusedPane);
   const saveTabLayout = useWorkspaceStore((state) => state.saveTabLayout);
   const resetTabLayout = useWorkspaceStore((state) => state.resetTabLayout);
+  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const { t } = useTranslation();
   const defaultFontSize = defaultTerminalSettings.fontSize;
   const canSplit = tab.panes.some((pane) => pane.connection);
   const focusedPaneId = tab.focusedPaneId ?? tab.panes[0]?.id;
@@ -91,10 +94,9 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
           : renderer.getBufferText();
       await saveTextFile(defaultFilename, text);
     } catch (error) {
-      window.alert(
-        `Could not save terminal buffer: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+      showWorkspaceStatus(
+        t("terminal.bufferSaveFailed", { message: error instanceof Error ? error.message : String(error) }),
+        { tone: "error" },
       );
     }
   }
@@ -275,6 +277,7 @@ function EmbeddedConnectionPane({
   onFocus: () => void;
 }) {
   const closePane = useWorkspaceStore((state) => state.closePane);
+  const { t } = useTranslation();
   const embeddedTab: WorkspaceTab = {
     id: pane.id,
     title: pane.title,
@@ -295,10 +298,10 @@ function EmbeddedConnectionPane({
       onMouseDown={onFocus}
     >
       <button
-        aria-label={`Close ${pane.title}`}
+        aria-label={t("workspace.closeTab", { title: pane.title })}
         className="embedded-pane-close"
         onClick={() => closePane(tabId, pane.id)}
-        title={`Close ${pane.title}`}
+        title={t("workspace.closeTab", { title: pane.title })}
         type="button"
       >
         <X size={13} />
@@ -639,16 +642,19 @@ export async function inspectActiveSshSystemContext(tab: WorkspaceTab | undefine
       request: tmuxConnectionRequest(connection),
     });
     return [
-      `Connection: ${connection.name}`,
-      `Target: ${connection.user}@${connection.host}${connection.port ? `:${connection.port}` : ""}`,
+      i18next.t("terminal.connectLabel", { name: connection.name }),
+      i18next.t("terminal.targetLabel", { target: `${connection.user}@${connection.host}${connection.port ? `:${connection.port}` : ""}` }),
       context.trim(),
     ]
       .filter(Boolean)
       .join("\n");
   } catch (error) {
-    return `Connection: ${connection.name}\nTarget: ${connection.user}@${connection.host}${
-      connection.port ? `:${connection.port}` : ""
-    }\nSSH system context unavailable: ${error instanceof Error ? error.message : String(error)}`;
+    return [
+      i18next.t("terminal.connectLabel", { name: connection.name }),
+      i18next.t("terminal.targetLabel", { target: `${connection.user}@${connection.host}${connection.port ? `:${connection.port}` : ""}` }),
+      i18next.t("terminal.sshContextUnavailable", { message: error instanceof Error ? error.message : String(error) }),
+    ]
+      .join("\n");
   }
 }
 
@@ -807,10 +813,10 @@ function TerminalPaneView({
       onFocusRef.current();
     });
     const terminalSessionType = terminalSessionTypeFor(connection);
-    terminal.writeln(`Starting ${terminalSessionType} session for ${connection.name}...`);
+    terminal.writeln(t("terminal.startingSessionFor", { type: terminalSessionType, name: connection.name }));
 
     if (!isTauriRuntime()) {
-      terminal.writeln("Terminal sessions require the Tauri desktop runtime.");
+      terminal.writeln(t("terminal.desktopRuntimeRequired"));
       return () => {
         terminal.dispose();
       };
@@ -834,7 +840,7 @@ function TerminalPaneView({
     registerPaneInputWriter(pane.id, writeInputToSession);
     const dataDisposable = terminal.onData((data) => {
       if (terminalSettings.confirmMultilinePaste && isMultilinePaste(data)) {
-        const shouldPaste = window.confirm("Paste multiple lines into this terminal?");
+        const shouldPaste = window.confirm(t("terminal.pasteMultilineConfirm"));
         if (!shouldPaste) {
           return;
         }
@@ -935,7 +941,7 @@ function TerminalPaneView({
 
       try {
         if (usesNativeSshHostKeyVerification(connection)) {
-          terminal.writeln("Verifying SSH host key...");
+          terminal.writeln(t("terminal.verifyingHostKey"));
           const preview = await invokeCommand("inspect_ssh_host_key", {
             request: {
               host: connection.host,
@@ -1001,7 +1007,7 @@ function TerminalPaneView({
         markConnectionSessionStarted(connection.id);
       } catch (error) {
         terminal.writeln("");
-        terminal.writeln(`[failed to start session: ${String(error)}]`);
+        terminal.writeln(t("terminal.failedToStartDetail", { message: String(error) }));
       }
     })();
 
@@ -1133,7 +1139,7 @@ function TerminalPaneView({
     }
 
     if (terminalSettings.confirmMultilinePaste && isMultilinePaste(text)) {
-      const shouldPaste = window.confirm("Paste multiple lines into this terminal?");
+      const shouldPaste = window.confirm(t("terminal.pasteMultilineConfirm"));
       if (!shouldPaste) {
         setContextMenu(null);
         terminalRendererRef.current?.focus();
@@ -1383,7 +1389,7 @@ function TerminalPaneView({
           </button>
           <ScreenshotMenu
             buttonClassName="terminal-pane-action"
-            targetLabel={`${pane.connection?.name ?? pane.title} terminal Pane`}
+            targetLabel={`${pane.connection?.name ?? pane.title} ${t("workspace.terminalPane")}`}
             targetRef={paneRef}
           />
           <button

@@ -67,7 +67,7 @@ export function TabStrip() {
     <div className="tab-strip" aria-label={t("workspace.tabs")}>
       {canScrollLeft ? (
         <button
-          aria-label="Scroll tabs left"
+          aria-label={t("workspace.scrollTabsLeft")}
           className="tab-scroll-arrow tab-scroll-left"
           onClick={scrollLeft}
           type="button"
@@ -87,13 +87,13 @@ export function TabStrip() {
               <span>{tab.title}</span>
             </button>
             <button
-              aria-label={`Close ${tab.title}`}
+              aria-label={t("workspace.closeTab", { title: tab.title })}
               className="tab-close-button"
               onClick={(event) => {
                 event.stopPropagation();
                 closeTab(tab.id);
               }}
-              title={`Close ${tab.title}`}
+              title={t("workspace.closeTab", { title: tab.title })}
               type="button"
             >
               <X size={13} />
@@ -103,7 +103,7 @@ export function TabStrip() {
       </div>
       {canScrollRight ? (
         <button
-          aria-label="Scroll tabs right"
+          aria-label={t("workspace.scrollTabsRight")}
           className="tab-scroll-arrow tab-scroll-right"
           onClick={scrollRight}
           type="button"

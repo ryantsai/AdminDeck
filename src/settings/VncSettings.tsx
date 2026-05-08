@@ -1,37 +1,38 @@
 import { useTranslation } from "react-i18next";
 import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { PlannedSettingsGrid, type PlannedSetting } from "./shared";
+import i18next from "../i18n/config";
 
 const VNC_QUALITY_SETTINGS: PlannedSetting[] = [
   {
-    label: "Quality",
-    value: "Auto",
-    hint: "Let the client adapt encoding and pixel format to link speed.",
+    label: i18next.t("settings.quality"),
+    value: i18next.t("settings.vncQualityValue"),
+    hint: i18next.t("settings.vncQualityHint"),
   },
   {
-    label: "Preferred encoding",
-    value: "Tight, then ZRLE",
-    hint: "Current client also advertises CopyRect, Raw, cursor, and desktop-size support.",
+    label: i18next.t("settings.preferredEncoding"),
+    value: i18next.t("settings.vncPreferredEncodingValue"),
+    hint: i18next.t("settings.vncPreferredEncodingHint"),
   },
   {
-    label: "JPEG quality",
-    value: "8 / 9",
-    hint: "Useful for Tight/JPEG-style encodings.",
+    label: i18next.t("settings.jpegQuality"),
+    value: i18next.t("settings.vncJpegQualityValue"),
+    hint: i18next.t("settings.vncJpegQualityHint"),
   },
   {
-    label: "Compression",
-    value: "2 / 9",
-    hint: "Higher values reduce bandwidth at a CPU cost.",
+    label: i18next.t("settings.compression"),
+    value: i18next.t("settings.vncCompressionValue"),
+    hint: i18next.t("settings.vncCompressionHint"),
   },
   {
-    label: "Color level",
-    value: "Full color",
-    hint: "Can degrade to 256, 64, or 8 colors for slower links.",
+    label: i18next.t("settings.colorLevel"),
+    value: i18next.t("settings.vncColorLevelValue"),
+    hint: i18next.t("settings.vncColorLevelHint"),
   },
   {
-    label: "Remote resize",
-    value: "Follow server support",
-    hint: "Depends on the VNC server supporting desktop-size updates.",
+    label: i18next.t("settings.remoteResize"),
+    value: i18next.t("settings.vncRemoteResizeValue"),
+    hint: i18next.t("settings.vncRemoteResizeHint"),
   },
 ];
 

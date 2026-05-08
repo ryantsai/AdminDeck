@@ -1,37 +1,38 @@
 import { useTranslation } from "react-i18next";
 import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { PlannedSettingsGrid, type PlannedSetting } from "./shared";
+import i18next from "../i18n/config";
 
 const RDP_QUALITY_SETTINGS: PlannedSetting[] = [
   {
-    label: "Resolution",
-    value: "Fit workspace bounds",
-    hint: "Maps to DesktopWidth, DesktopHeight, SmartSizing, and display sync.",
+    label: i18next.t("settings.resolution"),
+    value: i18next.t("settings.rdpResolutionValue"),
+    hint: i18next.t("settings.rdpResolutionHint"),
   },
   {
-    label: "Color depth",
-    value: "32-bit",
-    hint: "Uses the ActiveX ColorDepth property.",
+    label: i18next.t("settings.colorDepth"),
+    value: i18next.t("settings.rdpColorDepthValue"),
+    hint: i18next.t("settings.rdpColorDepthHint"),
   },
   {
-    label: "Bandwidth profile",
-    value: "Auto detect",
-    hint: "Uses bandwidth detection or NetworkConnectionType classes instead of a raw bitrate cap.",
+    label: i18next.t("settings.bandwidthProfile"),
+    value: i18next.t("settings.rdpBandwidthProfileValue"),
+    hint: i18next.t("settings.rdpBandwidthProfileHint"),
   },
   {
-    label: "Bitmap cache",
-    value: "Persistent cache planned",
-    hint: "Maps to BitmapPersistence and CachePersistenceActive.",
+    label: i18next.t("settings.bitmapCache"),
+    value: i18next.t("settings.rdpBitmapCacheValue"),
+    hint: i18next.t("settings.rdpBitmapCacheHint"),
   },
   {
-    label: "Performance flags",
-    value: "Balanced",
-    hint: "Controls wallpaper, full-window drag, menu animations, themes, cursors, and font smoothing.",
+    label: i18next.t("settings.performanceFlags"),
+    value: i18next.t("settings.rdpPerformanceFlagsValue"),
+    hint: i18next.t("settings.rdpPerformanceFlagsHint"),
   },
   {
-    label: "Enhanced graphics",
-    value: "Prefer when supported",
-    hint: "Uses RDP performance flags on capable servers.",
+    label: i18next.t("settings.enhancedGraphics"),
+    value: i18next.t("settings.rdpEnhancedGraphicsValue"),
+    hint: i18next.t("settings.rdpEnhancedGraphicsHint"),
   },
 ];
 

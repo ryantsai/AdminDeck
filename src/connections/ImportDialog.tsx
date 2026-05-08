@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import i18next from "../i18n/config";
 import { listen } from "@tauri-apps/api/event";
 import {
   invokeCommand,
@@ -1183,13 +1184,13 @@ function ImportPreviewSection({
                     }
                     value={row.type}
                   >
-                    <option value="ssh">SSH</option>
-                    <option value="telnet">Telnet</option>
-                    <option value="rdp">RDP</option>
-                    <option value="vnc">VNC</option>
-                    <option value="serial">Serial</option>
-                    <option value="url">URL</option>
-                    <option value="local">Local</option>
+                    <option value="ssh">{t("connections.ssh")}</option>
+                    <option value="telnet">{t("connections.telnet")}</option>
+                    <option value="rdp">{t("connections.rdp")}</option>
+                    <option value="vnc">{t("connections.vnc")}</option>
+                    <option value="serial">{t("connections.serial")}</option>
+                    <option value="url">{t("connections.url")}</option>
+                    <option value="local">{t("connections.localTerminal")}</option>
                   </select>
                 </td>
                 <td>
@@ -1301,15 +1302,15 @@ function suggestFolderName(format: string) {
   const stamp = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const label =
     format === "bookmarks"
-      ? "Bookmarks"
+      ? i18next.t("connections.import.importedFromBookmarks")
       : format === "scan"
-        ? "Scan"
+        ? i18next.t("connections.import.importedFromScan")
       : format === "rdcman"
-        ? "RDCMan"
+        ? i18next.t("connections.import.importedFromRdcman")
         : format === "mobaxterm"
-          ? "MobaXterm"
+          ? i18next.t("connections.import.importedFromMobaxterm")
           : format === "putty"
-            ? "PuTTY"
-            : "Imported";
+            ? i18next.t("connections.import.importedFromPutty")
+            : i18next.t("connections.import.importedDefault");
   return `${label} ${stamp}`;
 }

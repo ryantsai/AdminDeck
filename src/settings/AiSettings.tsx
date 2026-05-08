@@ -20,6 +20,7 @@ import type {
   AiReasoningEffort,
 } from "../types";
 import { SettingsSummary } from "./shared";
+import i18next from "../i18n/config";
 
 function createStoredApiKeyMask() {
   const maskLength = 12 + Math.floor(Math.random() * 5);
@@ -28,24 +29,24 @@ function createStoredApiKeyMask() {
 
 function formatProviderHost(baseUrl: string) {
   try {
-    return new URL(baseUrl).host || "OpenAI-compatible endpoint";
+    return new URL(baseUrl).host || i18next.t("settings.openAiCompatibleEndpoint");
   } catch {
-    return "OpenAI-compatible endpoint";
+    return i18next.t("settings.openAiCompatibleEndpoint");
   }
 }
 
 function formatAiProviderCapability(capability: string) {
   switch (capability) {
     case "toolCalling":
-      return "tools";
+      return i18next.t("settings.capabilityToolCalling");
     case "mcpReady":
-      return "MCP ready";
+      return i18next.t("settings.capabilityMcpReady");
     case "localRuntime":
-      return "local";
+      return i18next.t("settings.capabilityLocalRuntime");
     case "openAiCompatible":
-      return "OpenAI compatible";
+      return i18next.t("settings.capabilityOpenAiCompatible");
     case "sdkOAuth":
-      return "SDK OAuth";
+      return i18next.t("settings.capabilitySdkOAuth");
     default:
       return capability;
   }
@@ -54,15 +55,15 @@ function formatAiProviderCapability(capability: string) {
 function formatReasoningEffort(effort: AiReasoningEffort) {
   switch (effort) {
     case "default":
-      return "Provider default";
+      return i18next.t("settings.providerDefault");
     case "low":
-      return "Low";
+      return i18next.t("settings.low");
     case "medium":
-      return "Medium";
+      return i18next.t("settings.medium");
     case "high":
-      return "High";
+      return i18next.t("settings.high");
     case "max":
-      return "Max";
+      return i18next.t("settings.max");
     default:
       return effort;
   }

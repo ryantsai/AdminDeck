@@ -14,6 +14,7 @@ import {
 } from "@codemirror/view";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 const WIKI_LINK_REGEX = /\[\[([^\]\n]+)\]\]/g;
 const CONNECTION_EMBED_REGEX = /\{\{connection:([^}\s]+)\}\}/g;
@@ -115,6 +116,7 @@ export function WikiEditor({
   const latestValueRef = useRef(value);
   const onChangeRef = useRef(onChange);
   const readOnlyCompartment = useRef(new Compartment());
+  const { t } = useTranslation();
 
   onChangeRef.current = onChange;
   latestValueRef.current = value;
@@ -147,7 +149,7 @@ export function WikiEditor({
             }
           }
         }),
-        EditorView.contentAttributes.of({ "aria-label": ariaLabel ?? "Wiki editor" }),
+        EditorView.contentAttributes.of({ "aria-label": ariaLabel ?? t("wiki.editorAria") }),
       ],
     });
     const view = new EditorView({ state, parent: hostRef.current });

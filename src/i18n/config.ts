@@ -15,6 +15,7 @@ const localeLoaders = {
   ko: () => import("./locales/ko.json"),
   th: () => import("./locales/th.json"),
   id: () => import("./locales/id.json"),
+  vi: () => import("./locales/vi.json"),
 } as const;
 
 export const SUPPORTED_LANGUAGES = [
@@ -31,6 +32,7 @@ export const SUPPORTED_LANGUAGES = [
   "ko",
   "th",
   "id",
+  "vi",
 ] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];

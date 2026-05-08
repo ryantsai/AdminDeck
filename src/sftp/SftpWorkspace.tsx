@@ -4,6 +4,8 @@ import { WikiPagesButton } from "../wiki/WikiPagesButton";
 import { ArrowDown, ChevronDown, Download, FolderPlus, Pencil, RefreshCw, Terminal, Trash2, Upload, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18next from "../i18n/config";
 import type { DragEvent as ReactDragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import audioIcon from "../assets/file-icons/audio.svg";
 import cIcon from "../assets/file-icons/c.svg";
@@ -99,6 +101,7 @@ type FilePropertiesState = {
 };
 
 export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
+  const { t } = useTranslation();
   const openTerminalHere = useWorkspaceStore((state) => state.openTerminalHere);
   const connection = tab.connection;
   const workspaceRef = useRef<HTMLElement | null>(null);
@@ -106,7 +109,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
   const [localFiles, setLocalFiles] = useState<FileEntry[]>([]);
   const [remotePath, setRemotePath] = useState(".");
   const [remoteFiles, setRemoteFiles] = useState<FileEntry[]>([]);
-  const [status, setStatus] = useState("Connecting");
+  const [status, setStatus] = useState(t("sftp.connecting"));
   const [localStatus, setLocalStatus] = useState("");
   const [isLocalLoading, setIsLocalLoading] = useState(false);
   const [isRemoteLoading, setIsRemoteLoading] = useState(false);
@@ -182,13 +185,13 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
 
   const loadLocalDirectory = async (path?: string) => {
     if (!isTauriRuntime()) {
-      setLocalStatus("Tauri runtime unavailable");
+      setLocalStatus(t("sftp.tauriUnavailable"));
       setLocalFiles([]);
       return;
     }
 
     setIsLocalLoading(true);
-    setLocalStatus(path ? "Opening folder" : "Loading local files");
+    setLocalStatus(path ? t("sftp.openingFolder") : t("sftp.loadingLocal"));
     try {
       const result = await invokeCommand("list_local_directory", {
         request: { path },
@@ -207,12 +210,12 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
 
   useEffect(() => {
     if (!connection) {
-      setStatus("No SSH connection selected");
+      setStatus(t("sftp.noSshConnection"));
       return;
     }
 
     if (!isTauriRuntime()) {
-      setStatus("Tauri runtime unavailable");
+      setStatus(t("sftp.tauriUnavailable"));
       return;
     }
 
@@ -221,7 +224,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
     const requestedSessionId = uniqueRuntimeId(`${connection.id}-sftp`);
     sessionIdRef.current = requestedSessionId;
     setIsRemoteLoading(true);
-    setStatus("Verifying host");
+    setStatus(t("sftp.verifyingHost"));
 
     (async () => {
       try {
@@ -235,7 +238,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
           await confirmTrustedSshHostKey(preview);
         }
 
-        setStatus("Opening SFTP");
+        setStatus(t("sftp.openingSftp"));
         const result = await invokeCommand("start_sftp_session", {
           request: {
             sessionId: requestedSessionId,
@@ -262,7 +265,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
         setRemotePath(result.path);
         setRemoteFiles(result.entries.map(remoteEntryToFileEntry));
         setSelectedRemoteNames([]);
-        setStatus("Connected");
+        setStatus(t("sftp.connected"));
       } catch (error) {
         if (!disposed) {
           setStatus(String(error));
@@ -292,10 +295,10 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
   }, [connection, markConnectionSessionEnded, markConnectionSessionStarted]);
 
   const refreshRemoteDirectory = async () => {
-    await loadRemoteDirectory(remotePath, "Refreshing");
+    await loadRemoteDirectory(remotePath, t("sftp.refreshing"));
   };
 
-  const loadRemoteDirectory = async (path: string, loadingStatus = "Opening folder") => {
+  const loadRemoteDirectory = async (path: string, loadingStatus = t("sftp.openingFolder")) => {
     const sessionId = sessionIdRef.current;
     if (!sessionId || !isTauriRuntime()) {
       return;
@@ -310,7 +313,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       setRemotePath(result.path);
       setRemoteFiles(result.entries.map(remoteEntryToFileEntry));
       setSelectedRemoteNames([]);
-      setStatus("Connected");
+      setStatus(t("sftp.connected"));
     } catch (error) {
       setStatus(String(error));
     } finally {
@@ -382,7 +385,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       setTransferState(transfer.id, {
         state: "failed",
         progress: 100,
-        detail: "SFTP session unavailable",
+        detail: t("sftp.sessionUnavailable"),
       });
       activeTransferIdRef.current = null;
       return;
@@ -390,7 +393,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
 
     setTransferState(transfer.id, {
       state: "active",
-      detail: "Preparing",
+      detail: t("sftp.preparing"),
     });
 
     try {
@@ -436,7 +439,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
         setTransferState(transfer.id, {
           state: "queued",
           progress: 0,
-          detail: "Waiting to overwrite",
+          detail: t("sftp.waitingToOverwrite"),
           overwriteBehavior: "overwrite",
         });
         return;
@@ -477,7 +480,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
           setTransferState(transfer.id, {
             state: "queued",
             progress: 0,
-            detail: "Waiting to overwrite",
+            detail: t("sftp.waitingToOverwrite"),
             overwriteBehavior: "overwrite",
           });
           return;
@@ -486,7 +489,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
         setTransferState(transfer.id, {
           state: decision === "skip" ? "canceled" : "failed",
           progress: 100,
-          detail: decision === "skip" ? "Skipped existing target" : "Transfer canceled",
+          detail: decision === "skip" ? t("sftp.skippedExisting") : t("sftp.transferCanceled"),
         });
         return;
       }
@@ -494,7 +497,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       setTransferState(transfer.id, {
         state: message.includes("transfer canceled") ? "canceled" : "failed",
         progress: 100,
-        detail: message.includes("transfer canceled") ? "Canceled" : message,
+        detail: message.includes("transfer canceled") ? t("sftp.canceled") : message,
       });
     } finally {
       activeTransferIdRef.current = null;
@@ -578,7 +581,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
         name: file.name,
         state: "queued",
         progress: 0,
-        detail: "Waiting",
+        detail: t("sftp.waiting"),
         overwriteBehavior,
         localPath: direction === "upload" ? joinLocalPath(localPath, file.name) : undefined,
         remoteDirectory: direction === "upload" ? remotePath : undefined,
@@ -605,7 +608,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       setTransferState(transfer.id, {
         state: "canceled",
         progress: 100,
-        detail: "Canceled before start",
+        detail: t("sftp.canceledBeforeStart"),
       });
       return;
     }
@@ -614,7 +617,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       return;
     }
 
-    setTransferState(transfer.id, { detail: "Canceling" });
+    setTransferState(transfer.id, { detail: t("sftp.canceling") });
     try {
       await invokeCommand("cancel_sftp_transfer", {
         request: { transferId: transfer.id },
@@ -634,18 +637,18 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       return;
     }
 
-    const name = window.prompt("New remote folder name");
+    const name = window.prompt(t("sftp.newRemoteFolder"));
     if (name === null) {
       return;
     }
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setStatus("Remote folder name cannot be blank");
+      setStatus(t("sftp.folderNameBlank"));
       return;
     }
 
     setIsRemoteLoading(true);
-    setStatus("Creating folder");
+    setStatus(t("sftp.creatingFolder"));
     try {
       await invokeCommand("create_sftp_folder", {
         request: {
@@ -671,7 +674,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
 
     const trimmedName = newName.trim();
     if (!trimmedName) {
-      setStatus("Remote name cannot be blank");
+      setStatus(t("sftp.remoteNameBlank"));
       return;
     }
     if (trimmedName === selected.name) {
@@ -679,7 +682,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
     }
 
     setIsRemoteLoading(true);
-    setStatus("Renaming");
+    setStatus(t("sftp.renaming"));
     try {
       await invokeCommand("rename_sftp_path", {
         request: {
@@ -705,15 +708,15 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
 
     const shouldDelete = window.confirm(
       selected.length === 1
-        ? `Delete remote ${selected[0].kind} "${selected[0].name}"?`
-        : `Delete ${selected.length} remote items?`,
+        ? t("sftp.deleteRemoteItemConfirm", { kind: selected[0].kind, name: selected[0].name })
+        : t("sftp.deleteRemoteItemsMultiple", { count: selected.length }),
     );
     if (!shouldDelete) {
       return;
     }
 
     setIsRemoteLoading(true);
-    setStatus("Deleting");
+    setStatus(t("sftp.deleting"));
     try {
       for (const item of selected) {
         await invokeCommand("delete_sftp_path", {
@@ -822,7 +825,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
     if (side === "remote") {
       const sessionId = sessionIdRef.current;
       if (!sessionId || !isTauriRuntime()) {
-        setStatus("SFTP session unavailable");
+        setStatus(t("sftp.sessionUnavailable"));
         return;
       }
 
@@ -870,7 +873,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
     }
   };
 
-  const isConnected = status === "Connected" && Boolean(sessionIdRef.current);
+  const isConnected = status === t("sftp.connected") && Boolean(sessionIdRef.current);
   const isTransferring = transfers.some((transfer) => transfer.state === "active");
   const activeTransferCount = transfers.filter((transfer) => transfer.state === "active").length;
   const clearableTransferCount = transfers.filter((transfer) =>
@@ -886,7 +889,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       <div className="workspace-toolbar">
         <div>
           <strong>{toolbarTitle}</strong>
-          <span>{status === "Connected" ? tab.subtitle : status}</span>
+          <span>{status === t("sftp.connected") ? tab.subtitle : status}</span>
         </div>
         <div className="toolbar-cluster">
           <button
@@ -896,7 +899,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
             type="button"
           >
             <Upload size={15} />
-            Upload
+            {t("sftp.upload")}
           </button>
           <button
             className="toolbar-button"
@@ -905,7 +908,7 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
             type="button"
           >
             <Download size={15} />
-            Download
+            {t("sftp.download")}
           </button>
           <button
             className="toolbar-button"
@@ -914,9 +917,9 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
             type="button"
           >
             <Terminal size={15} />
-            Terminal
+            {t("sftp.terminal")}
           </button>
-          <ScreenshotMenu targetLabel={`${tab.title} SFTP view`} targetRef={workspaceRef} />
+          <ScreenshotMenu targetLabel={t("sftp.screenshotTarget", { title: tab.title })} targetRef={workspaceRef} />
           {connection ? (
             <WikiPagesButton
               buttonClassName="toolbar-button toolbar-icon-button"
@@ -930,8 +933,8 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
       <div className="file-manager">
         <FilePane
           side="local"
-          title="Local"
-          path={localPath || localStatus || "Local files"}
+          title={t("sftp.local")}
+          path={localPath || localStatus || t("sftp.localFiles")}
           files={localFiles}
           isLoading={isLocalLoading}
           status={localStatus}
@@ -945,11 +948,11 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
         />
         <FilePane
           side="remote"
-          title="Remote"
+          title={t("sftp.remote")}
           path={remotePath}
           files={remoteFiles}
           isLoading={isRemoteLoading}
-          status={status === "Connected" ? "" : status}
+          status={status === t("sftp.connected") ? "" : status}
           selectedNames={selectedRemoteNames}
           onRefresh={refreshRemoteDirectory}
           onGoUp={openRemoteParent}
@@ -966,9 +969,9 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
 
       <div className="transfer-queue">
         <header>
-          <strong>Transfer activity</strong>
+          <strong>{t("sftp.transferActivity")}</strong>
           <div className="transfer-queue-actions">
-            <span>{activeTransferCount} active</span>
+            <span>{t("sftp.transferCountActive", { count: activeTransferCount })}</span>
             <button
               className="toolbar-button transfer-clear-button"
               disabled={clearableTransferCount === 0}
@@ -980,17 +983,17 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
               type="button"
             >
               <Trash2 size={14} />
-              Clear
+              {t("sftp.clear")}
             </button>
           </div>
         </header>
         {transfers.length === 0 ? (
-          <div className="transfer-row transfer-row-muted">No transfers yet</div>
+          <div className="transfer-row transfer-row-muted">{t("sftp.noTransfers")}</div>
         ) : null}
         {transfers.map((transfer) => (
           <div className="transfer-row" key={transfer.id}>
             <span>
-              {transfer.direction === "upload" ? "Upload" : "Download"} {transfer.name}
+              {t(transfer.direction === "upload" ? "sftp.upload" : "sftp.download")} {transfer.name}
             </span>
             <progress value={transfer.progress} max="100" />
             <small className={`transfer-state transfer-state-${transfer.state}`}>
@@ -999,10 +1002,10 @@ export function SftpWorkspace({ isActive, tab }: { isActive: boolean; tab: Works
             <small>{transfer.detail}</small>
             <button
               className="row-action"
-              aria-label={`Cancel ${transfer.name}`}
+              aria-label={t("sftp.cancelTransferName", { name: transfer.name })}
               disabled={!["active", "queued"].includes(transfer.state)}
               onClick={() => void handleCancelTransfer(transfer)}
-              title={`Cancel ${transfer.name}`}
+              title={t("sftp.cancelTransferName", { name: transfer.name })}
               type="button"
             >
               <X size={13} />
@@ -1160,7 +1163,7 @@ function sortFileEntries(files: FileEntry[], sortKey: FileSortKey) {
 }
 
 function fileSortLabel(sortKey: FileSortKey) {
-  return sortKey === "name" ? "Name" : "Date";
+  return sortKey === "name" ? i18next.t("sftp.name") : i18next.t("sftp.date");
 }
 
 const FILE_ICON_BY_NAME: Record<string, string> = {
@@ -1293,13 +1296,13 @@ function fileIconFor(file: FileEntry) {
 
 function fileIconLabel(file: FileEntry) {
   if (file.kind === "folder") {
-    return "Folder";
+    return i18next.t("sftp.folder");
   }
   if (file.kind === "symlink") {
-    return "Symbolic link";
+    return i18next.t("sftp.symlink");
   }
   const extension = fileExtension(file.name);
-  return extension ? `${extension.toUpperCase()} file` : "File";
+  return extension ? i18next.t("sftp.fileTypeLabel", { ext: extension.toUpperCase() }) : i18next.t("sftp.file");
 }
 
 function FileTypeIcon({ file }: { file: FileEntry }) {
@@ -1355,6 +1358,7 @@ function FilePane({
   onDropTransfer?: (targetSide: FilePaneSide, fileNames: string[]) => void;
   renameRequest?: { side: FilePaneSide; name: string; requestId: number };
 }) {
+  const { t } = useTranslation();
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const renameCanceledRef = useRef(false);
   const lastSelectedNameRef = useRef<string | null>(null);
@@ -1527,10 +1531,10 @@ function FilePane({
         <div className="file-pane-actions">
           <button
             className="icon-button"
-            aria-label={`Open parent ${title.toLowerCase()} folder`}
+              aria-label={t("sftp.openParentFolderAria", { pane: title.toLowerCase() })}
             disabled={!onGoUp || isLoading}
             onClick={onGoUp}
-            title={`Open parent ${title.toLowerCase()} folder`}
+            title={t("sftp.openParentFolderAria", { pane: title.toLowerCase() })}
             type="button"
           >
             <ChevronDown className="up-icon" size={15} />
@@ -1539,30 +1543,30 @@ function FilePane({
             <>
               <button
                 className="icon-button"
-                aria-label={`Create ${title.toLowerCase()} folder`}
+                aria-label={t("sftp.createFolderAria", { pane: title.toLowerCase() })}
                 disabled={!onCreateFolder || isLoading}
                 onClick={onCreateFolder}
-                title={`Create ${title.toLowerCase()} folder`}
+                title={t("sftp.createFolderAria", { pane: title.toLowerCase() })}
                 type="button"
               >
                 <FolderPlus size={15} />
               </button>
               <button
                 className="icon-button"
-                aria-label={`Rename selected ${title.toLowerCase()} item`}
+                aria-label={t("sftp.renameSelectedAria", { pane: title.toLowerCase() })}
                 disabled={!canRenameSelected}
                 onClick={() => beginRename()}
-                title={`Rename selected ${title.toLowerCase()} item`}
+                title={t("sftp.renameSelectedAria", { pane: title.toLowerCase() })}
                 type="button"
               >
                 <Pencil size={15} />
               </button>
               <button
                 className="icon-button"
-                aria-label={`Delete selected ${title.toLowerCase()} item`}
+                aria-label={t("sftp.deleteSelectedAria", { pane: title.toLowerCase() })}
                 disabled={!onDeleteSelected || selectedNames.length === 0 || isLoading}
                 onClick={onDeleteSelected}
-                title={`Delete selected ${title.toLowerCase()} item`}
+                title={t("sftp.deleteSelectedAria", { pane: title.toLowerCase() })}
                 type="button"
               >
                 <Trash2 size={15} />
@@ -1571,9 +1575,9 @@ function FilePane({
           )}
           <button
             className="icon-button file-sort-button"
-            aria-label={`Sort ${title.toLowerCase()} files by ${nextSortKey}`}
+            aria-label={t("sftp.sortByAria", { pane: title.toLowerCase(), key: nextSortKey })}
             onClick={() => setSortKey(nextSortKey)}
-            title={`Sort by ${nextSortKey}`}
+            title={t("sftp.sortByTitle", { key: nextSortKey })}
             type="button"
           >
             <ArrowDown size={15} />
@@ -1581,10 +1585,10 @@ function FilePane({
           </button>
           <button
             className="icon-button"
-            aria-label={`Refresh ${title.toLowerCase()} files`}
+            aria-label={t("sftp.refreshFilesAria", { pane: title.toLowerCase() })}
             disabled={!onRefresh || isLoading}
             onClick={onRefresh}
-            title={`Refresh ${title.toLowerCase()} files`}
+            title={t("sftp.refreshFilesAria", { pane: title.toLowerCase() })}
             type="button"
           >
             <RefreshCw size={15} />
@@ -1598,21 +1602,21 @@ function FilePane({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {isLoading && <div className="file-row file-row-muted">Loading...</div>}
+        {isLoading && <div className="file-row file-row-muted">{t("sftp.loading")}</div>}
         {!isLoading && status && <div className="file-row file-row-muted">{status}</div>}
         {!isLoading && !status && sortedFiles.length === 0 && (
-          <div className="file-row file-row-muted">No files</div>
+          <div className="file-row file-row-muted">{t("sftp.noFiles")}</div>
         )}
         {sortedFiles.map((file) => {
           const isEditing = editingName === file.name;
           const isSelected = selectedNames.includes(file.name);
-          const fileTitle = file.kind === "folder" ? `Double-click to open ${file.name}` : file.name;
+          const fileTitle = file.kind === "folder" ? t("sftp.doubleClickToOpenFile", { name: file.name }) : file.name;
           const fileContents = (
             <>
               <FileTypeIcon file={file} />
               {isEditing ? (
                 <input
-                  aria-label={`Rename ${file.name}`}
+                  aria-label={t("sftp.renameFileAria", { name: file.name })}
                   className="file-rename-input"
                   onBlur={() => void commitRename()}
                   onChange={(event) => setRenameDraft(event.currentTarget.value)}
@@ -1706,20 +1710,20 @@ function TransferConflictDialog({
   conflict: TransferConflictState;
   onDecision: (decision: TransferConflictDecision) => void;
 }) {
-  const actionLabel = conflict.direction === "upload" ? "Upload" : "Download";
-  const itemLabel = conflict.isFolder ? "folder" : "file";
+  const { t } = useTranslation();
+  const isFolder = conflict.isFolder;
 
   return (
     <div className="dialog-backdrop transfer-conflict-backdrop" role="presentation">
-      <div className="transfer-conflict-dialog" role="dialog" aria-label="Transfer conflict">
+      <div className="transfer-conflict-dialog" role="dialog" aria-label={t("sftp.transferConflict")}>
         <header>
           <div>
-            <strong>{itemLabel === "folder" ? "Folder exists" : "File exists"}</strong>
-            <span>{actionLabel} conflict</span>
+            <strong>{isFolder ? t("sftp.folderExists") : t("sftp.fileExists")}</strong>
+            <span>{conflict.direction === "upload" ? t("sftp.uploadConflict") : t("sftp.downloadConflict")}</span>
           </div>
           <button
             className="icon-button"
-            aria-label="Cancel transfer conflict"
+            aria-label={t("sftp.cancelTransferConflict")}
             onClick={() => onDecision("cancel")}
             type="button"
           >
@@ -1727,32 +1731,30 @@ function TransferConflictDialog({
           </button>
         </header>
         <p>
-          The target {itemLabel} already exists. Choose whether to overwrite{" "}
-          <strong>{conflict.name}</strong>.
+          {t("sftp.targetExistsDetail", { kind: isFolder ? t("sftp.folder").toLowerCase() : t("sftp.file").toLowerCase(), name: conflict.name })}
         </p>
         <code>{conflict.targetPath}</code>
         {conflict.remainingConflicts > 0 ? (
           <small>
-            {conflict.remainingConflicts} more selected{" "}
-            {conflict.remainingConflicts === 1 ? "conflict" : "conflicts"} may follow.
+            {t("sftp.moreConflictsDetail", { count: conflict.remainingConflicts })}
           </small>
         ) : null}
         <div className="transfer-conflict-actions">
           <button className="secondary-button" onClick={() => onDecision("skip")} type="button">
-            Skip
+            {t("sftp.skip")}
           </button>
           <button className="secondary-button" onClick={() => onDecision("cancel")} type="button">
-            Cancel
+            {t("sftp.cancelTransfer")}
           </button>
           <button className="primary-button" onClick={() => onDecision("overwrite")} type="button">
-            Overwrite
+            {t("sftp.overwrite")}
           </button>
           <button
             className="primary-button"
             onClick={() => onDecision("overwriteAll")}
             type="button"
           >
-            Overwrite All
+            {t("sftp.overwriteAll")}
           </button>
         </div>
       </div>
@@ -1775,6 +1777,7 @@ function SftpContextMenu({
   onProperties: (menu: SftpContextMenuState) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1803,7 +1806,7 @@ function SftpContextMenu({
     node.style.top = `${menu.y}px`;
   }, [menu.x, menu.y]);
 
-  const transferLabel = menu.side === "local" ? "Transfer upload" : "Transfer download";
+  const transferLabel = menu.side === "local" ? t("sftp.transferUpload") : t("sftp.transferDownload");
   const canRename = menu.side === "remote" && menu.names.length === 1;
   const canDelete = menu.side === "remote" && menu.names.length > 0;
 
@@ -1816,17 +1819,17 @@ function SftpContextMenu({
       role="menu"
     >
       <button onClick={() => onTransfer(menu)} role="menuitem" type="button">
-        Transfer
+        {t("sftp.transfer")}
         <small>{transferLabel}</small>
       </button>
       <button disabled={!canRename} onClick={() => onRename(menu)} role="menuitem" type="button">
-        Rename
+        {t("sftp.renameItem")}
       </button>
       <button disabled={!canDelete} onClick={() => onDelete(menu)} role="menuitem" type="button">
-        Delete
+        {t("sftp.deleteLabel")}
       </button>
       <button onClick={() => onProperties(menu)} role="menuitem" type="button">
-        Properties
+        {t("sftp.properties")}
       </button>
     </div>
   );
@@ -1841,6 +1844,7 @@ function SftpPropertiesPopup({
   onClose: () => void;
   onSave: (request: { permissions?: string; uid?: number; gid?: number }) => void | Promise<void>;
 }) {
+  const { t } = useTranslation();
   const remoteProperties = properties.remoteProperties;
   const isRemote = properties.side === "remote";
   const modeValue = remoteProperties?.mode ?? properties.entry.mode ?? "";
@@ -1871,7 +1875,7 @@ function SftpPropertiesPopup({
     properties.entry.group ??
     (gidValue === undefined ? "-" : String(gidValue));
 
-  function parseOptionalOwner(value: string, label: string) {
+  function parseOptionalOwner(value: string, label: "Owner" | "Group") {
     const trimmed = value.trim();
     if (!trimmed) {
       return undefined;
@@ -1879,7 +1883,7 @@ function SftpPropertiesPopup({
 
     const parsed = Number(trimmed);
     if (!Number.isInteger(parsed) || parsed < 0) {
-      throw new Error(`${label} must be a non-negative number`);
+      throw new Error(label === "Owner" ? t("sftp.ownerMustBeNumber") : t("sftp.groupMustBeNumber"));
     }
     return parsed;
   }
@@ -1888,7 +1892,7 @@ function SftpPropertiesPopup({
     setError("");
 
     if (mode.trim() && !/^[0-7]{3,4}$/.test(mode.trim())) {
-      setError("Mode must be octal, for example 755 or 0644");
+      setError(t("sftp.modeHint"));
       return;
     }
 
@@ -1908,36 +1912,36 @@ function SftpPropertiesPopup({
   }
 
   return (
-    <div className="sftp-properties-popover" role="dialog" aria-label="SFTP properties">
+    <div className="sftp-properties-popover" role="dialog" aria-label={t("sftp.sftpProperties")}>
       <header>
         <div>
           <strong>{properties.entry.name}</strong>
           <span>{properties.path}</span>
         </div>
-        <button className="icon-button" aria-label="Close properties" onClick={onClose} type="button">
+        <button className="icon-button" aria-label={t("sftp.closeProperties")} onClick={onClose} type="button">
           <X size={15} />
         </button>
       </header>
       <div className="properties-grid">
-        <span>Type</span>
+        <span>{t("sftp.type")}</span>
         <strong>{remoteProperties?.kind ?? properties.entry.kind}</strong>
-        <span>Size</span>
+        <span>{t("sftp.size")}</span>
         <strong>{formatFileSize(size)}</strong>
-        <span>Modified</span>
+        <span>{t("sftp.modified")}</span>
         <strong>{formatRemoteTime(modified)}</strong>
-        <span>Accessed</span>
+        <span>{t("sftp.accessed")}</span>
         <strong>{formatRemoteTime(accessed)}</strong>
-        <span>Owner</span>
+        <span>{t("sftp.owner")}</span>
         <strong>{owner}</strong>
-        <span>Group</span>
+        <span>{t("sftp.group")}</span>
         <strong>{group}</strong>
-        <span>Mode</span>
+        <span>{t("sftp.mode")}</span>
         <strong>{modeValue || "-"}</strong>
       </div>
       {isRemote ? (
         <div className="properties-edit-grid">
           <label>
-            <span>chmod</span>
+            <span>{t("sftp.chmod")}</span>
             <input
               inputMode="numeric"
               maxLength={4}
@@ -1946,7 +1950,7 @@ function SftpPropertiesPopup({
             />
           </label>
           <label>
-            <span>chown uid</span>
+            <span>{t("sftp.chownUid")}</span>
             <input
               inputMode="numeric"
               onChange={(event) => setUid(event.currentTarget.value)}
@@ -1954,7 +1958,7 @@ function SftpPropertiesPopup({
             />
           </label>
           <label>
-            <span>chown gid</span>
+            <span>{t("sftp.chownGid")}</span>
             <input
               inputMode="numeric"
               onChange={(event) => setGid(event.currentTarget.value)}
@@ -1966,11 +1970,11 @@ function SftpPropertiesPopup({
       {error ? <p className="properties-error">{error}</p> : null}
       <div className="properties-actions">
         <button className="secondary-button" onClick={onClose} type="button">
-          Close
+          {t("common.close")}
         </button>
         {isRemote ? (
           <button className="primary-button" disabled={isSaving} onClick={() => void handleSave()} type="button">
-            Save
+            {t("sftp.save")}
           </button>
         ) : null}
       </div>
