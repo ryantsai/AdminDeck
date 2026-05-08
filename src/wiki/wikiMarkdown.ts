@@ -4,6 +4,8 @@ import type { Connection, WikiPageSummary } from "../types";
 
 export interface WikiPageLookup {
   byId: Map<string, WikiPageSummary>;
+  bySlug: Map<string, WikiPageSummary>;
+  byTitle: Map<string, WikiPageSummary>;
 }
 
 export interface WikiPreviewContext {
@@ -16,10 +18,14 @@ const CONNECTION_EMBED_PATTERN = /\{\{connection:([^}\s]+)\}\}/g;
 
 export function buildPageLookup(pages: WikiPageSummary[]): WikiPageLookup {
   const byId = new Map<string, WikiPageSummary>();
+  const bySlug = new Map<string, WikiPageSummary>();
+  const byTitle = new Map<string, WikiPageSummary>();
   for (const page of pages) {
     byId.set(page.id, page);
+    bySlug.set(page.slug, page);
+    byTitle.set(normalizeWikiTitle(page.title), page);
   }
-  return { byId };
+  return { byId, bySlug, byTitle };
 }
 
 export function flattenWikiTree(roots: WikiPageSummary[]): WikiPageSummary[] {
@@ -63,7 +69,7 @@ function transformWikiTokens(body: string, context: WikiPreviewContext): string 
   const withLinks = body.replace(WIKI_LINK_PATTERN, (_match, raw: string) => {
     const [rawTarget, rawLabel] = raw.split("|");
     const target = (rawTarget ?? "").trim();
-    const page = context.pages.byId.get(target);
+    const page = resolveWikiPage(target, context.pages);
     const label = (rawLabel ?? page?.title ?? target).trim();
     if (!page) {
       return `<span class="wiki-link wiki-link-missing" data-wiki-link="${escapeHtmlAttribute(target)}">${escapeHtml(label)}</span>`;
@@ -79,6 +85,16 @@ function transformWikiTokens(body: string, context: WikiPreviewContext): string 
     }
     return `<span class="wiki-connection-embed" data-connection-embed="${escapeHtmlAttribute(connection.id)}" tabindex="0" role="button">${escapeHtml(connection.name)}<span class="wiki-connection-meta"> · ${escapeHtml(connection.type)}</span></span>`;
   });
+}
+
+function resolveWikiPage(target: string, pages: WikiPageLookup): WikiPageSummary | undefined {
+  return pages.byId.get(target)
+    ?? pages.bySlug.get(target)
+    ?? pages.byTitle.get(normalizeWikiTitle(target));
+}
+
+function normalizeWikiTitle(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
 function escapeHtml(value: string): string {

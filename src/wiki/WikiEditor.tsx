@@ -10,6 +10,7 @@ import {
   highlightActiveLine,
   keymap,
   lineNumbers,
+  placeholder,
 } from "@codemirror/view";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
 import { useEffect, useRef } from "react";
@@ -99,9 +100,16 @@ interface WikiEditorProps {
   onChange: (next: string) => void;
   readOnly?: boolean;
   ariaLabel?: string;
+  placeholderText?: string;
 }
 
-export function WikiEditor({ value, onChange, readOnly, ariaLabel }: WikiEditorProps) {
+export function WikiEditor({
+  value,
+  onChange,
+  readOnly,
+  ariaLabel,
+  placeholderText,
+}: WikiEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const latestValueRef = useRef(value);
@@ -124,6 +132,7 @@ export function WikiEditor({ value, onChange, readOnly, ariaLabel }: WikiEditorP
         indentOnInput(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         markdown({ base: markdownLanguage }),
+        placeholder(placeholderText ?? ""),
         highlightActiveLine(),
         wikiTokenPlugin,
         wikiTheme,

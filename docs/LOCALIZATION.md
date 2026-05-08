@@ -302,3 +302,80 @@ When a key is translated into every supported locale, remove its entry from this
 - Tone: concise descriptive tooltip.
 - Placeholder details: none.
 - Domain notes: The displayed value is aggregate local network throughput formatted as decimal MB/s, not a percentage.
+
+### wiki.backlinks
+
+- English value: "Backlinks"
+- Namespace: `wiki`
+- File/component: `src/wiki/WikiWorkspace.tsx` / `PageSidebar`
+- UI role: metadata panel section heading
+- Surrounding user flow: Shown beneath the active wiki page editor next to attachments, tags, and linked Connections; lists pages that reference the current page with `[[Page Name]]`-style links.
+- Tone: compact PKM terminology.
+- Placeholder details: none.
+- Domain notes: Backlinks are wiki page references, not browser links or backend Connection links.
+
+### wiki.noBacklinks
+
+- English value: "No backlinks yet."
+- Namespace: `wiki`
+- File/component: `src/wiki/WikiWorkspace.tsx` / `PageSidebar`
+- UI role: empty-state text
+- Surrounding user flow: Shown in the Backlinks section when no other wiki page links to the active page.
+- Tone: brief and neutral.
+- Placeholder details: none.
+- Domain notes: Refers only to wiki page-to-page links parsed from Markdown.
+
+### wiki.tags
+
+- English value: "Tags"
+- Namespace: `wiki`
+- File/component: `src/wiki/WikiWorkspace.tsx` / `PageSidebar`
+- UI role: metadata panel section heading
+- Surrounding user flow: Shown beneath the active wiki page editor and groups clickable `#tag` chips parsed from the current Markdown page.
+- Tone: compact PKM terminology.
+- Placeholder details: none.
+- Domain notes: These are inline Markdown wiki tags, separate from Connection tags.
+
+### wiki.noTags
+
+- English value: "No tags in this page."
+- Namespace: `wiki`
+- File/component: `src/wiki/WikiWorkspace.tsx` / `PageSidebar`
+- UI role: empty-state text
+- Surrounding user flow: Shown in the Tags section when the active wiki page Markdown does not contain any `#tag` tokens.
+- Tone: brief and neutral.
+- Placeholder details: none.
+- Domain notes: These are inline Markdown wiki tags, separate from Connection tags.
+
+### wiki.filterByTag
+
+- English value: "Filter wiki by #{{tag}}"
+- Namespace: `wiki`
+- File/component: `src/wiki/WikiWorkspace.tsx` / `PageSidebar`
+- UI role: tag chip tooltip and aria-label
+- Surrounding user flow: The user clicks a tag chip beneath a wiki page to populate the wiki search/filter field with that tag.
+- Tone: direct action label.
+- Placeholder details: `{{tag}}` is the tag text without the leading `#`; the rendered string adds the hash prefix.
+- Domain notes: Filters wiki pages by inline Markdown tags only.
+
+### wiki.bodyPlaceholder
+
+- English value: "Write in Markdown. Use [[Page Name]] to link pages, #tags to organize notes, and {{connection:id}} to embed a connection."
+- Namespace: `wiki`
+- File/component: `src/wiki/WikiEditor.tsx` / markdown editor placeholder
+- UI role: editor placeholder/help text
+- Surrounding user flow: Shown in the wiki Markdown editor when the active page body is empty.
+- Tone: instructional and concise.
+- Placeholder details: `[[Page Name]]`, `#tags`, and `{{connection:id}}` are literal syntax examples and should remain recognizable.
+- Domain notes: Connection is the AdminDeck durable resource; `#tags` are wiki note tags, not Connection tags.
+
+### wiki.deletePageTitle
+
+- English value: "Delete wiki page?"
+- Namespace: `wiki`
+- File/component: `src/wiki/WikiWorkspace.tsx` / `DeletePageDialog`
+- UI role: confirmation dialog title
+- Surrounding user flow: The user clicks the delete action for a wiki page in the page tree and sees an app-owned confirmation dialog before the page and subpages are removed.
+- Tone: concise confirmation question.
+- Placeholder details: none.
+- Domain notes: Wiki page deletion is separate from deleting a stored Connection.

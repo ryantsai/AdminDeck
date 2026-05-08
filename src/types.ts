@@ -428,6 +428,8 @@ export interface WikiPage {
   createdAt: string;
   updatedAt: string;
   connectionIds: string[];
+  backlinks: WikiPageReference[];
+  tags: string[];
   attachments: WikiAttachment[];
 }
 

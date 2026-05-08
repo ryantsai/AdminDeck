@@ -81,6 +81,8 @@ pub struct WikiPage {
     pub created_at: String,
     pub updated_at: String,
     pub connection_ids: Vec<String>,
+    pub backlinks: Vec<WikiPageReference>,
+    pub tags: Vec<String>,
     pub attachments: Vec<WikiAttachment>,
 }
 
@@ -299,6 +301,41 @@ pub fn search_wiki(
         return Ok(Vec::new());
     }
     let cap = limit.clamp(1, 100) as i64;
+    if let Some(tag) = trimmed
+        .strip_prefix('#')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let tag_pattern = format!("%#{}%", escape_like(tag));
+        return storage.with_connection(|connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT id, title, slug, body_md
+                     FROM wiki_pages
+                     WHERE body_md LIKE ?1 ESCAPE '\\'
+                     ORDER BY updated_at DESC
+                     LIMIT ?2",
+                )
+                .map_err(to_wiki_error)?;
+            let rows = statement
+                .query_map(params![tag_pattern, cap], |row| {
+                    let body: String = row.get(3)?;
+                    Ok(WikiSearchHit {
+                        id: row.get(0)?,
+                        title: row.get(1)?,
+                        slug: row.get(2)?,
+                        snippet: tag_snippet(&body, tag),
+                    })
+                })
+                .map_err(to_wiki_error)?;
+            let mut hits = Vec::new();
+            for row in rows {
+                hits.push(row.map_err(to_wiki_error)?);
+            }
+            Ok(hits)
+        });
+    }
+
     let fts_query = sanitize_fts_query(&trimmed);
 
     storage.with_connection(|connection| {
@@ -666,6 +703,8 @@ fn load_wiki_page(connection: &SqliteConnection, page_id: &str) -> Result<WikiPa
         .ok_or_else(|| format!("wiki page {page_id} not found"))?;
 
     let connection_ids = list_connection_ids(connection, page_id)?;
+    let backlinks = list_backlinks(connection, page_id)?;
+    let tags = extract_wiki_tags(&row.4);
     let attachments = list_attachments(connection, page_id)?;
 
     Ok(WikiPage {
@@ -678,6 +717,8 @@ fn load_wiki_page(connection: &SqliteConnection, page_id: &str) -> Result<WikiPa
         created_at: row.6,
         updated_at: row.7,
         connection_ids,
+        backlinks,
+        tags,
         attachments,
     })
 }
@@ -718,6 +759,35 @@ fn list_attachments(
         attachments.push(row.map_err(to_wiki_error)?);
     }
     Ok(attachments)
+}
+
+fn list_backlinks(
+    connection: &SqliteConnection,
+    page_id: &str,
+) -> Result<Vec<WikiPageReference>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT p.id, p.title, p.slug
+             FROM wiki_page_links l
+             JOIN wiki_pages p ON p.id = l.page_id
+             WHERE l.target_page_id = ?1
+             ORDER BY p.title COLLATE NOCASE",
+        )
+        .map_err(to_wiki_error)?;
+    let rows = statement
+        .query_map(params![page_id], |row| {
+            Ok(WikiPageReference {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                slug: row.get(2)?,
+            })
+        })
+        .map_err(to_wiki_error)?;
+    let mut backlinks = Vec::new();
+    for row in rows {
+        backlinks.push(row.map_err(to_wiki_error)?);
+    }
+    Ok(backlinks)
 }
 
 fn list_connection_ids(
@@ -810,26 +880,18 @@ fn sync_page_links_in_tx(
             params![page_id],
         )
         .map_err(to_wiki_error)?;
-    let targets = extract_wiki_link_ids(body);
+    let targets = extract_wiki_link_targets(body);
     for target in targets {
-        if target == page_id {
+        let Some(target_id) = resolve_wiki_link_target(transaction, &target)? else {
             continue;
-        }
-        let exists: Option<i64> = transaction
-            .query_row(
-                "SELECT 1 FROM wiki_pages WHERE id = ?1",
-                params![target],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(to_wiki_error)?;
-        if exists.is_none() {
+        };
+        if target_id == page_id {
             continue;
         }
         transaction
             .execute(
                 "INSERT OR IGNORE INTO wiki_page_links (page_id, target_page_id) VALUES (?1, ?2)",
-                params![page_id, target],
+                params![page_id, target_id],
             )
             .map_err(to_wiki_error)?;
     }
@@ -869,20 +931,136 @@ fn sync_page_connections_in_tx(
     Ok(())
 }
 
-fn extract_wiki_link_ids(body: &str) -> Vec<String> {
-    // Recognizes the canonical [[id]] and [[id|label]] forms.
+fn extract_wiki_tags(body: &str) -> Vec<String> {
+    let mut tags = Vec::new();
+    for word in body.split(|character: char| character.is_whitespace()) {
+        let candidate = word
+            .trim_start_matches(|character: char| {
+                !character.is_ascii_alphanumeric() && character != '#'
+            })
+            .trim_end_matches(|character: char| {
+                !character.is_ascii_alphanumeric() && character != '-' && character != '_'
+            });
+        let Some(tag) = candidate.strip_prefix('#') else {
+            continue;
+        };
+        if tag.is_empty() {
+            continue;
+        }
+        if tag.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '-' || character == '_'
+        }) && !tags.iter().any(|existing| existing == tag)
+        {
+            tags.push(tag.to_string());
+        }
+    }
+    tags.sort_by_key(|tag| tag.to_ascii_lowercase());
+    tags
+}
+
+fn escape_like(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+fn tag_snippet(body: &str, tag: &str) -> String {
+    let needle = format!("#{}", tag);
+    let lower_body = body.to_ascii_lowercase();
+    let lower_needle = needle.to_ascii_lowercase();
+    let Some(index) = lower_body.find(&lower_needle) else {
+        return body.chars().take(96).collect();
+    };
+    let match_end = index + needle.len();
+    let start = floor_char_boundary(body, index.saturating_sub(48));
+    let end = ceil_char_boundary(body, (match_end + 48).min(body.len()));
+    let mut snippet = String::new();
+    if start > 0 {
+        snippet.push('…');
+    }
+    snippet.push_str(&body[start..index]);
+    snippet.push_str("<<");
+    snippet.push_str(&body[index..match_end]);
+    snippet.push_str(">>");
+    snippet.push_str(&body[match_end..end]);
+    if end < body.len() {
+        snippet.push('…');
+    }
+    snippet
+}
+
+fn floor_char_boundary(value: &str, mut index: usize) -> usize {
+    while index > 0 && !value.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+fn ceil_char_boundary(value: &str, mut index: usize) -> usize {
+    while index < value.len() && !value.is_char_boundary(index) {
+        index += 1;
+    }
+    index
+}
+
+fn extract_wiki_link_targets(body: &str) -> Vec<String> {
+    // Recognizes [[Page Name]], [[page-id]], [[slug]], and [[target|label]] forms.
     let mut results = Vec::new();
     for (start, _) in body.match_indices("[[") {
         let after_open = start + 2;
         if let Some(relative_end) = body[after_open..].find("]]") {
             let inner = &body[after_open..after_open + relative_end];
             let target = inner.split('|').next().unwrap_or("").trim();
-            if !target.is_empty() && is_safe_id(target) {
+            if !target.is_empty() {
                 results.push(target.to_string());
             }
         }
     }
     results
+}
+
+fn resolve_wiki_link_target(
+    transaction: &rusqlite::Transaction<'_>,
+    target: &str,
+) -> Result<Option<String>, String> {
+    if is_safe_id(target) {
+        let by_id = transaction
+            .query_row(
+                "SELECT id FROM wiki_pages WHERE id = ?1",
+                params![target],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_wiki_error)?;
+        if by_id.is_some() {
+            return Ok(by_id);
+        }
+    }
+
+    let slug = slugify(target);
+    if !slug.is_empty() {
+        let by_slug = transaction
+            .query_row(
+                "SELECT id FROM wiki_pages WHERE slug = ?1 ORDER BY updated_at DESC LIMIT 1",
+                params![slug],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_wiki_error)?;
+        if by_slug.is_some() {
+            return Ok(by_slug);
+        }
+    }
+
+    transaction
+        .query_row(
+            "SELECT id FROM wiki_pages WHERE title = ?1 COLLATE NOCASE ORDER BY updated_at DESC LIMIT 1",
+            params![target],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(to_wiki_error)
 }
 
 fn is_safe_id(value: &str) -> bool {
