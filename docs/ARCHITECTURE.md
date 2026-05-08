@@ -38,7 +38,7 @@ Debug-only observability should use local debug logs, console output, or the dia
 
 `src/settings/SettingsPage.tsx` owns the Settings shell — the header, sidebar nav, and section routing. Each settings section is a separate page component under `src/settings/`, owning its own draft state, save/reset handlers, and helper controls:
 
-- `src/settings/GeneralSettings.tsx` — Language (i18n) selector, Auto Backup toggle and last-backup status, settings backup/import actions, database folder opener.
+- `src/settings/GeneralSettings.tsx` — Language (i18n) selector, Auto Backup toggle and last-backup status, connected Connection rail shortcut toggle, settings backup/import actions, database folder opener.
 - `src/settings/AppearanceSettings.tsx` — App UI font family, layout reset, Color Scheme placeholder.
 - `src/settings/AiSettings.tsx` — AI provider kind, dynamic provider fields, provider-specific model selector, custom model ID input, API key, output language.
 - `src/settings/SshSettings.tsx` — Read-only SSH defaults and SFTP transfer defaults summary.
@@ -242,7 +242,7 @@ The primary UI is a dense desktop workspace:
 
 Default visual direction: quiet productivity light chrome with dark terminal panes.
 
-The activity rail uses icons with delayed hover labels for top-level destinations. The top rail entry is Dashboard, and the second entry is Settings. The current Settings surface lives in `src/settings/SettingsPage.tsx`; it is ordered as General, Appearance, AI Assistant, SSH, Terminal, URL, Remote Desktop(RDP), VNC, and About. General exposes Language (i18n) as a selectable dropdown, Appearance owns App UI font, layout reset, and Color Scheme as a placeholder, SSH folds in SFTP transfer defaults, Terminal owns editable terminal behavior, and RDP/VNC expose planned quality default summaries.
+The activity rail uses icons with delayed hover labels for top-level destinations. The top rail entry is Dashboard, and the second entry is Settings. The current Settings surface lives in `src/settings/SettingsPage.tsx`; it is ordered as General, Appearance, AI Assistant, SSH, Terminal, URL, Remote Desktop(RDP), VNC, and About. General exposes Language (i18n) as a selectable dropdown plus connected Connection rail shortcuts and Auto Backup controls, Appearance owns App UI font, layout reset, and Color Scheme as a placeholder, SSH folds in SFTP transfer defaults, Terminal owns editable terminal behavior, and RDP/VNC expose planned quality default summaries.
 
 AdminDeck does not include a global command palette in the current product scope; navigation and workflow entry points should stay visible in the Dashboard/connection tree, tab workspace, SFTP toolbar/context actions, assistant panel, and Settings.
 

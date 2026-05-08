@@ -7,7 +7,7 @@ import {
   Moon,
   Settings,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { invokeCommand, isTauriRuntime } from "./lib/tauri";
@@ -18,6 +18,7 @@ import "@icon-park/react/styles/index.css";
 import "@xterm/xterm/css/xterm.css";
 import "./App.css";
 import { AssistantPanel } from "./ai/AssistantPanel";
+import { ConnectionIcon } from "./connections/ConnectionIcon";
 import { ConnectionSidebar } from "./connections/ConnectionSidebar";
 import { StatusBar } from "./workspace/StatusBar";
 import { TabStrip, WorkspaceCanvas } from "./workspace/WorkspaceCanvas";
@@ -427,6 +428,11 @@ function ActivityRail({
 }) {
   const { t } = useTranslation();
   const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const activeTabId = useWorkspaceStore((state) => state.activeTabId);
+  const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
+  const tabs = useWorkspaceStore((state) => state.tabs);
+  const generalSettings = useWorkspaceStore((state) => state.generalSettings);
+  const activateTab = useWorkspaceStore((state) => state.activateTab);
   const [dontSleepEnabled, setDontSleepEnabled] = useState(false);
   const [dontSleepUpdating, setDontSleepUpdating] = useState(false);
 
@@ -457,6 +463,36 @@ function ActivityRail({
       onConnectionsRestore();
     }
   }
+
+  function handleConnectedConnectionClick(tabId: string) {
+    onNavigate("workspace");
+    activateTab(tabId);
+  }
+
+  const activeTabConnectionId = useMemo(
+    () => tabs.find((tab) => tab.id === activeTabId)?.connection?.id,
+    [activeTabId, tabs],
+  );
+
+  const connectedRailItems = useMemo(() => {
+    if (!generalSettings.showConnectedConnectionsInRail) {
+      return [];
+    }
+
+    const seenConnectionIds = new Set<string>();
+    return tabs.flatMap((tab) => {
+      const connection = tab.connection;
+      if (
+        !connection ||
+        seenConnectionIds.has(connection.id) ||
+        !activeSessionCounts[connection.id]
+      ) {
+        return [];
+      }
+      seenConnectionIds.add(connection.id);
+      return [{ connection, tabId: tab.id }];
+    });
+  }, [activeSessionCounts, generalSettings.showConnectedConnectionsInRail, tabs]);
 
   async function handleDontSleepClick() {
     if (dontSleepUpdating) {
@@ -502,6 +538,36 @@ function ActivityRail({
           {t("app.connections")}
         </span>
       </button>
+      {connectedRailItems.length > 0 ? (
+        <div
+          className="rail-connected-connections"
+          aria-label={t("app.connectedConnectionsRail")}
+        >
+          {connectedRailItems.map(({ connection, tabId }) => (
+            <button
+              key={connection.id}
+              className={`rail-button rail-button-connection ${
+                activePage === "workspace" && activeTabConnectionId === connection.id
+                  ? "active"
+                  : ""
+              }`}
+              aria-label={t("app.openConnectedConnection", {
+                name: connection.name,
+              })}
+              onClick={() => handleConnectedConnectionClick(tabId)}
+            >
+              <ConnectionIcon
+                localShell={connection.localShell}
+                size={18}
+                type={connection.type}
+              />
+              <span className="rail-tooltip" role="tooltip">
+                {connection.name}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <button
         className={`rail-button ${activePage === "wiki" ? "active" : ""}`}
         aria-label={t("app.wiki")}

@@ -12,7 +12,9 @@
     "resizeConnections": "Resize Connections column",
     "resizeAiAssistant": "Resize AI Assistant panel",
     "aiAssistant": "AI Assistant",
-    "wiki": "Wiki"
+    "wiki": "Wiki",
+    "connectedConnectionsRail": "Connected Connections",
+    "openConnectedConnection": "Open {{name}}"
   },
   "settings": {
     "title": "Settings",
@@ -218,7 +220,10 @@
         "label": "PowerShell / batch commands",
         "description": "Run non-destructive PowerShell or batch commands from AdminDeck app data only."
       }
-    }
+    },
+    "connectedConnectionsRail": "Show connected Connection icons in the left rail",
+    "connectedConnectionsRailHint": "Adds an icon for each connected Connection to the left rail so you can switch back to it quickly.",
+    "connectedConnectionsRailSaved": "Connected Connection icons setting saved."
   },
   "connections": {
     "title": "Connections",

@@ -314,6 +314,20 @@ button {
   position: relative;
 }
 
+.rail-connected-connections {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  width: 100%;
+  padding-top: 6px;
+  margin-top: 2px;
+  border-top: 1px solid var(--nav-toolbar-tooltip-border);
+}
+
+.rail-button-connection .connection-icon-image {
+  border-radius: 4px;
+}
+
 .rail-button-dont-sleep {
   margin-top: auto;
 }

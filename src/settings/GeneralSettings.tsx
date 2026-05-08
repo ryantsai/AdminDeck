@@ -51,8 +51,10 @@ export function GeneralSettings() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
-  async function updateAutoBackup(enabled: boolean) {
-    const nextSettings = { ...generalSettings, autoBackupEnabled: enabled };
+  async function updateGeneralSettings(
+    nextSettings: typeof generalSettings,
+    successMessage: string,
+  ) {
     setGeneralSettings(nextSettings);
     setStatus("");
     setError("");
@@ -64,12 +66,26 @@ export function GeneralSettings() {
         request: nextSettings,
       });
       setGeneralSettings(saved);
-      setStatus(t("settings.autoBackupSaved"));
+      setStatus(successMessage);
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : String(saveError),
       );
     }
+  }
+
+  function updateAutoBackup(enabled: boolean) {
+    return updateGeneralSettings(
+      { ...generalSettings, autoBackupEnabled: enabled },
+      t("settings.autoBackupSaved"),
+    );
+  }
+
+  function updateConnectedConnectionsInRail(enabled: boolean) {
+    return updateGeneralSettings(
+      { ...generalSettings, showConnectedConnectionsInRail: enabled },
+      t("settings.connectedConnectionsRailSaved"),
+    );
   }
 
   async function handleBackupSettings() {
@@ -196,6 +212,19 @@ export function GeneralSettings() {
           {t("settings.lastBackup", {
             value: lastBackup ?? t("settings.lastBackupNever"),
           })}
+        </small>
+        <label>
+          <input
+            type="checkbox"
+            checked={generalSettings.showConnectedConnectionsInRail}
+            onChange={(event) =>
+              void updateConnectedConnectionsInRail(event.currentTarget.checked)
+            }
+          />
+          {t("settings.connectedConnectionsRail")}
+        </label>
+        <small className="field-hint">
+          {t("settings.connectedConnectionsRailHint")}
         </small>
       </div>
 

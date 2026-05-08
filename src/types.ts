@@ -161,6 +161,7 @@ export type TerminalCursorStyle = "block" | "bar" | "underline";
 
 export interface GeneralSettings {
   autoBackupEnabled: boolean;
+  showConnectedConnectionsInRail: boolean;
   lastBackupAt?: string | null;
 }
 

@@ -489,3 +489,58 @@ When a key is translated into every supported locale, remove its entry from this
 - Tone: compact UI-part label.
 - Placeholder details: none.
 - Domain notes: Refers to foreground text and icon color for the themed navigation toolbar, not terminal text or workspace content text.
+
+### settings.connectedConnectionsRail
+
+- English value: "Show connected Connection icons in the left rail"
+- Namespace: `settings`
+- File/component: `src/settings/GeneralSettings.tsx`
+- UI role: checkbox label
+- Surrounding user flow: Settings -> General lets the user enable or disable adding currently connected Connections to the left activity rail.
+- Tone: concise settings label.
+- Placeholder details: none.
+- Domain notes: Connection is the stored openable resource; the rail item appears only while a live Session exists for that Connection. Defaults to off.
+
+### settings.connectedConnectionsRailHint
+
+- English value: "Adds an icon for each connected Connection to the left rail so you can switch back to it quickly."
+- Namespace: `settings`
+- File/component: `src/settings/GeneralSettings.tsx`
+- UI role: helper text
+- Surrounding user flow: Shown below the Settings -> General checkbox that controls connected Connection icons in the activity rail.
+- Tone: brief explanatory helper.
+- Placeholder details: none.
+- Domain notes: Connection is the durable resource and the icon opens the existing workspace Tab for quick switching; this does not create a new Connection or persist live Session state.
+
+### settings.connectedConnectionsRailSaved
+
+- English value: "Connected Connection icons setting saved."
+- Namespace: `settings`
+- File/component: `src/settings/GeneralSettings.tsx`
+- UI role: save confirmation status
+- Surrounding user flow: Appears after the Settings -> General connected Connection icons checkbox is persisted successfully.
+- Tone: short confirmation.
+- Placeholder details: none.
+- Domain notes: Refers to the persisted General setting only, not to a new Connection lifecycle event.
+
+### app.connectedConnectionsRail
+
+- English value: "Connected Connections"
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: rail group aria-label
+- Surrounding user flow: Labels the optional group of connected Connection shortcut icons in the left activity rail for assistive technologies.
+- Tone: compact navigation label.
+- Placeholder details: none.
+- Domain notes: The group is visible only when the General setting is enabled and at least one Connection has an active Session.
+
+### app.openConnectedConnection
+
+- English value: "Open {{name}}"
+- Namespace: `app`
+- File/component: `src/App.tsx` / `ActivityRail`
+- UI role: button aria-label
+- Surrounding user flow: Used on each connected Connection shortcut in the left activity rail; activating it switches to the existing workspace Tab for that Connection.
+- Tone: direct action label.
+- Placeholder details: `{{name}}` is the user-defined Connection name.
+- Domain notes: This action opens/switches to an existing Tab for a connected Connection; it does not start a duplicate Session.

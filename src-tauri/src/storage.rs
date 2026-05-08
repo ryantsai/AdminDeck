@@ -158,6 +158,8 @@ pub struct Storage {
 pub struct GeneralSettings {
     auto_backup_enabled: bool,
     #[serde(default)]
+    show_connected_connections_in_rail: bool,
+    #[serde(default)]
     last_backup_at: Option<String>,
 }
 
@@ -2840,6 +2842,7 @@ fn required_field(field: &str, value: String) -> Result<String, String> {
 fn default_general_settings() -> GeneralSettings {
     GeneralSettings {
         auto_backup_enabled: true,
+        show_connected_connections_in_rail: false,
         last_backup_at: None,
     }
 }
@@ -3981,18 +3984,22 @@ mod tests {
             .general_settings()
             .expect("default general settings load");
         assert!(defaults.auto_backup_enabled);
+        assert!(!defaults.show_connected_connections_in_rail);
         assert!(defaults.last_backup_at.is_none());
 
         let updated = storage
             .update_general_settings(GeneralSettings {
                 auto_backup_enabled: false,
+                show_connected_connections_in_rail: true,
                 last_backup_at: None,
             })
             .expect("general settings update");
         assert!(!updated.auto_backup_enabled);
+        assert!(updated.show_connected_connections_in_rail);
 
         let reloaded = storage.general_settings().expect("general settings reload");
         assert!(!reloaded.auto_backup_enabled);
+        assert!(reloaded.show_connected_connections_in_rail);
         assert!(reloaded.last_backup_at.is_none());
     }
 
@@ -4003,6 +4010,7 @@ mod tests {
         storage
             .update_general_settings(GeneralSettings {
                 auto_backup_enabled: false,
+                show_connected_connections_in_rail: true,
                 last_backup_at: None,
             })
             .expect("general settings update");
@@ -4012,6 +4020,7 @@ mod tests {
         storage
             .update_general_settings(GeneralSettings {
                 auto_backup_enabled: true,
+                show_connected_connections_in_rail: false,
                 last_backup_at: None,
             })
             .expect("general settings changes after export");
@@ -4024,6 +4033,7 @@ mod tests {
             .expect("database imports");
 
         assert!(!imported.general_settings.auto_backup_enabled);
+        assert!(imported.general_settings.show_connected_connections_in_rail);
         assert_eq!(
             imported.general_settings.last_backup_at.as_deref(),
             Some(imported.backup.created_at.as_str())
