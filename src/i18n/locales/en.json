@@ -328,7 +328,7 @@
     "folderSubfoldersCount": "subfolder(s)",
     "import": {
       "tileTitle": "Import",
-      "tileSubtitle": "From file or network scan",
+      "tileSubtitle": "From file, bookmarks, or network scan",
       "title": "Import connections",
       "back": "Back",
       "chooseSource": "Choose an import source",
@@ -383,7 +383,20 @@
       "noneSelected": "Select at least one row to import.",
       "importCount": "Import {{count}}",
       "importFileComplete": "Imported {{count}} Connections from file.",
-      "importScanComplete": "Imported {{count}} Connections from scan."
+      "importScanComplete": "Imported {{count}} Connections from scan.",
+      "bookmarksTitle": "Import browser bookmarks",
+      "bookmarksSubtitle": "Edge, Chrome, Firefox URL bookmarks",
+      "bookmarksLoading": "Looking for browser bookmark sources...",
+      "bookmarksNoSources": "No Edge, Chrome, or Firefox bookmark sources were found on this device.",
+      "bookmarksSourceLabel": "Browser profile",
+      "bookmarksSourcePath": "Source file: {{path}}",
+      "bookmarksTreeLabel": "Bookmark folders and links",
+      "bookmarksPreview": "Preview {{count}} selected",
+      "bookmarksSourceRequired": "Choose a browser bookmark source.",
+      "bookmarksSelectionRequired": "Select at least one folder or bookmark to import.",
+      "bookmarksNoImportable": "The selected bookmarks did not include any http or https URLs.",
+      "bookmarkFallbackName": "Imported bookmark",
+      "importBookmarksComplete": "Imported {{count}} Connections from bookmarks."
     }
   },
   "terminal": {

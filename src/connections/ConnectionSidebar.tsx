@@ -1192,7 +1192,9 @@ export function ConnectionSidebar({
               t(
                 source === "scan"
                   ? "connections.import.importScanComplete"
-                  : "connections.import.importFileComplete",
+                  : source === "bookmarks"
+                    ? "connections.import.importBookmarksComplete"
+                    : "connections.import.importFileComplete",
                 { count },
               ),
             );

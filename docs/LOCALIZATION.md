@@ -544,3 +544,157 @@ When a key is translated into every supported locale, remove its entry from this
 - Tone: direct action label.
 - Placeholder details: `{{name}}` is the user-defined Connection name.
 - Domain notes: This action opens/switches to an existing Tab for a connected Connection; it does not start a duplicate Session.
+
+### connections.import.tileSubtitle
+
+- English value: "From file, bookmarks, or network scan"
+- Namespace: `connections`
+- File/component: `src/connections/ConnectionSidebar.tsx`, `src/connections/ImportDialog.tsx`
+- UI role: import entry tile helper text
+- Surrounding user flow: Appears on the New Connection wizard Import tile before the user opens the import source chooser.
+- Tone: compact feature summary.
+- Placeholder details: none.
+- Domain notes: "bookmarks" means browser URL bookmarks from Edge, Chrome, and Firefox; imported items become URL Connections.
+
+### connections.import.bookmarksTitle
+
+- English value: "Import browser bookmarks"
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx`
+- UI role: import source title/dialog heading
+- Surrounding user flow: Appears in the import source chooser and as the dialog heading after choosing the browser bookmarks source.
+- Tone: direct action label.
+- Placeholder details: none.
+- Domain notes: Browser bookmarks are imported as URL Connections, not browser tabs.
+
+### connections.import.bookmarksSubtitle
+
+- English value: "Edge, Chrome, Firefox URL bookmarks"
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx`
+- UI role: import source helper text
+- Surrounding user flow: Appears below the browser bookmarks import tile in the source chooser.
+- Tone: concise capability summary.
+- Placeholder details: none.
+- Domain notes: Browser product names should remain recognizable; URL can remain English as a technical term.
+
+### connections.import.bookmarksLoading
+
+- English value: "Looking for browser bookmark sources..."
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: loading status
+- Surrounding user flow: Displayed while AdminDeck searches local browser profile folders for supported bookmark stores.
+- Tone: brief progress update.
+- Placeholder details: none.
+- Domain notes: Sources are local Edge/Chrome JSON bookmark files and Firefox `places.sqlite` databases.
+
+### connections.import.bookmarksNoSources
+
+- English value: "No Edge, Chrome, or Firefox bookmark sources were found on this device."
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: empty-state message
+- Surrounding user flow: Shown when no supported browser bookmark stores are discovered on the local machine.
+- Tone: clear neutral status.
+- Placeholder details: none.
+- Domain notes: This does not indicate a failed import; users may not have those browsers/profiles.
+
+### connections.import.bookmarksSourceLabel
+
+- English value: "Browser profile"
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: select label
+- Surrounding user flow: Labels the dropdown of discovered browser profiles before the user selects folders/bookmarks.
+- Tone: concise field label.
+- Placeholder details: none.
+- Domain notes: Profile refers to a browser profile here, not an AdminDeck Connection.
+
+### connections.import.bookmarksSourcePath
+
+- English value: "Source file: {{path}}"
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: helper text
+- Surrounding user flow: Shows the local bookmark file or database path for the selected browser profile.
+- Tone: factual diagnostic helper.
+- Placeholder details: `{{path}}` is an absolute local filesystem path.
+- Domain notes: Path may point to a Chromium `Bookmarks` JSON file or a Firefox `places.sqlite` database.
+
+### connections.import.bookmarksTreeLabel
+
+- English value: "Bookmark folders and links"
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarkTreeRow`
+- UI role: ARIA label
+- Surrounding user flow: Labels the tree of bookmark folders and individual bookmark links for assistive technologies.
+- Tone: descriptive accessibility label.
+- Placeholder details: none.
+- Domain notes: Links imported from the tree become URL Connections.
+
+### connections.import.bookmarksPreview
+
+- English value: "Preview {{count}} selected"
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: button label
+- Surrounding user flow: The user clicks this after selecting bookmark folders/links to generate the editable import preview.
+- Tone: direct action label.
+- Placeholder details: `{{count}}` is the number of selected tree nodes, including folders and bookmarks.
+- Domain notes: Preview rows may be fewer than selected nodes because folders expand to importable http/https bookmarks only.
+
+### connections.import.bookmarksSourceRequired
+
+- English value: "Choose a browser bookmark source."
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: validation error
+- Surrounding user flow: Shown if the user attempts to preview bookmarks without a selected browser profile.
+- Tone: direct corrective instruction.
+- Placeholder details: none.
+- Domain notes: Source means the discovered browser profile/bookmark store.
+
+### connections.import.bookmarksSelectionRequired
+
+- English value: "Select at least one folder or bookmark to import."
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: validation error
+- Surrounding user flow: Shown if the user attempts to preview without checking any bookmark tree item.
+- Tone: direct corrective instruction.
+- Placeholder details: none.
+- Domain notes: Selected folders include their descendant bookmarks.
+
+### connections.import.bookmarksNoImportable
+
+- English value: "The selected bookmarks did not include any http or https URLs."
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `BookmarksPanel`
+- UI role: validation/status error
+- Surrounding user flow: Shown when selected browser bookmark nodes contain no URLs that AdminDeck can store as URL Connections.
+- Tone: explanatory, not alarming.
+- Placeholder details: none.
+- Domain notes: Non-web schemes such as `chrome://`, `about:`, `file:`, and `javascript:` are intentionally skipped.
+
+### connections.import.bookmarkFallbackName
+
+- English value: "Imported bookmark"
+- Namespace: `connections`
+- File/component: `src/connections/ImportDialog.tsx` / `ImportPreviewSection`
+- UI role: fallback Connection name fragment
+- Surrounding user flow: Used only if an imported URL bookmark row has no usable bookmark title, host, or URL text.
+- Tone: neutral default name.
+- Placeholder details: none.
+- Domain notes: The saved durable resource is a URL Connection.
+
+### connections.import.importBookmarksComplete
+
+- English value: "Imported {{count}} Connections from bookmarks."
+- Namespace: `connections`
+- File/component: `src/connections/ConnectionSidebar.tsx`, `src/connections/ImportDialog.tsx`
+- UI role: transient status
+- Surrounding user flow: Appears in the bottom workspace status bar after selected browser bookmark preview rows are saved as Connections.
+- Tone: brief success confirmation.
+- Placeholder details: `{{count}}` is the number of imported URL Connection rows.
+- Domain notes: Connection is capitalized for the durable stored resource; imported bookmarks become URL Connections.
