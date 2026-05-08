@@ -1,8 +1,11 @@
+use rusqlite::{Connection as SqliteConnection, OpenFlags};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{
-    fs,
+    collections::BTreeMap,
+    env, fs,
     net::Ipv4Addr,
-    path::Path,
+    path::{Path, PathBuf},
     str::FromStr,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -23,6 +26,7 @@ pub struct ImportedConnectionDraft {
     pub name: String,
     pub host: String,
     pub user: String,
+    pub url: Option<String>,
     pub port: Option<u16>,
     #[serde(rename = "type")]
     pub connection_type: &'static str,
@@ -314,6 +318,7 @@ fn draft_from_row(
         name,
         host,
         user,
+        url: None,
         port,
         connection_type,
         folder_path,
@@ -491,6 +496,7 @@ impl RdcmanServer {
             name: display,
             host,
             user,
+            url: None,
             port: self.port,
             connection_type: "rdp",
             folder_path,
@@ -588,6 +594,7 @@ fn parse_mobaxterm_session(
             name: name.to_string(),
             host: String::new(),
             user: String::new(),
+            url: None,
             port: None,
             connection_type,
             folder_path: folder_path.to_vec(),
@@ -616,6 +623,7 @@ fn parse_mobaxterm_session(
         name: name.to_string(),
         host,
         user,
+        url: None,
         port,
         connection_type,
         folder_path: folder_path.to_vec(),
@@ -736,6 +744,7 @@ fn finalize_putty_session(
         name,
         host,
         user: values.user.unwrap_or_default(),
+        url: None,
         port: values.port,
         connection_type,
         folder_path: Vec::new(),
@@ -785,6 +794,473 @@ fn strip_quotes(value: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+// ===== Browser bookmark import ==============================================
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookmarkImportSource {
+    pub id: String,
+    pub label: String,
+    pub browser: String,
+    pub path: String,
+    pub root: BookmarkTreeNode,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookmarkTreeNode {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub node_type: &'static str,
+    pub url: Option<String>,
+    pub children: Vec<BookmarkTreeNode>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserBookmarkSourcesResponse {
+    pub sources: Vec<BookmarkImportSource>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewBrowserBookmarkImportRequest {
+    pub source_id: String,
+    pub selected_node_ids: Vec<String>,
+}
+
+pub fn list_browser_bookmark_sources() -> BrowserBookmarkSourcesResponse {
+    let mut sources = Vec::new();
+    for candidate in browser_bookmark_candidates() {
+        if !candidate.path.exists() {
+            continue;
+        }
+        match parse_bookmark_source(&candidate.browser, &candidate.label, &candidate.path) {
+            Ok(mut source) => {
+                if !source.root.children.is_empty() {
+                    source.id = candidate.id;
+                    sources.push(source);
+                }
+            }
+            Err(error) => sources.push(BookmarkImportSource {
+                id: candidate.id,
+                label: candidate.label,
+                browser: candidate.browser,
+                path: candidate.path.to_string_lossy().into_owned(),
+                root: BookmarkTreeNode {
+                    id: "root".to_string(),
+                    name: "Bookmarks".to_string(),
+                    node_type: "folder",
+                    url: None,
+                    children: Vec::new(),
+                },
+                warnings: vec![error],
+            }),
+        }
+    }
+    BrowserBookmarkSourcesResponse { sources }
+}
+
+pub fn preview_browser_bookmark_import(
+    request: PreviewBrowserBookmarkImportRequest,
+) -> Result<ImportFilePreview, String> {
+    let candidates = browser_bookmark_candidates();
+    let candidate = candidates
+        .into_iter()
+        .find(|candidate| candidate.id == request.source_id)
+        .ok_or_else(|| "bookmark source was not found".to_string())?;
+    let source = parse_bookmark_source(&candidate.browser, &candidate.label, &candidate.path)?;
+    let selected: std::collections::HashSet<String> =
+        request.selected_node_ids.into_iter().collect();
+    let mut drafts = Vec::new();
+    collect_selected_bookmark_drafts(&source.root, &selected, &mut Vec::new(), false, &mut drafts);
+    Ok(ImportFilePreview {
+        format: "bookmarks",
+        drafts,
+        warnings: source.warnings,
+    })
+}
+
+struct BookmarkCandidate {
+    id: String,
+    label: String,
+    browser: String,
+    path: PathBuf,
+}
+
+fn browser_bookmark_candidates() -> Vec<BookmarkCandidate> {
+    let mut candidates = Vec::new();
+    add_chromium_candidates(&mut candidates, "chrome", "Chrome", chrome_user_data_dirs());
+    add_chromium_candidates(&mut candidates, "edge", "Edge", edge_user_data_dirs());
+    add_firefox_candidates(&mut candidates);
+    candidates
+}
+
+fn add_chromium_candidates(
+    candidates: &mut Vec<BookmarkCandidate>,
+    id_prefix: &str,
+    browser: &str,
+    roots: Vec<PathBuf>,
+) {
+    for root in roots {
+        for profile in chromium_profiles(&root) {
+            let bookmarks = profile.join("Bookmarks");
+            let profile_name = profile
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("Default")
+                .to_string();
+            candidates.push(BookmarkCandidate {
+                id: format!("{id_prefix}:{}", profile.to_string_lossy()),
+                label: format!("{browser} — {profile_name}"),
+                browser: browser.to_string(),
+                path: bookmarks,
+            });
+        }
+    }
+}
+
+fn add_firefox_candidates(candidates: &mut Vec<BookmarkCandidate>) {
+    for root in firefox_profile_roots() {
+        if let Ok(entries) = fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                let places = path.join("places.sqlite");
+                let profile_name = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("Profile")
+                    .to_string();
+                candidates.push(BookmarkCandidate {
+                    id: format!("firefox:{}", path.to_string_lossy()),
+                    label: format!("Firefox — {profile_name}"),
+                    browser: "Firefox".to_string(),
+                    path: places,
+                });
+            }
+        }
+    }
+}
+
+fn chromium_profiles(root: &Path) -> Vec<PathBuf> {
+    let mut profiles = Vec::new();
+    if let Ok(entries) = fs::read_dir(root) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() || !path.join("Bookmarks").exists() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if name == "Default" || name.starts_with("Profile ") {
+                profiles.push(path);
+            }
+        }
+    }
+    if profiles.is_empty() {
+        profiles.push(root.join("Default"));
+    }
+    profiles.sort();
+    profiles
+}
+
+fn chrome_user_data_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+        dirs.push(PathBuf::from(local_app_data).join("Google/Chrome/User Data"));
+    }
+    if let Ok(home) = env::var("HOME") {
+        dirs.push(PathBuf::from(&home).join(".config/google-chrome"));
+        dirs.push(PathBuf::from(&home).join("Library/Application Support/Google/Chrome"));
+    }
+    dirs
+}
+
+fn edge_user_data_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+        dirs.push(PathBuf::from(local_app_data).join("Microsoft/Edge/User Data"));
+    }
+    if let Ok(home) = env::var("HOME") {
+        dirs.push(PathBuf::from(&home).join(".config/microsoft-edge"));
+        dirs.push(PathBuf::from(&home).join("Library/Application Support/Microsoft Edge"));
+    }
+    dirs
+}
+
+fn firefox_profile_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(app_data) = env::var("APPDATA") {
+        roots.push(PathBuf::from(app_data).join("Mozilla/Firefox/Profiles"));
+    }
+    if let Ok(home) = env::var("HOME") {
+        roots.push(PathBuf::from(&home).join(".mozilla/firefox"));
+        roots.push(PathBuf::from(&home).join("Library/Application Support/Firefox/Profiles"));
+    }
+    roots
+}
+
+fn parse_bookmark_source(
+    browser: &str,
+    label: &str,
+    path: &Path,
+) -> Result<BookmarkImportSource, String> {
+    let (root, warnings) = if browser == "Firefox" {
+        parse_firefox_bookmarks(path)?
+    } else {
+        parse_chromium_bookmarks(path)?
+    };
+    Ok(BookmarkImportSource {
+        id: String::new(),
+        label: label.to_string(),
+        browser: browser.to_string(),
+        path: path.to_string_lossy().into_owned(),
+        root,
+        warnings,
+    })
+}
+
+fn parse_chromium_bookmarks(path: &Path) -> Result<(BookmarkTreeNode, Vec<String>), String> {
+    let text =
+        fs::read_to_string(path).map_err(|error| format!("failed to read bookmarks: {error}"))?;
+    let value: Value = serde_json::from_str(&text)
+        .map_err(|error| format!("failed to parse bookmarks JSON: {error}"))?;
+    let roots = value
+        .get("roots")
+        .and_then(|roots| roots.as_object())
+        .ok_or_else(|| "bookmarks file does not contain a roots object".to_string())?;
+    let mut root = BookmarkTreeNode {
+        id: "root".to_string(),
+        name: "Bookmarks".to_string(),
+        node_type: "folder",
+        url: None,
+        children: Vec::new(),
+    };
+    for key in ["bookmark_bar", "other", "synced"] {
+        if let Some(node) = roots
+            .get(key)
+            .and_then(|node| parse_chromium_node(node, key.to_string()))
+        {
+            if !node.children.is_empty() {
+                root.children.push(node);
+            }
+        }
+    }
+    Ok((root, Vec::new()))
+}
+
+fn parse_chromium_node(value: &Value, fallback_id: String) -> Option<BookmarkTreeNode> {
+    let node_type = value.get("type")?.as_str()?;
+    let id = value
+        .get("id")
+        .and_then(|id| id.as_str())
+        .map(|id| format!("chromium-{id}"))
+        .unwrap_or_else(|| format!("chromium-{fallback_id}"));
+    let name = value
+        .get("name")
+        .and_then(|name| name.as_str())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or("Bookmarks")
+        .trim()
+        .to_string();
+    if node_type == "url" {
+        let url = value.get("url")?.as_str()?.trim().to_string();
+        if !is_importable_bookmark_url(&url) {
+            return None;
+        }
+        return Some(BookmarkTreeNode {
+            id,
+            name: if name.is_empty() {
+                bookmark_name_from_url(&url)
+            } else {
+                name
+            },
+            node_type: "bookmark",
+            url: Some(url),
+            children: Vec::new(),
+        });
+    }
+    if node_type != "folder" {
+        return None;
+    }
+    let mut children = Vec::new();
+    if let Some(raw_children) = value
+        .get("children")
+        .and_then(|children| children.as_array())
+    {
+        for (index, child) in raw_children.iter().enumerate() {
+            if let Some(parsed) = parse_chromium_node(child, format!("{fallback_id}-{index}")) {
+                children.push(parsed);
+            }
+        }
+    }
+    Some(BookmarkTreeNode {
+        id,
+        name,
+        node_type: "folder",
+        url: None,
+        children,
+    })
+}
+
+#[derive(Clone)]
+struct FirefoxBookmarkRow {
+    id: i64,
+    parent: i64,
+    node_type: i64,
+    title: String,
+    url: Option<String>,
+}
+
+fn parse_firefox_bookmarks(path: &Path) -> Result<(BookmarkTreeNode, Vec<String>), String> {
+    let connection = SqliteConnection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|error| format!("failed to open Firefox bookmarks database: {error}"))?;
+    let mut statement = connection
+        .prepare(
+            "SELECT b.id, b.parent, b.type, COALESCE(b.title, ''), p.url
+             FROM moz_bookmarks b
+             LEFT JOIN moz_places p ON b.fk = p.id
+             ORDER BY b.position, b.id",
+        )
+        .map_err(|error| format!("failed to read Firefox bookmarks: {error}"))?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(FirefoxBookmarkRow {
+                id: row.get(0)?,
+                parent: row.get(1)?,
+                node_type: row.get(2)?,
+                title: row.get(3)?,
+                url: row.get(4)?,
+            })
+        })
+        .map_err(|error| format!("failed to query Firefox bookmarks: {error}"))?;
+    let mut by_parent: BTreeMap<i64, Vec<FirefoxBookmarkRow>> = BTreeMap::new();
+    for row in rows {
+        let row = row.map_err(|error| format!("failed to read Firefox bookmark row: {error}"))?;
+        by_parent.entry(row.parent).or_default().push(row);
+    }
+    let mut root = BookmarkTreeNode {
+        id: "root".to_string(),
+        name: "Bookmarks".to_string(),
+        node_type: "folder",
+        url: None,
+        children: Vec::new(),
+    };
+    let root_rows = by_parent.remove(&0).unwrap_or_default();
+    for row in root_rows {
+        if let Some(node) = build_firefox_node(row, &by_parent) {
+            if node.node_type == "bookmark" || !node.children.is_empty() {
+                root.children.push(node);
+            }
+        }
+    }
+    Ok((root, Vec::new()))
+}
+
+fn build_firefox_node(
+    row: FirefoxBookmarkRow,
+    by_parent: &BTreeMap<i64, Vec<FirefoxBookmarkRow>>,
+) -> Option<BookmarkTreeNode> {
+    if row.node_type == 1 {
+        let url = row.url?.trim().to_string();
+        if !is_importable_bookmark_url(&url) {
+            return None;
+        }
+        let name = if row.title.trim().is_empty() {
+            bookmark_name_from_url(&url)
+        } else {
+            row.title.trim().to_string()
+        };
+        return Some(BookmarkTreeNode {
+            id: format!("firefox-{}", row.id),
+            name,
+            node_type: "bookmark",
+            url: Some(url),
+            children: Vec::new(),
+        });
+    }
+    if row.node_type != 2 {
+        return None;
+    }
+    let mut children = Vec::new();
+    if let Some(raw_children) = by_parent.get(&row.id) {
+        for child in raw_children {
+            if let Some(node) = build_firefox_node(child.clone(), by_parent) {
+                children.push(node);
+            }
+        }
+    }
+    Some(BookmarkTreeNode {
+        id: format!("firefox-{}", row.id),
+        name: if row.title.trim().is_empty() {
+            "Bookmarks".to_string()
+        } else {
+            row.title.trim().to_string()
+        },
+        node_type: "folder",
+        url: None,
+        children,
+    })
+}
+
+fn collect_selected_bookmark_drafts(
+    node: &BookmarkTreeNode,
+    selected: &std::collections::HashSet<String>,
+    folder_path: &mut Vec<String>,
+    _inherited: bool,
+    drafts: &mut Vec<ImportedConnectionDraft>,
+) {
+    if node.node_type == "bookmark" {
+        if selected.contains(&node.id) {
+            if let Some(url) = node.url.as_deref() {
+                drafts.push(ImportedConnectionDraft {
+                    name: node.name.clone(),
+                    host: bookmark_host_from_url(url),
+                    user: String::new(),
+                    url: Some(url.to_string()),
+                    port: None,
+                    connection_type: "url",
+                    folder_path: folder_path.clone(),
+                });
+            }
+        }
+        return;
+    }
+    let pushed = node.id != "root" && !node.name.trim().is_empty();
+    if pushed {
+        folder_path.push(node.name.clone());
+    }
+    for child in &node.children {
+        collect_selected_bookmark_drafts(child, selected, folder_path, false, drafts);
+    }
+    if pushed {
+        folder_path.pop();
+    }
+}
+
+fn is_importable_bookmark_url(url: &str) -> bool {
+    url::Url::parse(url)
+        .map(|parsed| matches!(parsed.scheme(), "http" | "https"))
+        .unwrap_or(false)
+}
+
+fn bookmark_host_from_url(value: &str) -> String {
+    url::Url::parse(value)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(|host| host.to_string()))
+        .unwrap_or_else(|| value.to_string())
+}
+
+fn bookmark_name_from_url(value: &str) -> String {
+    bookmark_host_from_url(value)
 }
 
 // ===== Lightweight XML event scanner ========================================
@@ -1267,5 +1743,46 @@ mod tests {
         assert_eq!(connection_type_for_port(23), "telnet");
         assert_eq!(connection_type_for_port(3389), "rdp");
         assert_eq!(connection_type_for_port(5900), "vnc");
+    }
+    #[test]
+    fn parses_chromium_bookmarks_as_url_tree() {
+        let path =
+            std::env::temp_dir().join(format!("admindeck-bookmarks-{}.json", std::process::id()));
+        std::fs::write(
+            &path,
+            r#"{
+              "roots": {
+                "bookmark_bar": {
+                  "id": "1",
+                  "name": "Bookmarks bar",
+                  "type": "folder",
+                  "children": [
+                    {"id": "2", "name": "AdminDeck", "type": "url", "url": "https://example.com/admin"},
+                    {"id": "3", "name": "Internal", "type": "folder", "children": [
+                      {"id": "4", "name": "Ignored", "type": "url", "url": "chrome://settings"},
+                      {"id": "5", "name": "Docs", "type": "url", "url": "https://docs.example.com/"}
+                    ]}
+                  ]
+                }
+              }
+            }"#,
+        )
+        .expect("write bookmark fixture");
+
+        let (root, warnings) = parse_chromium_bookmarks(&path).expect("parse bookmarks");
+        std::fs::remove_file(&path).ok();
+        assert!(warnings.is_empty());
+        assert_eq!(root.children.len(), 1);
+        let selected = std::collections::HashSet::from(["chromium-3".to_string()]);
+        let mut drafts = Vec::new();
+        collect_selected_bookmark_drafts(&root, &selected, &mut Vec::new(), false, &mut drafts);
+        assert_eq!(drafts.len(), 1);
+        assert_eq!(drafts[0].connection_type, "url");
+        assert_eq!(drafts[0].url.as_deref(), Some("https://docs.example.com/"));
+        assert_eq!(drafts[0].host, "docs.example.com");
+        assert_eq!(
+            drafts[0].folder_path,
+            vec!["Bookmarks bar".to_string(), "Internal".to_string()]
+        );
     }
 }

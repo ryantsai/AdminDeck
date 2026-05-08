@@ -5831,3 +5831,58 @@ progress {
   font-size: 11px;
   line-height: 1.35;
 }
+
+.import-bookmark-tree {
+  display: grid;
+  gap: 4px;
+  max-height: 260px;
+  padding: 10px;
+  overflow: auto;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.import-bookmark-node {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.import-bookmark-label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 3px 4px;
+  color: var(--text);
+  font-size: 12px;
+  border-radius: 5px;
+}
+
+.import-bookmark-label:hover {
+  background: var(--surface);
+}
+
+.import-bookmark-label span {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-bookmark-label small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-bookmark-children {
+  display: grid;
+  gap: 4px;
+  margin-left: 20px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}

@@ -525,6 +525,18 @@ fn parse_import_file(
 }
 
 #[tauri::command]
+fn list_browser_bookmark_sources() -> import::BrowserBookmarkSourcesResponse {
+    import::list_browser_bookmark_sources()
+}
+
+#[tauri::command]
+fn preview_browser_bookmark_import(
+    request: import::PreviewBrowserBookmarkImportRequest,
+) -> Result<import::ImportFilePreview, String> {
+    import::preview_browser_bookmark_import(request)
+}
+
+#[tauri::command]
 fn scan_network_for_connections(
     app: tauri::AppHandle,
     request: import::ScanNetworkRequest,
@@ -1304,6 +1316,8 @@ pub fn run() {
             ssh_transport_plan,
             import_ssh_config,
             parse_import_file,
+            list_browser_bookmark_sources,
+            preview_browser_bookmark_import,
             scan_network_for_connections,
             inspect_ssh_host_key,
             trust_ssh_host_key,
