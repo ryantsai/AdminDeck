@@ -224,6 +224,122 @@
   --shadow: 0 12px 40px rgba(80, 20, 60, 0.1);
 }
 
+[data-color-scheme="green-kuai-kuai"] {
+  --app-bg: #ffffff;
+  --chrome: #a7ec5a;
+  --chrome-strong: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #f6fff0;
+  --text: #082d68;
+  --text-muted: #385a8e;
+  --text-faint: #6f86aa;
+  --border: #8bcf4c;
+  --border-strong: #5ea72c;
+  --accent: #082d68;
+  --accent-soft: #dde8fa;
+  --green-soft: #edfbdc;
+  --amber-soft: #fff7d8;
+  --green: #62bd2f;
+  --amber: #d8a128;
+  --red: #d71920;
+  --nav-toolbar-bg: #ffffff;
+  --nav-toolbar-text: #082d68;
+  --nav-toolbar-hover-bg: rgba(8, 45, 104, 0.08);
+  --nav-toolbar-accent: #082d68;
+  --nav-toolbar-warning: #cc8800;
+  --nav-toolbar-tooltip-bg: #082d68;
+  --nav-toolbar-tooltip-text: #ffffff;
+  --nav-toolbar-tooltip-border: rgba(255, 255, 255, 0.2);
+  --shadow: 0 18px 46px rgba(44, 104, 18, 0.2);
+}
+
+[data-color-scheme="blue-see"] {
+  --app-bg: #0c1929;
+  --chrome: #111f33;
+  --chrome-strong: #182840;
+  --surface: #182840;
+  --surface-muted: #111f33;
+  --text: #d8e6f4;
+  --text-muted: #6d8eae;
+  --text-faint: #4a6c8e;
+  --border: #1e3252;
+  --border-strong: #2c4468;
+  --accent: #4da6ff;
+  --accent-soft: #152e4a;
+  --green-soft: #0f2a20;
+  --amber-soft: #2a2410;
+  --green: #3fb87b;
+  --amber: #d9a03d;
+  --red: #e0554d;
+  --nav-toolbar-bg: #0a1525;
+  --nav-toolbar-text: #c8dcf0;
+  --nav-toolbar-hover-bg: rgba(77, 166, 255, 0.18);
+  --nav-toolbar-accent: #7dc2ff;
+  --nav-toolbar-warning: #ffd54f;
+  --nav-toolbar-tooltip-bg: #08101d;
+  --nav-toolbar-tooltip-text: #e8f2fc;
+  --nav-toolbar-tooltip-border: rgba(125, 194, 255, 0.25);
+  --shadow: 0 18px 50px rgba(0, 12, 30, 0.5);
+}
+
+[data-color-scheme="confetti"] {
+  --app-bg: #fef9f0;
+  --chrome: #fffcf7;
+  --chrome-strong: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #fff8ec;
+  --text: #2d1f3a;
+  --text-muted: #7a5c8e;
+  --text-faint: #aa8ec0;
+  --border: #e8dae8;
+  --border-strong: #d4c0d8;
+  --accent: #e040b0;
+  --accent-soft: #ffe8f8;
+  --green-soft: #e8faf0;
+  --amber-soft: #fff5e0;
+  --green: #2eaa6a;
+  --amber: #e89520;
+  --red: #e04040;
+  --nav-toolbar-bg: #3a2550;
+  --nav-toolbar-text: #f0e0f8;
+  --nav-toolbar-hover-bg: rgba(224, 64, 176, 0.18);
+  --nav-toolbar-accent: #f098d0;
+  --nav-toolbar-warning: #ffd54f;
+  --nav-toolbar-tooltip-bg: #221435;
+  --nav-toolbar-tooltip-text: #fff0f8;
+  --nav-toolbar-tooltip-border: rgba(240, 152, 208, 0.25);
+  --shadow: 0 12px 40px rgba(60, 20, 70, 0.08);
+}
+
+[data-color-scheme="wood"] {
+  --app-bg: #f5ede1;
+  --chrome: #faf6ef;
+  --chrome-strong: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #f6efe4;
+  --text: #2d1f14;
+  --text-muted: #7a5e45;
+  --text-faint: #a89078;
+  --border: #e0d3c0;
+  --border-strong: #d0c0a8;
+  --accent: #c07830;
+  --accent-soft: #fdf0e0;
+  --green-soft: #ecf5e8;
+  --amber-soft: #fdf5e8;
+  --green: #4a8a3a;
+  --amber: #c07830;
+  --red: #c04030;
+  --nav-toolbar-bg: #3a2818;
+  --nav-toolbar-text: #f0e0c8;
+  --nav-toolbar-hover-bg: rgba(192, 120, 48, 0.18);
+  --nav-toolbar-accent: #e0a870;
+  --nav-toolbar-warning: #ffd166;
+  --nav-toolbar-tooltip-bg: #251808;
+  --nav-toolbar-tooltip-text: #fff4e8;
+  --nav-toolbar-tooltip-border: rgba(224, 168, 112, 0.25);
+  --shadow: 0 12px 40px rgba(50, 30, 10, 0.1);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -445,7 +561,7 @@ button {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  padding: 18px 14px;
+  padding: 12px 14px;
 }
 
 .assistant-panel {
@@ -539,8 +655,39 @@ button {
 
 .sidebar-actions {
   display: flex;
-  gap: 7px;
+  gap: 5px;
   align-items: center;
+}
+
+.sidebar-header {
+  min-height: 28px;
+}
+
+.sidebar-header h1 {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.connection-sidebar .icon-button {
+  width: 27px;
+  height: 27px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.connection-sidebar .icon-button:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.connection-sidebar .icon-button:disabled {
+  color: var(--text-faint);
+  background: transparent;
+  cursor: not-allowed;
 }
 
 .panel-label {

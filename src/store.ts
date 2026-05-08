@@ -513,6 +513,47 @@ function isTerminalPane(pane: WorkspacePane): pane is TerminalPane {
   return pane.kind === undefined || pane.kind === "terminal";
 }
 
+function urlConnectionIdsForTab(tab: WorkspaceTab) {
+  return tab.panes.flatMap((pane) =>
+    pane.kind === "webview" && pane.connection.type === "url"
+      ? [pane.connection.id]
+      : [],
+  );
+}
+
+function incrementActiveSessionCounts(
+  activeSessionCounts: Record<string, number>,
+  connectionIds: string[],
+) {
+  if (connectionIds.length === 0) {
+    return activeSessionCounts;
+  }
+  const nextCounts = { ...activeSessionCounts };
+  connectionIds.forEach((connectionId) => {
+    nextCounts[connectionId] = (nextCounts[connectionId] ?? 0) + 1;
+  });
+  return nextCounts;
+}
+
+function decrementActiveSessionCounts(
+  activeSessionCounts: Record<string, number>,
+  connectionIds: string[],
+) {
+  if (connectionIds.length === 0) {
+    return activeSessionCounts;
+  }
+  const nextCounts = { ...activeSessionCounts };
+  connectionIds.forEach((connectionId) => {
+    const currentCount = nextCounts[connectionId] ?? 0;
+    if (currentCount <= 1) {
+      delete nextCounts[connectionId];
+      return;
+    }
+    nextCounts[connectionId] = currentCount - 1;
+  });
+  return nextCounts;
+}
+
 interface WorkspaceState {
   query: string;
   tabs: WorkspaceTab[];
@@ -700,8 +741,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         : {},
     ),
   activateTab: (tabId) => set({ activeTabId: tabId }),
-  closeAllTabs: () => set({ tabs: [], activeTabId: "" }),
+  closeAllTabs: () => {
+    const urlConnectionIds = get().tabs.flatMap(urlConnectionIdsForTab);
+    set((state) => ({
+      tabs: [],
+      activeTabId: "",
+      activeSessionCounts: decrementActiveSessionCounts(
+        state.activeSessionCounts,
+        urlConnectionIds,
+      ),
+    }));
+  },
   closeTab: (tabId) => {
+    const closingTab = get().tabs.find((tab) => tab.id === tabId);
     const remainingTabs = get().tabs.filter((tab) => tab.id !== tabId);
     set({
       tabs: remainingTabs,
@@ -709,6 +761,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         get().activeTabId === tabId
           ? (remainingTabs[0]?.id ?? "")
           : get().activeTabId,
+      activeSessionCounts: decrementActiveSessionCounts(
+        get().activeSessionCounts,
+        closingTab ? urlConnectionIdsForTab(closingTab) : [],
+      ),
     });
   },
   openConnection: (connection) => {
@@ -834,6 +890,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       tabs: [...state.tabs, tab],
       activeTabId: tab.id,
+      activeSessionCounts: incrementActiveSessionCounts(
+        state.activeSessionCounts,
+        urlConnectionIdsForTab(tab),
+      ),
     }));
   },
   openSshPortForwardBrowser: (sourceConnection, forward) => {
@@ -954,8 +1014,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     get().splitTerminalPaneDirected(tabId, "right");
   },
   splitTerminalPaneDirected: (tabId, direction) => {
-    set((state) => ({
-      tabs: state.tabs.map((tab) => {
+    set((state) => {
+      const openedUrlConnectionIds: string[] = [];
+      const tabs = state.tabs.map((tab) => {
         if (tab.id !== tabId || tab.kind !== "terminal") {
           return tab;
         }
@@ -973,6 +1034,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           return tab;
         }
         newPane.title = `${focusedPane.title} ${tab.panes.length + 1}`;
+        if (newPane.kind === "webview") {
+          openedUrlConnectionIds.push(newPane.connection.id);
+        }
 
         const nextPanes = [...tab.panes, newPane];
         const baseLayout = ensureLayout(tab.layout, tab.panes);
@@ -990,12 +1054,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           layout: nextLayout,
           focusedPaneId: newPane.id,
         };
-      }),
-    }));
+      });
+      return {
+        tabs,
+        activeSessionCounts: incrementActiveSessionCounts(
+          state.activeSessionCounts,
+          openedUrlConnectionIds,
+        ),
+      };
+    });
   },
   addConnectionToTerminalPane: (tabId, connection, direction) => {
-    set((state) => ({
-      tabs: state.tabs.map((tab) => {
+    set((state) => {
+      const openedUrlConnectionIds: string[] = [];
+      const tabs = state.tabs.map((tab) => {
         if (tab.id !== tabId || tab.kind !== "terminal") {
           return tab;
         }
@@ -1009,6 +1081,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (!newPane) {
           return tab;
         }
+        if (newPane.kind === "webview") {
+          openedUrlConnectionIds.push(newPane.connection.id);
+        }
         const nextPanes = [...tab.panes, newPane];
         const baseLayout = ensureLayout(tab.layout, tab.panes);
         const nextLayout = splitLayout(
@@ -1024,8 +1099,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           layout: nextLayout,
           focusedPaneId: newPane.id,
         };
-      }),
-    }));
+      });
+      return {
+        tabs,
+        activeSessionCounts: incrementActiveSessionCounts(
+          state.activeSessionCounts,
+          openedUrlConnectionIds,
+        ),
+      };
+    });
   },
   closePane: (tabId, paneId) => {
     const state = get();
@@ -1037,6 +1119,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().closeTab(tabId);
       return;
     }
+    const closingPane = tab.panes.find((pane) => pane.id === paneId);
     const nextPanes = tab.panes.filter((p) => p.id !== paneId);
     const nextLayout = ensureLayout(tab.layout, nextPanes);
     const nextFocusedPaneId =
@@ -1054,6 +1137,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               focusedPaneId: nextFocusedPaneId,
             },
       ),
+      activeSessionCounts:
+        closingPane?.kind === "webview"
+          ? decrementActiveSessionCounts(s.activeSessionCounts, [closingPane.connection.id])
+          : s.activeSessionCounts,
     }));
   },
   openTmuxSessionInPane: (tabId, connection, tmuxSessionId, direction) => {

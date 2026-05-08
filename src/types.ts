@@ -205,7 +205,11 @@ export type ColorScheme =
   | "mac"
   | "orange"
   | "purple"
-  | "pink";
+  | "pink"
+  | "green-kuai-kuai"
+  | "blue-see"
+  | "confetti"
+  | "wood";
 
 export interface AppearanceSettings {
   appFontFamily: string;

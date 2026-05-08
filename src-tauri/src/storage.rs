@@ -3063,12 +3063,13 @@ fn validate_appearance_settings(
     settings.color_scheme = required_field("color scheme", settings.color_scheme)?;
     settings.custom_font_path = trim_optional(settings.custom_font_path);
     settings.color_scheme = match settings.color_scheme.to_lowercase().as_str() {
-        "default" | "dark" | "light" | "mac" | "orange" | "purple" | "pink" => {
+        "default" | "dark" | "light" | "mac" | "orange" | "purple" | "pink"
+        | "green-kuai-kuai" | "blue-see" | "confetti" | "wood" => {
             settings.color_scheme.to_lowercase()
         }
         _ => {
             return Err(
-                "color scheme must be one of: default, dark, light, mac, orange, purple, pink"
+                "color scheme must be one of: default, dark, light, mac, orange, purple, pink, green-kuai-kuai, blue-see, confetti, wood"
                     .to_string(),
             )
         }

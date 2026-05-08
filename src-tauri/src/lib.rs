@@ -99,7 +99,13 @@ fn open_custom_fonts_folder(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn list_custom_fonts() -> Result<Vec<CustomFontEntry>, String> {
+async fn list_custom_fonts() -> Result<Vec<CustomFontEntry>, String> {
+    tauri::async_runtime::spawn_blocking(list_custom_fonts_sync)
+        .await
+        .map_err(|error| format!("failed to list custom fonts: {error}"))?
+}
+
+fn list_custom_fonts_sync() -> Result<Vec<CustomFontEntry>, String> {
     let folder = custom_fonts_folder()?;
     fs::create_dir_all(&folder).map_err(|error| {
         format!(

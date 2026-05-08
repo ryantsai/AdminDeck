@@ -281,6 +281,51 @@ Workspace chrome layout is global state. Connection-specific live context may ch
 
 New feature code should land in the owning module above. Keep `src/App.tsx` limited to app chrome and cross-cutting bootstrap. Workspace state, settings I/O, layout serialization, terminal rendering, pane input routing, and the Tauri command boundary remain separated under `src/store.ts`, `src/lib/`, `src/workspace/`, `src/terminal/`, and `src/lib/tauri.ts`.
 
+## Color Scheme CSS Variables
+
+Color schemes are defined in `src/App.css` as CSS custom property blocks keyed by `[data-color-scheme="scheme-name"]`. The `:root` block defines the `"default"` scheme. Each scheme must define every variable in the list below. When adding a new scheme, also update:
+
+- `src/types.ts` — `ColorScheme` union type
+- `src/settings/AppearanceSettings.tsx` — `COLOR_SCHEME_OPTIONS` and `SCHEME_PREVIEW_COLORS`
+- `src/i18n/locales/en.json` — display label under `settings.scheme*`
+- `src-tauri/src/storage.rs` — `validate_appearance_settings()` whitelist
+- `docs/LOCALIZATION.md` — pending translation entries
+
+### Variable → UI Area Mapping
+
+| Variable | CSS Property | UI Area |
+|---|---|---|
+| `--app-bg` | `background` of `:root` | Full app background (visible behind session pane, settings) |
+| `--chrome` | `background` of `.connection-sidebar`, `.assistant-panel` | Connections tree sidebar, AI Assistant panel |
+| `--chrome-strong` | `background` of `.workspace` | Main workspace / session pane |
+| `--surface` | `background` of `.tree-folder-row:hover`, `.search-box`, various cards/dialogs | Hover highlights, search inputs, surface-level containers |
+| `--surface-muted` | `background` of sub-surfaces | Muted surface variant (settings sections, inactive panels) |
+| `--terminal` | Terminal pane background (xterm theme) | Terminal viewport background |
+| `--terminal-2` | Secondary terminal background | Split pane alternate, terminal chrome |
+| `--terminal-border` | `border-color` of terminal panes | Terminal pane borders |
+| `--text` | `color` of primary text | Body text, headings, primary content |
+| `--text-muted` | `color` of secondary text | Descriptions, secondary labels |
+| `--text-faint` | `color` of tertiary text | Placeholders, disabled text |
+| `--border` | `border-color` of containers | Container borders, separators |
+| `--border-strong` | `border-color` of emphasized containers | Active borders, panel resize handles |
+| `--accent` | `color` / `background` of primary actions | Buttons, links, active indicators |
+| `--accent-soft` | `background` of accent tints | Accent-tinted backgrounds, selection highlights |
+| `--green` | `color` of success states | Success badges, connection status |
+| `--green-soft` | `background` of green tints | Success-tinted backgrounds |
+| `--amber` | `color` of warning states | Warning badges, pending status |
+| `--amber-soft` | `background` of amber tints | Warning-tinted backgrounds |
+| `--red` | `color` of error states | Error badges, disconnected status |
+| `--nav-toolbar-bg` | `background` of `.workspace-toolbar`, top nav bars | Session toolbar, SSH/SFTP/RDP nav bars |
+| `--nav-toolbar-text` | `color` of toolbar text | Toolbar labels, toolbar button text |
+| `--nav-toolbar-hover-bg` | `background` of toolbar button hover | Toolbar button hover state |
+| `--nav-toolbar-accent` | `color` of toolbar accent | Toolbar active indicators, toolbar link color |
+| `--nav-toolbar-warning` | `color` of toolbar warnings | Toolbar warning indicators |
+| `--nav-toolbar-tooltip-bg` | `background` of toolbar tooltips | Toolbar popup tooltip background |
+| `--nav-toolbar-tooltip-text` | `color` of toolbar tooltip text | Toolbar popup tooltip text |
+| `--nav-toolbar-tooltip-border` | `border-color` of toolbar tooltips | Toolbar popup tooltip border |
+| `--shadow` | `box-shadow` of elevated surfaces | Dropdowns, popovers, tooltips |
+| `--app-ui-font-family` | `font-family` of `:root` | App-wide UI font stack |
+
 ## Performance Strategy
 
 Startup and session creation should avoid unnecessary frontend work, heavyweight dependencies, and eager initialization. Expensive subsystems should initialize lazily where possible.

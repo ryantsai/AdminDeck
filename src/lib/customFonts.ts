@@ -35,7 +35,7 @@ export async function listCustomFontOptions() {
   }
   const fonts = await invokeCommand("list_custom_fonts");
   const options = toCustomFontOptions(fonts);
-  await loadCustomFontOptions(options);
+  void loadCustomFontOptions(options);
   return options;
 }
 
@@ -44,7 +44,7 @@ export async function loadCustomFontOptions(fonts: CustomFontOption[]) {
     return;
   }
 
-  await Promise.all(
+  await Promise.allSettled(
     fonts.map(async (font) => {
       if (loadedFontFamilies.has(font.cssFamily)) {
         return;

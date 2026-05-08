@@ -58,6 +58,10 @@ const COLOR_SCHEME_OPTIONS: { value: ColorScheme; labelKey: string }[] = [
   { value: "orange", labelKey: "settings.schemeOrange" },
   { value: "purple", labelKey: "settings.schemePurple" },
   { value: "pink", labelKey: "settings.schemePink" },
+  { value: "green-kuai-kuai", labelKey: "settings.schemeGreenKuaiKuai" },
+  { value: "blue-see", labelKey: "settings.schemeBlueSee" },
+  { value: "confetti", labelKey: "settings.schemeConfetti" },
+  { value: "wood", labelKey: "settings.schemeWood" },
 ];
 
 type SchemePreviewColor = { color: string; labelKey: string };
@@ -125,6 +129,42 @@ const SCHEME_PREVIEW_COLORS: Record<ColorScheme, SchemePreviewColor[]> = {
     { color: "#15803d", labelKey: "settings.green" },
     { color: "#5a2148", labelKey: "settings.navToolbar" },
     { color: "#ffe3f1", labelKey: "settings.toolbarText" },
+  ],
+  "green-kuai-kuai": [
+    { color: "#71c83a", labelKey: "settings.appBg" },
+    { color: "#ffffff", labelKey: "settings.surface" },
+    { color: "#082d68", labelKey: "settings.text" },
+    { color: "#d71920", labelKey: "settings.accent" },
+    { color: "#62bd2f", labelKey: "settings.green" },
+    { color: "#71c83a", labelKey: "settings.navToolbar" },
+    { color: "#082d68", labelKey: "settings.toolbarText" },
+  ],
+  "blue-see": [
+    { color: "#0c1929", labelKey: "settings.appBg" },
+    { color: "#182840", labelKey: "settings.surface" },
+    { color: "#d8e6f4", labelKey: "settings.text" },
+    { color: "#4da6ff", labelKey: "settings.accent" },
+    { color: "#3fb87b", labelKey: "settings.green" },
+    { color: "#0a1525", labelKey: "settings.navToolbar" },
+    { color: "#c8dcf0", labelKey: "settings.toolbarText" },
+  ],
+  confetti: [
+    { color: "#fef9f0", labelKey: "settings.appBg" },
+    { color: "#ffffff", labelKey: "settings.surface" },
+    { color: "#2d1f3a", labelKey: "settings.text" },
+    { color: "#e040b0", labelKey: "settings.accent" },
+    { color: "#2eaa6a", labelKey: "settings.green" },
+    { color: "#3a2550", labelKey: "settings.navToolbar" },
+    { color: "#f0e0f8", labelKey: "settings.toolbarText" },
+  ],
+  wood: [
+    { color: "#f5ede1", labelKey: "settings.appBg" },
+    { color: "#ffffff", labelKey: "settings.surface" },
+    { color: "#2d1f14", labelKey: "settings.text" },
+    { color: "#c07830", labelKey: "settings.accent" },
+    { color: "#4a8a3a", labelKey: "settings.green" },
+    { color: "#3a2818", labelKey: "settings.navToolbar" },
+    { color: "#f0e0c8", labelKey: "settings.toolbarText" },
   ],
 };
 
