@@ -176,6 +176,7 @@ export interface ImportedDatabaseSnapshot {
   appearanceSettings: AppearanceSettings;
   sshSettings: SshSettings;
   sftpSettings: SftpSettings;
+  urlSettings: UrlSettings;
   aiProviderSettings: AiProviderSettings;
   connectionTree: ConnectionTree;
   backup: DatabaseBackupInfo;
@@ -225,6 +226,10 @@ export type SftpOverwriteBehavior = "fail" | "overwrite";
 
 export interface SftpSettings {
   overwriteBehavior: SftpOverwriteBehavior;
+}
+
+export interface UrlSettings {
+  ignoreCertificateErrors: boolean;
 }
 
 export type AiProviderKind =

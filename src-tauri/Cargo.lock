@@ -34,6 +34,7 @@ dependencies = [
  "tokio",
  "url",
  "vnc-rs",
+ "webview2-com",
  "windows 0.61.3",
  "windows-native-keyring-store",
  "windows-sys 0.59.0",

@@ -489,3 +489,58 @@ When a key is translated into every supported locale, remove its entry from this
 - Tone: compact UI-part label.
 - Placeholder details: none.
 - Domain notes: Refers to foreground text and icon color for the themed navigation toolbar, not terminal text or workspace content text.
+
+### settings.urlSecurity
+
+- English value: "URL security"
+- Namespace: `settings`
+- File/component: `src/settings/UrlSettings.tsx`
+- UI role: settings subsection heading
+- Surrounding user flow: Settings -> URL shows security-related controls above saved website passwords and URL data shards.
+- Tone: concise category label.
+- Placeholder details: none.
+- Domain notes: URL refers to AdminDeck URL Connections backed by embedded WebView2.
+
+### settings.urlSecurityHint
+
+- English value: "Controls certificate handling for URL Connections. Keep bypass off unless you trust the internal site and network."
+- Namespace: `settings`
+- File/component: `src/settings/UrlSettings.tsx`
+- UI role: helper text
+- Surrounding user flow: Settings -> URL explains the security controls before the user enables certificate bypass for internal self-signed HTTPS sites.
+- Tone: cautious, practical security guidance.
+- Placeholder details: none.
+- Domain notes: Certificate bypass affects HTTPS validation for URL Connections; URL Connection is the stored connection type.
+
+### settings.ignoreCertificateErrors
+
+- English value: "Ignore invalid HTTPS certificates"
+- Namespace: `settings`
+- File/component: `src/settings/UrlSettings.tsx`
+- UI role: checkbox label
+- Surrounding user flow: Settings -> URL lets the user opt in to loading internal URL Connections with self-signed or untrusted certificates.
+- Tone: explicit security-affecting setting label.
+- Placeholder details: none.
+- Domain notes: HTTPS and URL stay English technical terms. The setting defaults off.
+
+### settings.ignoreCertificateErrorsHint
+
+- English value: "Loads URL Connections with self-signed or untrusted certificates without the browser warning. Applies to newly opened URL tabs."
+- Namespace: `settings`
+- File/component: `src/settings/UrlSettings.tsx`
+- UI role: checkbox helper text
+- Surrounding user flow: Displayed under the certificate-bypass checkbox so the user understands why existing URL tabs may need to be reopened after changing the setting.
+- Tone: explanatory and safety-conscious.
+- Placeholder details: none.
+- Domain notes: URL Connection is the domain term for saved URL resources; tab refers to the frontend workspace container.
+
+### settings.urlSettingsSaved
+
+- English value: "URL settings saved."
+- Namespace: `settings`
+- File/component: `src/settings/UrlSettings.tsx`
+- UI role: success status
+- Surrounding user flow: Shown after the user saves URL settings such as invalid HTTPS certificate bypass.
+- Tone: brief confirmation.
+- Placeholder details: none.
+- Domain notes: URL refers to the Settings -> URL section and URL Connection behavior.

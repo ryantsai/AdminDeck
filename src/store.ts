@@ -4,6 +4,7 @@ import {
   defaultAiProviderSettings,
   defaultSftpSettings,
   defaultSshSettings,
+  defaultUrlSettings,
   defaultGeneralSettings,
   defaultTerminalSettings,
   initialTabs,
@@ -26,6 +27,7 @@ import type {
   HostUsageSnapshot,
   SftpSettings,
   SplitDirection,
+  UrlSettings,
   SshSettings,
   StoredConnectionLayout,
   TerminalPane,
@@ -520,6 +522,7 @@ interface WorkspaceState {
   appearanceSettings: AppearanceSettings;
   sshSettings: SshSettings;
   sftpSettings: SftpSettings;
+  urlSettings: UrlSettings;
   aiProviderSettings: AiProviderSettings;
   aiProviderHasApiKey: boolean;
   assistantContextSnippet?: AssistantContextSnippet;
@@ -533,6 +536,7 @@ interface WorkspaceState {
   setAppearanceSettings: (settings: AppearanceSettings) => void;
   setSshSettings: (settings: SshSettings) => void;
   setSftpSettings: (settings: SftpSettings) => void;
+  setUrlSettings: (settings: UrlSettings) => void;
   setAiProviderSettings: (settings: AiProviderSettings) => void;
   setAiProviderHasApiKey: (hasApiKey: boolean) => void;
   setAssistantContextSnippet: (snippet: AssistantContextSnippet) => void;
@@ -593,6 +597,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   appearanceSettings: defaultAppearanceSettings,
   sshSettings: defaultSshSettings,
   sftpSettings: defaultSftpSettings,
+  urlSettings: defaultUrlSettings,
   aiProviderSettings: defaultAiProviderSettings,
   aiProviderHasApiKey: false,
   assistantContextSnippet: undefined,
@@ -606,6 +611,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setAppearanceSettings: (appearanceSettings) => set({ appearanceSettings }),
   setSshSettings: (sshSettings) => set({ sshSettings }),
   setSftpSettings: (sftpSettings) => set({ sftpSettings }),
+  setUrlSettings: (urlSettings) => set({ urlSettings }),
   setAiProviderSettings: (aiProviderSettings) => set({ aiProviderSettings }),
   setAiProviderHasApiKey: (aiProviderHasApiKey) => set({ aiProviderHasApiKey }),
   setAssistantContextSnippet: (assistantContextSnippet) =>

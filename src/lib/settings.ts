@@ -26,6 +26,7 @@ export function useBootstrapSettings() {
   );
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
+  const setUrlSettings = useWorkspaceStore((state) => state.setUrlSettings);
   const setAiProviderSettings = useWorkspaceStore(
     (state) => state.setAiProviderSettings,
   );
@@ -76,6 +77,12 @@ export function useBootstrapSettings() {
       })
       .catch(swallow);
 
+    void invokeCommand("get_url_settings")
+      .then((settings) => {
+        if (!disposed) setUrlSettings(settings);
+      })
+      .catch(swallow);
+
     void invokeCommand("get_ai_provider_settings")
       .then((settings) => {
         if (!disposed) setAiProviderSettings(settings);
@@ -103,6 +110,7 @@ export function useBootstrapSettings() {
     setAppearanceSettings,
     setSftpSettings,
     setSshSettings,
+    setUrlSettings,
     setTerminalSettings,
   ]);
 }

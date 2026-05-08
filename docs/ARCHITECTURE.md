@@ -43,7 +43,7 @@ Debug-only observability should use local debug logs, console output, or the dia
 - `src/settings/AiSettings.tsx` — AI provider kind, dynamic provider fields, provider-specific model selector, custom model ID input, API key, output language.
 - `src/settings/SshSettings.tsx` — Read-only SSH defaults and SFTP transfer defaults summary.
 - `src/settings/TerminalSettings.tsx` — Terminal font, size, line height, scrollback, cursor, default shell, toggles.
-- `src/settings/UrlSettings.tsx` — URL Connection saved website password metadata and URL data shard management.
+- `src/settings/UrlSettings.tsx` — URL Connection security defaults, saved website password metadata, and URL data shard management.
 - `src/settings/RdpSettings.tsx` — Planned RDP quality defaults summary.
 - `src/settings/VncSettings.tsx` — Planned VNC quality defaults summary.
 - `src/settings/AboutSettings.tsx` — Product info, version, open-source component tables.
@@ -271,7 +271,7 @@ Workspace chrome layout is global state. Connection-specific live context may ch
 - `src/ai/providers.ts` — frontend provider registry barrel and provider validation.
 - `src/ai/providerRegistry/` — one provider definition per file plus shared registry types. Provider model suggestions live here, not in Settings. The Settings model picker must render these suggestions as a real provider-specific select so users can see every known model; freeform model or deployment IDs belong in the separate custom model ID input.
 - `src/settings/SettingsPage.tsx` — Settings shell with sidebar nav and section routing.
-- `src/settings/UrlSettings.tsx` — URL Connection saved website password metadata and URL data shard management.
+- `src/settings/UrlSettings.tsx` — URL Connection security defaults, saved website password metadata, and URL data shard management.
 - `src/settings/shared.tsx` — Shared `SettingsSummary` and `PlannedSettingsGrid` for settings pages.
 - `src/settings/aboutData.ts` — Product metadata and open-source component groups.
 - `src/lib/clipboard.ts` — shared clipboard read/write fallback helpers.

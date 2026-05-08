@@ -13,7 +13,6 @@
     "windows": [
       {
         "title": "AdminDeck",
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --ignore-certificate-errors",
         "width": 1360,
         "height": 860,
         "minWidth": 1120,

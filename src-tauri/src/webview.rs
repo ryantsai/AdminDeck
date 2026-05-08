@@ -12,11 +12,6 @@ use tauri::{
 const HOST_WINDOW_LABEL: &str = "main";
 const DEFAULT_PARTITION: &str = "shared";
 const HIDDEN_WEBVIEW_POSITION: f64 = -32_000.0;
-// Keep child URL WebView2 instances on the same browser-process arguments as
-// the host window. WebView2 applies these process-wide on Windows, so the host
-// window config in tauri.conf.json must carry the same value.
-const URL_WEBVIEW_BROWSER_ARGS: &str =
-    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --ignore-certificate-errors";
 const AUTOFILL_AGENT: &str = r#"
 (() => {
   const TITLE_CHANNEL = "__ADMINDECK_URL_CREDENTIAL__";
@@ -239,6 +234,8 @@ pub struct StartWebviewSessionRequest {
     session_id: String,
     url: String,
     data_partition: Option<String>,
+    #[serde(default)]
+    ignore_certificate_errors: bool,
     x: f64,
     y: f64,
     width: f64,
@@ -352,6 +349,7 @@ impl WebviewSessionManager {
             session_id,
             url,
             data_partition,
+            ignore_certificate_errors,
             x,
             y,
             width,
@@ -403,8 +401,12 @@ impl WebviewSessionManager {
         let title_session_id = session_id.clone();
         let download_app = app.clone();
         let download_session_id = session_id.clone();
-        let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url))
-            .additional_browser_args(URL_WEBVIEW_BROWSER_ARGS)
+        let initial_webview_url = if ignore_certificate_errors && cfg!(windows) {
+            parse_webview_blank_url()?
+        } else {
+            parsed_url.clone()
+        };
+        let builder = WebviewBuilder::new(&label, WebviewUrl::External(initial_webview_url))
             .initialization_script(AUTOFILL_AGENT)
             .on_navigation(move |url| {
                 let _ = navigation_app.emit(
@@ -477,6 +479,13 @@ impl WebviewSessionManager {
                 self.clear_starting(&session_id);
                 format!("failed to attach child webview: {error}")
             })?;
+
+        configure_certificate_error_bypass(&webview, ignore_certificate_errors)?;
+        if ignore_certificate_errors && cfg!(windows) {
+            webview
+                .navigate(parsed_url)
+                .map_err(|error| format!("failed to navigate webview: {error}"))?;
+        }
 
         let mut sessions = self.lock()?;
         sessions.insert(session_id.clone(), webview);
@@ -671,6 +680,79 @@ fn hide_webview(webview: &Webview) -> Result<(), String> {
         .map_err(|error| format!("failed to hide webview: {error}"))
 }
 
+fn configure_certificate_error_bypass(webview: &Webview, enabled: bool) -> Result<(), String> {
+    if !enabled {
+        return Ok(());
+    }
+    configure_platform_certificate_error_bypass(webview)
+}
+
+#[cfg(windows)]
+fn configure_platform_certificate_error_bypass(webview: &Webview) -> Result<(), String> {
+    use std::sync::{Arc, Mutex};
+
+    use webview2_com::{
+        Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2_14, COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_ALWAYS_ALLOW,
+        },
+        ServerCertificateErrorDetectedEventHandler,
+    };
+    use windows::core::Interface;
+
+    let setup_error = Arc::new(Mutex::new(None::<String>));
+    let setup_error_for_callback = Arc::clone(&setup_error);
+
+    webview
+        .with_webview(move |platform_webview| {
+            let result = unsafe {
+                let webview2 = platform_webview
+                    .controller()
+                    .CoreWebView2()
+                    .map_err(|error| error.to_string())?;
+                let webview2 = webview2
+                    .cast::<ICoreWebView2_14>()
+                    .map_err(|error| error.to_string())?;
+                let handler = ServerCertificateErrorDetectedEventHandler::create(Box::new(
+                    move |_sender, args| {
+                        if let Some(args) = args {
+                            unsafe {
+                                args.SetAction(
+                                    COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_ALWAYS_ALLOW,
+                                )?;
+                            }
+                        }
+                        Ok(())
+                    },
+                ));
+                let mut token = 0;
+                webview2
+                    .add_ServerCertificateErrorDetected(handler, &mut token)
+                    .map_err(|error| error.to_string())?;
+                Ok::<(), String>(())
+            };
+            if let Err(error) = result {
+                if let Ok(mut setup_error) = setup_error_for_callback.lock() {
+                    *setup_error = Some(error);
+                }
+            }
+        })
+        .map_err(|error| format!("failed to access WebView2 for certificate settings: {error}"))?;
+
+    if let Ok(mut setup_error) = setup_error.lock() {
+        if let Some(error) = setup_error.take() {
+            return Err(format!(
+                "failed to enable URL certificate bypass for WebView2: {error}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn configure_platform_certificate_error_bypass(_webview: &Webview) -> Result<(), String> {
+    Ok(())
+}
+
 fn required_id(value: String) -> Result<String, String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -686,6 +768,10 @@ fn required_id(value: String) -> Result<String, String> {
         return Err("webview session id may only contain letters, digits, '-' or '_'".to_string());
     }
     Ok(trimmed.to_string())
+}
+
+fn parse_webview_blank_url() -> Result<url::Url, String> {
+    url::Url::parse("about:blank").map_err(|error| format!("blank URL is not valid: {error}"))
 }
 
 fn parse_external_url(value: &str) -> Result<url::Url, String> {

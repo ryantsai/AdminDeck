@@ -130,6 +130,7 @@ function createCredentialCaptureNonce() {
 export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: WorkspaceTab }) {
   const { t } = useTranslation();
   const updateWebviewTabMetadata = useWorkspaceStore((state) => state.updateWebviewTabMetadata);
+  const ignoreCertificateErrors = useWorkspaceStore((state) => state.urlSettings.ignoreCertificateErrors);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const placeholderRef = useRef<HTMLDivElement | null>(null);
   const sessionStartedRef = useRef(false);
@@ -249,6 +250,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
           sessionId,
           url: initialUrl,
           dataPartition: tab.dataPartition,
+          ignoreCertificateErrors,
           ...bounds,
         },
       }),

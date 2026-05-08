@@ -1,7 +1,8 @@
-import { Database, KeyRound, Trash2 } from "lucide-react";
+import { Database, KeyRound, Save, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
+import { useWorkspaceStore } from "../store";
 import type { UrlCredentialSummary, UrlDataPartitionSummary } from "../types";
 
 function formatDate(value: string) {
@@ -11,10 +12,18 @@ function formatDate(value: string) {
 
 export function UrlSettings() {
   const { t } = useTranslation();
+  const urlSettings = useWorkspaceStore((state) => state.urlSettings);
+  const setUrlSettings = useWorkspaceStore((state) => state.setUrlSettings);
+  const [draft, setDraft] = useState(urlSettings);
   const [credentials, setCredentials] = useState<UrlCredentialSummary[]>([]);
   const [partitions, setPartitions] = useState<UrlDataPartitionSummary[]>([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(urlSettings);
+
+  useEffect(() => {
+    setDraft(urlSettings);
+  }, [urlSettings]);
 
   async function load() {
     if (!isTauriRuntime()) {
@@ -36,6 +45,19 @@ export function UrlSettings() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function handleSave() {
+    setStatus("");
+    setError("");
+    try {
+      const saved = isTauriRuntime() ? await invokeCommand("update_url_settings", { request: draft }) : draft;
+      setUrlSettings(saved);
+      setDraft(saved);
+      setStatus(t("settings.urlSettingsSaved"));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : String(saveError));
+    }
+  }
 
   async function deleteCredential(connectionId: string) {
     setStatus("");
@@ -70,10 +92,43 @@ export function UrlSettings() {
           <p className="panel-label">{t("settings.sectionUrl")}</p>
           <h2>{t("settings.urlDefaults")}</h2>
         </div>
+        <button className="toolbar-button" disabled={!hasChanges} onClick={() => void handleSave()} type="button">
+          <Save size={15} />
+          {t("settings.save")}
+        </button>
       </div>
 
       {status ? <p className="settings-status success">{status}</p> : null}
       {error ? <p className="settings-status error">{error}</p> : null}
+
+      <div className="settings-subsection">
+        <div className="settings-section-title">
+          <ShieldAlert className="settings-section-icon" size={18} />
+          <div>
+            <h3 className="settings-section-heading">{t("settings.urlSecurity")}</h3>
+            <p className="field-hint">{t("settings.urlSecurityHint")}</p>
+          </div>
+        </div>
+        <div className="settings-toggle-list">
+          <label className="settings-toggle-row">
+            <input
+              checked={draft.ignoreCertificateErrors}
+              onChange={(event) => {
+                const ignoreCertificateErrors = event.currentTarget.checked;
+                setDraft((settings) => ({
+                  ...settings,
+                  ignoreCertificateErrors,
+                }));
+              }}
+              type="checkbox"
+            />
+            <span>
+              <strong>{t("settings.ignoreCertificateErrors")}</strong>
+              <small>{t("settings.ignoreCertificateErrorsHint")}</small>
+            </span>
+          </label>
+        </div>
+      </div>
 
       <div className="settings-subsection">
         <div className="settings-section-title">

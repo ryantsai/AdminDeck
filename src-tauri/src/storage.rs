@@ -177,6 +177,7 @@ pub struct ImportedDatabaseSnapshot {
     appearance_settings: AppearanceSettings,
     ssh_settings: SshSettings,
     sftp_settings: SftpSettings,
+    url_settings: UrlSettings,
     ai_provider_settings: AiProviderSettings,
     connection_tree: ConnectionTree,
     backup: DatabaseBackupInfo,
@@ -219,6 +220,13 @@ pub struct SshSettings {
 #[serde(rename_all = "camelCase")]
 pub struct SftpSettings {
     overwrite_behavior: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UrlSettings {
+    #[serde(default)]
+    ignore_certificate_errors: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -656,6 +664,7 @@ impl Storage {
             appearance_settings: self.appearance_settings()?,
             ssh_settings: self.ssh_settings()?,
             sftp_settings: self.sftp_settings()?,
+            url_settings: self.url_settings()?,
             ai_provider_settings: self.ai_provider_settings()?,
             connection_tree: self.list_connection_tree()?,
             backup,
@@ -857,6 +866,41 @@ impl Storage {
             .execute(
                 "INSERT INTO settings (key, value, updated_at)
                  VALUES ('sftp', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
+    }
+
+    pub fn url_settings(&self) -> Result<UrlSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row("SELECT value FROM settings WHERE key = 'url'", [], |row| {
+                row.get::<_, String>(0)
+            })
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_url_settings)
+                .map_err(|error| format!("URL settings are invalid: {error}"))?,
+            None => Ok(default_url_settings()),
+        }
+    }
+
+    pub fn update_url_settings(&self, request: UrlSettings) -> Result<UrlSettings, String> {
+        let settings = validate_url_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize URL settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('url', ?1, CURRENT_TIMESTAMP)
                  ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value,
                     updated_at = CURRENT_TIMESTAMP",
@@ -2889,6 +2933,12 @@ fn default_sftp_settings() -> SftpSettings {
     }
 }
 
+fn default_url_settings() -> UrlSettings {
+    UrlSettings {
+        ignore_certificate_errors: false,
+    }
+}
+
 fn default_ai_provider_settings() -> AiProviderSettings {
     AiProviderSettings {
         enabled: false,
@@ -3004,6 +3054,10 @@ fn validate_sftp_settings(mut settings: SftpSettings) -> Result<SftpSettings, St
         "overwrite" | "replace" => "overwrite".to_string(),
         _ => return Err("SFTP overwrite behavior must be fail or overwrite".to_string()),
     };
+    Ok(settings)
+}
+
+fn validate_url_settings(settings: UrlSettings) -> Result<UrlSettings, String> {
     Ok(settings)
 }
 
@@ -4191,6 +4245,25 @@ mod tests {
 
         let reloaded = storage.sftp_settings().expect("SFTP settings reload");
         assert_eq!(reloaded.overwrite_behavior, "overwrite");
+    }
+
+    #[test]
+    fn url_settings_round_trip_through_settings_table() {
+        let storage = Storage::open(temp_db_path("url-settings")).expect("storage opens");
+
+        let defaults = storage.url_settings().expect("default URL settings load");
+        assert!(!defaults.ignore_certificate_errors);
+
+        let updated = storage
+            .update_url_settings(UrlSettings {
+                ignore_certificate_errors: true,
+            })
+            .expect("URL settings update");
+
+        assert!(updated.ignore_certificate_errors);
+
+        let reloaded = storage.url_settings().expect("URL settings reload");
+        assert!(reloaded.ignore_certificate_errors);
     }
 
     #[test]

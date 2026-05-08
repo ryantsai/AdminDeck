@@ -414,6 +414,21 @@ fn update_sftp_settings(
 }
 
 #[tauri::command]
+fn get_url_settings(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::UrlSettings, String> {
+    storage.url_settings()
+}
+
+#[tauri::command]
+fn update_url_settings(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::UrlSettings,
+) -> Result<storage::UrlSettings, String> {
+    storage.update_url_settings(request)
+}
+
+#[tauri::command]
 fn get_ai_provider_settings(
     storage: tauri::State<'_, storage::Storage>,
 ) -> Result<storage::AiProviderSettings, String> {
@@ -1289,6 +1304,8 @@ pub fn run() {
             transfer_ssh_public_key,
             get_sftp_settings,
             update_sftp_settings,
+            get_url_settings,
+            update_url_settings,
             get_ai_provider_settings,
             update_ai_provider_settings,
             plan_command_proposal,
