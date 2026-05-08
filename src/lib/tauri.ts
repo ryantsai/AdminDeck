@@ -286,6 +286,13 @@ export interface AgentRunRequest {
     sourceLabel: string;
     dataUrl: string;
   }>;
+  files?: Array<{
+    sourceLabel: string;
+    fileData?: string;
+    dataUrl?: string;
+    mimeType?: string;
+    text?: string;
+  }>;
   systemContext?: string;
   messages: AgentChatMessage[];
   outputLanguage?: string;

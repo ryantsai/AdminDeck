@@ -196,6 +196,16 @@ pub struct AgentScreenshotContext {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AgentFileContext {
+    source_label: String,
+    file_data: Option<String>,
+    data_url: Option<String>,
+    mime_type: Option<String>,
+    text: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentRunRequest {
     prompt: String,
     context_label: String,
@@ -204,6 +214,8 @@ pub struct AgentRunRequest {
     screenshot: Option<AgentScreenshotContext>,
     #[serde(default)]
     screenshots: Vec<AgentScreenshotContext>,
+    #[serde(default)]
+    files: Vec<AgentFileContext>,
     system_context: Option<String>,
     messages: Vec<AgentChatMessage>,
     output_language: Option<String>,
@@ -243,6 +255,7 @@ struct OpenAiCompatibleProvider {
     requires_api_key: bool,
     endpoint_style: OpenAiEndpointStyle,
     auth_style: OpenAiAuthStyle,
+    default_api: OpenAiApiStyle,
 }
 
 fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
@@ -253,6 +266,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::Azure,
             auth_style: OpenAiAuthStyle::ApiKeyHeader,
+            default_api: OpenAiApiStyle::Responses,
         }),
         "deepseek" => Ok(OpenAiCompatibleProvider {
             provider_kind: "deepseek",
@@ -260,6 +274,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::ChatCompletions,
         }),
         "grok" => Ok(OpenAiCompatibleProvider {
             provider_kind: "grok",
@@ -267,6 +282,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::ChatCompletions,
         }),
         "litellm" => Ok(OpenAiCompatibleProvider {
             provider_kind: "litellm",
@@ -274,6 +290,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::Responses,
         }),
         "openai" => Ok(OpenAiCompatibleProvider {
             provider_kind: "openai",
@@ -281,6 +298,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::Responses,
         }),
         "openrouter" => Ok(OpenAiCompatibleProvider {
             provider_kind: "openrouter",
@@ -288,6 +306,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::Responses,
         }),
         "ollama" => Ok(OpenAiCompatibleProvider {
             provider_kind: "ollama",
@@ -295,6 +314,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: false,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::Responses,
         }),
         "nvidia" => Ok(OpenAiCompatibleProvider {
             provider_kind: "nvidia",
@@ -302,6 +322,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::Responses,
         }),
         "openai-compatible" => Ok(OpenAiCompatibleProvider {
             provider_kind: "openai-compatible",
@@ -309,6 +330,7 @@ fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
             requires_api_key: true,
             endpoint_style: OpenAiEndpointStyle::ChatCompletions,
             auth_style: OpenAiAuthStyle::Bearer,
+            default_api: OpenAiApiStyle::ChatCompletions,
         }),
         "anthropic" => Err(
             "Anthropic support needs a provider adapter; DeepSeek and OpenAI-compatible providers are wired first."
@@ -334,6 +356,12 @@ enum OpenAiAuthStyle {
     ApiKeyHeader,
 }
 
+#[derive(Clone, Copy)]
+enum OpenAiApiStyle {
+    ChatCompletions,
+    Responses,
+}
+
 impl AgentProvider for OpenAiCompatibleProvider {
     async fn run(
         &self,
@@ -342,8 +370,6 @@ impl AgentProvider for OpenAiCompatibleProvider {
         api_key: Option<String>,
         request: AgentRunRequest,
     ) -> Result<AgentRunResponse, String> {
-        let prompt = trim_required("assistant prompt", request.prompt)?;
-        let context_label = trim_required("assistant context", request.context_label)?;
         let api_key = api_key
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
@@ -354,6 +380,23 @@ impl AgentProvider for OpenAiCompatibleProvider {
             ));
         }
 
+        match self.default_api {
+            OpenAiApiStyle::ChatCompletions => self.run_chat(app, settings, api_key, request).await,
+            OpenAiApiStyle::Responses => self.run_responses(app, settings, api_key, request).await,
+        }
+    }
+}
+
+impl OpenAiCompatibleProvider {
+    async fn run_chat(
+        &self,
+        app: tauri::AppHandle,
+        settings: AiProviderSettings,
+        api_key: Option<String>,
+        request: AgentRunRequest,
+    ) -> Result<AgentRunResponse, String> {
+        let prompt = trim_required("assistant prompt", request.prompt)?;
+        let context_label = trim_required("assistant context", request.context_label)?;
         let endpoint =
             chat_completions_endpoint(settings.base_url(), settings.model(), self.endpoint_style)?;
         let mut messages = build_agent_messages(
@@ -450,18 +493,107 @@ impl AgentProvider for OpenAiCompatibleProvider {
             }
         }
 
-        if content.is_empty() {
-            return Err(format!(
-                "{} response did not include assistant content",
-                self.label
-            ));
+        finish_agent_response(self, settings.model(), content)
+    }
+
+    async fn run_responses(
+        &self,
+        app: tauri::AppHandle,
+        settings: AiProviderSettings,
+        api_key: Option<String>,
+        request: AgentRunRequest,
+    ) -> Result<AgentRunResponse, String> {
+        let prompt = trim_required("assistant prompt", request.prompt)?;
+        let context_label = trim_required("assistant context", request.context_label)?;
+        let endpoint = responses_endpoint(settings.base_url(), self.endpoint_style)?;
+        let messages = build_agent_messages(
+            prompt,
+            context_label,
+            request.intent,
+            settings.reasoning_effort().to_string(),
+            request.system_context,
+            request.selected_output,
+            supports_image_input(self.provider_kind, settings.model()),
+            request.screenshot,
+            request.screenshots,
+            request.messages,
+            request.output_language,
+        );
+        let mut input = responses_input_from_messages(messages, request.files);
+        let client = reqwest::Client::new();
+        let tool_definitions = ai_tool_definitions(settings.tools());
+        let app_data_dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| format!("failed to locate AdminDeck app data: {error}"))?;
+        let mut content = String::new();
+
+        for _ in 0..4 {
+            let response = client
+                .post(endpoint.clone())
+                .headers(openai_compatible_headers(
+                    api_key.as_deref(),
+                    self.auth_style,
+                )?)
+                .json(&OpenAiResponsesRequest {
+                    model: settings.model().to_string(),
+                    input: input.clone(),
+                    stream: false,
+                    store: false,
+                    tools: responses_tool_definitions(&tool_definitions),
+                    tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
+                })
+                .send()
+                .await
+                .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
+
+            let status = response.status();
+            let response_text = response
+                .text()
+                .await
+                .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+
+            if !status.is_success() {
+                return Err(format!(
+                    "{} returned HTTP {}: {}",
+                    self.label,
+                    status.as_u16(),
+                    truncate_error_body(&response_text)
+                ));
+            }
+
+            let response_value: Value = serde_json::from_str(&response_text)
+                .map_err(|error| format!("failed to parse {} response: {error}", self.label))?;
+            if let Some(text) = response_value
+                .get("output_text")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                content = text.to_string();
+            } else if let Some(text) = extract_responses_output_text(&response_value) {
+                content = text;
+            }
+
+            let tool_calls = extract_responses_tool_calls(&response_value);
+            if tool_calls.is_empty() {
+                break;
+            }
+
+            if let Some(output) = response_value.get("output").and_then(Value::as_array) {
+                input.extend(output.iter().cloned());
+            }
+            for tool_call in tool_calls {
+                let result = run_ai_tool(settings.tools(), &app_data_dir, &tool_call).await;
+                input.push(json!({
+                    "type": "function_call_output",
+                    "call_id": tool_call.id,
+                    "output": result,
+                }));
+            }
         }
 
-        Ok(AgentRunResponse {
-            provider_kind: self.provider_kind.to_string(),
-            model: settings.model().to_string(),
-            content,
-        })
+        finish_agent_response(self, settings.model(), content)
     }
 }
 
@@ -472,6 +604,18 @@ struct OpenAiCompatibleChatRequest {
     stream: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<OpenAiToolDefinition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<String>,
+}
+
+#[derive(Serialize)]
+struct OpenAiResponsesRequest {
+    model: String,
+    input: Vec<Value>,
+    stream: bool,
+    store: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tools: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
 }
@@ -531,6 +675,183 @@ struct OpenAiToolFunctionDefinition {
     name: &'static str,
     description: &'static str,
     parameters: Value,
+}
+
+fn finish_agent_response(
+    provider: &OpenAiCompatibleProvider,
+    model: &str,
+    content: String,
+) -> Result<AgentRunResponse, String> {
+    let content = content.trim().to_string();
+    if content.is_empty() {
+        return Err(format!(
+            "{} response did not include assistant content",
+            provider.label
+        ));
+    }
+
+    Ok(AgentRunResponse {
+        provider_kind: provider.provider_kind.to_string(),
+        model: model.to_string(),
+        content,
+    })
+}
+
+fn responses_tool_definitions(tools: &[OpenAiToolDefinition]) -> Vec<Value> {
+    tools
+        .iter()
+        .map(|tool| {
+            json!({
+                "type": tool.tool_type,
+                "name": tool.function.name,
+                "description": tool.function.description,
+                "parameters": tool.function.parameters.clone(),
+            })
+        })
+        .collect()
+}
+
+fn responses_input_from_messages(
+    messages: Vec<OpenAiCompatibleMessage>,
+    files: Vec<AgentFileContext>,
+) -> Vec<Value> {
+    let mut input = Vec::new();
+    for message in messages {
+        if message.role == "system" {
+            if let OpenAiCompatibleContent::Text(text) = message.content {
+                input.push(json!({"role": "developer", "content": text}));
+            }
+            continue;
+        }
+        input.push(responses_message_from_openai_compatible(message));
+    }
+
+    let file_parts: Vec<Value> = files
+        .into_iter()
+        .filter_map(normalize_file_context)
+        .collect();
+    if !file_parts.is_empty() {
+        input.push(json!({
+            "role": "user",
+            "content": file_parts,
+        }));
+    }
+    input
+}
+
+fn responses_message_from_openai_compatible(message: OpenAiCompatibleMessage) -> Value {
+    let role = message.role;
+    match message.content {
+        OpenAiCompatibleContent::Text(text) => json!({"role": role, "content": text}),
+        OpenAiCompatibleContent::Parts(parts) => {
+            let content: Vec<Value> = parts
+                .into_iter()
+                .map(|part| match part {
+                    OpenAiCompatibleContentPart::Text { text } => {
+                        json!({"type": "input_text", "text": text})
+                    }
+                    OpenAiCompatibleContentPart::ImageUrl { image_url } => {
+                        json!({"type": "input_image", "image_url": image_url.url})
+                    }
+                })
+                .collect();
+            json!({"role": role, "content": content})
+        }
+    }
+}
+
+fn normalize_file_context(file: AgentFileContext) -> Option<Value> {
+    let filename = file.source_label.trim().to_string();
+    if filename.is_empty() {
+        return None;
+    }
+    let file_data = file
+        .file_data
+        .or(file.data_url)
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    if let Some(file_data) = file_data {
+        let file_data = if file_data.starts_with("data:") {
+            file_data
+        } else {
+            let mime_type = file
+                .mime_type
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "application/octet-stream".to_string());
+            format!("data:{mime_type};base64,{file_data}")
+        };
+        return Some(json!({
+            "type": "input_file",
+            "filename": filename,
+            "file_data": file_data,
+        }));
+    }
+
+    file.text
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|text| {
+            json!({
+                "type": "input_text",
+                "text": format!("Attached file {filename}:\n```text\n{text}\n```")
+            })
+        })
+}
+
+fn extract_responses_output_text(response: &Value) -> Option<String> {
+    let mut parts = Vec::new();
+    for item in response.get("output")?.as_array()? {
+        if item.get("type").and_then(Value::as_str) != Some("message") {
+            continue;
+        }
+        let Some(content) = item.get("content").and_then(Value::as_array) else {
+            continue;
+        };
+        for part in content {
+            if part.get("type").and_then(Value::as_str) == Some("output_text") {
+                if let Some(text) = part.get("text").and_then(Value::as_str) {
+                    let text = text.trim();
+                    if !text.is_empty() {
+                        parts.push(text.to_string());
+                    }
+                }
+            }
+        }
+    }
+    (!parts.is_empty()).then(|| parts.join("\n"))
+}
+
+fn extract_responses_tool_calls(response: &Value) -> Vec<OpenAiToolCall> {
+    response
+        .get("output")
+        .and_then(Value::as_array)
+        .map(|output| {
+            output
+                .iter()
+                .filter_map(|item| {
+                    if item.get("type").and_then(Value::as_str) != Some("function_call") {
+                        return None;
+                    }
+                    let name = item.get("name")?.as_str()?.to_string();
+                    let arguments = item
+                        .get("arguments")
+                        .and_then(Value::as_str)
+                        .unwrap_or("{}")
+                        .to_string();
+                    let id = item
+                        .get("call_id")
+                        .or_else(|| item.get("id"))
+                        .and_then(Value::as_str)?
+                        .to_string();
+                    Some(OpenAiToolCall {
+                        id,
+                        function: OpenAiToolCallFunction { name, arguments },
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefinition> {
@@ -1087,6 +1408,42 @@ fn to_openai_compatible_history_message(
     })
 }
 
+fn responses_endpoint(
+    base_url: &str,
+    endpoint_style: OpenAiEndpointStyle,
+) -> Result<String, String> {
+    let base_url = trim_required("AI provider endpoint", base_url.to_string())?;
+    let base_url = base_url.trim_end_matches('/');
+    match endpoint_style {
+        OpenAiEndpointStyle::ChatCompletions => {
+            if base_url.ends_with("/responses") {
+                Ok(base_url.to_string())
+            } else if let Some(prefix) = base_url.strip_suffix("/chat/completions") {
+                Ok(format!("{prefix}/responses"))
+            } else {
+                Ok(format!("{base_url}/responses"))
+            }
+        }
+        OpenAiEndpointStyle::Azure => azure_responses_endpoint(base_url),
+    }
+}
+
+fn azure_responses_endpoint(base_url: &str) -> Result<String, String> {
+    if base_url.ends_with("/responses") {
+        return Ok(base_url.to_string());
+    }
+    if let Some(prefix) = base_url.strip_suffix("/chat/completions") {
+        return Ok(format!("{prefix}/responses"));
+    }
+    if base_url.ends_with("/openai/v1") || base_url.ends_with("/openai/v1/") {
+        return Ok(format!("{}/responses", base_url.trim_end_matches('/')));
+    }
+    Ok(format!(
+        "{}/openai/v1/responses",
+        base_url.trim_end_matches('/')
+    ))
+}
+
 fn chat_completions_endpoint(
     base_url: &str,
     model: &str,
@@ -1290,6 +1647,54 @@ mod tests {
     }
 
     #[test]
+    fn responses_endpoint_uses_responses_path_once() {
+        assert_eq!(
+            responses_endpoint(
+                "https://api.openai.com/v1",
+                OpenAiEndpointStyle::ChatCompletions,
+            )
+            .expect("endpoint builds"),
+            "https://api.openai.com/v1/responses"
+        );
+        assert_eq!(
+            responses_endpoint(
+                "https://api.openai.com/v1/chat/completions",
+                OpenAiEndpointStyle::ChatCompletions,
+            )
+            .expect("endpoint is rewritten"),
+            "https://api.openai.com/v1/responses"
+        );
+        assert_eq!(
+            responses_endpoint(
+                "https://api.openai.com/v1/responses",
+                OpenAiEndpointStyle::ChatCompletions,
+            )
+            .expect("endpoint is kept"),
+            "https://api.openai.com/v1/responses"
+        );
+    }
+
+    #[test]
+    fn azure_responses_endpoint_uses_openai_v1() {
+        assert_eq!(
+            responses_endpoint(
+                "https://example.openai.azure.com",
+                OpenAiEndpointStyle::Azure
+            )
+            .expect("native endpoint builds"),
+            "https://example.openai.azure.com/openai/v1/responses"
+        );
+        assert_eq!(
+            responses_endpoint(
+                "https://example.openai.azure.com/openai/v1",
+                OpenAiEndpointStyle::Azure,
+            )
+            .expect("v1 endpoint builds"),
+            "https://example.openai.azure.com/openai/v1/responses"
+        );
+    }
+
+    #[test]
     fn azure_chat_endpoint_accepts_v1_or_native_resource_url() {
         assert_eq!(
             chat_completions_endpoint(
@@ -1430,6 +1835,87 @@ mod tests {
                 panic!("text-only models must not receive image parts")
             }
         }
+    }
+
+    #[test]
+    fn responses_input_converts_image_and_file_parts() {
+        let messages = build_agent_messages(
+            "Review this.".to_string(),
+            "Workspace".to_string(),
+            None,
+            "medium".to_string(),
+            None,
+            None,
+            true,
+            Some(AgentScreenshotContext {
+                source_label: "Screenshot".to_string(),
+                data_url: "data:image/png;base64,abcd".to_string(),
+            }),
+            vec![],
+            vec![],
+            None,
+        );
+        let input = responses_input_from_messages(
+            messages,
+            vec![AgentFileContext {
+                source_label: "notes.txt".to_string(),
+                file_data: Some("SGVsbG8=".to_string()),
+                data_url: None,
+                mime_type: Some("text/plain".to_string()),
+                text: None,
+            }],
+        );
+
+        assert_eq!(
+            input[0].get("role").and_then(Value::as_str),
+            Some("developer")
+        );
+        let user_content = input[1]
+            .get("content")
+            .and_then(Value::as_array)
+            .expect("user content parts are present");
+        assert!(user_content
+            .iter()
+            .any(|part| part.get("type").and_then(Value::as_str) == Some("input_image")));
+        let file_content = input[2]
+            .get("content")
+            .and_then(Value::as_array)
+            .expect("file content parts are present");
+        assert_eq!(
+            file_content[0].get("type").and_then(Value::as_str),
+            Some("input_file")
+        );
+        assert_eq!(
+            file_content[0].get("file_data").and_then(Value::as_str),
+            Some("data:text/plain;base64,SGVsbG8=")
+        );
+    }
+
+    #[test]
+    fn responses_parser_extracts_text_and_tool_calls() {
+        let response = json!({
+            "output": [
+                {
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": "Tool result explained."}]
+                },
+                {
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "current_time",
+                    "arguments": "{}"
+                }
+            ]
+        });
+
+        assert_eq!(
+            extract_responses_output_text(&response).as_deref(),
+            Some("Tool result explained.")
+        );
+        let tool_calls = extract_responses_tool_calls(&response);
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].id, "call_123");
+        assert_eq!(tool_calls[0].function.name, "current_time");
     }
 
     #[test]
