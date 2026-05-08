@@ -1,10 +1,10 @@
 import {
+  BedSingle,
   BookOpen,
   ChevronLeft,
   ChevronRight,
   Coffee,
   LayoutDashboard,
-  Moon,
   Settings,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -780,7 +780,7 @@ function ActivityRail({
   const dontSleepLabel = dontSleepEnabled
     ? t("app.dontSleepDisable")
     : t("app.dontSleepEnable");
-  const DontSleepIcon = dontSleepEnabled ? Coffee : Moon;
+  const DontSleepIcon = dontSleepEnabled ? Coffee : BedSingle;
 
   return (
     <nav className="activity-rail" aria-label={t("app.primaryNav")}>
