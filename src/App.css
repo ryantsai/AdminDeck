@@ -5830,6 +5830,51 @@ progress {
   align-items: center;
 }
 
+.screenshots-capture-button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.screenshots-capture-menu-anchor {
+  position: relative;
+}
+
+.screenshots-capture-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 12;
+  min-width: 132px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.screenshots-capture-menu button {
+  display: flex;
+  width: 100%;
+  min-height: 28px;
+  align-items: center;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.screenshots-capture-menu button:hover,
+.screenshots-capture-menu button:focus-visible {
+  background: var(--surface-muted);
+}
+
 .screenshots-actions .icon-button[aria-pressed="true"] {
   color: var(--accent);
   background: var(--accent-soft);

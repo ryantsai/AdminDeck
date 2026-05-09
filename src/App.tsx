@@ -854,9 +854,13 @@ function ActivityRail({
       await addStoredScreenshot(kind, rect);
       showWorkspaceStatus(t("screenshots.captureSuccess"), { tone: "success" });
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === "screenshot capture canceled") {
+        return;
+      }
       showWorkspaceStatus(
         t("workspace.screenshotCaptureError", {
-          message: error instanceof Error ? error.message : String(error),
+          message,
         }),
         { tone: "error" },
       );
@@ -865,9 +869,7 @@ function ActivityRail({
 
   function handleCaptureRegion() {
     setScreenshotMenu(null);
-    setScreenshotRegionState({
-      bounds: new DOMRect(0, 0, window.innerWidth, window.innerHeight),
-    });
+    void captureScreenshot("region");
   }
 
   function handleCaptureWindow() {

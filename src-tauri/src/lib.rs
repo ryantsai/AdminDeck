@@ -642,6 +642,20 @@ fn capture_active_window_screenshot_to_library(
 }
 
 #[tauri::command]
+fn capture_interactive_region_screenshot_to_library(
+    app: tauri::AppHandle,
+    storage: tauri::State<'_, storage::Storage>,
+    kind: String,
+) -> Result<screenshot::StoredScreenshot, String> {
+    let settings = storage.screenshot_settings()?;
+    screenshot::capture_interactive_region_to_library(
+        &app,
+        kind,
+        settings.folder_path().to_string(),
+    )
+}
+
+#[tauri::command]
 fn list_screenshots(
     storage: tauri::State<'_, storage::Storage>,
     request: screenshot::ListScreenshotsRequest,
@@ -1549,6 +1563,7 @@ pub fn run() {
             capture_screenshot_to_library,
             capture_fullscreen_screenshot_to_library,
             capture_active_window_screenshot_to_library,
+            capture_interactive_region_screenshot_to_library,
             list_screenshots,
             delete_screenshot,
             clear_screenshots,

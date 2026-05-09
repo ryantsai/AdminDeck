@@ -32,6 +32,8 @@ export async function addStoredScreenshot(
     stored = await invokeCommand("capture_fullscreen_screenshot_to_library", { kind });
   } else if (kind === "window" && !request) {
     stored = await invokeCommand("capture_active_window_screenshot_to_library", { kind });
+  } else if (kind === "region" && !request) {
+    stored = await invokeCommand("capture_interactive_region_screenshot_to_library", { kind });
   } else {
     stored = await invokeCommand("capture_screenshot_to_library", {
       kind,

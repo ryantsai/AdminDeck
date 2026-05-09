@@ -21,6 +21,8 @@ export function ScreenshotsPage() {
   const [hasMoreScreenshots, setHasMoreScreenshots] = useState(false);
   const [loadingScreenshots, setLoadingScreenshots] = useState(false);
   const [viewMode, setViewMode] = useState<ScreenshotViewMode>("grid");
+  const [captureMenuOpen, setCaptureMenuOpen] = useState(false);
+  const captureMenuRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLButtonElement | null>(null);
   const loadingScreenshotsRef = useRef(false);
   const screenshotCountRef = useRef(0);
@@ -73,6 +75,30 @@ export function ScreenshotsPage() {
   }, [loadScreenshots]);
 
   useEffect(() => {
+    if (!captureMenuOpen) {
+      return;
+    }
+    function closeCaptureMenu(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Node && captureMenuRef.current?.contains(target)) {
+        return;
+      }
+      setCaptureMenuOpen(false);
+    }
+    function closeCaptureMenuOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setCaptureMenuOpen(false);
+      }
+    }
+    window.addEventListener("pointerdown", closeCaptureMenu);
+    window.addEventListener("keydown", closeCaptureMenuOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeCaptureMenu);
+      window.removeEventListener("keydown", closeCaptureMenuOnEscape);
+    };
+  }, [captureMenuOpen]);
+
+  useEffect(() => {
     const node = loadMoreRef.current;
     if (!node || !hasMoreScreenshots) {
       return;
@@ -123,12 +149,16 @@ export function ScreenshotsPage() {
     }
   }
 
-  async function takeScreenshot() {
+  async function takeScreenshot(kind: StoredScreenshot["kind"]) {
+    setCaptureMenuOpen(false);
     try {
-      await addStoredScreenshot("fullscreen");
+      await addStoredScreenshot(kind);
       showWorkspaceStatus(t("screenshots.captureSuccess"), { tone: "success" });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (message === "screenshot capture canceled") {
+        return;
+      }
       showWorkspaceStatus(t("screenshots.captureError", { message }), { tone: "error" });
     }
   }
@@ -154,14 +184,30 @@ export function ScreenshotsPage() {
           <p>{t("screenshots.subtitle")}</p>
         </div>
         <div className="screenshots-actions" role="toolbar" aria-label={t("screenshots.viewOptions")}>
-          <button
-            className="secondary-button"
-            onClick={() => void takeScreenshot()}
-            type="button"
-          >
-            <Camera size={15} />
-            {t("screenshots.takeScreenshot")}
-          </button>
+          <div className="screenshots-capture-menu-anchor" ref={captureMenuRef}>
+            <button
+              aria-expanded={captureMenuOpen}
+              className="secondary-button screenshots-capture-button"
+              onClick={() => setCaptureMenuOpen((open) => !open)}
+              type="button"
+            >
+              <Camera size={15} />
+              {t("screenshots.takeScreenshot")}
+            </button>
+            {captureMenuOpen ? (
+              <div className="screenshots-capture-menu" role="menu">
+                <button onClick={() => void takeScreenshot("fullscreen")} role="menuitem" type="button">
+                  {t("screenshots.fullScreenOption")}
+                </button>
+                <button onClick={() => void takeScreenshot("window")} role="menuitem" type="button">
+                  {t("screenshots.windowOption")}
+                </button>
+                <button onClick={() => void takeScreenshot("region")} role="menuitem" type="button">
+                  {t("screenshots.regionOption")}
+                </button>
+              </div>
+            ) : null}
+          </div>
           <button
             aria-label={t("screenshots.gridView")}
             aria-pressed={viewMode === "grid"}

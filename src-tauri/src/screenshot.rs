@@ -145,9 +145,35 @@ pub fn capture_active_window_to_library(
     folder_path: String,
 ) -> Result<StoredScreenshot, String> {
     let _guard = MinimizedCaptureWindow::new(app)?;
-    let target = platform::foreground_window_rect()?;
-    let dib =
-        platform::capture_screen_rect_to_dib(target.x, target.y, target.width, target.height)?;
+    let screen = platform::virtual_screen_rect();
+    let screen_dib =
+        platform::capture_screen_rect_to_dib(screen.x, screen.y, screen.width, screen.height)?;
+    let windows = platform::enumerate_window_rects(&screen);
+    let target = platform::select_window_rect(&screen_dib, &screen, windows)?
+        .ok_or_else(|| "screenshot capture canceled".to_string())?;
+    let dib = platform::crop_dib(&screen_dib, screen.width, screen.height, &screen, &target)?;
+    save_dib_to_library(
+        &dib,
+        target.width as u32,
+        target.height as u32,
+        kind,
+        &folder_path,
+    )
+}
+
+#[cfg(target_os = "windows")]
+pub fn capture_interactive_region_to_library(
+    app: &tauri::AppHandle,
+    kind: String,
+    folder_path: String,
+) -> Result<StoredScreenshot, String> {
+    let _guard = MinimizedCaptureWindow::new(app)?;
+    let screen = platform::virtual_screen_rect();
+    let screen_dib =
+        platform::capture_screen_rect_to_dib(screen.x, screen.y, screen.width, screen.height)?;
+    let target = platform::select_region_rect(&screen_dib, &screen)?
+        .ok_or_else(|| "screenshot capture canceled".to_string())?;
+    let dib = platform::crop_dib(&screen_dib, screen.width, screen.height, &screen, &target)?;
     save_dib_to_library(
         &dib,
         target.width as u32,
@@ -280,6 +306,15 @@ pub fn capture_fullscreen_to_library(
 
 #[cfg(not(target_os = "windows"))]
 pub fn capture_active_window_to_library(
+    _app: &tauri::AppHandle,
+    _kind: String,
+    _folder_path: String,
+) -> Result<StoredScreenshot, String> {
+    Err("screenshot capture is currently available on Windows".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn capture_interactive_region_to_library(
     _app: &tauri::AppHandle,
     _kind: String,
     _folder_path: String,
@@ -527,12 +562,15 @@ mod platform {
 
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use image::{codecs::jpeg::JpegEncoder, ColorType, ImageEncoder};
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture, VK_ESCAPE};
     use windows_sys::Win32::{
-        Foundation::{GlobalFree, HANDLE, HWND},
+        Foundation::{GlobalFree, HANDLE, HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::Gdi::{
-            BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
-            GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CAPTUREBLT,
-            DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, SRCCOPY,
+            BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateSolidBrush,
+            DeleteDC, DeleteObject, EndPaint, FillRect, FrameRect, GetDC, GetDIBits,
+            InvalidateRect, ReleaseDC, SelectObject, SetDIBitsToDevice, BITMAPINFO,
+            BITMAPINFOHEADER, BI_RGB, CAPTUREBLT, DIB_RGB_COLORS, HBITMAP, HBRUSH, HDC, HGDIOBJ,
+            PAINTSTRUCT, SRCCOPY,
         },
         System::{
             DataExchange::{CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData},
@@ -540,8 +578,13 @@ mod platform {
             Ole::CF_DIB,
         },
         UI::WindowsAndMessaging::{
-            GetForegroundWindow, GetSystemMetrics, GetWindowRect, SM_CXVIRTUALSCREEN,
-            SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+            CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows,
+            GetMessageW, GetSystemMetrics, GetWindowLongPtrW, GetWindowRect, IsWindowVisible,
+            LoadCursorW, PostQuitMessage, RegisterClassW, SetWindowLongPtrW, ShowWindow,
+            TranslateMessage, CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, IDC_CROSS, MSG,
+            SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW,
+            WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE,
+            WM_NCCREATE, WM_PAINT, WNDCLASSW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
         },
     };
 
@@ -563,27 +606,105 @@ mod platform {
         }
     }
 
-    pub fn foreground_window_rect() -> Result<ScreenRect, String> {
-        unsafe {
-            let hwnd = GetForegroundWindow();
-            if hwnd.is_null() {
-                return Err("no active window is available for screenshot capture".to_string());
+    pub fn enumerate_window_rects(screen: &ScreenRect) -> Vec<ScreenRect> {
+        unsafe extern "system" fn enum_window(hwnd: HWND, lparam: LPARAM) -> i32 {
+            let state = &mut *(lparam as *mut WindowEnumeration);
+            if IsWindowVisible(hwnd) == 0 {
+                return 1;
             }
 
-            let mut rect = mem::zeroed();
+            let mut rect: RECT = mem::zeroed();
             if GetWindowRect(hwnd, &mut rect) == 0 {
-                return Err("failed to resolve active window bounds".to_string());
+                return 1;
             }
 
-            let width = (rect.right - rect.left).max(1);
-            let height = (rect.bottom - rect.top).max(1);
-            Ok(ScreenRect {
-                x: rect.left,
-                y: rect.top,
-                width,
-                height,
-            })
+            let Some(rect) = screen_rect_from_rect(rect) else {
+                return 1;
+            };
+            if rect.width < 80 || rect.height < 60 || !rect_intersects(&rect, state.screen) {
+                return 1;
+            }
+
+            state
+                .windows
+                .push(clamp_rect_to_screen(&rect, state.screen));
+            1
         }
+
+        let mut state = WindowEnumeration {
+            screen,
+            windows: Vec::new(),
+        };
+        unsafe {
+            let _ = EnumWindows(Some(enum_window), &mut state as *mut _ as LPARAM);
+        }
+        state.windows
+    }
+
+    pub fn select_window_rect(
+        dib: &[u8],
+        screen: &ScreenRect,
+        windows: Vec<ScreenRect>,
+    ) -> Result<Option<ScreenRect>, String> {
+        run_selection_overlay(dib, screen, SelectionMode::Window { windows })
+    }
+
+    pub fn select_region_rect(
+        dib: &[u8],
+        screen: &ScreenRect,
+    ) -> Result<Option<ScreenRect>, String> {
+        run_selection_overlay(dib, screen, SelectionMode::Region)
+    }
+
+    pub fn crop_dib(
+        dib: &[u8],
+        source_width: i32,
+        source_height: i32,
+        source_screen: &ScreenRect,
+        target: &ScreenRect,
+    ) -> Result<Vec<u8>, String> {
+        if target.width <= 0 || target.height <= 0 {
+            return Err("screenshot region must have a positive size".to_string());
+        }
+
+        let header_size = mem::size_of::<BITMAPINFOHEADER>();
+        let source_width = source_width.max(1) as usize;
+        let source_height = source_height.max(1) as usize;
+        let target_width = target.width.max(1) as usize;
+        let target_height = target.height.max(1) as usize;
+        let expected_len = header_size + source_width * source_height * 4;
+        if dib.len() < expected_len {
+            return Err("captured screenshot image data is incomplete".to_string());
+        }
+
+        let offset_x = (target.x - source_screen.x).max(0) as usize;
+        let offset_y = (target.y - source_screen.y).max(0) as usize;
+        if offset_x >= source_width || offset_y >= source_height {
+            return Err("screenshot selection is outside the captured screen".to_string());
+        }
+
+        let copy_width = target_width.min(source_width - offset_x);
+        let copy_height = target_height.min(source_height - offset_y);
+        let mut cropped = vec![0u8; header_size + copy_width * copy_height * 4];
+        cropped[..header_size].copy_from_slice(&dib[..header_size]);
+        unsafe {
+            let header = cropped.as_mut_ptr() as *mut BITMAPINFOHEADER;
+            (*header).biWidth = copy_width as i32;
+            (*header).biHeight = -(copy_height as i32);
+            (*header).biSizeImage = (copy_width * copy_height * 4) as u32;
+        }
+
+        let source_pixels = &dib[header_size..expected_len];
+        let target_pixels = &mut cropped[header_size..];
+        for row in 0..copy_height {
+            let source_start = ((offset_y + row) * source_width + offset_x) * 4;
+            let source_end = source_start + copy_width * 4;
+            let target_start = row * copy_width * 4;
+            target_pixels[target_start..target_start + copy_width * 4]
+                .copy_from_slice(&source_pixels[source_start..source_end]);
+        }
+
+        Ok(cropped)
     }
 
     pub fn capture_screen_rect_to_clipboard(
@@ -743,6 +864,378 @@ mod platform {
         mem::forget(clipboard);
         let _ = CloseClipboard();
         Ok(())
+    }
+
+    enum SelectionMode {
+        Window { windows: Vec<ScreenRect> },
+        Region,
+    }
+
+    struct WindowEnumeration<'a> {
+        screen: &'a ScreenRect,
+        windows: Vec<ScreenRect>,
+    }
+
+    struct SelectionOverlay<'a> {
+        dib: &'a [u8],
+        screen: ScreenRect,
+        mode: SelectionMode,
+        result: Option<ScreenRect>,
+        hover: Option<ScreenRect>,
+        drag_start: Option<(i32, i32)>,
+        drag_current: Option<(i32, i32)>,
+    }
+
+    fn run_selection_overlay(
+        dib: &[u8],
+        screen: &ScreenRect,
+        mode: SelectionMode,
+    ) -> Result<Option<ScreenRect>, String> {
+        unsafe {
+            let class_name = wide_null("AdminDeckScreenshotSelection");
+            let cursor = LoadCursorW(ptr::null_mut(), IDC_CROSS);
+            let wnd_class = WNDCLASSW {
+                style: CS_HREDRAW | CS_VREDRAW,
+                lpfnWndProc: Some(selection_wnd_proc),
+                hInstance: ptr::null_mut(),
+                hCursor: cursor,
+                lpszClassName: class_name.as_ptr(),
+                ..mem::zeroed()
+            };
+            let _ = RegisterClassW(&wnd_class);
+
+            let mut overlay = Box::new(SelectionOverlay {
+                dib,
+                screen: ScreenRect {
+                    x: screen.x,
+                    y: screen.y,
+                    width: screen.width,
+                    height: screen.height,
+                },
+                mode,
+                result: None,
+                hover: None,
+                drag_start: None,
+                drag_current: None,
+            });
+            let overlay_ptr = overlay.as_mut() as *mut SelectionOverlay;
+            let hwnd = CreateWindowExW(
+                WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+                class_name.as_ptr(),
+                class_name.as_ptr(),
+                WS_POPUP,
+                screen.x,
+                screen.y,
+                screen.width,
+                screen.height,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                overlay_ptr.cast(),
+            );
+            if hwnd.is_null() {
+                return Err("failed to create screenshot selection overlay".to_string());
+            }
+
+            ShowWindow(hwnd, SW_SHOW);
+            let _ = InvalidateRect(hwnd, ptr::null(), 1);
+
+            let mut message: MSG = mem::zeroed();
+            while GetMessageW(&mut message, ptr::null_mut(), 0, 0) > 0 {
+                let _ = TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+
+            Ok(overlay.result)
+        }
+    }
+
+    unsafe extern "system" fn selection_wnd_proc(
+        hwnd: HWND,
+        message: u32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
+        if message == WM_NCCREATE {
+            let create = lparam as *const CREATESTRUCTW;
+            let overlay = (*create).lpCreateParams as *mut SelectionOverlay;
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, overlay as isize);
+            return DefWindowProcW(hwnd, message, wparam, lparam);
+        }
+
+        let overlay = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut SelectionOverlay;
+        if overlay.is_null() {
+            return DefWindowProcW(hwnd, message, wparam, lparam);
+        }
+        let overlay = &mut *overlay;
+
+        match message {
+            WM_CREATE => 0,
+            WM_MOUSEMOVE => {
+                let point = message_point(lparam, &overlay.screen);
+                match &overlay.mode {
+                    SelectionMode::Window { windows } => {
+                        overlay.hover = windows
+                            .iter()
+                            .find(|rect| rect_contains(rect, point.0, point.1))
+                            .map(copy_rect);
+                    }
+                    SelectionMode::Region => {
+                        if overlay.drag_start.is_some() {
+                            overlay.drag_current = Some(point);
+                        }
+                    }
+                }
+                let _ = InvalidateRect(hwnd, ptr::null(), 0);
+                0
+            }
+            WM_LBUTTONDOWN => {
+                let point = message_point(lparam, &overlay.screen);
+                match overlay.mode {
+                    SelectionMode::Window { .. } => {
+                        if let Some(rect) = overlay.hover.as_ref() {
+                            overlay.result = Some(copy_rect(rect));
+                            DestroyWindow(hwnd);
+                        }
+                    }
+                    SelectionMode::Region => {
+                        overlay.drag_start = Some(point);
+                        overlay.drag_current = Some(point);
+                        SetCapture(hwnd);
+                    }
+                }
+                0
+            }
+            WM_LBUTTONUP => {
+                if matches!(overlay.mode, SelectionMode::Region) {
+                    let point = message_point(lparam, &overlay.screen);
+                    let _ = ReleaseCapture();
+                    if let Some(start) = overlay.drag_start {
+                        let rect = rect_from_points(start, point);
+                        if rect.width >= 4 && rect.height >= 4 {
+                            overlay.result = Some(clamp_rect_to_screen(&rect, &overlay.screen));
+                        }
+                    }
+                    DestroyWindow(hwnd);
+                }
+                0
+            }
+            WM_KEYDOWN => {
+                if wparam == VK_ESCAPE as usize {
+                    DestroyWindow(hwnd);
+                    return 0;
+                }
+                DefWindowProcW(hwnd, message, wparam, lparam)
+            }
+            WM_PAINT => {
+                paint_selection_overlay(hwnd, overlay);
+                0
+            }
+            WM_DESTROY => {
+                PostQuitMessage(0);
+                0
+            }
+            _ => DefWindowProcW(hwnd, message, wparam, lparam),
+        }
+    }
+
+    unsafe fn paint_selection_overlay(hwnd: HWND, overlay: &SelectionOverlay<'_>) {
+        let mut paint: PAINTSTRUCT = mem::zeroed();
+        let hdc = BeginPaint(hwnd, &mut paint);
+        if hdc.is_null() {
+            return;
+        }
+
+        let header_size = mem::size_of::<BITMAPINFOHEADER>();
+        if overlay.dib.len() >= header_size {
+            let info = overlay.dib.as_ptr() as *const BITMAPINFO;
+            let bits = overlay.dib.as_ptr().add(header_size) as *const c_void;
+            let _ = SetDIBitsToDevice(
+                hdc,
+                0,
+                0,
+                overlay.screen.width as u32,
+                overlay.screen.height as u32,
+                0,
+                0,
+                0,
+                overlay.screen.height as u32,
+                bits,
+                info,
+                DIB_RGB_COLORS,
+            );
+        }
+
+        let selected = match overlay.mode {
+            SelectionMode::Window { .. } => overlay.hover.as_ref().map(copy_rect),
+            SelectionMode::Region => overlay
+                .drag_start
+                .zip(overlay.drag_current)
+                .map(|(start, current)| rect_from_points(start, current)),
+        };
+        let selected = selected
+            .as_ref()
+            .map(|rect| clamp_rect_to_screen(rect, &overlay.screen));
+        dim_outside_rect(hdc, &overlay.screen, selected.as_ref());
+        if let Some(rect) = selected {
+            frame_rect(
+                hdc,
+                &screen_to_overlay_rect(&rect, &overlay.screen),
+                0x00ff_ffff,
+            );
+            let inner = inset_rect(&screen_to_overlay_rect(&rect, &overlay.screen), 1);
+            frame_rect(hdc, &inner, 0x0000_78ff);
+        }
+
+        EndPaint(hwnd, &paint);
+    }
+
+    unsafe fn dim_outside_rect(hdc: HDC, screen: &ScreenRect, selected: Option<&ScreenRect>) {
+        let brush = Brush::new(0x0000_0000);
+        let Some(selected) = selected else {
+            return;
+        };
+
+        let selected = screen_to_overlay_rect(selected, screen);
+        for rect in outside_rects(screen.width, screen.height, &selected) {
+            let _ = FillRect(hdc, &rect, brush.0);
+        }
+    }
+
+    unsafe fn frame_rect(hdc: HDC, rect: &RECT, color: u32) {
+        let brush = Brush::new(color);
+        let _ = FrameRect(hdc, rect, brush.0);
+    }
+
+    fn outside_rects(width: i32, height: i32, selected: &RECT) -> [RECT; 4] {
+        [
+            RECT {
+                left: 0,
+                top: 0,
+                right: width,
+                bottom: selected.top.max(0),
+            },
+            RECT {
+                left: 0,
+                top: selected.bottom.min(height),
+                right: width,
+                bottom: height,
+            },
+            RECT {
+                left: 0,
+                top: selected.top.max(0),
+                right: selected.left.max(0),
+                bottom: selected.bottom.min(height),
+            },
+            RECT {
+                left: selected.right.min(width),
+                top: selected.top.max(0),
+                right: width,
+                bottom: selected.bottom.min(height),
+            },
+        ]
+    }
+
+    fn wide_null(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    fn message_point(lparam: LPARAM, screen: &ScreenRect) -> (i32, i32) {
+        let x = (lparam as u32 & 0xffff) as i16 as i32 + screen.x;
+        let y = ((lparam as u32 >> 16) & 0xffff) as i16 as i32 + screen.y;
+        (x, y)
+    }
+
+    fn screen_rect_from_rect(rect: RECT) -> Option<ScreenRect> {
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
+        if width <= 0 || height <= 0 {
+            return None;
+        }
+        Some(ScreenRect {
+            x: rect.left,
+            y: rect.top,
+            width,
+            height,
+        })
+    }
+
+    fn rect_from_points(start: (i32, i32), end: (i32, i32)) -> ScreenRect {
+        let x = start.0.min(end.0);
+        let y = start.1.min(end.1);
+        ScreenRect {
+            x,
+            y,
+            width: (start.0 - end.0).abs(),
+            height: (start.1 - end.1).abs(),
+        }
+    }
+
+    fn rect_contains(rect: &ScreenRect, x: i32, y: i32) -> bool {
+        x >= rect.x && y >= rect.y && x < rect.x + rect.width && y < rect.y + rect.height
+    }
+
+    fn rect_intersects(rect: &ScreenRect, screen: &ScreenRect) -> bool {
+        rect.x < screen.x + screen.width
+            && rect.x + rect.width > screen.x
+            && rect.y < screen.y + screen.height
+            && rect.y + rect.height > screen.y
+    }
+
+    fn clamp_rect_to_screen(rect: &ScreenRect, screen: &ScreenRect) -> ScreenRect {
+        let left = rect.x.max(screen.x);
+        let top = rect.y.max(screen.y);
+        let right = (rect.x + rect.width).min(screen.x + screen.width);
+        let bottom = (rect.y + rect.height).min(screen.y + screen.height);
+        ScreenRect {
+            x: left,
+            y: top,
+            width: (right - left).max(1),
+            height: (bottom - top).max(1),
+        }
+    }
+
+    fn screen_to_overlay_rect(rect: &ScreenRect, screen: &ScreenRect) -> RECT {
+        RECT {
+            left: rect.x - screen.x,
+            top: rect.y - screen.y,
+            right: rect.x - screen.x + rect.width,
+            bottom: rect.y - screen.y + rect.height,
+        }
+    }
+
+    fn inset_rect(rect: &RECT, amount: i32) -> RECT {
+        RECT {
+            left: rect.left + amount,
+            top: rect.top + amount,
+            right: rect.right - amount,
+            bottom: rect.bottom - amount,
+        }
+    }
+
+    fn copy_rect(rect: &ScreenRect) -> ScreenRect {
+        ScreenRect {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+        }
+    }
+
+    struct Brush(HBRUSH);
+
+    impl Brush {
+        unsafe fn new(color: u32) -> Self {
+            Self(CreateSolidBrush(color))
+        }
+    }
+
+    impl Drop for Brush {
+        fn drop(&mut self) {
+            unsafe {
+                let _ = DeleteObject(self.0 as HGDIOBJ);
+            }
+        }
     }
 
     struct ScreenDc(HDC);

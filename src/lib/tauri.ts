@@ -799,6 +799,10 @@ type CommandMap = {
     args: { kind: StoredScreenshot["kind"] };
     result: StoredScreenshot;
   };
+  capture_interactive_region_screenshot_to_library: {
+    args: { kind: StoredScreenshot["kind"] };
+    result: StoredScreenshot;
+  };
   list_screenshots: {
     args: { request: { offset?: number; limit?: number } };
     result: ListScreenshotsResponse;
