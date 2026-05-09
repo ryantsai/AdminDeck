@@ -42,8 +42,8 @@ import type {
 } from "./types";
 import i18next from "./i18n/config";
 
-const LAYOUT_STORAGE_PREFIX = "admindeck.layout.";
-const TMUX_SESSION_STORAGE_PREFIX = "admindeck.tmuxSessions.";
+const LAYOUT_STORAGE_PREFIX = "kkterm.layout.";
+const TMUX_SESSION_STORAGE_PREFIX = "kkterm.tmuxSessions.";
 const TMUX_SESSION_ID_PATTERN = /^[^\s:;]+$/u;
 // Stable fallback slugs. New tmux session ids use ai.tmuxSessionLabels
 // for the active locale when those labels are safe for tmux.
@@ -153,7 +153,7 @@ const TMUX_SESSION_NAMES = [
 ];
 
 export function getTmuxSessionLabel(slug: string): string {
-  const match = /^(?:admindeck-)?([a-z]+)((?:[0-9]{2}|[0-9]{3})?)$/.exec(slug);
+  const match = /^(?:kkterm-)?([a-z]+)((?:[0-9]{2}|[0-9]{3})?)$/.exec(slug);
   const baseSlug = match?.[1] ?? slug;
   const suffix = match?.[2] ?? "";
   const index = TMUX_SESSION_NAMES.indexOf(baseSlug);

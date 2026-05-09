@@ -1,10 +1,10 @@
-# AdminDeck Release Notes and Gates
+# KKTerm Release Notes and Gates
 
 This document captures v0.1 release-facing posture that is not tied to a single feature milestone.
 
 ## No-Telemetry Posture
 
-AdminDeck is local-first by default.
+KKTerm is local-first by default.
 
 - The app does not include analytics, automatic crash upload, or background telemetry.
 - The status bar shows local host usage metrics and transient workspace notifications only. It does not upload telemetry and no longer presents debug timing budgets.
@@ -21,7 +21,7 @@ The current bundle is a local folder under the app data directory. It includes:
 
 - `README.txt` with sharing guidance.
 - `manifest.json` with app version, target OS/architecture, local performance snapshot, last native SSH terminal readiness when measured, and included-file list.
-- `admin-deck.log` when the local startup log is available.
+- `kkterm.log` when the local startup log is available.
 
 The bundle intentionally excludes by default:
 
@@ -41,10 +41,10 @@ Create the v0.1 portable package with:
 npm run package:portable
 ```
 
-The script builds the frontend and release executable, stages `admin-deck.exe`, license/readme files, release/performance docs, a portable package manifest, and a local-only portable readme, then writes:
+The script builds the frontend and release executable, stages `kkterm.exe`, license/readme files, release/performance docs, a portable package manifest, and a local-only portable readme, then writes:
 
-- `artifacts/admin-deck-<version>-windows-x64-portable.zip`
-- `artifacts/admin-deck-<version>-windows-x64-portable.zip.sha256`
+- `artifacts/kkterm-<version>-windows-x64-portable.zip`
+- `artifacts/kkterm-<version>-windows-x64-portable.zip.sha256`
 
 Portable ZIP installs are intentionally manual and do not self-update. The v0.2 updater scope is limited to normal forward updates for installed Windows builds.
 
@@ -58,10 +58,10 @@ npm run package:installer
 
 The script runs the Tauri NSIS bundle target without code signing, copies the generated setup executable to a stable release filename, and writes:
 
-- `artifacts/admin-deck-<version>-windows-x64-setup.exe`
-- `artifacts/admin-deck-<version>-windows-x64-setup.exe.sha256`
+- `artifacts/kkterm-<version>-windows-x64-setup.exe`
+- `artifacts/kkterm-<version>-windows-x64-setup.exe.sha256`
 
-The installer uses a current-user install mode by default, creates AdminDeck Start Menu entries, and downloads the WebView2 bootstrapper only if the target machine needs WebView2 during install. The v0.1 installer is unsigned until release signing is configured.
+The installer uses a current-user install mode by default, creates KKTerm Start Menu entries, and downloads the WebView2 bootstrapper only if the target machine needs WebView2 during install. The v0.1 installer is unsigned until release signing is configured.
 
 Smoke test the installer artifact with:
 
@@ -69,7 +69,7 @@ Smoke test the installer artifact with:
 npm run smoke:installer
 ```
 
-The smoke test verifies the release artifact checksum, silently installs into a temporary directory, confirms `admin-deck.exe` is present and non-empty, then silently uninstalls and removes only the temporary smoke-test directory it created.
+The smoke test verifies the release artifact checksum, silently installs into a temporary directory, confirms `kkterm.exe` is present and non-empty, then silently uninstalls and removes only the temporary smoke-test directory it created.
 
 ## GitHub Release
 

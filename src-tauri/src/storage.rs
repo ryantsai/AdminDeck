@@ -646,7 +646,7 @@ impl Storage {
         let mut zip = ZipWriter::new(export_file);
         let options =
             SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-        zip.start_file("admin-deck.sqlite3", options)
+        zip.start_file("kkterm.sqlite3", options)
             .map_err(|error| format!("failed to add database to export: {error}"))?;
         let mut temp_db = File::open(&temp_db_path).map_err(|error| {
             format!(
@@ -659,8 +659,8 @@ impl Storage {
         zip.start_file("manifest.json", options)
             .map_err(|error| format!("failed to add export manifest: {error}"))?;
         let manifest = serde_json::json!({
-            "product": "AdminDeck",
-            "format": "admindeck-settings-export",
+            "product": "KKTerm",
+            "format": "kkterm-settings-export",
             "version": 1,
             "createdAt": OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_else(|_| "unknown".to_string()),
         });
@@ -1775,7 +1775,7 @@ impl Storage {
     fn temp_database_path(&self, prefix: &str) -> PathBuf {
         let parent = self.db_path.parent().unwrap_or_else(|| Path::new("."));
         parent.join(format!(
-            "admin-deck-{prefix}-{}.sqlite3",
+            "kkterm-{prefix}-{}.sqlite3",
             timestamp_for_filename()
         ))
     }
@@ -1791,7 +1791,7 @@ impl Storage {
     fn next_backup_path(&self, backup_dir: &Path) -> Result<PathBuf, String> {
         let timestamp = timestamp_for_filename();
         for serial in 1..=999 {
-            let filename = format!("admin-deck-{timestamp}-{serial:03}.zip");
+            let filename = format!("kkterm-{timestamp}-{serial:03}.zip");
             let path = backup_dir.join(filename);
             if !path.exists() {
                 return Ok(path);
@@ -1896,10 +1896,10 @@ fn extract_imported_database(import_path: &Path, temp_import_path: &Path) -> Res
         )
     })?;
     let mut archive = ZipArchive::new(import_file)
-        .map_err(|error| format!("import file is not a valid AdminDeck export zip: {error}"))?;
+        .map_err(|error| format!("import file is not a valid KKTerm export zip: {error}"))?;
     let mut db_file = archive
-        .by_name("admin-deck.sqlite3")
-        .map_err(|_| "import zip does not contain admin-deck.sqlite3".to_string())?;
+        .by_name("kkterm.sqlite3")
+        .map_err(|_| "import zip does not contain kkterm.sqlite3".to_string())?;
     let mut contents = Vec::new();
     db_file
         .read_to_end(&mut contents)
@@ -2943,7 +2943,7 @@ fn make_folder_id(name: &str) -> String {
 }
 
 fn make_tmux_connection_id(connection_id: &str) -> String {
-    make_unique_id("admindeck", connection_id)
+    make_unique_id("kkterm", connection_id)
 }
 
 fn make_unique_id(fallback: &str, name: &str) -> String {
@@ -3865,7 +3865,7 @@ mod tests {
             .update_appearance_settings(AppearanceSettings {
                 app_font_family: "  \"Custom UI Font\", \"Segoe UI\", sans-serif  ".to_string(),
                 color_scheme: "dark".to_string(),
-                custom_font_path: Some("  C:/AdminDeck/fonts/custom.ttf  ".to_string()),
+                custom_font_path: Some("  C:/KKTerm/fonts/custom.ttf  ".to_string()),
             })
             .expect("appearance settings update");
 
@@ -3875,7 +3875,7 @@ mod tests {
         );
         assert_eq!(
             updated.custom_font_path.as_deref(),
-            Some("C:/AdminDeck/fonts/custom.ttf")
+            Some("C:/KKTerm/fonts/custom.ttf")
         );
 
         drop(storage);
@@ -4127,8 +4127,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system clock is after Unix epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("admin-deck-storage-{name}-{unique}"));
+        let dir = std::env::temp_dir().join(format!("kkterm-storage-{name}-{unique}"));
         fs::create_dir_all(&dir).expect("temp directory is created");
-        dir.join("admin-deck.sqlite3")
+        dir.join("kkterm.sqlite3")
     }
 }

@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-AdminDeck prioritizes high performance, fast startup, low idle memory, GPU-capable terminal rendering, and cross-platform desktop support. Electron would simplify embedded browser behavior, but it conflicts with the performance and package-size goals. A fully native UI per platform would slow delivery.
+KKTerm prioritizes high performance, fast startup, low idle memory, GPU-capable terminal rendering, and cross-platform desktop support. Electron would simplify embedded browser behavior, but it conflicts with the performance and package-size goals. A fully native UI per platform would slow delivery.
 
 ## Decision
 

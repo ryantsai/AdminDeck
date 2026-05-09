@@ -6,24 +6,24 @@ Accepted
 
 ## Context
 
-Milestone G wants AdminDeck to support user-installed extensions and to let the
+Milestone G wants KKTerm to support user-installed extensions and to let the
 AI Assistant help draft extensions. That cannot become a real creation or
-installation flow until AdminDeck defines the extension trust model first.
+installation flow until KKTerm defines the extension trust model first.
 
-AdminDeck is local-first and handles terminal commands, host metadata,
+KKTerm is local-first and handles terminal commands, host metadata,
 credentials, screenshots, SFTP paths, URL surfaces, and remote desktop surfaces.
 Generated or user-installed code must not get broad access to those boundaries
 by default.
 
 ## Decision
 
-AdminDeck extensions will start as signed-or-local user-installed packages with
+KKTerm extensions will start as signed-or-local user-installed packages with
 a manifest, explicit permissions, isolated storage, and user-mediated lifecycle
 actions.
 
 An extension package contains:
 
-- `admindeck.extension.json` manifest.
+- `kkterm.extension.json` manifest.
 - extension source or bundled assets.
 - optional UI contribution metadata.
 - optional command contribution metadata.
@@ -33,7 +33,7 @@ The manifest declares:
 
 - stable extension id.
 - name, version, publisher, and description.
-- requested AdminDeck API version.
+- requested KKTerm API version.
 - activation events.
 - UI contributions.
 - command contributions.
@@ -61,16 +61,16 @@ Initial permission families:
 Extensions cannot directly read terminal contents, raw screenshots, credentials,
 AI API keys, SSH private keys, or arbitrary SQLite tables. Extensions cannot run
 local commands, terminal input, SFTP write actions, install/update operations,
-or other state-changing host actions without an AdminDeck approval surface.
+or other state-changing host actions without an KKTerm approval surface.
 
 Install lifecycle:
 
 - User chooses an extension package.
-- AdminDeck validates the manifest and package shape.
-- AdminDeck shows permissions, activation events, update source, and trust
+- KKTerm validates the manifest and package shape.
+- KKTerm shows permissions, activation events, update source, and trust
   warnings.
 - User explicitly approves install.
-- AdminDeck stores package metadata in SQLite and package files under an app
+- KKTerm stores package metadata in SQLite and package files under an app
   data extension directory.
 - Extension is disabled by default if manifest validation fails, permissions are
   unknown, or the package requests an unsupported API version.
@@ -116,7 +116,7 @@ AI Assistant integration:
 
 ## Consequences
 
-The extension platform can grow without breaking AdminDeck's local-first trust
+The extension platform can grow without breaking KKTerm's local-first trust
 model. The first user-visible AI work can help produce reviewable extension
 drafts, while actual installable extension support remains gated by manifest
 validation, permission review, isolated storage, and a runtime boundary.

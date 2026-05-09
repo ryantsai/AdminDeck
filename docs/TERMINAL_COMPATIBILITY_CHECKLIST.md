@@ -13,7 +13,7 @@ Record these values with the completed checklist:
 | Field | Value |
 | --- | --- |
 | Date | |
-| AdminDeck build or commit | |
+| KKTerm build or commit | |
 | Windows version | |
 | Shell | PowerShell / cmd / Git Bash / WSL / other |
 | Session type | Local / native SSH |
@@ -44,11 +44,11 @@ The checklist passes when:
 | Open baseline local terminal | Open a new local terminal tab. Run `echo $PSVersionTable.PSVersion` in PowerShell or `echo %COMSPEC%` in cmd. | Prompt accepts input and output appears without layout shifts. | |
 | Open optional SSH terminal | Open a trusted native SSH Connection if available. | Session reaches a prompt and resize/status behavior remains normal. | |
 | Open tmux-enabled SSH terminal | Open an SSH Connection with `Use tmux sessions` enabled. | The Pane toolbar shows a `tmux` session tag before other Pane actions. The remote shell attaches to or creates the named tmux session when tmux is installed. | |
-| Open SSH terminal without remote tmux | Open a tmux-enabled SSH Connection to a host where `tmux` is not installed, or temporarily make `tmux` unavailable on a test host. | AdminDeck falls back to the normal remote shell and the terminal remains usable. | |
+| Open SSH terminal without remote tmux | Open a tmux-enabled SSH Connection to a host where `tmux` is not installed, or temporarily make `tmux` unavailable on a test host. | KKTerm falls back to the normal remote shell and the terminal remains usable. | |
 | Switch tabs without disconnecting | Open two terminal tabs. Run a long-lived safe command or leave a prompt active in the first tab, switch to the second tab, then switch back. Repeat with native SSH when available. | The first Session remains connected and usable after tab switches. No disconnect occurs unless the tab-strip close `X` is explicitly pressed or the process/remote host ends the Session. | |
-| Minimize/background idle SSH | Open a native SSH terminal and leave it idle at a prompt. Minimize AdminDeck or switch to another app for at least 2 minutes, then return. | The SSH Session remains connected and usable. For tmux-enabled Panes, the Pane should still be attached to the same friendly `admindeck-<sci-fi-name><number>` session id. | |
+| Minimize/background idle SSH | Open a native SSH terminal and leave it idle at a prompt. Minimize KKTerm or switch to another app for at least 2 minutes, then return. | The SSH Session remains connected and usable. For tmux-enabled Panes, the Pane should still be attached to the same friendly `kkterm-<sci-fi-name><number>` session id. | |
 | Split terminal panes | Split the terminal tab into at least two Panes. Run a different command in each Pane. | Focus, typing, and output stay isolated to the active Pane. | |
-| Resize app window | Resize the AdminDeck window while a prompt is visible. | Prompt redraws cleanly, with no duplicated prompt fragments or stale rows. | |
+| Resize app window | Resize the KKTerm window while a prompt is visible. | Prompt redraws cleanly, with no duplicated prompt fragments or stale rows. | |
 
 ## vim or nvim
 
@@ -59,7 +59,7 @@ Use `vim` or `nvim`; if neither is installed, record `Not installed` and skip th
 | Alternate screen entry and exit | Run `vim` or `nvim`, then `:q`. | Editor opens full-screen and exits back to the original shell view cleanly. | |
 | Edit and save | Open a temporary file, enter insert mode, type several lines, save with `:w`, then exit. | Insert mode, status line, command line, and saved file behavior are normal. | |
 | Arrow and Escape keys | Move around with arrows, enter insert mode, press Escape, then navigate again. | Mode changes and cursor movement are correct. | |
-| Resize while open | Resize the AdminDeck window while the editor is open. | Editor redraws to the new dimensions without visual corruption. | |
+| Resize while open | Resize the KKTerm window while the editor is open. | Editor redraws to the new dimensions without visual corruption. | |
 | Paste behavior | Paste multiple lines into insert mode. | Paste is inserted as text, not executed by the shell, and indentation is not unexpectedly mangled by terminal handling. | |
 
 ## tmux
@@ -71,8 +71,8 @@ If `tmux` is unavailable on the local shell, run this section in SSH or record `
 | Start and exit | Run `tmux`, then exit with `exit` or detach/kill the test session. | tmux starts full-screen and returns to the shell cleanly. | |
 | Split panes | In tmux, create horizontal and vertical splits. | tmux panes render with correct borders and no stale text. | |
 | Switch panes | Move focus between tmux panes using the configured tmux prefix shortcuts. | Input goes to the selected tmux pane only. | |
-| Resize propagation | Resize the AdminDeck window while tmux is open. | tmux recalculates layout correctly. | |
-| Mouse mode | Use an AdminDeck-launched tmux SSH Pane or enable tmux mouse mode, then click panes and scroll. | tmux mouse focus and internal scrollback behavior work; a native xterm scrollbar is not expected while tmux owns the alternate buffer. | |
+| Resize propagation | Resize the KKTerm window while tmux is open. | tmux recalculates layout correctly. | |
+| Mouse mode | Use an KKTerm-launched tmux SSH Pane or enable tmux mouse mode, then click panes and scroll. | tmux mouse focus and internal scrollback behavior work; a native xterm scrollbar is not expected while tmux owns the alternate buffer. | |
 
 ## SSH tmux Resume
 
@@ -82,8 +82,8 @@ Run these checks against a trusted SSH Connection. If the remote host has no `tm
 | --- | --- | --- | --- |
 | Default setting | Create a new SSH Connection. | `Use tmux sessions` is enabled by default. | |
 | Pane session tag | Open the SSH Connection. | Each terminal Pane toolbar shows its tmux session id to the left of the Pane actions. | |
-| Resume same Pane session | In a tmux-enabled Pane, run a safe long-lived command or create a tmux window, close the AdminDeck Tab, then reopen the same Connection. | The Pane attaches to the same named tmux session and the remote tmux state is still present. | |
-| Recover after idle transport close | In a tmux-enabled native SSH Pane, simulate or wait for a transient transport close, then return to the Pane. | AdminDeck silently attempts the bounded reattach and the Pane returns to the same tmux session id. If the retry window is exhausted, the failure remains quiet after startup and no unrelated Sessions are closed. | |
+| Resume same Pane session | In a tmux-enabled Pane, run a safe long-lived command or create a tmux window, close the KKTerm Tab, then reopen the same Connection. | The Pane attaches to the same named tmux session and the remote tmux state is still present. | |
+| Recover after idle transport close | In a tmux-enabled native SSH Pane, simulate or wait for a transient transport close, then return to the Pane. | KKTerm silently attempts the bounded reattach and the Pane returns to the same tmux session id. If the retry window is exhausted, the failure remains quiet after startup and no unrelated Sessions are closed. | |
 | Split Pane session ids | Split the SSH terminal into at least two Panes. | Each Pane gets a distinct tmux session id and input stays isolated to the active Pane. | |
 | List tmux sessions | Click the tmux session tag. | The popover lists remote tmux sessions and clearly marks attached vs detached sessions. | |
 | Close tmux session | In the tmux session popover, close a detached test session with the `X` button. | The remote tmux session is killed and the list refreshes without closing unrelated terminal Sessions. | |
@@ -98,7 +98,7 @@ Use whichever is installed. If both are installed, prefer running both.
 | Full-screen redraw | Run `htop` or `btop`. | Screen updates continuously without flicker severe enough to impair use. | |
 | Keyboard navigation | Use arrows/PageUp/PageDown or app-specific navigation. | Selection and scrolling respond normally. | |
 | Mouse interaction | Click rows or controls if the app supports mouse input. | Clicks are delivered accurately. | |
-| Resize while active | Resize the AdminDeck window. | Layout redraws without broken columns or stale regions. | |
+| Resize while active | Resize the KKTerm window. | Layout redraws without broken columns or stale regions. | |
 | Exit restore | Quit the app. | Original shell prompt is restored cleanly. | |
 
 ## git and Pager Behavior
@@ -123,7 +123,7 @@ Run these checks in a Node project.
 | Long output scrollback | Run a command that prints enough lines to fill scrollback, such as a verbose test or build. | Scrollback remains available after the command completes. | |
 | Interactive interrupt | Start a long-running script such as a dev server, then press Ctrl+C. | Process receives interrupt and returns to the prompt. | |
 | Resize during output | Resize the window while npm output is streaming. | New output uses the new terminal width without corrupting existing visible rows. | |
-| Multiline paste confirmation | Paste a multi-line command while confirmation is enabled. | AdminDeck prompts before sending the paste to the Session. | |
+| Multiline paste confirmation | Paste a multi-line command while confirmation is enabled. | KKTerm prompts before sending the paste to the Session. | |
 
 ## cargo
 
@@ -135,7 +135,7 @@ Run these checks in a Rust project.
 | Test output | Run `cargo test`. | Test status lines render correctly and prompt returns. | |
 | Colored diagnostics | Trigger or inspect colored compiler/test output if available. | ANSI color and formatting are readable and do not leak escape text. | |
 | Long command interrupt | Run a safe long command, then press Ctrl+C. | Process interrupts and the Session remains usable. | |
-| Resize during cargo output | Resize the AdminDeck window while cargo is running. | Output continues without prompt or line corruption. | |
+| Resize during cargo output | Resize the KKTerm window while cargo is running. | Output continues without prompt or line corruption. | |
 
 ## Pane Scrollback Search
 

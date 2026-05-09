@@ -398,7 +398,7 @@ fn save_dib_to_library(
     let jpeg = platform::dib_to_jpeg_bytes(dib, width, height)?;
     let captured_at = now_millis();
     let normalized_kind = normalize_kind(&kind);
-    let file_name = format!("AdminDeck-{normalized_kind}-{captured_at}.jpg");
+    let file_name = format!("KKTerm-{normalized_kind}-{captured_at}.jpg");
     let path = folder.join(file_name);
     fs::write(&path, jpeg).map_err(|error| format!("failed to save screenshot: {error}"))?;
     stored_screenshot_from_path(&folder, path)
@@ -892,7 +892,7 @@ mod platform {
         mode: SelectionMode,
     ) -> Result<Option<ScreenRect>, String> {
         unsafe {
-            let class_name = wide_null("AdminDeckScreenshotSelection");
+            let class_name = wide_null("KKTermScreenshotSelection");
             let cursor = LoadCursorW(ptr::null_mut(), IDC_CROSS);
             let wnd_class = WNDCLASSW {
                 style: CS_HREDRAW | CS_VREDRAW,

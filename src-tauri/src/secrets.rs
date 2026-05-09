@@ -2,7 +2,7 @@ use keyring_core::{Entry, Error};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
-const SERVICE_NAME: &str = "com.admindeck.app";
+const SERVICE_NAME: &str = "com.kkterm.app";
 
 pub struct Secrets {
     backend: Option<String>,

@@ -1490,13 +1490,13 @@ function FilePane({
     onSelectionChange?.(names);
     event.dataTransfer.effectAllowed = "copy";
     event.dataTransfer.setData(
-      "application/x-admindeck-sftp-items",
+      "application/x-kkterm-sftp-items",
       JSON.stringify({ side, names }),
     );
   }
 
   function handleDragOver(event: ReactDragEvent<HTMLDivElement>) {
-    if (!Array.from(event.dataTransfer.types).includes("application/x-admindeck-sftp-items")) {
+    if (!Array.from(event.dataTransfer.types).includes("application/x-kkterm-sftp-items")) {
       return;
     }
 
@@ -1511,7 +1511,7 @@ function FilePane({
 
     try {
       const payload = JSON.parse(
-        event.dataTransfer.getData("application/x-admindeck-sftp-items"),
+        event.dataTransfer.getData("application/x-kkterm-sftp-items"),
       ) as { side?: FilePaneSide; names?: string[] };
       if (payload.side && payload.side !== side && payload.names?.length) {
         onDropTransfer?.(side, payload.names);

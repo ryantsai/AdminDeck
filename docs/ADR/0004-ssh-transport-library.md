@@ -9,11 +9,11 @@ Accepted
 Milestone B needs an in-process SSH implementation for terminal channels,
 authentication, host-key verification, resize events, and later SFTP reuse.
 The existing Milestone A terminal path may launch the system `ssh` binary as a
-debug/fallback path, but the product direction requires AdminDeck to own the
+debug/fallback path, but the product direction requires KKTerm to own the
 SSH lifecycle in Rust so host-key prompts, credentials, settings, and SFTP can
 share one local trust model.
 
-The library choice must fit AdminDeck's MIT project, avoid GPL runtime
+The library choice must fit KKTerm's MIT project, avoid GPL runtime
 dependencies, work on Windows first, and leave room for macOS and Linux.
 
 ## Decision
@@ -35,15 +35,15 @@ Current evaluated candidates:
 
 ## Consequences
 
-AdminDeck can build SSH behavior around one in-process Rust transport instead
+KKTerm can build SSH behavior around one in-process Rust transport instead
 of shelling out for the main product path. Host-key verification, password
 auth, key-file auth, terminal channel allocation, resize propagation, and SFTP
-reuse can be implemented behind an AdminDeck transport boundary.
+reuse can be implemented behind an KKTerm transport boundary.
 
 The primary risk is that `russh` may expose lower-level async APIs than the app
 needs for early UX. If that blocks v0.1, revisit `ssh2` for a narrower client
-implementation while preserving the same AdminDeck transport boundary.
+implementation while preserving the same KKTerm transport boundary.
 
 The system `ssh` path remains useful for diagnostics and parity checks, but it
-must not silently bypass AdminDeck's host-key or credential model in the primary
+must not silently bypass KKTerm's host-key or credential model in the primary
 workflow.

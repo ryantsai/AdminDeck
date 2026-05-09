@@ -742,7 +742,7 @@ pub(crate) fn remote_tmux_resume_command(
         .map(|directory| format!("cd -- {} && ", shell_single_quote(directory)))
         .unwrap_or_default();
     format!(
-        "if command -v tmux >/dev/null 2>&1; then {cd_command}exec tmux new-session -A -s {} \\; set-option mouse on \\; set-option set-clipboard on \\; set-option history-limit {}; else {cd_command}printf '\\r\\n[AdminDeck: tmux not found, using normal shell]\\r\\n'; exec \"${{SHELL:-sh}}\" -i; fi",
+        "if command -v tmux >/dev/null 2>&1; then {cd_command}exec tmux new-session -A -s {} \\; set-option mouse on \\; set-option set-clipboard on \\; set-option history-limit {}; else {cd_command}printf '\\r\\n[KKTerm: tmux not found, using normal shell]\\r\\n'; exec \"${{SHELL:-sh}}\" -i; fi",
         shell_single_quote(session_id),
         clamp_tmux_history_limit(history_limit),
     )
@@ -1114,13 +1114,13 @@ mod tests {
         let mut request = native_terminal_request();
 
         request.use_tmux = true;
-        request.tmux_session_id = Some("admindeck-test".to_string());
+        request.tmux_session_id = Some("kkterm-test".to_string());
         assert!(can_resume_tmux_terminal(&request));
 
         request.tmux_session_id = Some("  ".to_string());
         assert!(!can_resume_tmux_terminal(&request));
 
-        request.tmux_session_id = Some("admindeck-test".to_string());
+        request.tmux_session_id = Some("kkterm-test".to_string());
         request.use_tmux = false;
         assert!(!can_resume_tmux_terminal(&request));
     }
@@ -1201,7 +1201,7 @@ mod tests {
 
     #[test]
     fn tmux_resume_command_enables_mouse_mode_for_internal_scrollback() {
-        let cmd = remote_tmux_resume_command(None, "admindeck-test", 5_000);
+        let cmd = remote_tmux_resume_command(None, "kkterm-test", 5_000);
         assert!(
             cmd.contains("\\; set-option mouse on"),
             "command must enable tmux mouse mode so tmux owns alternate-buffer scrolling: {cmd}"
@@ -1210,7 +1210,7 @@ mod tests {
 
     #[test]
     fn tmux_resume_command_enables_mouse_mode_with_initial_directory() {
-        let cmd = remote_tmux_resume_command(Some("/home/user"), "admindeck-test", 5_000);
+        let cmd = remote_tmux_resume_command(Some("/home/user"), "kkterm-test", 5_000);
         assert!(
             cmd.contains("\\; set-option mouse on"),
             "command must enable tmux mouse mode even with initial directory: {cmd}"
@@ -1219,16 +1219,16 @@ mod tests {
 
     #[test]
     fn tmux_resume_command_sets_default_history_limit() {
-        let cmd = remote_tmux_resume_command(None, "admindeck-test", 5_000);
+        let cmd = remote_tmux_resume_command(None, "kkterm-test", 5_000);
         assert!(
             cmd.contains("\\; set-option history-limit 5000"),
-            "command must keep tmux pane history aligned with AdminDeck's default terminal buffer: {cmd}"
+            "command must keep tmux pane history aligned with KKTerm's default terminal buffer: {cmd}"
         );
     }
 
     #[test]
     fn tmux_resume_command_enables_osc52_clipboard_sync() {
-        let cmd = remote_tmux_resume_command(None, "admindeck-test", 5_000);
+        let cmd = remote_tmux_resume_command(None, "kkterm-test", 5_000);
         assert!(
             cmd.contains("\\; set-option set-clipboard on"),
             "command must enable tmux OSC 52 clipboard sync for new sessions: {cmd}"
@@ -1237,7 +1237,7 @@ mod tests {
 
     #[test]
     fn tmux_resume_command_uses_requested_history_limit() {
-        let cmd = remote_tmux_resume_command(None, "admindeck-test", 12_000);
+        let cmd = remote_tmux_resume_command(None, "kkterm-test", 12_000);
         assert!(
             cmd.contains("\\; set-option history-limit 12000"),
             "command must apply the SSH buffer setting to tmux history: {cmd}"
@@ -1262,7 +1262,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires a trusted SSH server and credentials in ADMINDECK_SSH_* environment variables"]
+    #[ignore = "requires a trusted SSH server and credentials in KKTERM_SSH_* environment variables"]
     fn measure_native_ssh_terminal_readiness_after_auth() {
         let config =
             SshReadinessMeasurementConfig::from_env().expect("measurement env is configured");
@@ -1275,7 +1275,7 @@ mod tests {
             .block_on(measure_terminal_readiness_after_auth(config))
             .expect("SSH readiness measurement succeeds");
 
-        println!("AdminDeck SSH terminal ready after auth: {terminal_ready_ms} ms");
+        println!("KKTerm SSH terminal ready after auth: {terminal_ready_ms} ms");
         assert!(
             terminal_ready_ms <= 150,
             "SSH terminal readiness budget is <= 150 ms after auth"
@@ -1297,42 +1297,42 @@ mod tests {
 
     impl SshReadinessMeasurementConfig {
         fn from_env() -> Result<Self, String> {
-            let host = required_measurement_env("ADMINDECK_SSH_HOST")?;
-            let user = env::var("ADMINDECK_SSH_USER")
+            let host = required_measurement_env("KKTERM_SSH_HOST")?;
+            let user = env::var("KKTERM_SSH_USER")
                 .ok()
                 .filter(|value| !value.trim().is_empty())
                 .or_else(|| env::var("USERNAME").ok())
                 .or_else(|| env::var("USER").ok())
-                .ok_or_else(|| "set ADMINDECK_SSH_USER for the measurement user".to_string())?;
-            let port = optional_measurement_env("ADMINDECK_SSH_PORT")
+                .ok_or_else(|| "set KKTERM_SSH_USER for the measurement user".to_string())?;
+            let port = optional_measurement_env("KKTERM_SSH_PORT")
                 .map(|value| {
                     value.parse::<u16>().map_err(|error| {
-                        format!("ADMINDECK_SSH_PORT must be a valid TCP port: {error}")
+                        format!("KKTERM_SSH_PORT must be a valid TCP port: {error}")
                     })
                 })
                 .transpose()?
                 .unwrap_or(22);
-            let known_hosts_path = optional_measurement_env("ADMINDECK_SSH_KNOWN_HOSTS_PATH")
+            let known_hosts_path = optional_measurement_env("KKTERM_SSH_KNOWN_HOSTS_PATH")
                 .map(PathBuf::from)
                 .or_else(default_app_known_hosts_path)
                 .ok_or_else(|| {
-                    "set ADMINDECK_SSH_KNOWN_HOSTS_PATH to AdminDeck's trusted known-hosts file"
+                    "set KKTERM_SSH_KNOWN_HOSTS_PATH to KKTerm's trusted known-hosts file"
                         .to_string()
                 })?;
             let auth = measurement_auth_from_env()?;
-            let cols = optional_measurement_env("ADMINDECK_SSH_COLS")
+            let cols = optional_measurement_env("KKTERM_SSH_COLS")
                 .and_then(|value| value.parse::<u16>().ok())
                 .unwrap_or(80);
-            let rows = optional_measurement_env("ADMINDECK_SSH_ROWS")
+            let rows = optional_measurement_env("KKTERM_SSH_ROWS")
                 .and_then(|value| value.parse::<u16>().ok())
                 .unwrap_or(24);
-            let pixel_width = optional_measurement_env("ADMINDECK_SSH_PIXEL_WIDTH")
+            let pixel_width = optional_measurement_env("KKTERM_SSH_PIXEL_WIDTH")
                 .and_then(|value| value.parse::<u16>().ok())
                 .unwrap_or(0);
-            let pixel_height = optional_measurement_env("ADMINDECK_SSH_PIXEL_HEIGHT")
+            let pixel_height = optional_measurement_env("KKTERM_SSH_PIXEL_HEIGHT")
                 .and_then(|value| value.parse::<u16>().ok())
                 .unwrap_or(0);
-            let initial_directory = optional_measurement_env("ADMINDECK_SSH_INITIAL_DIRECTORY");
+            let initial_directory = optional_measurement_env("KKTERM_SSH_INITIAL_DIRECTORY");
 
             Ok(Self {
                 host,
@@ -1398,10 +1398,10 @@ mod tests {
     }
 
     fn measurement_auth_from_env() -> Result<NativeSshAuth, String> {
-        let auth_method = optional_measurement_env("ADMINDECK_SSH_AUTH").unwrap_or_else(|| {
-            if optional_measurement_env("ADMINDECK_SSH_PASSWORD").is_some() {
+        let auth_method = optional_measurement_env("KKTERM_SSH_AUTH").unwrap_or_else(|| {
+            if optional_measurement_env("KKTERM_SSH_PASSWORD").is_some() {
                 "password".to_string()
-            } else if optional_measurement_env("ADMINDECK_SSH_KEY_PATH").is_some() {
+            } else if optional_measurement_env("KKTERM_SSH_KEY_PATH").is_some() {
                 "keyFile".to_string()
             } else {
                 "agent".to_string()
@@ -1411,12 +1411,12 @@ mod tests {
         match auth_method.trim() {
             "agent" | "sshAgent" | "ssh-agent" => Ok(NativeSshAuth::Agent),
             "keyFile" | "key-file" | "key" => Ok(NativeSshAuth::KeyFile {
-                key_path: required_measurement_env("ADMINDECK_SSH_KEY_PATH")?,
+                key_path: required_measurement_env("KKTERM_SSH_KEY_PATH")?,
             }),
             "password" => Ok(NativeSshAuth::Password {
-                password: required_measurement_env("ADMINDECK_SSH_PASSWORD")?,
+                password: required_measurement_env("KKTERM_SSH_PASSWORD")?,
             }),
-            _ => Err("ADMINDECK_SSH_AUTH must be agent, keyFile, or password".to_string()),
+            _ => Err("KKTERM_SSH_AUTH must be agent, keyFile, or password".to_string()),
         }
     }
 
@@ -1435,11 +1435,11 @@ mod tests {
         if cfg!(target_os = "windows") {
             env::var_os("APPDATA")
                 .map(PathBuf::from)
-                .map(|path| path.join("com.admindeck.app").join("ssh_known_hosts"))
+                .map(|path| path.join("com.kkterm.app").join("ssh_known_hosts"))
         } else if let Some(data_home) = env::var_os("XDG_DATA_HOME") {
             Some(
                 PathBuf::from(data_home)
-                    .join("com.admindeck.app")
+                    .join("com.kkterm.app")
                     .join("ssh_known_hosts"),
             )
         } else {
@@ -1447,7 +1447,7 @@ mod tests {
                 PathBuf::from(home)
                     .join(".local")
                     .join("share")
-                    .join("com.admindeck.app")
+                    .join("com.kkterm.app")
                     .join("ssh_known_hosts")
             })
         }
@@ -1458,7 +1458,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system clock is after Unix epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("admin-deck-known-hosts-{name}-{unique}"));
+        let dir = std::env::temp_dir().join(format!("kkterm-known-hosts-{name}-{unique}"));
         fs::create_dir_all(&dir).expect("temp directory is created");
         dir.join("known_hosts")
     }

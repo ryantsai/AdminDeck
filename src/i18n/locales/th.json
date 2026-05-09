@@ -69,7 +69,7 @@
     "importSettingsComplete": "นำเข้าการตั้งค่าแล้ว ข้อมูลสำรองฐานข้อมูลก่อนหน้า: {{filename}}",
     "openDatabaseFolder": "เปิดโฟลเดอร์ฐานข้อมูล",
     "settingsDataActions": "การดำเนินการสำรองและนำเข้าการตั้งค่า",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "ค่าเริ่มต้นใช้ src/assets/fonts/inter/web/InterVariable.woff2",
     "aiProvider": "ผู้ให้บริการ AI",
     "provider": "ผู้ให้บริการ",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "ข้อมูลและข้อมูลรับรอง URL",
     "savedWebsitePasswords": "รหัสผ่านเว็บไซต์ที่บันทึกไว้",
-    "savedWebsitePasswordsHint": "รหัสผ่านถูกเก็บในพวงกุญแจของระบบปฏิบัติการ AdminDeck เก็บคอนเนคชัน URL ชื่อผู้ใช้ และตัวเลือกฟิลด์ที่ตรวจพบใน SQLite เพื่อให้การเติมอัตโนมัติสามารถระบุฟิลด์เดียวกันได้โดยไม่ส่งฟอร์ม",
+    "savedWebsitePasswordsHint": "รหัสผ่านถูกเก็บในพวงกุญแจของระบบปฏิบัติการ KKTerm เก็บคอนเนคชัน URL ชื่อผู้ใช้ และตัวเลือกฟิลด์ที่ตรวจพบใน SQLite เพื่อให้การเติมอัตโนมัติสามารถระบุฟิลด์เดียวกันได้โดยไม่ส่งฟอร์ม",
     "noSavedWebsitePasswords": "ยังไม่มีรหัสผ่านเว็บไซต์ที่บันทึกไว้",
     "urlPasswordDeleted": "ลบรหัสผ่านเว็บไซต์ที่บันทึกแล้ว",
     "urlPasswordDetails": "ผู้ใช้: {{username}} · อัปเดต: {{updatedAt}}",
@@ -203,7 +203,7 @@
     "urlSettingsSaved": "บันทึกการตั้งค่า URL แล้ว",
     "aiToolsTitle": "เครื่องมือผู้ช่วย",
     "aiToolsDescription": "เลือกเครื่องมือในตัวที่ผู้ช่วย AI สามารถเรียกใช้ขณะตอบคำถาม ปิดเครื่องมือที่มีความเสี่ยงไว้ยกเว้นคุณจำเป็นต้องใช้",
-    "aiToolsSafety": "มาตรการป้องกัน: เครื่องมือไฟล์ถูกจำกัดไว้ในข้อมูลแอป AdminDeck คำสั่งเชลล์รันจากข้อมูลแอปเท่านั้น และคำขอลบ/ทำลายจะถูกบล็อกจนกว่าจะมีพรอมต์อนุมัติที่ชัดเจนในอนาคต",
+    "aiToolsSafety": "มาตรการป้องกัน: เครื่องมือไฟล์ถูกจำกัดไว้ในข้อมูลแอป KKTerm คำสั่งเชลล์รันจากข้อมูลแอปเท่านั้น และคำขอลบ/ทำลายจะถูกบล็อกจนกว่าจะมีพรอมต์อนุมัติที่ชัดเจนในอนาคต",
     "aiTools": {
        "currentTime": {
          "label": "เวลาปัจจุบัน",
@@ -219,15 +219,15 @@
        },
        "appDataFileSearch": {
          "label": "ค้นหาไฟล์ข้อมูลแอป",
-         "description": "ค้นหาไฟล์ตามชื่อภายในข้อมูลแอปของ AdminDeck เท่านั้น"
+          "description": "ค้นหาไฟล์ตามชื่อภายในข้อมูลแอปของ KKTerm เท่านั้น"
        },
        "appDataFileRead": {
          "label": "อ่านไฟล์ข้อมูลแอป",
-         "description": "อ่านไฟล์ข้อความขนาดเล็กภายในข้อมูลแอปของ AdminDeck เท่านั้น"
+          "description": "อ่านไฟล์ข้อความขนาดเล็กภายในข้อมูลแอปของ KKTerm เท่านั้น"
        },
        "shellCommand": {
          "label": "คำสั่ง PowerShell / batch",
-         "description": "รันคำสั่ง PowerShell หรือ batch แบบไม่ทำลายจากข้อมูลแอป AdminDeck เท่านั้น"
+          "description": "รันคำสั่ง PowerShell หรือ batch แบบไม่ทำลายจากข้อมูลแอป KKTerm เท่านั้น"
        }
     },
     "portRedirect": "การเปลี่ยนเส้นทางพอร์ต",
@@ -237,7 +237,7 @@
     "allowLocalOsc52Clipboard": "อนุญาตให้ OSC 52 เขียนคลิปบอร์ดในเทอร์มินัลภายใน",
     "allowSshOsc52Clipboard": "อนุญาตให้ OSC 52 เขียนคลิปบอร์ดใน SSH",
     "allowClipboardRead": "อนุญาตให้อ่านคลิปบอร์ดสำหรับวาง",
-    "allowClipboardReadHint": "อนุญาตให้พื้นผิว WebView2 ของ AdminDeck ใช้สิทธิ์ clipboard-read โดยไม่แสดงพรอมต์วางแบบเนทีฟ",
+    "allowClipboardReadHint": "อนุญาตให้พื้นผิว WebView2 ของ KKTerm ใช้สิทธิ์ clipboard-read โดยไม่แสดงพรอมต์วางแบบเนทีฟ",
     "clipboardReadSaved": "บันทึกการตั้งค่าการอ่านคลิปบอร์ดแล้ว",
     "appSlogan": "พื้นที่ทำงานระบบดูแลแบบ local-first",
     "capabilityToolCalling": "เครื่องมือ",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "ตัวอย่าง {{label}}",
     "imageInputNotSupported": "โมเดลนี้ไม่รองรับการป้อนรูปภาพ จึงจะไม่ส่งภาพหน้าจอที่วาง",
     "apiKeyRequired": "{{provider}} ต้องใช้คีย์ API ก่อนที่ผู้ช่วย AI จะสนทนาได้",
-    "extensionDraftPrompt": "สร้างแบบร่างส่วนขยาย AdminDeck สำหรับ: ",
+    "extensionDraftPrompt": "สร้างแบบร่างส่วนขยาย KKTerm สำหรับ: ",
     "modelRequired": "จำเป็นต้องระบุโมเดล",
     "providerEndpointRequired": "จำเป็นต้องระบุจุดสิ้นสุดของผู้ให้บริการ"
   },

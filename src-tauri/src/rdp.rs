@@ -744,7 +744,7 @@ mod platform {
             let _ = set_property_bool(&advanced, "EnableCredSspSupport", true);
             // Match mstsc's Local Resources defaults closely enough for embedded sessions:
             // Windows shortcut replacements (including Ctrl+Alt+End for SAS) must be routed to
-            // the remote host, while higher-risk device redirects stay disabled until AdminDeck
+            // the remote host, while higher-risk device redirects stay disabled until KKTerm
             // exposes durable Connection settings for them.
             let _ = set_property_bool(&advanced, "RedirectClipboard", true);
             let _ = set_property_bool(&advanced, "RedirectDrives", false);

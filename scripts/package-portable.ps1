@@ -12,14 +12,14 @@ $PackageJsonPath = Join-Path $RepoRoot "package.json"
 $Package = Get-Content -Raw $PackageJsonPath | ConvertFrom-Json
 $Version = $Package.version
 $TargetTriple = "windows-x64"
-$PackageName = "admin-deck-$Version-$TargetTriple-portable"
+$PackageName = "kkterm-$Version-$TargetTriple-portable"
 $TargetDir = Join-Path $RepoRoot "src-tauri\target"
 $PortableRoot = Join-Path $TargetDir "portable"
 $StageDir = Join-Path $PortableRoot $PackageName
 $ResolvedOutputDir = Join-Path $RepoRoot $OutputDir
 $ZipPath = Join-Path $ResolvedOutputDir "$PackageName.zip"
 $ChecksumPath = "$ZipPath.sha256"
-$ExePath = Join-Path $RepoRoot "src-tauri\target\release\admin-deck.exe"
+$ExePath = Join-Path $RepoRoot "src-tauri\target\release\kkterm.exe"
 
 function Assert-ChildPath {
     param(
@@ -58,7 +58,7 @@ if (Test-Path $StageDir) {
 }
 New-Item -ItemType Directory -Force -Path $StageDir | Out-Null
 
-Copy-Item -LiteralPath $ExePath -Destination (Join-Path $StageDir "admin-deck.exe")
+Copy-Item -LiteralPath $ExePath -Destination (Join-Path $StageDir "kkterm.exe")
 Copy-Item -LiteralPath (Join-Path $RepoRoot "LICENSE") -Destination (Join-Path $StageDir "LICENSE")
 Copy-Item -LiteralPath (Join-Path $RepoRoot "README.md") -Destination (Join-Path $StageDir "README.md")
 
@@ -68,9 +68,9 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot "docs\RELEASE.md") -Destination (Joi
 Copy-Item -LiteralPath (Join-Path $RepoRoot "docs\PERFORMANCE.md") -Destination (Join-Path $DocsDir "PERFORMANCE.md")
 
 $PortableReadme = @"
-AdminDeck portable package
+KKTerm portable package
 
-Run admin-deck.exe to start the app. This package is local-first and does not
+Run kkterm.exe to start the app. This package is local-first and does not
 upload telemetry. Durable Connection metadata remains in the local app data
 directory, and secrets remain in the OS keychain.
 
@@ -91,12 +91,12 @@ $StagedFiles = Get-ChildItem -Path $StageDir -File -Recurse |
 $ManifestFiles = @($StagedFiles + "manifest.json") | Sort-Object
 
 $Manifest = [ordered]@{
-    productName = "AdminDeck"
+    productName = "KKTerm"
     version = $Version
     packageType = "windows-portable-zip"
     target = $TargetTriple
     createdAtUtc = (Get-Date).ToUniversalTime().ToString("o")
-    entrypoint = "admin-deck.exe"
+    entrypoint = "kkterm.exe"
     telemetry = "off"
     portableUpdateBehavior = "self-update-disabled"
     files = $ManifestFiles

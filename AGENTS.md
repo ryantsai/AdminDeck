@@ -2,7 +2,7 @@
 
 ## Project Shape
 
-AdminDeck is a Windows-first, local-first Tauri v2 desktop app — Rust backend, React/TypeScript frontend. Product direction: `docs/PRD.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/ADR/`. Before changing behavior or terminology, read `CONTEXT.md` and preserve its domain boundaries.
+KKTerm is a Windows-first, local-first Tauri v2 desktop app — Rust backend, React/TypeScript frontend. Product direction: `docs/PRD.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/ADR/`. Before changing behavior or terminology, read `CONTEXT.md` and preserve its domain boundaries.
 
 ## Domain Language
 
@@ -16,12 +16,12 @@ Use **Connection** (not "profile") for stored openable resources.
 ## Engineering Defaults
 
 - Prefer existing repo patterns over new abstractions.
-- AdminDeck is a desktop-only app. Optimize layouts for desktop windows and Tauri/WebView2 runtime behavior; do not spend implementation or QA time on mobile viewport layouts unless the user explicitly requests mobile support.
+- KKTerm is a desktop-only app. Optimize layouts for desktop windows and Tauri/WebView2 runtime behavior; do not spend implementation or QA time on mobile viewport layouts unless the user explicitly requests mobile support.
 - SQLite stores non-secret durable data; OS keychain stores secrets; terminal contents are not logged by default.
 - Do not put live session state into the durable connection model. Keep UI state (tabs, selected panes) in the frontend workspace layer unless persistence is required.
 - Keep Tauri command calls behind typed wrappers in `src/lib/tauri.ts`.
 - Do not add Tauri app-window close listeners/hooks. In this app, `CloseRequested`, `onCloseRequested`, `tauri://close-requested`, `prevent_close`, and close-confirmation hooks have repeatedly broken the native Windows title-bar close button in Tauri v2. Keep the main window close path native and unhooked. Persist window/layout state during normal resize/move/settings flows instead of doing work during close.
-- Automatic database backups must not run from app-window close. The supported shape is startup/manual backup ZIP creation using the same importable AdminDeck settings export format.
+- Automatic database backups must not run from app-window close. The supported shape is startup/manual backup ZIP creation using the same importable KKTerm settings export format.
 - For debugging builds, prefer local debug logs, console output, or existing diagnostics plumbing over adding visible in-app indicators/status text. Add user-visible debug indicators only when explicitly requested or when they are part of a real product feature.
 - Activity rail icon labels must use the shared app-owned `RailTooltip` in `src/App.tsx`, not native `title` tooltips. Keep rail popups unified with delayed hover/focus behavior and the light native-style bordered popup treatment so browser-native tooltips do not appear beside app tooltips. Wiki, Settings, and other non-workspace pages must stay inset from the 48px rail and below the rail stacking layer so rail hover/focus tooltips still work while those pages are active.
 - User-facing transient status messages belong in the bottom workspace status bar. Use the shared `showWorkspaceStatus` store action, keep success confirmations at the default 5 second duration unless the product flow explicitly needs otherwise, and let `src/workspace/StatusBar.tsx` own fade-in/fade-out behavior. Do not add one-off toast/status implementations for Connection lifecycle events.
@@ -38,13 +38,13 @@ Use **Connection** (not "profile") for stored openable resources.
 - See `docs/ARCHITECTURE.md` "Frontend Module Map" before placing new UI or helper logic.
 - Native HWND-backed surfaces cannot be trusted to obey DOM z-index. RDP ActiveX and WebView2 must be parked/hidden whenever app-owned DOM overlays, dialogs, menus, or region-selection surfaces need to appear above them. For RDP, preserve the screenshot/parking behavior in `src/remote-desktop/RemoteDesktopWorkspace.tsx`: capture the visible RDP host via the typed screenshot command, show that bitmap underneath the DOM overlay, then hide/park the ActiveX HWND until the overlay closes. Keep overlay detection centralized in `src/workspace/nativeOverlay.ts` and update that helper when adding new app-level overlays.
 - Terminal surfaces can use xterm/WebGL canvas layers that visually win when a sidebar flyout spills into the workspace. Keep Quick Connect and other sidebar flyout menus geometrically inside the sidebar when possible; if a flyout must cross into the workspace, verify it over an active terminal/RDP/WebView2 session and update overlay parking/stacking behavior as needed.
-- Do not validate Command Prompt, PowerShell, or WSL local-terminal focus/input bugs with localhost, Vite, or browser preview. Those previews do not host a real Tauri local PTY/Windows ConPTY path. Use the real Tauri desktop runtime or a Tauri-capable harness, and compare against native SSH only as a transport contrast: SSH uses AdminDeck's `NativeSsh` transport, while local Windows shells use `portable_pty`/ConPTY through the generic `Pty` transport. Be especially careful around xterm focus/blur changes, since xterm input is backed by a hidden textarea and WebView2 focus can be host-runtime sensitive.
+- Do not validate Command Prompt, PowerShell, or WSL local-terminal focus/input bugs with localhost, Vite, or browser preview. Those previews do not host a real Tauri local PTY/Windows ConPTY path. Use the real Tauri desktop runtime or a Tauri-capable harness, and compare against native SSH only as a transport contrast: SSH uses KKTerm's `NativeSsh` transport, while local Windows shells use `portable_pty`/ConPTY through the generic `Pty` transport. Be especially careful around xterm focus/blur changes, since xterm input is backed by a hidden textarea and WebView2 focus can be host-runtime sensitive.
 - For dynamic ARIA in TSX, use the typed helpers in `src/lib/aria.ts` and spread their results onto elements. Match ARIA roles to real children: `role="menu"` for menu items only; mixed popovers with forms use a dialog-style surface.
 - Avoid JSX `style=` when classes, data attributes, CSS variables, or ref-applied geometry can carry the state. Add vendor fallbacks; avoid `color-mix()` in shared app CSS unless target support is intentional.
 
 ## Internationalization (i18n)
 
-Stack: **i18next + react-i18next**, in `src/i18n/`. English (`locales/en.json`, ~500 keys, 11 namespaces) is the source of truth and the only bundled locale; 12 others (fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id) load on demand via dynamic `import()`. Selection persists in `localStorage` (`admindeck.language`) and is hot-swapped via `switchLanguage()` in `src/i18n/config.ts`; `ensureI18nReady()` handles startup. Selector lives at Settings → General → Language. The typed `useT()` hook in `src/i18n/useT.ts` autocompletes keys from the English JSON shape.
+Stack: **i18next + react-i18next**, in `src/i18n/`. English (`locales/en.json`, ~500 keys, 11 namespaces) is the source of truth and the only bundled locale; 12 others (fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id) load on demand via dynamic `import()`. Selection persists in `localStorage` (`kkterm.language`) and is hot-swapped via `switchLanguage()` in `src/i18n/config.ts`; `ensureI18nReady()` handles startup. Selector lives at Settings → General → Language. The typed `useT()` hook in `src/i18n/useT.ts` autocompletes keys from the English JSON shape.
 
 ### Rules
 1. **Every user-visible string MUST go through `t()`** — labels, aria-labels, titles, placeholders, status, errors. In React, `const { t } = useTranslation()`. In pure helpers that can't use hooks, import `i18next` from `src/i18n/config` and call `i18next.t(key)`.

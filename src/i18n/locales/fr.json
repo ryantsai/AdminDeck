@@ -69,7 +69,7 @@
     "importSettingsComplete": "Paramètres importés. Sauvegarde précédente de la base de données : {{filename}}.",
     "openDatabaseFolder": "Ouvrir le dossier de la base de données",
     "settingsDataActions": "Actions de sauvegarde et d'importation des paramètres",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "Par défaut, utilise src/assets/fonts/inter/web/InterVariable.woff2.",
     "aiProvider": "Fournisseur IA",
     "provider": "Fournisseur",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "Données et identifiants URL",
     "savedWebsitePasswords": "Mots de passe de sites enregistrés",
-    "savedWebsitePasswordsHint": "Les mots de passe sont stockés dans le trousseau du système d'exploitation. AdminDeck conserve la connexion URL, le nom d'utilisateur et les sélecteurs de champs détectés dans SQLite afin que le remplissage automatique cible les mêmes champs sans soumettre le formulaire.",
+    "savedWebsitePasswordsHint": "Les mots de passe sont stockés dans le trousseau du système d'exploitation. KKTerm conserve la connexion URL, le nom d'utilisateur et les sélecteurs de champs détectés dans SQLite afin que le remplissage automatique cible les mêmes champs sans soumettre le formulaire.",
     "noSavedWebsitePasswords": "Aucun mot de passe de site enregistré pour le moment.",
     "urlPasswordDeleted": "Mot de passe de site enregistré supprimé.",
     "urlPasswordDetails": "Utilisateur : {{username}} · Mis à jour : {{updatedAt}}",
@@ -207,12 +207,12 @@
     "ignoreCertificateErrors": "Ignorer les certificats HTTPS invalides",
     "ignoreCertificateErrorsHint": "Charge les connexions URL avec des certificats auto-signés ou non fiables sans l'avertissement du navigateur. S'applique aux nouveaux onglets URL ouverts.",
     "allowClipboardRead": "Autoriser la lecture du presse-papiers pour le collage",
-    "allowClipboardReadHint": "Permet aux surfaces WebView2 d'AdminDeck d'utiliser la permission clipboard-read sans l'invite de collage native.",
+    "allowClipboardReadHint": "Permet aux surfaces WebView2 d'KKTerm d'utiliser la permission clipboard-read sans l'invite de collage native.",
     "clipboardReadSaved": "Paramètre de lecture du presse-papiers enregistré.",
     "urlSettingsSaved": "Paramètres URL enregistrés.",
     "aiToolsTitle": "Outils de l'assistant",
     "aiToolsDescription": "Choisissez quels outils intégrés l'assistant IA peut utiliser pour répondre. Gardez les outils risqués désactivés sauf si nécessaire.",
-    "aiToolsSafety": "Protections : les outils de fichiers sont confinés aux données de l'application AdminDeck, les commandes shell s'exécutent uniquement depuis les données de l'application, et les demandes de suppression/destruction sont bloquées jusqu'à ce qu'une future invite d'approbation explicite puisse les examiner.",
+    "aiToolsSafety": "Protections : les outils de fichiers sont confinés aux données de l'application KKTerm, les commandes shell s'exécutent uniquement depuis les données de l'application, et les demandes de suppression/destruction sont bloquées jusqu'à ce qu'une future invite d'approbation explicite puisse les examiner.",
     "aiTools": {
       "currentTime": {
         "label": "Heure actuelle",
@@ -228,15 +228,15 @@
       },
       "appDataFileSearch": {
         "label": "Rechercher dans les fichiers de données",
-        "description": "Trouver des fichiers par nom uniquement dans les données d'application AdminDeck."
+        "description": "Trouver des fichiers par nom uniquement dans les données d'application KKTerm."
       },
       "appDataFileRead": {
         "label": "Lire un fichier de données",
-        "description": "Lire de petits fichiers texte uniquement dans les données d'application AdminDeck."
+        "description": "Lire de petits fichiers texte uniquement dans les données d'application KKTerm."
       },
       "shellCommand": {
         "label": "Commandes PowerShell / batch",
-        "description": "Exécuter des commandes PowerShell ou batch non destructives uniquement depuis les données d'application AdminDeck."
+        "description": "Exécuter des commandes PowerShell ou batch non destructives uniquement depuis les données d'application KKTerm."
       }
     },
     "appSlogan": "Espace de travail d'administration local-first.",
@@ -696,7 +696,7 @@
   },
   "ai": {
     "apiKeyRequired": "{{provider}} a besoin d'une clé API avant que l'Assistant IA puisse discuter.",
-    "extensionDraftPrompt": "Créer un brouillon d'extension AdminDeck pour : ",
+    "extensionDraftPrompt": "Créer un brouillon d'extension KKTerm pour : ",
     "modelRequired": "Le modèle est requis.",
     "providerEndpointRequired": "Le point de terminaison du fournisseur est requis.",
     "title": "Assistant IA",

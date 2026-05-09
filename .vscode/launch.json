@@ -2,10 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run AdminDeck exe",
+      "name": "Run KKTerm exe",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}\\src-tauri\\target\\debug\\admin-deck.exe",
+      "program": "${workspaceFolder}\\src-tauri\\target\\debug\\kkterm.exe",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
@@ -19,10 +19,10 @@
           "value": "--remote-debugging-port=9222"
         }
       ],
-      "preLaunchTask": "debug AdminDeck exe"
+      "preLaunchTask": "debug KKTerm exe"
     },
     {
-      "name": "Attach AdminDeck WebView2",
+      "name": "Attach KKTerm WebView2",
       "type": "msedge",
       "request": "attach",
       "port": 9222,

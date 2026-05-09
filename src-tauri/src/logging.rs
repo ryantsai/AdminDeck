@@ -36,12 +36,12 @@ fn write_startup_line() -> std::io::Result<PathBuf> {
     let log_dir = std::env::current_dir()?.join("logs");
     fs::create_dir_all(&log_dir)?;
 
-    let log_path = log_dir.join("admin-deck.log");
+    let log_path = log_dir.join("kkterm.log");
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&log_path)?;
 
-    writeln!(file, "AdminDeck runtime started")?;
+    writeln!(file, "KKTerm runtime started")?;
     Ok(log_path)
 }

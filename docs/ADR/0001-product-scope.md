@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-AdminDeck started as a request for a fast, modern terminal emulator and remote administration workspace combining ideas from Ghostty, RDCMan, VSCode, and MobaXterm. The desired long-term platform includes Windows, macOS, Linux, iOS, and Android, with support for SSH, RDP, VNC, browser tabs, AI command assistance, and SFTP.
+KKTerm started as a request for a fast, modern terminal emulator and remote administration workspace combining ideas from Ghostty, RDCMan, VSCode, and MobaXterm. The desired long-term platform includes Windows, macOS, Linux, iOS, and Android, with support for SSH, RDP, VNC, browser tabs, AI command assistance, and SFTP.
 
 That full scope is too broad for a first release. RDP, VNC, mobile, browser tabs, cloud sync, team vaults, and autonomous AI all introduce different security and UX constraints.
 

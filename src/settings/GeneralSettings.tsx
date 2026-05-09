@@ -160,7 +160,7 @@ export function GeneralSettings() {
       setUrlSettings(snapshot.urlSettings);
       setAiProviderSettings(snapshot.aiProviderSettings);
       window.dispatchEvent(
-        new CustomEvent("admindeck:connection-tree-invalidated"),
+        new CustomEvent("kkterm:connection-tree-invalidated"),
       );
       setStatus(
         t("settings.importSettingsComplete", {
@@ -242,7 +242,7 @@ export function GeneralSettings() {
       setCurrentLanguage(detectLanguage());
       setAiProviderHasApiKey(false);
       window.dispatchEvent(
-        new CustomEvent("admindeck:connection-tree-invalidated"),
+new CustomEvent("kkterm:connection-tree-invalidated"),
       );
       setStatus(t("settings.resetAllSettingsComplete"));
       setResetDialogOpen(false);

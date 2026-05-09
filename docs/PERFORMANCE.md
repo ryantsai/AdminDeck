@@ -1,6 +1,6 @@
-# AdminDeck Performance and Terminal Compatibility Checks
+# KKTerm Performance and Terminal Compatibility Checks
 
-AdminDeck performance checks are local-only. They use manual observation, diagnostics snapshots, scripts, and local process memory data; they do not upload telemetry and they should not capture terminal contents.
+KKTerm performance checks are local-only. They use manual observation, diagnostics snapshots, scripts, and local process memory data; they do not upload telemetry and they should not capture terminal contents.
 
 The app chrome status bar is no longer a performance-budget readout. It is intentionally reserved for:
 
@@ -22,7 +22,7 @@ Do not add debug-only timing indicators back to the status bar. Use diagnostics,
 
 Use a release-like Tauri build when possible. Development builds are still useful for regressions, but record that they are development measurements.
 
-1. Start AdminDeck and wait until the first workspace is usable.
+1. Start KKTerm and wait until the first workspace is usable.
 2. Record cold launch timing from the release-measurement harness, DevTools, or another explicit timing source.
 3. Let the app sit idle for at least 30 seconds with no active transfers.
 4. Record memory from diagnostics, Task Manager, Process Explorer, or equivalent local OS counters.
@@ -38,12 +38,12 @@ The last native SSH post-auth readiness value is kept in the local performance s
 For repeatable SSH readiness checks without terminal output capture, use the ignored Rust measurement test through the package script:
 
 ```powershell
-$env:ADMINDECK_SSH_HOST = "example.internal"
-$env:ADMINDECK_SSH_USER = "admin"
-$env:ADMINDECK_SSH_AUTH = "agent" # or keyFile/password
-$env:ADMINDECK_SSH_KEY_PATH = "C:\Users\you\.ssh\id_ed25519" # keyFile only
-$env:ADMINDECK_SSH_PASSWORD = "..." # password only; not printed by the script
-$env:ADMINDECK_SSH_KNOWN_HOSTS_PATH = "$env:APPDATA\com.admindeck.app\ssh_known_hosts"
+$env:KKTERM_SSH_HOST = "example.internal"
+$env:KKTERM_SSH_USER = "admin"
+$env:KKTERM_SSH_AUTH = "agent" # or keyFile/password
+$env:KKTERM_SSH_KEY_PATH = "C:\Users\you\.ssh\id_ed25519" # keyFile only
+$env:KKTERM_SSH_PASSWORD = "..." # password only; not printed by the script
+$env:KKTERM_SSH_KNOWN_HOSTS_PATH = "$env:APPDATA\com.kkterm.app\ssh_known_hosts"
 npm run measure:ssh-readiness
 ```
 
@@ -51,7 +51,7 @@ The helper opens the native `russh` terminal path, starts timing only after veri
 
 ## Latest Measurement
 
-Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `src-tauri/target/release/admin-deck.exe`. The Tauri bundler did not complete because the WiX download timed out, so this run uses the built release executable directly rather than an installed MSI.
+Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `src-tauri/target/release/kkterm.exe`. The Tauri bundler did not complete because the WiX download timed out, so this run uses the built release executable directly rather than an installed MSI.
 
 ### System Specs
 
@@ -75,7 +75,7 @@ Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `sr
 | Idle CPU | 0.000% | No formal budget | Informational | CPU delta over the 30 second idle window, normalized across 32 logical processors. |
 | New local terminal tab ready | 16 ms | <= 100 ms | Pass | Historical measurement from the previous app chrome `Local ready` value after triggering the `New local terminal` button in the release app. New runs should use explicit timing instrumentation. |
 | Working set after one local terminal | 29.4 MiB | No separate budget | Informational | Process private bytes were 6.5 MiB. Shell child-process memory is not included in this app-process value. |
-| Release executable size | 16.9 MiB | Not Electron-scale | Pass | Size of `src-tauri/target/release/admin-deck.exe`. |
+| Release executable size | 16.9 MiB | Not Electron-scale | Pass | Size of `src-tauri/target/release/kkterm.exe`. |
 | SSH terminal ready after auth | Not measured | <= 150 ms excluding network/auth | Pending | The app records native SSH post-auth terminal readiness in performance snapshots and diagnostics manifests, and the repeatable `npm run measure:ssh-readiness` helper can measure it directly. This run still requires a non-`ProxyJump` SSH Connection with host key already trusted and valid auth available in the measurement environment. |
 
 This run meets every measured performance budget. SSH readiness remains the only documented performance budget not validated by this run.
@@ -94,7 +94,7 @@ If WebGL is not active, record this in the run notes; the budgets in this docume
 
 ## SSH Idle Behavior
 
-Native SSH terminal Sessions do not use an app-side inactivity timeout. Idle performance runs may leave SSH Panes quiet and unfocused without expecting AdminDeck to disconnect them. If a tmux-enabled native SSH channel unexpectedly closes after startup, AdminDeck attempts a small bounded silent reattach to the same friendly Pane tmux session id. Server-side SSH idle policies, firewall idle reaping, sleep/resume, and network drops remain external causes and should be recorded separately from app CPU or memory measurements.
+Native SSH terminal Sessions do not use an app-side inactivity timeout. Idle performance runs may leave SSH Panes quiet and unfocused without expecting KKTerm to disconnect them. If a tmux-enabled native SSH channel unexpectedly closes after startup, KKTerm attempts a small bounded silent reattach to the same friendly Pane tmux session id. Server-side SSH idle policies, firewall idle reaping, sleep/resume, and network drops remain external causes and should be recorded separately from app CPU or memory measurements.
 
 ## Terminal Compatibility Checklist
 

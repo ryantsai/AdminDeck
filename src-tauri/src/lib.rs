@@ -65,7 +65,7 @@ fn app_bootstrap(
     secrets: tauri::State<'_, secrets::Secrets>,
 ) -> AppBootstrap {
     AppBootstrap {
-        product_name: "AdminDeck",
+        product_name: "KKTerm",
         version: env!("CARGO_PKG_VERSION"),
         log_status: logging::status(),
         storage_status: storage.status(),
@@ -1439,7 +1439,7 @@ pub fn run() {
             let app_data_dir = app.path().app_data_dir().map_err(|error| {
                 setup_error(format!("failed to resolve app data directory: {error}"))
             })?;
-            let db_path = app_data_dir.join("admin-deck.sqlite3");
+            let db_path = app_data_dir.join("kkterm.sqlite3");
             let wiki_paths = wiki::WikiPaths::new(app_data_dir);
             let storage = storage::Storage::open(db_path).map_err(setup_error)?;
             let general_settings = storage.general_settings().map_err(setup_error)?;
@@ -1461,7 +1461,7 @@ pub fn run() {
                     window_state::restore_main_window(&main_window, main_window_settings);
                 app.manage(window_state::MainWindowState::new(initial_window_settings));
             }
-            if let Err(error) = app_tray::install(app, "AdminDeck") {
+            if let Err(error) = app_tray::install(app, "KKTerm") {
                 eprintln!("{error}");
             }
             app.manage(app_tray::TrayState::new(
@@ -1642,7 +1642,7 @@ pub fn run() {
             get_wiki_attachments_folder
         ])
         .run(tauri::generate_context!())
-        .expect("error while running AdminDeck");
+        .expect("error while running KKTerm");
 }
 
 fn setup_error(message: String) -> Box<dyn std::error::Error> {

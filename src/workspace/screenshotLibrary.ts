@@ -9,7 +9,7 @@ import {
 export type StoredScreenshotKind = StoredScreenshot["kind"];
 export type { StoredScreenshot };
 
-const SCREENSHOTS_CHANGED_EVENT = "admindeck:screenshots-changed";
+const SCREENSHOTS_CHANGED_EVENT = "kkterm:screenshots-changed";
 
 type ScreenshotChangeListener = () => void;
 

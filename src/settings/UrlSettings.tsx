@@ -93,7 +93,7 @@ export function UrlSettings() {
         setEditingCredentialId(null);
         setCredentialDraft(null);
       }
-      window.dispatchEvent(new CustomEvent("admindeck:connection-tree-invalidated"));
+      window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
       await load();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : String(deleteError));
@@ -144,7 +144,7 @@ export function UrlSettings() {
       setStatus(t("settings.urlPasswordUpdated"));
       setEditingCredentialId(null);
       setCredentialDraft(null);
-      window.dispatchEvent(new CustomEvent("admindeck:connection-tree-invalidated"));
+      window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError));
@@ -157,7 +157,7 @@ export function UrlSettings() {
     try {
       await invokeCommand("clear_url_data_partition", { name });
       setStatus(t("settings.urlDataShardCleared", { name }));
-      window.dispatchEvent(new CustomEvent("admindeck:connection-tree-invalidated"));
+      window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
       await load();
     } catch (clearError) {
       setError(clearError instanceof Error ? clearError.message : String(clearError));

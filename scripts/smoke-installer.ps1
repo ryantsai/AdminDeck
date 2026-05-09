@@ -17,7 +17,7 @@ $TargetTriple = "windows-x64"
 $ResolvedOutputDir = Join-Path $RepoRoot $OutputDir
 
 if (-not $InstallerPath) {
-    $InstallerPath = Join-Path $ResolvedOutputDir "admin-deck-$Version-$TargetTriple-setup.exe"
+    $InstallerPath = Join-Path $ResolvedOutputDir "kkterm-$Version-$TargetTriple-setup.exe"
 }
 
 $ResolvedInstallerPath = Resolve-Path $InstallerPath
@@ -25,11 +25,11 @@ $ChecksumPath = "$ResolvedInstallerPath.sha256"
 $OwnsInstallDir = -not $PSBoundParameters.ContainsKey("InstallDir")
 
 if ($OwnsInstallDir) {
-    $InstallDir = Join-Path ([System.IO.Path]::GetTempPath()) "admin-deck-installer-smoke-$([System.Guid]::NewGuid().ToString("N"))"
+    $InstallDir = Join-Path ([System.IO.Path]::GetTempPath()) "kkterm-installer-smoke-$([System.Guid]::NewGuid().ToString("N"))"
 }
 
 $ResolvedInstallDir = [System.IO.Path]::GetFullPath($InstallDir)
-$InstalledExe = Join-Path $ResolvedInstallDir "admin-deck.exe"
+$InstalledExe = Join-Path $ResolvedInstallDir "kkterm.exe"
 $Uninstaller = Join-Path $ResolvedInstallDir "uninstall.exe"
 
 function Assert-ChildPath {
@@ -89,7 +89,7 @@ if (Test-Path $ResolvedInstallDir) {
     }
 
     Assert-ChildPath -Parent ([System.IO.Path]::GetTempPath()) -Child $ResolvedInstallDir
-    if (-not ([System.IO.Path]::GetFileName($ResolvedInstallDir).StartsWith("admin-deck-installer-smoke-"))) {
+    if (-not ([System.IO.Path]::GetFileName($ResolvedInstallDir).StartsWith("kkterm-installer-smoke-"))) {
         throw "Refusing to clean unexpected smoke-test directory: $ResolvedInstallDir"
     }
     Remove-Item -LiteralPath $ResolvedInstallDir -Recurse -Force
@@ -103,12 +103,12 @@ try {
         -Action "Silent installer smoke test"
 
     if (-not (Test-Path $InstalledExe)) {
-        throw "Silent installer completed but admin-deck.exe was not found at $InstalledExe."
+        throw "Silent installer completed but kkterm.exe was not found at $InstalledExe."
     }
 
     $InstalledItem = Get-Item -LiteralPath $InstalledExe
     if ($InstalledItem.Length -le 0) {
-        throw "Installed admin-deck.exe is empty."
+        throw "Installed kkterm.exe is empty."
     }
 
     $InstallSucceeded = $true
@@ -123,7 +123,7 @@ finally {
 
     if ($OwnsInstallDir -and -not $KeepInstall -and (Test-Path $ResolvedInstallDir)) {
         Assert-ChildPath -Parent ([System.IO.Path]::GetTempPath()) -Child $ResolvedInstallDir
-        if (-not ([System.IO.Path]::GetFileName($ResolvedInstallDir).StartsWith("admin-deck-installer-smoke-"))) {
+        if (-not ([System.IO.Path]::GetFileName($ResolvedInstallDir).StartsWith("kkterm-installer-smoke-"))) {
             throw "Refusing to clean unexpected smoke-test directory: $ResolvedInstallDir"
         }
         Remove-Item -LiteralPath $ResolvedInstallDir -Recurse -Force

@@ -39,7 +39,7 @@ pub fn create_bundle(
         .app_data_dir()
         .map_err(|error| format!("failed to resolve app data directory: {error}"))?
         .join("diagnostics")
-        .join(format!("admin-deck-diagnostics-{created_at_unix_seconds}"));
+        .join(format!("kkterm-diagnostics-{created_at_unix_seconds}"));
     fs::create_dir_all(&bundle_dir)
         .map_err(|error| format!("failed to create diagnostics directory: {error}"))?;
 
@@ -50,7 +50,7 @@ pub fn create_bundle(
         &bundle_dir,
         "README.txt",
         [
-            "AdminDeck diagnostics bundle",
+            "KKTerm diagnostics bundle",
             "",
             "This bundle is local-only and is not uploaded automatically.",
             "It excludes terminal output, connection secrets, API keys, and the SQLite database by default.",
@@ -62,8 +62,8 @@ pub fn create_bundle(
     )?;
 
     if let Some(log_path) = logging::log_path() {
-        match copy_file(&log_path, &bundle_dir.join("admin-deck.log")) {
-            Ok(()) => files.push("admin-deck.log".to_string()),
+        match copy_file(&log_path, &bundle_dir.join("kkterm.log")) {
+            Ok(()) => files.push("kkterm.log".to_string()),
             Err(error) => warnings.push(format!("local log was not included: {error}")),
         }
     } else {
@@ -73,7 +73,7 @@ pub fn create_bundle(
     let mut included_files = files.clone();
     included_files.push("manifest.json".to_string());
     let manifest = DiagnosticsManifest {
-        product_name: "AdminDeck",
+        product_name: "KKTerm",
         version: env!("CARGO_PKG_VERSION"),
         created_at_unix_seconds,
         target_os: std::env::consts::OS,

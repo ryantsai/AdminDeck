@@ -23,7 +23,7 @@ impl TrayState {
 }
 
 pub fn install(app: &tauri::App, tooltip: &str) -> Result<(), String> {
-    let mut builder = TrayIconBuilder::with_id("admindeck-main").tooltip(tooltip);
+    let mut builder = TrayIconBuilder::with_id("kkterm-main").tooltip(tooltip);
     if let Some(icon) = app.default_window_icon().cloned() {
         builder = builder.icon(icon);
     }

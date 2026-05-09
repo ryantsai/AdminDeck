@@ -417,7 +417,7 @@ impl OpenAiCompatibleProvider {
         let app_data_dir = app
             .path()
             .app_data_dir()
-            .map_err(|error| format!("failed to locate AdminDeck app data: {error}"))?;
+            .map_err(|error| format!("failed to locate KKTerm app data: {error}"))?;
         let mut content = String::new();
 
         for _ in 0..4 {
@@ -525,7 +525,7 @@ impl OpenAiCompatibleProvider {
         let app_data_dir = app
             .path()
             .app_data_dir()
-            .map_err(|error| format!("failed to locate AdminDeck app data: {error}"))?;
+            .map_err(|error| format!("failed to locate KKTerm app data: {error}"))?;
         let mut content = String::new();
 
         for _ in 0..4 {
@@ -883,19 +883,19 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
     if settings.app_data_file_search() {
         tools.push(tool_definition(
             "app_data_file_search",
-            "Search for file names under AdminDeck app data only.",
+            "Search for file names under KKTerm app data only.",
             json!({"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}),
         ));
     }
     if settings.app_data_file_read() {
         tools.push(tool_definition(
             "app_data_file_read",
-            "Read a small UTF-8 text file under AdminDeck app data only.",
+            "Read a small UTF-8 text file under KKTerm app data only.",
             json!({"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}),
         ));
     }
     if settings.shell_command() {
-        tools.push(tool_definition("shell_command", "Run a non-destructive PowerShell or batch command from AdminDeck app data only. Destructive commands are blocked.", json!({"type":"object","properties":{"command":{"type":"string"},"shell":{"type":"string","enum":["powershell","batch"]}},"required":["command"]})));
+        tools.push(tool_definition("shell_command", "Run a non-destructive PowerShell or batch command from KKTerm app data only. Destructive commands are blocked.", json!({"type":"object","properties":{"command":{"type":"string"},"shell":{"type":"string","enum":["powershell","batch"]}},"required":["command"]})));
     }
     tools
 }
@@ -991,7 +991,7 @@ fn app_data_file_search_tool(root: &Path, args: Value) -> String {
 fn app_data_file_read_tool(root: &Path, args: Value) -> String {
     let requested = arg_string(&args, "path");
     let Some(path) = safe_app_data_path(root, &requested) else {
-        return "Path is outside AdminDeck app data or is invalid.".to_string();
+        return "Path is outside KKTerm app data or is invalid.".to_string();
     };
     match fs::metadata(&path) {
         Ok(metadata) if metadata.len() > 128 * 1024 => {
@@ -1013,7 +1013,7 @@ fn shell_command_tool(root: &Path, args: Value) -> String {
         return "shell_command requires command.".to_string();
     }
     if is_destructive_command(&command) {
-        return "Blocked: deletion or destructive commands require an explicit AdminDeck approval prompt and were not executed.".to_string();
+        return "Blocked: deletion or destructive commands require an explicit KKTerm approval prompt and were not executed.".to_string();
     }
     let output = if shell.eq_ignore_ascii_case("batch") {
         Command::new("cmd")
@@ -1189,7 +1189,7 @@ fn build_agent_messages(
 ) -> Vec<OpenAiCompatibleMessage> {
     let normalized_intent = normalize_agent_intent(intent);
     let mut system_instructions: Vec<String> = vec![
-        "You are AdminDeck's AI Assistant for local-first administration workflows.".to_string(),
+        "You are KKTerm's AI Assistant for local-first administration workflows.".to_string(),
         "Help with terminal, SSH, SFTP, URL, RDP, and VNC operational tasks.".to_string(),
         "When suggesting commands, explain intent and prefer commands the user can review before running.".to_string(),
         "Do not claim to have executed commands or observed live session state unless it is in the provided context.".to_string(),
@@ -1200,10 +1200,10 @@ fn build_agent_messages(
     }
     if normalized_intent == AgentIntent::ExtensionCreation {
         system_instructions.extend([
-            "EXTENSION DRAFT MODE: The user is asking for an AdminDeck extension draft. Produce reviewable extension design, manifest, permission request, and source files only.".to_string(),
-            "Do not say that AdminDeck installed, enabled, executed, loaded, or verified generated extension code.".to_string(),
+            "EXTENSION DRAFT MODE: The user is asking for a KKTerm extension draft. Produce reviewable extension design, manifest, permission request, and source files only.".to_string(),
+            "Do not say that KKTerm installed, enabled, executed, loaded, or verified generated extension code.".to_string(),
             "Keep extension output approval-based: require explicit user review before any future install, run, file write, permission grant, or command execution step.".to_string(),
-            "Prefer narrow extension permissions, local-first storage boundaries, and clear trust notes. If an AdminDeck extension API is not provided in context, mark API details as proposed rather than claiming they exist.".to_string(),
+            "Prefer narrow extension permissions, local-first storage boundaries, and clear trust notes. If a KKTerm extension API is not provided in context, mark API details as proposed rather than claiming they exist.".to_string(),
         ]);
     }
 
@@ -1937,7 +1937,7 @@ mod tests {
         let system_content = text_content(&messages[0]);
         let request_content = text_content(&messages[1]);
         assert!(system_content.contains("EXTENSION DRAFT MODE"));
-        assert!(system_content.contains("Do not say that AdminDeck installed"));
+        assert!(system_content.contains("Do not say that KKTerm installed"));
         assert!(system_content.contains("require explicit user review"));
         assert!(request_content.contains("Assistant intent: extensionCreation"));
     }
@@ -1952,7 +1952,7 @@ mod tests {
     #[test]
     fn assistant_file_tool_paths_stay_inside_app_data() {
         let root =
-            std::env::temp_dir().join(format!("admindeck-ai-tool-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("kkterm-ai-tool-test-{}", std::process::id()));
         let nested = root.join("nested");
         std::fs::create_dir_all(&nested).expect("test app data directory is created");
         let inside = nested.join("log.txt");

@@ -1055,7 +1055,7 @@ async fn forward_local_stream(
 }
 
 fn remote_loopback_port_command() -> String {
-    "if command -v ss >/dev/null 2>&1; then ss -H -ltn; elif command -v netstat >/dev/null 2>&1; then netstat -ltn; elif command -v lsof >/dev/null 2>&1; then lsof -nP -iTCP -sTCP:LISTEN; else printf 'AdminDeck: no ss, netstat, or lsof available\\n' >&2; fi".to_string()
+    "if command -v ss >/dev/null 2>&1; then ss -H -ltn; elif command -v netstat >/dev/null 2>&1; then netstat -ltn; elif command -v lsof >/dev/null 2>&1; then lsof -nP -iTCP -sTCP:LISTEN; else printf 'KKTerm: no ss, netstat, or lsof available\\n' >&2; fi".to_string()
 }
 
 fn parse_remote_loopback_ports(output: &str) -> Vec<RemoteLoopbackPort> {
@@ -1644,24 +1644,24 @@ mod tests {
     #[test]
     fn tmux_capture_pane_command_targets_session_history() {
         assert_eq!(
-            tmux_capture_pane_command("admindeck-test", 5_000),
-            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -5000 -t 'admindeck-test':"
+            tmux_capture_pane_command("kkterm-test", 5_000),
+            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -5000 -t 'kkterm-test':"
         );
     }
 
     #[test]
     fn tmux_capture_pane_command_quotes_session_id() {
         assert_eq!(
-            tmux_capture_pane_command("admindeck-test'quoted", 5_000),
-            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -5000 -t 'admindeck-test'\\''quoted':"
+            tmux_capture_pane_command("kkterm-test'quoted", 5_000),
+            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -5000 -t 'kkterm-test'\\''quoted':"
         );
     }
 
     #[test]
     fn tmux_capture_pane_command_uses_requested_history_limit() {
         assert_eq!(
-            tmux_capture_pane_command("admindeck-test", 12_000),
-            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -12000 -t 'admindeck-test':"
+            tmux_capture_pane_command("kkterm-test", 12_000),
+            "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -12000 -t 'kkterm-test':"
         );
     }
 

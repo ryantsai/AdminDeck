@@ -69,7 +69,7 @@
     "importSettingsComplete": "Pengaturan diimpor. Backup database sebelumnya: {{filename}}.",
     "openDatabaseFolder": "Buka Folder Database",
     "settingsDataActions": "Tindakan backup dan impor pengaturan",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "Default menggunakan src/assets/fonts/inter/web/InterVariable.woff2.",
     "aiProvider": "Penyedia AI",
     "provider": "Penyedia",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "Data dan kredensial URL",
     "savedWebsitePasswords": "Kata sandi situs tersimpan",
-    "savedWebsitePasswordsHint": "Kata sandi disimpan di keychain sistem operasi. AdminDeck menyimpan koneksi URL, nama pengguna, dan selektor kolom yang terdeteksi di SQLite agar Autofill dapat menargetkan kolom yang sama tanpa mengirim formulir.",
+    "savedWebsitePasswordsHint": "Kata sandi disimpan di keychain sistem operasi. KKTerm menyimpan koneksi URL, nama pengguna, dan selektor kolom yang terdeteksi di SQLite agar Autofill dapat menargetkan kolom yang sama tanpa mengirim formulir.",
     "noSavedWebsitePasswords": "Belum ada kata sandi situs yang tersimpan.",
     "urlPasswordDeleted": "Kata sandi situs tersimpan dihapus.",
     "urlPasswordDetails": "Pengguna: {{username}} · Diperbarui: {{updatedAt}}",
@@ -203,7 +203,7 @@
     "urlSettingsSaved": "Pengaturan URL disimpan.",
     "aiToolsTitle": "Alat asisten",
     "aiToolsDescription": "Pilih alat bawaan mana yang dapat dipanggil AI Assistant saat menjawab. Matikan alat berisiko kecuali Anda membutuhkannya.",
-    "aiToolsSafety": "Perlindungan: alat file terbatas pada data aplikasi AdminDeck, perintah shell hanya berjalan dari data aplikasi, dan permintaan penghapusan/destruktif diblokir hingga prompt persetujuan eksplisit di masa mendatang dapat meninjaunya.",
+    "aiToolsSafety": "Perlindungan: alat file terbatas pada data aplikasi KKTerm, perintah shell hanya berjalan dari data aplikasi, dan permintaan penghapusan/destruktif diblokir hingga prompt persetujuan eksplisit di masa mendatang dapat meninjaunya.",
     "aiTools": {
        "currentTime": {
          "label": "Waktu saat ini",
@@ -219,15 +219,15 @@
        },
        "appDataFileSearch": {
          "label": "Cari file data aplikasi",
-         "description": "Temukan file berdasarkan nama di dalam data aplikasi milik AdminDeck saja."
+          "description": "Temukan file berdasarkan nama di dalam data aplikasi milik KKTerm saja."
        },
        "appDataFileRead": {
          "label": "Baca file data aplikasi",
-         "description": "Baca file teks kecil di dalam data aplikasi milik AdminDeck saja."
+          "description": "Baca file teks kecil di dalam data aplikasi milik KKTerm saja."
        },
        "shellCommand": {
          "label": "Perintah PowerShell / batch",
-         "description": "Jalankan perintah PowerShell atau batch non-destruktif dari data aplikasi AdminDeck saja."
+          "description": "Jalankan perintah PowerShell atau batch non-destruktif dari data aplikasi KKTerm saja."
        }
     },
     "portRedirect": "Pengalihan Port",
@@ -237,7 +237,7 @@
     "allowLocalOsc52Clipboard": "Izinkan penulisan clipboard OSC 52 terminal lokal",
     "allowSshOsc52Clipboard": "Izinkan penulisan clipboard OSC 52 SSH",
     "allowClipboardRead": "Izinkan pembacaan clipboard untuk tempel",
-    "allowClipboardReadHint": "Mengizinkan permukaan WebView2 AdminDeck menggunakan izin clipboard-read tanpa prompt tempel native.",
+    "allowClipboardReadHint": "Mengizinkan permukaan WebView2 KKTerm menggunakan izin clipboard-read tanpa prompt tempel native.",
     "clipboardReadSaved": "Pengaturan pembacaan clipboard disimpan.",
     "appSlogan": "Ruang kerja administrasi local-first.",
     "capabilityToolCalling": "alat",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "Pratinjau {{label}}",
     "imageInputNotSupported": "Model ini tidak mendukung input gambar, jadi tangkapan layar yang ditempel tidak dikirim.",
     "apiKeyRequired": "{{provider}} memerlukan kunci API sebelum AI Assistant dapat mengobrol.",
-    "extensionDraftPrompt": "Buat draf ekstensi AdminDeck untuk: ",
+    "extensionDraftPrompt": "Buat draf ekstensi KKTerm untuk: ",
     "modelRequired": "Model wajib diisi.",
     "providerEndpointRequired": "Endpoint penyedia wajib diisi."
   },

@@ -74,7 +74,7 @@ export async function deleteWikiAttachment(attachmentId: string): Promise<void> 
 }
 
 export async function exportWikiToZip(): Promise<WikiExportInfo | null> {
-  const destination = await selectWikiExportPath("admin-deck-wiki.zip");
+  const destination = await selectWikiExportPath("kkterm-wiki.zip");
   if (!destination) {
     return null;
   }

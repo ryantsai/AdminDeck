@@ -69,7 +69,7 @@
     "importSettingsComplete": "設定已匯入。先前的資料庫備份：{{filename}}。",
     "openDatabaseFolder": "開啟資料庫資料夾",
     "settingsDataActions": "設定備份與匯入操作",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "預設使用 src/assets/fonts/inter/web/InterVariable.woff2。",
     "aiProvider": "AI 提供者",
     "provider": "提供者",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "URL 資料與認證",
     "savedWebsitePasswords": "已儲存的網站密碼",
-    "savedWebsitePasswordsHint": "密碼儲存在作業系統鑰匙圈中。AdminDeck 將 URL 連線、使用者名稱與偵測到的欄位選擇器保存在 SQLite,讓自動填入能對相同欄位作用,而不會送出表單。",
+    "savedWebsitePasswordsHint": "密碼儲存在作業系統鑰匙圈中。KKTerm 將 URL 連線、使用者名稱與偵測到的欄位選擇器保存在 SQLite,讓自動填入能對相同欄位作用,而不會送出表單。",
     "noSavedWebsitePasswords": "尚無已儲存的網站密碼。",
     "urlPasswordDeleted": "已刪除已儲存的網站密碼。",
     "urlPasswordDetails": "使用者:{{username}} · 更新時間:{{updatedAt}}",
@@ -203,7 +203,7 @@
     "urlSettingsSaved": "URL 設定已儲存。",
     "aiToolsTitle": "助理工具",
     "aiToolsDescription": "選擇 AI 助理在回答時可呼叫的內建工具。除非需要，否則請勿開啟高風險工具。",
-    "aiToolsSafety": "安全措施：檔案工具僅限於 AdminDeck 應用程式資料、Shell 命令僅從應用程式資料執行，且刪除／破壞性請求會遭封鎖，直到未來的明確核准提示可以審核為止。",
+    "aiToolsSafety": "安全措施：檔案工具僅限於 KKTerm 應用程式資料、Shell 命令僅從應用程式資料執行，且刪除／破壞性請求會遭封鎖，直到未來的明確核准提示可以審核為止。",
     "aiTools": {
       "currentTime": {
         "label": "目前時間",
@@ -219,15 +219,15 @@
       },
       "appDataFileSearch": {
         "label": "搜尋應用程式資料檔案",
-        "description": "僅在 AdminDeck 擁有的應用程式資料中依名稱尋找檔案。"
+        "description": "僅在 KKTerm 擁有的應用程式資料中依名稱尋找檔案。"
       },
       "appDataFileRead": {
         "label": "讀取應用程式資料檔案",
-        "description": "僅在 AdminDeck 擁有的應用程式資料中讀取小型文字檔案。"
+        "description": "僅在 KKTerm 擁有的應用程式資料中讀取小型文字檔案。"
       },
       "shellCommand": {
         "label": "PowerShell / 批次命令",
-        "description": "僅從 AdminDeck 應用程式資料執行非破壞性的 PowerShell 或批次命令。"
+        "description": "僅從 KKTerm 應用程式資料執行非破壞性的 PowerShell 或批次命令。"
       }
     },
     "appSlogan": "以本機為優先的管理工作區。",
@@ -264,7 +264,7 @@
     "connectedConnectionsRailHint": "對每個已連線的連線在左側導覽列新增圖示，方便您快速切換回去。",
     "connectedConnectionsRailSaved": "已連線的連線圖示顯示設定已儲存。",
     "allowClipboardRead": "允許讀取剪貼簿以進行貼上",
-    "allowClipboardReadHint": "允許 AdminDeck 的 WebView2 介面使用 clipboard-read 權限，而不顯示原生貼上提示。",
+    "allowClipboardReadHint": "允許 KKTerm 的 WebView2 介面使用 clipboard-read 權限，而不顯示原生貼上提示。",
     "clipboardReadSaved": "剪貼簿讀取設定已儲存。",
     "portRedirect": "連接埠重新導向",
     "portRedirectHint": "控制哪些遠端回送連接埠顯示在 SSH 終端機連接埠重新導向選單中。",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "{{label}} 預覽",
     "imageInputNotSupported": "此模型不支援影像輸入,因此貼上的螢幕截圖不會送出。",
     "apiKeyRequired": "{{provider}} 需要 API 金鑰，AI 助理才能開始聊天。",
-    "extensionDraftPrompt": "為以下內容建立 AdminDeck 擴充功能草稿：",
+    "extensionDraftPrompt": "為以下內容建立 KKTerm 擴充功能草稿：",
     "modelRequired": "必須指定模型。",
     "providerEndpointRequired": "必須指定提供者端點。"
   },

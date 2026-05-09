@@ -84,7 +84,7 @@ type ConnectionDialogRequest = CreateConnectionRequest & {
 
 type ConnectionTileType = ConnectionType;
 
-const RECENT_CONNECTION_STORAGE_KEY = "admin-deck.recentConnectionIds";
+const RECENT_CONNECTION_STORAGE_KEY = "kkterm.recentConnectionIds";
 
 const RECENT_CONNECTION_LIMIT = 5;
 
@@ -172,9 +172,9 @@ export function ConnectionSidebar({
     const handleTreeInvalidated = () => {
       void reloadConnectionGroups();
     };
-    window.addEventListener("admindeck:connection-tree-invalidated", handleTreeInvalidated);
+    window.addEventListener("kkterm:connection-tree-invalidated", handleTreeInvalidated);
     return () => {
-      window.removeEventListener("admindeck:connection-tree-invalidated", handleTreeInvalidated);
+      window.removeEventListener("kkterm:connection-tree-invalidated", handleTreeInvalidated);
     };
   }, []);
 
@@ -436,7 +436,7 @@ export function ConnectionSidebar({
       useTmuxSessions: connectionRequest.useTmuxSessions,
       tmuxConnectionId:
         connectionRequest.type === "ssh" && connectionRequest.useTmuxSessions !== false
-          ? uniqueRuntimeId("admindeck")
+          ? uniqueRuntimeId("kkterm")
           : undefined,
       urlCredentialUsername:
         connectionRequest.type === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,

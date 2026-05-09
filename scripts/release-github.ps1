@@ -107,9 +107,9 @@ try {
     $NextVersion = "$($VersionParts[0]).$($VersionParts[1]).$($VersionParts[2] + 1)"
     $TagName = "v$NextVersion"
     $TargetTriple = "windows-x64"
-    $PortableZip = Join-Path $ResolvedOutputDir "admin-deck-$NextVersion-$TargetTriple-portable.zip"
+    $PortableZip = Join-Path $ResolvedOutputDir "kkterm-$NextVersion-$TargetTriple-portable.zip"
     $PortableSha = "$PortableZip.sha256"
-    $InstallerExe = Join-Path $ResolvedOutputDir "admin-deck-$NextVersion-$TargetTriple-setup.exe"
+    $InstallerExe = Join-Path $ResolvedOutputDir "kkterm-$NextVersion-$TargetTriple-setup.exe"
     $InstallerSha = "$InstallerExe.sha256"
     $ReleaseAssets = @($PortableZip, $PortableSha, $InstallerExe, $InstallerSha)
 
@@ -180,7 +180,7 @@ try {
         throw "Unable to commit release version bump (exit $LASTEXITCODE):`n$($CommitOutput -join "`n")"
     }
 
-    $TagOutput = git tag -a $TagName -m "AdminDeck $TagName" 2>&1
+    $TagOutput = git tag -a $TagName -m "KKTerm $TagName" 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Unable to create git tag $TagName (exit $LASTEXITCODE):`n$($TagOutput -join "`n")"
     }
@@ -197,9 +197,9 @@ try {
         $InstallerExe,
         $InstallerSha,
         "--title",
-        "AdminDeck $TagName",
+        "KKTerm $TagName",
         "--notes",
-        "AdminDeck $TagName Windows release."
+        "KKTerm $TagName Windows release."
     )
 
     if ($Draft) {

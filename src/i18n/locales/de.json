@@ -69,7 +69,7 @@
     "importSettingsComplete": "Einstellungen importiert. Vorherige Datenbanksicherung: {{filename}}.",
     "openDatabaseFolder": "Datenbankordner öffnen",
     "settingsDataActions": "Aktionen zum Sichern und Importieren von Einstellungen",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "Standard verwendet src/assets/fonts/inter/web/InterVariable.woff2.",
     "aiProvider": "KI-Anbieter",
     "provider": "Anbieter",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "URL-Daten und Anmeldeinformationen",
     "savedWebsitePasswords": "Gespeicherte Website-Passwörter",
-    "savedWebsitePasswordsHint": "Passwörter werden im Schlüsselbund des Betriebssystems gespeichert. AdminDeck speichert die URL-Verbindung, den Benutzernamen und die erkannten Feld-Selektoren in SQLite, damit das automatische Ausfüllen dieselben Felder treffen kann, ohne das Formular abzusenden.",
+    "savedWebsitePasswordsHint": "Passwörter werden im Schlüsselbund des Betriebssystems gespeichert. KKTerm speichert die URL-Verbindung, den Benutzernamen und die erkannten Feld-Selektoren in SQLite, damit das automatische Ausfüllen dieselben Felder treffen kann, ohne das Formular abzusenden.",
     "noSavedWebsitePasswords": "Noch keine Website-Passwörter gespeichert.",
     "urlPasswordDeleted": "Gespeichertes Website-Passwort gelöscht.",
     "urlPasswordDetails": "Benutzer: {{username}} · Aktualisiert: {{updatedAt}}",
@@ -207,12 +207,12 @@
     "ignoreCertificateErrors": "Ungültige HTTPS-Zertifikate ignorieren",
     "ignoreCertificateErrorsHint": "Lädt URL-Verbindungen mit selbstsignierten oder nicht vertrauenswürdigen Zertifikaten ohne Browserwarnung. Gilt für neu geöffnete URL-Tabs.",
     "allowClipboardRead": "Zwischenablage-Lesen zum Einfügen erlauben",
-    "allowClipboardReadHint": "Erlaubt AdminDeck-WebView2-Oberflächen die Verwendung der clipboard-read-Berechtigung ohne native Einfügeaufforderung.",
+    "allowClipboardReadHint": "Erlaubt KKTerm-WebView2-Oberflächen die Verwendung der clipboard-read-Berechtigung ohne native Einfügeaufforderung.",
     "clipboardReadSaved": "Zwischenablage-Lese-Einstellung gespeichert.",
     "urlSettingsSaved": "URL-Einstellungen gespeichert.",
     "aiToolsTitle": "Assistenten-Werkzeuge",
     "aiToolsDescription": "Wählen Sie, welche integrierten Werkzeuge der KI-Assistent beim Antworten verwenden darf. Lassen Sie riskante Werkzeuge deaktiviert, es sei denn, Sie benötigen sie.",
-    "aiToolsSafety": "Sicherheitsvorkehrungen: Dateiwerkzeuge sind auf AdminDeck-App-Daten beschränkt, Shell-Befehle werden nur aus App-Daten ausgeführt, und Lösch-/Zerstörungsanfragen werden blockiert, bis eine zukünftige explizite Genehmigungsaufforderung sie überprüfen kann.",
+    "aiToolsSafety": "Sicherheitsvorkehrungen: Dateiwerkzeuge sind auf KKTerm-App-Daten beschränkt, Shell-Befehle werden nur aus App-Daten ausgeführt, und Lösch-/Zerstörungsanfragen werden blockiert, bis eine zukünftige explizite Genehmigungsaufforderung sie überprüfen kann.",
     "aiTools": {
       "currentTime": {
         "label": "Aktuelle Uhrzeit",
@@ -228,15 +228,15 @@
       },
       "appDataFileSearch": {
         "label": "App-Dateien durchsuchen",
-        "description": "Dateien nach Namen nur innerhalb der AdminDeck-eigenen App-Daten finden."
+        "description": "Dateien nach Namen nur innerhalb der KKTerm-eigenen App-Daten finden."
       },
       "appDataFileRead": {
         "label": "App-Datei lesen",
-        "description": "Kleine Textdateien nur innerhalb der AdminDeck-eigenen App-Daten lesen."
+        "description": "Kleine Textdateien nur innerhalb der KKTerm-eigenen App-Daten lesen."
       },
       "shellCommand": {
         "label": "PowerShell / Batch-Befehle",
-        "description": "Nicht-destruktive PowerShell- oder Batch-Befehle nur aus AdminDeck-App-Daten ausführen."
+        "description": "Nicht-destruktive PowerShell- oder Batch-Befehle nur aus KKTerm-App-Daten ausführen."
       }
     },
     "appSlogan": "Lokal-zentrierter Administrations-Arbeitsbereich.",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "Vorschau {{label}}",
     "imageInputNotSupported": "Dieses Modell unterstützt keine Bildeingabe; eingefügte Screenshots werden nicht gesendet.",
     "apiKeyRequired": "{{provider}} benötigt einen API-Schlüssel, bevor der KI-Assistent chatten kann.",
-    "extensionDraftPrompt": "AdminDeck-Erweiterungsentwurf erstellen für: ",
+    "extensionDraftPrompt": "KKTerm-Erweiterungsentwurf erstellen für: ",
     "modelRequired": "Modell ist erforderlich.",
     "providerEndpointRequired": "Anbieter-Endpunkt ist erforderlich."
   },

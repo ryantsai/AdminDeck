@@ -1748,7 +1748,7 @@ mod tests {
     #[test]
     fn parses_chromium_bookmarks_as_url_tree() {
         let path =
-            std::env::temp_dir().join(format!("admindeck-bookmarks-{}.json", std::process::id()));
+            std::env::temp_dir().join(format!("kkterm-bookmarks-{}.json", std::process::id()));
         std::fs::write(
             &path,
             r#"{
@@ -1758,7 +1758,7 @@ mod tests {
                   "name": "Bookmarks bar",
                   "type": "folder",
                   "children": [
-                    {"id": "2", "name": "AdminDeck", "type": "url", "url": "https://example.com/admin"},
+                    {"id": "2", "name": "KKTerm", "type": "url", "url": "https://example.com/admin"},
                     {"id": "3", "name": "Internal", "type": "folder", "children": [
                       {"id": "4", "name": "Ignored", "type": "url", "url": "chrome://settings"},
                       {"id": "5", "name": "Docs", "type": "url", "url": "https://docs.example.com/"}

@@ -58,7 +58,7 @@ export function ScreenshotSettings() {
         : draft;
       setScreenshotSettings(saved);
       setDraft(saved);
-      window.dispatchEvent(new Event("admindeck:screenshots-changed"));
+      window.dispatchEvent(new Event("kkterm:screenshots-changed"));
       setStatus(t("settings.screenshotsSaved"));
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : String(saveError));

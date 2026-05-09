@@ -602,8 +602,8 @@ pub fn export_wiki_zip(
     }
 
     let manifest = serde_json::json!({
-        "product": "AdminDeck",
-        "format": "admindeck-wiki-export",
+        "product": "KKTerm",
+        "format": "kkterm-wiki-export",
         "version": 1,
         "createdAt": OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_else(|_| "unknown".to_string()),
         "pages": manifest_pages,
@@ -618,7 +618,7 @@ pub fn export_wiki_zip(
     let filename = dest_path
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("admin-deck-wiki.zip")
+        .unwrap_or("kkterm-wiki.zip")
         .to_string();
     Ok(WikiExportInfo {
         path: dest_path.display().to_string(),

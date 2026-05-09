@@ -34,14 +34,14 @@
       }
     },
     {
-      "label": "build AdminDeck exe",
+      "label": "build KKTerm exe",
       "dependsOrder": "sequence",
       "dependsOn": ["npm build", "cargo build (tauri debug)"],
       "group": "build",
       "problemMatcher": []
     },
     {
-      "label": "debug AdminDeck exe",
+      "label": "debug KKTerm exe",
       "dependsOrder": "sequence",
       "dependsOn": ["cargo build (tauri debug)", "start Vite dev server"],
       "problemMatcher": []

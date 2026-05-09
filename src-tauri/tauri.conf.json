@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AdminDeck",
+  "productName": "KKTerm",
   "version": "0.1.6",
-  "identifier": "com.admindeck.app",
+  "identifier": "com.kkterm.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AdminDeck",
+        "title": "KKTerm",
         "width": 1360,
         "height": 860,
         "minWidth": 1120,
@@ -32,7 +32,7 @@
     "licenseFile": "../LICENSE",
     "category": "DeveloperTool",
     "shortDescription": "Local-first administration workspace.",
-    "longDescription": "AdminDeck is a local-first desktop administration workspace for terminals, SSH, SFTP, and approval-based command assistance.",
+    "longDescription": "KKTerm is a local-first desktop administration workspace for terminals, SSH, SFTP, and approval-based command assistance.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -53,7 +53,7 @@
         ],
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
-        "startMenuFolder": "AdminDeck",
+        "startMenuFolder": "KKTerm",
         "compression": "lzma"
       }
     }

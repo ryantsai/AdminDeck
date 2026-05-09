@@ -55,11 +55,11 @@ const AI_PANEL_MAX_WIDTH = 1860;
 
 const SCREENSHOTS_RAIL_ENABLED = false;
 
-const CONNECTION_PANEL_LAYOUT_KEY = "admindeck.layout.connectionsPanel.v1";
+const CONNECTION_PANEL_LAYOUT_KEY = "kkterm.layout.connectionsPanel.v1";
 
-const AI_PANEL_LAYOUT_KEY = "admindeck.layout.aiAssistPanel.v2";
+const AI_PANEL_LAYOUT_KEY = "kkterm.layout.aiAssistPanel.v2";
 
-const CONNECTION_RAIL_ORDER_KEY = "admindeck.connectionRail.order.v1";
+const CONNECTION_RAIL_ORDER_KEY = "kkterm.connectionRail.order.v1";
 
 type ConnectedRailItem = {
   connection: Connection;
@@ -205,7 +205,7 @@ function removeLayoutStorageKeys() {
   try {
     for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
       const key = window.localStorage.key(index);
-      if (key?.startsWith("admindeck.layout.")) {
+      if (key?.startsWith("kkterm.layout.")) {
         window.localStorage.removeItem(key);
       }
     }

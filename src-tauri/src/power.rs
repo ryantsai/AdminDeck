@@ -50,7 +50,7 @@ impl DontSleepWorker {
         let (ready_tx, ready_rx) = mpsc::channel();
         let (stop_tx, stop_rx) = mpsc::channel();
         let handle = thread::Builder::new()
-            .name("AdminDeck Don't Sleep".to_string())
+            .name("KKTerm Don't Sleep".to_string())
             .spawn(move || platform::run_dont_sleep_worker(stop_rx, ready_tx))
             .map_err(|error| format!("failed to start Don't Sleep worker: {error}"))?;
 
@@ -97,9 +97,9 @@ mod platform {
         },
     };
 
-    const WINDOW_CLASS: &str = "AdminDeckDontSleepWindow";
-    const WINDOW_TITLE: &str = "AdminDeck Don't Sleep";
-    const SHUTDOWN_REASON: &str = "AdminDeck Don't Sleep mode is enabled.";
+    const WINDOW_CLASS: &str = "KKTermDontSleepWindow";
+    const WINDOW_TITLE: &str = "KKTerm Don't Sleep";
+    const SHUTDOWN_REASON: &str = "KKTerm Don't Sleep mode is enabled.";
 
     pub fn run_dont_sleep_worker(
         stop_rx: mpsc::Receiver<()>,

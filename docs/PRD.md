@@ -1,20 +1,20 @@
-# AdminDeck PRD
+# KKTerm PRD
 
 ## Problem Statement
 
 Administrators, developers, and operators often juggle separate tools for local terminals, SSH sessions, SFTP transfers, saved host lists, and AI-assisted command work. Existing tools either feel dated and Windows-only, focus narrowly on terminal emulation, or carry heavyweight runtime and UI costs that make them feel slow.
 
-AdminDeck is intended to be a fast, professional desktop workspace for personal/local infrastructure administration. The first version should provide the core experience users expect from a modern MobaXterm/RDCMan/VSCode-inspired tool without taking on team sync, RDP, VNC, or cloud services too early.
+KKTerm is intended to be a fast, professional desktop workspace for personal/local infrastructure administration. The first version should provide the core experience users expect from a modern MobaXterm/RDCMan/VSCode-inspired tool without taking on team sync, RDP, VNC, or cloud services too early.
 
 ## Solution
 
-AdminDeck v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions with optional tmux resume, SFTP dual-pane file management, explicit screenshot capture to clipboard for workspace surfaces, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
+KKTerm v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It will provide a left-side activity rail with Dashboard and Settings entry points, a connection tree, VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions with optional tmux resume, SFTP dual-pane file management, explicit screenshot capture to clipboard for workspace surfaces, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
 
 The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. Mobile, RDP, VNC, team vaults, and sync are explicitly later-stage work.
 
 ## User Stories
 
-1. As a Windows administrator, I want AdminDeck to launch quickly, so that I can start work without waiting on a heavy desktop app.
+1. As a Windows administrator, I want KKTerm to launch quickly, so that I can start work without waiting on a heavy desktop app.
 2. As an operator, I want a left-side connection tree, so that I can open Connections from the root or organize them into folders when useful.
 3. As an operator, I want to create saved SSH connections, so that I do not retype hostnames, usernames, ports, or key paths.
 4. As an operator, I want optional folders and subfolders in the connection tree, so that I can group hosts by project, environment, customer, or region without forcing every Connection into a folder.
@@ -22,13 +22,13 @@ The product will be light chrome with dark terminal panes by default, optimized 
 6. As an operator, I want drag/drop reorder in the tree, so that I can keep my workspace arranged naturally.
 7. As an operator, I want rename, delete, and duplicate actions for folders and connections, so that connection maintenance is fast.
 8. As an operator, I want quick connect, so that I can connect to a host without saving a full connection first.
-9. As an SSH user, I want to import entries from my SSH config, so that AdminDeck can bootstrap my existing workflow.
+9. As an SSH user, I want to import entries from my SSH config, so that KKTerm can bootstrap my existing workflow.
 10. As an SSH user, I want imported SSH config entries to preserve host, user, port, identity file, and proxy jump when possible, so that imported connections behave as expected.
 11. As an SSH user, I want unsupported SSH config directives to be visible, so that I understand what may need manual adjustment.
-11a. As an operator coming from another tool, I want to import Connections in bulk from CSV/TSV, RDCMan `.rdg`, MobaXterm `.mxtsessions`, or PuTTY `.reg` exports, so that I can populate AdminDeck without retyping every host. Imported nested folders should round-trip as ConnectionFolders.
+11a. As an operator coming from another tool, I want to import Connections in bulk from CSV/TSV, RDCMan `.rdg`, MobaXterm `.mxtsessions`, or PuTTY `.reg` exports, so that I can populate KKTerm without retyping every host. Imported nested folders should round-trip as ConnectionFolders.
 11b. As an operator on a new network, I want a light TCP port scan over a single host, hyphen range, or CIDR (capped per scan) with SSH/Telnet/RDP probes, so that I can seed Connection drafts from what is actually reachable.
 11c. As an operator, I want an editable preview before imported Connections are persisted, with bulk username and optional bulk password actions across the current selection, so that I can fix placeholder values once instead of per row.
-12. As a terminal user, I want local terminal tabs, so that AdminDeck can replace my daily terminal for common work.
+12. As a terminal user, I want local terminal tabs, so that KKTerm can replace my daily terminal for common work.
 13. As a terminal user, I want local terminal connections to require no host details, so that launching the default shell is fast and obvious.
 14. As a Windows user, I want saved local terminal options for PowerShell, Command Prompt, and WSL, so that local terminals match the shell I need.
 15. As a terminal user, I want SSH terminal tabs with optional named tmux session resume per Pane, so that remote shell work happens in the same workspace as local work and can return to the same remote context.
@@ -40,7 +40,7 @@ The product will be light chrome with dark terminal panes by default, optimized 
 21. As a terminal user, I want multiline paste confirmation, so that accidental command floods are prevented.
 22. As a Windows user, I want a configurable default shell, so that local terminals can use PowerShell, Command Prompt, WSL, or another shell later.
 23. As an SSH user, I want password authentication, so that I can connect to hosts that do not use key auth.
-24. As an SSH user, I want key-file authentication by path, so that AdminDeck uses my existing SSH keys.
+24. As an SSH user, I want key-file authentication by path, so that KKTerm uses my existing SSH keys.
 25. As an SSH user, I want SSH agent support where practical, so that I can use existing key workflows.
 26. As an SSH user, I want known-host verification, so that first connections and host-key changes are explicit.
 27. As an SSH user, I want resize events to propagate to remote terminals, so that full-screen terminal apps render correctly.
@@ -65,20 +65,20 @@ The product will be light chrome with dark terminal panes by default, optimized 
 46. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
 47. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
 48. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
-49. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from AdminDeck.
+49. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from KKTerm.
 50. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
 51. As a contributor, I want an MIT open-source project, so that licensing is clear and permissive.
 52. As a maintainer, I want dependencies compatible with MIT/Apache-2.0/BSD/MPL-style use, so that runtime licensing stays clean.
 53. As a maintainer, I want GPL dependencies avoided in the core runtime, so that copyleft obligations are not introduced unintentionally.
 54. As a maintainer, I want performance budgets documented, so that architectural decisions can be judged against measurable targets.
 55. As a Windows user of the installed app, I want update checks to be enabled by default, so that I learn about stable signed releases without manually monitoring GitHub.
-56. As a Windows user of the installed app, I want update installation to require my confirmation, so that AdminDeck does not silently replace itself while I am using administrative tools.
+56. As a Windows user of the installed app, I want update installation to require my confirmation, so that KKTerm does not silently replace itself while I am using administrative tools.
 57. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only, so that the local-first trust model remains understandable.
-58. As a power user, I want the AI Assistant to draft AdminDeck extensions with manifests, permissions, and source files, so that I can explore workflow automation without generated code being installed or run automatically.
+58. As a power user, I want the AI Assistant to draft KKTerm extensions with manifests, permissions, and source files, so that I can explore workflow automation without generated code being installed or run automatically.
 
 ## Implementation Decisions
 
-- Product name: AdminDeck.
+- Product name: KKTerm.
 - First shippable target: desktop app.
 - Primary acceptance platform: Windows.
 - Follow-on platforms: macOS and Linux using the same architecture.
@@ -110,10 +110,10 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - CLI agent integrations: suggest-only/ask-before-execute where possible.
 - UI model: left activity rail with Dashboard and Settings entries, left-side connection manager/tree with root Connections and optional nested folders, main tab/workspace area, optional bottom/output panel, right AI Assistant panel.
 - Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
-- SSH tmux model: SSH Connections can opt into tmux session launch by default. Each SSH terminal Pane gets a generated friendly tmux session id like `admindeck-cockpit001`, starts or attaches with `tmux new-session -A`, falls back to a normal remote shell if `tmux` is missing, and exposes a Pane-toolbar tag that lists attached and detached remote tmux sessions with explicit close actions. Quiet native SSH Sessions should not disconnect because the app is idle or unfocused; tmux-backed native SSH terminal Sessions may silently make a small bounded attempt to reattach to the same Pane tmux id if the transport breaks.
+- SSH tmux model: SSH Connections can opt into tmux session launch by default. Each SSH terminal Pane gets a generated friendly tmux session id like `kkterm-cockpit001`, starts or attaches with `tmux new-session -A`, falls back to a normal remote shell if `tmux` is missing, and exposes a Pane-toolbar tag that lists attached and detached remote tmux sessions with explicit close actions. Quiet native SSH Sessions should not disconnect because the app is idle or unfocused; tmux-backed native SSH terminal Sessions may silently make a small bounded attempt to reattach to the same Pane tmux id if the transport breaks.
 - SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
-- Screenshot model: explicit user action only. Terminal Panes expose screenshot capture in the Pane toolbar; SFTP, URL, RDP, and VNC workspaces expose it in the top toolbar. Region and Entire Window/Panel captures can be copied to the system clipboard or attached as transient AI Assistant screenshot context. AdminDeck does not persist captured screenshots.
-- RDP overlay model: the Windows RDP ActiveX host is a native child HWND and must not be expected to layer beneath React UI through CSS alone. When app-owned DOM overlays such as Add Connection, screenshot menus, or Region selection appear over an active RDP workspace, AdminDeck should snapshot the visible RDP view, park/hide the ActiveX host, and show the snapshot beneath the overlay until normal RDP visibility resumes.
+- Screenshot model: explicit user action only. Terminal Panes expose screenshot capture in the Pane toolbar; SFTP, URL, RDP, and VNC workspaces expose it in the top toolbar. Region and Entire Window/Panel captures can be copied to the system clipboard or attached as transient AI Assistant screenshot context. KKTerm does not persist captured screenshots.
+- RDP overlay model: the Windows RDP ActiveX host is a native child HWND and must not be expected to layer beneath React UI through CSS alone. When app-owned DOM overlays such as Add Connection, screenshot menus, or Region selection appear over an active RDP workspace, KKTerm should snapshot the visible RDP view, park/hide the ActiveX host, and show the snapshot beneath the overlay until normal RDP visibility resumes.
 - Extension draft model: the AI Assistant may draft extension designs, manifests, permission requests, and source files when explicitly asked. Until the extension platform exists, this is review-only and must not install, enable, write, run, load, or verify generated extension code.
 - Extension platform model: v0.2 extension support must be manifest-first, permissioned, user-mediated, and isolated. See `docs/ADR/0005-extension-platform-architecture.md` for the initial permission, lifecycle, storage, and trust-boundary decision.
 - Settings: each section is a separate page component under `src/settings/`, routed by the Settings shell (`src/settings/SettingsPage.tsx`) with a sidebar nav. Sections are General, Appearance, AI Assistant, SSH, Terminal, URL, Remote Desktop (RDP), VNC, and About. General contains Language (i18n), workspace access toggles, Settings data actions, backup/import/database-folder actions, and Reset All Settings; Appearance contains App UI font, layout reset, and Color Scheme; AI Assistant contains provider connection, response defaults, and Assistant tool calling; SSH contains SSH defaults, authentication defaults, SSH terminal behavior, and port redirect visibility; Terminal contains editable local terminal behavior; URL contains URL security, saved website password metadata, and URL data shard management; RDP and VNC expose planned quality default summaries. Settings controls should use consistent fieldset/legend group boxes, editable inputs should look editable in the default color scheme, and destructive global actions should stay in General → Settings data with app-owned confirmation dialogs. Diagnostics, update, SSH config import, and keybinding controls should be reintroduced only when their UX is clear and backed by the existing local storage/keychain boundaries.
@@ -161,6 +161,6 @@ The product will be light chrome with dark terminal panes by default, optimized 
 
 ## Further Notes
 
-AdminDeck is open-source under MIT. The codebase should prefer deep modules with small, testable interfaces for storage, connections, terminal sessions, SSH/SFTP transport, renderer abstraction, AI provider adapters, command approval, and importers.
+KKTerm is open-source under MIT. The codebase should prefer deep modules with small, testable interfaces for storage, connections, terminal sessions, SSH/SFTP transport, renderer abstraction, AI provider adapters, command approval, and importers.
 
 The product should feel like a quiet, dense, professional desktop tool. Avoid marketing-style layouts, decorative gradients, oversized cards, or generic admin-dashboard styling.

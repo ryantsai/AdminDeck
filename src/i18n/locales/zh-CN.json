@@ -69,7 +69,7 @@
     "importSettingsComplete": "设置已导入。先前的数据库备份：{{filename}}。",
     "openDatabaseFolder": "打开数据库文件夹",
     "settingsDataActions": "设置备份与导入操作",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "默认使用 src/assets/fonts/inter/web/InterVariable.woff2。",
     "aiProvider": "AI 提供者",
     "provider": "提供者",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "URL 数据与凭据",
     "savedWebsitePasswords": "已保存的网站密码",
-    "savedWebsitePasswordsHint": "密码存储在操作系统钥匙串中。AdminDeck 将 URL 连接、用户名以及检测到的字段选择器保存在 SQLite 中,以便自动填充可以瞄准同一组字段而不提交表单。",
+    "savedWebsitePasswordsHint": "密码存储在操作系统钥匙串中。KKTerm 将 URL 连接、用户名以及检测到的字段选择器保存在 SQLite 中,以便自动填充可以瞄准同一组字段而不提交表单。",
     "noSavedWebsitePasswords": "暂无已保存的网站密码。",
     "urlPasswordDeleted": "已删除已保存的网站密码。",
     "urlPasswordDetails": "用户:{{username}} · 更新时间:{{updatedAt}}",
@@ -203,7 +203,7 @@
     "urlSettingsSaved": "URL 设置已保存。",
     "aiToolsTitle": "助手工具",
     "aiToolsDescription": "选择 AI 助手在回答时可以调用的内置工具。除非需要，否则请保持有风险的工具关闭。",
-    "aiToolsSafety": "安全措施：文件工具仅限于 AdminDeck 应用数据，Shell 命令仅从应用数据运行，删除/破坏性请求将被阻止，直到将来有明确的审批提示可以审查它们。",
+    "aiToolsSafety": "安全措施：文件工具仅限于 KKTerm 应用数据，Shell 命令仅从应用数据运行，删除/破坏性请求将被阻止，直到将来有明确的审批提示可以审查它们。",
     "aiTools": {
       "currentTime": {
         "label": "当前时间",
@@ -219,15 +219,15 @@
       },
       "appDataFileSearch": {
         "label": "搜索应用数据文件",
-        "description": "仅在 AdminDeck 拥有的应用数据中按名称查找文件。"
+        "description": "仅在 KKTerm 拥有的应用数据中按名称查找文件。"
       },
       "appDataFileRead": {
         "label": "读取应用数据文件",
-        "description": "仅在 AdminDeck 拥有的应用数据中读取小型文本文件。"
+        "description": "仅在 KKTerm 拥有的应用数据中读取小型文本文件。"
       },
       "shellCommand": {
         "label": "PowerShell / 批处理命令",
-        "description": "仅从 AdminDeck 应用数据运行非破坏性的 PowerShell 或批处理命令。"
+        "description": "仅从 KKTerm 应用数据运行非破坏性的 PowerShell 或批处理命令。"
       }
     },
     "appSlogan": "本地优先的管理工作区。",
@@ -264,7 +264,7 @@
     "connectedConnectionsRailHint": "在左侧导轨中为每个已连接的连接添加图标，以便快速切回。",
     "connectedConnectionsRailSaved": "在左侧导轨中显示连接设置已保存。",
     "allowClipboardRead": "允许剪贴板读取以进行粘贴",
-    "allowClipboardReadHint": "允许 AdminDeck 的 WebView2 界面使用 clipboard-read 权限，不显示原生粘贴提示。",
+    "allowClipboardReadHint": "允许 KKTerm 的 WebView2 界面使用 clipboard-read 权限，不显示原生粘贴提示。",
     "clipboardReadSaved": "剪贴板读取设置已保存。",
     "portRedirect": "端口重定向",
     "portRedirectHint": "控制哪些远程回环端口显示在 SSH 终端端口重定向菜单中。",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "{{label}} 预览",
     "imageInputNotSupported": "此模型不支持图像输入,因此粘贴的截图不会发送。",
     "apiKeyRequired": "{{provider}} 需要 API 密钥，AI 助手才能开始聊天。",
-    "extensionDraftPrompt": "为以下内容创建 AdminDeck 扩展草稿：",
+    "extensionDraftPrompt": "为以下内容创建 KKTerm 扩展草稿：",
     "modelRequired": "需要指定模型。",
     "providerEndpointRequired": "需要提供者端点。"
   },

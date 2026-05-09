@@ -69,7 +69,7 @@
     "importSettingsComplete": "設定をインポートしました。以前のデータベースバックアップ：{{filename}}。",
     "openDatabaseFolder": "データベースフォルダを開く",
     "settingsDataActions": "設定のバックアップとインポート操作",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "デフォルトは src/assets/fonts/inter/web/InterVariable.woff2 を使用します。",
     "aiProvider": "AIプロバイダー",
     "provider": "プロバイダー",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "URL データと資格情報",
     "savedWebsitePasswords": "保存済みのウェブサイトパスワード",
-    "savedWebsitePasswordsHint": "パスワードは OS のキーチェーンに保存されます。AdminDeck は URL コネクション、ユーザー名、検出されたフィールドセレクタを SQLite に保持し、自動入力がフォームを送信せずに同じフィールドを対象にできるようにします。",
+    "savedWebsitePasswordsHint": "パスワードは OS のキーチェーンに保存されます。KKTerm は URL コネクション、ユーザー名、検出されたフィールドセレクタを SQLite に保持し、自動入力がフォームを送信せずに同じフィールドを対象にできるようにします。",
     "noSavedWebsitePasswords": "保存済みのウェブサイトパスワードはまだありません。",
     "urlPasswordDeleted": "保存済みのウェブサイトパスワードを削除しました。",
     "urlPasswordDetails": "ユーザー: {{username}} · 更新: {{updatedAt}}",
@@ -203,7 +203,7 @@
     "urlSettingsSaved": "URL 設定を保存しました。",
     "aiToolsTitle": "アシスタントツール",
     "aiToolsDescription": "AI アシスタントが応答中に呼び出せる組み込みツールを選択します。必要な場合を除き、リスクのあるツールはオフにしてください。",
-    "aiToolsSafety": "保護措置：ファイルツールは AdminDeck アプリデータに制限され、シェルコマンドはアプリデータからのみ実行され、削除/破壊リクエストは将来の明示的な承認プロンプトが確認できるまでブロックされます。",
+    "aiToolsSafety": "保護措置：ファイルツールは KKTerm アプリデータに制限され、シェルコマンドはアプリデータからのみ実行され、削除/破壊リクエストは将来の明示的な承認プロンプトが確認できるまでブロックされます。",
     "aiTools": {
       "currentTime": {
         "label": "現在時刻",
@@ -219,15 +219,15 @@
       },
       "appDataFileSearch": {
         "label": "アプリデータファイルを検索",
-        "description": "AdminDeck が所有するアプリデータ内でのみ名前でファイルを検索します。"
+        "description": "KKTerm が所有するアプリデータ内でのみ名前でファイルを検索します。"
       },
       "appDataFileRead": {
         "label": "アプリデータファイルを読み取り",
-        "description": "AdminDeck が所有するアプリデータ内の小さなテキストファイルのみを読み取ります。"
+        "description": "KKTerm が所有するアプリデータ内の小さなテキストファイルのみを読み取ります。"
       },
       "shellCommand": {
         "label": "PowerShell / バッチコマンド",
-        "description": "AdminDeck アプリデータからのみ非破壊的な PowerShell またはバッチコマンドを実行します。"
+        "description": "KKTerm アプリデータからのみ非破壊的な PowerShell またはバッチコマンドを実行します。"
       }
     },
     "appSlogan": "ローカルファーストの管理ワークスペース。",
@@ -264,7 +264,7 @@
     "connectedConnectionsRailHint": "接続中の各 Connection のアイコンを左レールに追加し、素早く切り替えられるようにします。",
     "connectedConnectionsRailSaved": "左レールに接続を表示する設定を保存しました。",
     "allowClipboardRead": "貼り付けのためのクリップボード読み取りを許可",
-    "allowClipboardReadHint": "AdminDeck の WebView2 サーフェスがネイティブ貼り付けプロンプトなしで clipboard-read 権限を使用できるようにします。",
+    "allowClipboardReadHint": "KKTerm の WebView2 サーフェスがネイティブ貼り付けプロンプトなしで clipboard-read 権限を使用できるようにします。",
     "clipboardReadSaved": "クリップボード読み取り設定を保存しました。",
     "portRedirect": "ポートリダイレクト",
     "portRedirectHint": "SSH ターミナルのポートリダイレクトメニューに表示されるリモートループバックポートを制御します。",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "{{label}} のプレビュー",
     "imageInputNotSupported": "このモデルは画像入力に対応していないため、貼り付けたスクリーンショットは送信されません。",
     "apiKeyRequired": "{{provider}} は、AIアシスタントがチャットを開始する前にAPIキーが必要です。",
-    "extensionDraftPrompt": "AdminDeck拡張機能のドラフトを作成：",
+    "extensionDraftPrompt": "KKTerm拡張機能のドラフトを作成：",
     "modelRequired": "モデルは必須です。",
     "providerEndpointRequired": "プロバイダーエンドポイントは必須です。"
   },

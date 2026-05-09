@@ -69,7 +69,7 @@
     "importSettingsComplete": "Impostazioni importate. Backup precedente del database: {{filename}}.",
     "openDatabaseFolder": "Apri cartella database",
     "settingsDataActions": "Azioni di backup e importazione impostazioni",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "Predefinito usa src/assets/fonts/inter/web/InterVariable.woff2.",
     "aiProvider": "Provider IA",
     "provider": "Provider",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "Dati e credenziali URL",
     "savedWebsitePasswords": "Password dei siti salvate",
-    "savedWebsitePasswordsHint": "Le password vengono memorizzate nel portachiavi del sistema operativo. AdminDeck conserva in SQLite la connessione URL, il nome utente e i selettori di campo rilevati, così il riempimento automatico può puntare agli stessi campi senza inviare il modulo.",
+    "savedWebsitePasswordsHint": "Le password vengono memorizzate nel portachiavi del sistema operativo. KKTerm conserva in SQLite la connessione URL, il nome utente e i selettori di campo rilevati, così il riempimento automatico può puntare agli stessi campi senza inviare il modulo.",
     "noSavedWebsitePasswords": "Nessuna password di sito salvata.",
     "urlPasswordDeleted": "Password del sito eliminata.",
     "urlPasswordDetails": "Utente: {{username}} · Aggiornato: {{updatedAt}}",
@@ -207,12 +207,12 @@
     "ignoreCertificateErrors": "Ignora certificati HTTPS non validi",
     "ignoreCertificateErrorsHint": "Carica le connessioni URL con certificati auto-firmati o non attendibili senza l'avviso del browser. Si applica alle nuove schede URL aperte.",
     "allowClipboardRead": "Consenti lettura appunti per incollare",
-    "allowClipboardReadHint": "Consente alle superfici WebView2 di AdminDeck di usare il permesso clipboard-read senza il prompt di incolla nativo.",
+    "allowClipboardReadHint": "Consente alle superfici WebView2 di KKTerm di usare il permesso clipboard-read senza il prompt di incolla nativo.",
     "clipboardReadSaved": "Impostazione lettura appunti salvata.",
     "urlSettingsSaved": "Impostazioni URL salvate.",
     "aiToolsTitle": "Strumenti dell'assistente",
     "aiToolsDescription": "Scegli quali strumenti integrati l'Assistente IA può utilizzare per rispondere. Tieni disattivati gli strumenti rischiosi a meno che non ti servano.",
-    "aiToolsSafety": "Protezioni: gli strumenti sui file sono confinati ai dati dell'app AdminDeck, i comandi shell vengono eseguiti solo dai dati dell'app, e le richieste di eliminazione/distruzione sono bloccate fino a quando un futuro prompt di approvazione esplicita potrà esaminarle.",
+    "aiToolsSafety": "Protezioni: gli strumenti sui file sono confinati ai dati dell'app KKTerm, i comandi shell vengono eseguiti solo dai dati dell'app, e le richieste di eliminazione/distruzione sono bloccate fino a quando un futuro prompt di approvazione esplicita potrà esaminarle.",
     "aiTools": {
       "currentTime": {
         "label": "Ora corrente",
@@ -228,15 +228,15 @@
       },
       "appDataFileSearch": {
         "label": "Cerca nei file dati app",
-        "description": "Trova file per nome solo all'interno dei dati dell'app AdminDeck."
+        "description": "Trova file per nome solo all'interno dei dati dell'app KKTerm."
       },
       "appDataFileRead": {
         "label": "Leggi file dati app",
-        "description": "Leggi piccoli file di testo solo all'interno dei dati dell'app AdminDeck."
+        "description": "Leggi piccoli file di testo solo all'interno dei dati dell'app KKTerm."
       },
       "shellCommand": {
         "label": "Comandi PowerShell / batch",
-        "description": "Esegui comandi PowerShell o batch non distruttivi solo dai dati dell'app AdminDeck."
+        "description": "Esegui comandi PowerShell o batch non distruttivi solo dai dati dell'app KKTerm."
       }
     },
     "appSlogan": "Spazio di lavoro di amministrazione local-first.",
@@ -696,7 +696,7 @@
   },
   "ai": {
     "apiKeyRequired": "{{provider}} ha bisogno di una chiave API prima che l'Assistente IA possa chattare.",
-    "extensionDraftPrompt": "Crea una bozza di estensione AdminDeck per: ",
+    "extensionDraftPrompt": "Crea una bozza di estensione KKTerm per: ",
     "modelRequired": "Il modello è obbligatorio.",
     "providerEndpointRequired": "L'endpoint del provider è obbligatorio.",
     "title": "Assistente IA",

@@ -9,39 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "admin-deck"
-version = "0.1.6"
-dependencies = [
- "base64 0.22.1",
- "image",
- "keyring-core",
- "portable-pty",
- "rand 0.8.6",
- "reqwest 0.12.28",
- "rusqlite",
- "russh",
- "russh-sftp",
- "serde",
- "serde_json",
- "serial2",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tauri-plugin-single-instance",
- "time",
- "tokio",
- "url",
- "vnc-rs",
- "webview2-com",
- "windows 0.61.3",
- "windows-native-keyring-store",
- "windows-sys 0.59.0",
- "zip",
-]
-
-[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2757,6 +2724,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb1e621458ca9c51aa110bd0339d4751a056b9576bf1253aee1aa560dda0fc9d"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "kkterm"
+version = "0.1.6"
+dependencies = [
+ "base64 0.22.1",
+ "image",
+ "keyring-core",
+ "portable-pty",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "russh",
+ "russh-sftp",
+ "serde",
+ "serde_json",
+ "serial2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tauri-plugin-single-instance",
+ "time",
+ "tokio",
+ "url",
+ "vnc-rs",
+ "webview2-com",
+ "windows 0.61.3",
+ "windows-native-keyring-store",
+ "windows-sys 0.59.0",
+ "zip",
 ]
 
 [[package]]

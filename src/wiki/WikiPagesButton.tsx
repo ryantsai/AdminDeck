@@ -6,7 +6,7 @@ import { menuButtonAria } from "../lib/aria";
 import type { WikiPageReference } from "../types";
 import { listWikiPagesForConnection } from "./wikiCommands";
 
-const OPEN_WIKI_EVENT = "admindeck:open-wiki";
+const OPEN_WIKI_EVENT = "kkterm:open-wiki";
 
 export function dispatchOpenWiki(pageId: string) {
   window.dispatchEvent(

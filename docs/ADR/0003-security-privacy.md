@@ -6,18 +6,18 @@ Accepted
 
 ## Context
 
-AdminDeck handles sensitive hostnames, usernames, SSH keys, passwords, passphrases, terminal commands, terminal output, and AI API keys. User trust is central to the product. The app is personal/local for v0.1, with no team vault or cloud sync.
+KKTerm handles sensitive hostnames, usernames, SSH keys, passwords, passphrases, terminal commands, terminal output, and AI API keys. User trust is central to the product. The app is personal/local for v0.1, with no team vault or cloud sync.
 
 ## Decision
 
-AdminDeck v0.1 will be local-first and privacy-first.
+KKTerm v0.1 will be local-first and privacy-first.
 
 Storage decisions:
 
 - Store non-secret data in SQLite.
 - Store passwords, SSH passphrases, and AI API keys in the OS keychain.
 - Reference SSH key files by path.
-- Do not store private keys directly in AdminDeck v0.1.
+- Do not store private keys directly in KKTerm v0.1.
 - Do not store plaintext secrets in config or SQLite.
 
 AI decisions:
@@ -38,7 +38,7 @@ Telemetry decisions:
 
 Licensing decisions:
 
-- AdminDeck app/core uses MIT.
+- KKTerm app/core uses MIT.
 - Prefer dependencies compatible with MIT/Apache-2.0/BSD/MPL-style use.
 - Avoid GPL dependencies in the core runtime unless explicitly revisited.
 

@@ -70,7 +70,7 @@
     "importSettingsComplete": "Settings imported. Previous database backup: {{filename}}.",
     "openDatabaseFolder": "Open Database Folder",
     "settingsDataActions": "Settings backup and import actions",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "Default uses src/assets/fonts/inter/web/InterVariable.woff2.",
     "aiProvider": "AI provider",
     "provider": "Provider",
@@ -186,7 +186,7 @@
     "ignoreCertificateErrorsHint": "Tải Kết nối URL với chứng chỉ tự ký hoặc không đáng tin cậy mà không có cảnh báo trình duyệt. Áp dụng cho các tab URL mới mở.",
     "urlSettingsSaved": "Đã lưu cài đặt URL.",
     "savedWebsitePasswords": "Saved website passwords",
-    "savedWebsitePasswordsHint": "Passwords are stored in the OS keychain. AdminDeck keeps the URL Connection, username, and detected field selectors in SQLite so Autofill can target the same fields without submitting the form.",
+    "savedWebsitePasswordsHint": "Passwords are stored in the OS keychain. KKTerm keeps the URL Connection, username, and detected field selectors in SQLite so Autofill can target the same fields without submitting the form.",
     "noSavedWebsitePasswords": "No saved website passwords yet.",
     "urlPasswordDeleted": "Saved website password deleted.",
     "urlPasswordDetails": "Username: {{username}} · Updated: {{updatedAt}}",
@@ -199,7 +199,7 @@
     "urlDataShardConnectionCountPlural": "{{count}} URL Connections",
     "aiToolsTitle": "Công cụ trợ lý",
     "aiToolsDescription": "Chọn công cụ tích hợp nào Trợ lý AI có thể gọi khi trả lời. Tắt các công cụ rủi ro trừ khi bạn cần chúng.",
-    "aiToolsSafety": "Biện pháp bảo vệ: công cụ tệp bị giới hạn trong dữ liệu ứng dụng AdminDeck, lệnh shell chỉ chạy từ dữ liệu ứng dụng, và yêu cầu xóa/phá hủy bị chặn cho đến khi có lời nhắc phê duyệt rõ ràng trong tương lai.",
+    "aiToolsSafety": "Biện pháp bảo vệ: công cụ tệp bị giới hạn trong dữ liệu ứng dụng KKTerm, lệnh shell chỉ chạy từ dữ liệu ứng dụng, và yêu cầu xóa/phá hủy bị chặn cho đến khi có lời nhắc phê duyệt rõ ràng trong tương lai.",
     "aiTools": {
        "currentTime": {
          "label": "Thời gian hiện tại",
@@ -215,15 +215,15 @@
        },
        "appDataFileSearch": {
          "label": "Tìm tệp dữ liệu ứng dụng",
-         "description": "Tìm tệp theo tên trong dữ liệu ứng dụng của AdminDeck."
+          "description": "Tìm tệp theo tên trong dữ liệu ứng dụng của KKTerm."
        },
        "appDataFileRead": {
          "label": "Đọc tệp dữ liệu ứng dụng",
-         "description": "Đọc tệp văn bản nhỏ trong dữ liệu ứng dụng của AdminDeck."
+          "description": "Đọc tệp văn bản nhỏ trong dữ liệu ứng dụng của KKTerm."
        },
        "shellCommand": {
          "label": "Lệnh PowerShell / batch",
-         "description": "Chạy lệnh PowerShell hoặc batch không phá hủy từ dữ liệu ứng dụng AdminDeck."
+          "description": "Chạy lệnh PowerShell hoặc batch không phá hủy từ dữ liệu ứng dụng KKTerm."
        }
     },
     "portRedirect": "Chuyển Hướng Cổng",
@@ -233,7 +233,7 @@
     "allowLocalOsc52Clipboard": "Cho phép ghi clipboard OSC 52 terminal cục bộ",
     "allowSshOsc52Clipboard": "Cho phép ghi clipboard OSC 52 SSH",
     "allowClipboardRead": "Cho phép đọc clipboard để dán",
-    "allowClipboardReadHint": "Cho phép bề mặt WebView2 của AdminDeck sử dụng quyền clipboard-read mà không hiện lời nhắc dán gốc.",
+    "allowClipboardReadHint": "Cho phép bề mặt WebView2 của KKTerm sử dụng quyền clipboard-read mà không hiện lời nhắc dán gốc.",
     "clipboardReadSaved": "Đã lưu cài đặt đọc clipboard.",
     "appSlogan": "Không gian làm việc quản trị ưu tiên cục bộ.",
     "capabilityToolCalling": "công cụ",
@@ -693,7 +693,7 @@
   "ai": {
     "title": "AI Assistant",
     "apiKeyRequired": "{{provider}} cần khóa API trước khi Trợ lý AI có thể trò chuyện.",
-    "extensionDraftPrompt": "Tạo bản nháp tiện ích mở rộng AdminDeck cho: ",
+    "extensionDraftPrompt": "Tạo bản nháp tiện ích mở rộng KKTerm cho: ",
     "modelRequired": "Model là bắt buộc.",
     "providerEndpointRequired": "Endpoint nhà cung cấp là bắt buộc.",
     "refresh": "Refresh AI Assistant",

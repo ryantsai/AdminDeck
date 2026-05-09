@@ -1,4 +1,4 @@
-# AdminDeck Roadmap
+# KKTerm Roadmap
 
 ## Current Progress
 
@@ -14,13 +14,13 @@ Milestone E has started with local-only performance instrumentation that records
 
 Milestone F has started with a repeatable Windows portable ZIP packaging flow that builds the release executable, stages release/privacy documentation, writes a package manifest, and emits a SHA-256 checksum under `artifacts/`. It now also has a repeatable unsigned Windows NSIS setup executable packaging flow that copies the installer into `artifacts/` with a SHA-256 checksum, plus a repeatable installer smoke test that verifies the checksum, silently installs to a temporary directory, confirms the installed executable, and silently uninstalls.
 
-Milestone G has started with explicit screenshot capture into AI Assistant context, an Assistant extension draft mode, and an accepted extension platform architecture ADR. Extension drafting is review-only: generated extension designs, manifests, permission requests, and source snippets are not installed, enabled, run, or written by AdminDeck until the extension platform and explicit approval flow exist.
+Milestone G has started with explicit screenshot capture into AI Assistant context, an Assistant extension draft mode, and an accepted extension platform architecture ADR. Extension drafting is review-only: generated extension designs, manifests, permission requests, and source snippets are not installed, enabled, run, or written by KKTerm until the extension platform and explicit approval flow exist.
 
 Latest validation on May 7, 2026: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` (103 passed) all clean after finishing the localization backlog and adding fields to two URL credential test-only struct literals in `src/storage.rs` so they keep up with the new `page_url`, `username_selector`, and `password_selector` fields on `UpsertUrlCredentialRequest`. `npm run build` still reports Vite's existing chunk-size warning. Previous May 2, 2026 packaging validation passed for `npm run package:portable`, `npm run package:installer`, and `npm run smoke:installer`.
 
 ## Milestone 0: Project Foundation
 
-- [x] Confirm working product name: AdminDeck.
+- [x] Confirm working product name: KKTerm.
 - [x] Initialize repository structure.
 - [x] Add MIT license.
 - [x] Add Rust/Tauri/React/Vite scaffold.
@@ -196,7 +196,7 @@ Latest validation on May 7, 2026: `npm run check`, `npm run build`, `cargo check
 - [ ] Allow AI Assistant to read the current active Connection text buffer.
 - [ ] Allow AI Assistant to reference previous session text buffers via RAG/agentic search.
 - [ ] Add voice input for AI Assistant with local model support.
-- [ ] Add MCP (Model Context Protocol) server support so the AI Assistant and external agents can automate AdminDeck workflows through the MCP protocol.
+- [ ] Add MCP (Model Context Protocol) server support so the AI Assistant and external agents can automate KKTerm workflows through the MCP protocol.
 
 ### Session Logging and Universal Search
 

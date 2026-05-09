@@ -69,7 +69,7 @@
     "importSettingsComplete": "설정을 가져왔습니다. 이전 데이터베이스 백업: {{filename}}.",
     "openDatabaseFolder": "데이터베이스 폴더 열기",
     "settingsDataActions": "설정 백업 및 가져오기 작업",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "기본값은 src/assets/fonts/inter/web/InterVariable.woff2를 사용합니다.",
     "aiProvider": "AI 제공자",
     "provider": "제공자",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "URL 데이터 및 자격 증명",
     "savedWebsitePasswords": "저장된 웹사이트 비밀번호",
-    "savedWebsitePasswordsHint": "비밀번호는 OS 키체인에 저장됩니다. AdminDeck는 URL 연결, 사용자 이름, 감지된 필드 선택자를 SQLite에 보관하여 자동 채우기가 폼을 제출하지 않고 동일한 필드를 대상으로 할 수 있게 합니다.",
+    "savedWebsitePasswordsHint": "비밀번호는 OS 키체인에 저장됩니다. KKTerm는 URL 연결, 사용자 이름, 감지된 필드 선택자를 SQLite에 보관하여 자동 채우기가 폼을 제출하지 않고 동일한 필드를 대상으로 할 수 있게 합니다.",
     "noSavedWebsitePasswords": "저장된 웹사이트 비밀번호가 아직 없습니다.",
     "urlPasswordDeleted": "저장된 웹사이트 비밀번호를 삭제했습니다.",
     "urlPasswordDetails": "사용자: {{username}} · 업데이트: {{updatedAt}}",
@@ -203,7 +203,7 @@
     "urlSettingsSaved": "URL 설정이 저장되었습니다.",
     "aiToolsTitle": "어시스턴트 도구",
     "aiToolsDescription": "AI 어시스턴트가 응답 중에 호출할 수 있는 내장 도구를 선택합니다. 필요한 경우가 아니면 위험한 도구는 끄십시오.",
-    "aiToolsSafety": "보호 장치: 파일 도구는 AdminDeck 앱 데이터로 제한되며, 셸 명령은 앱 데이터에서만 실행되고, 삭제/파괴 요청은 향후 명시적 승인 프롬프트에서 검토할 수 있을 때까지 차단됩니다.",
+    "aiToolsSafety": "보호 장치: 파일 도구는 KKTerm 앱 데이터로 제한되며, 셸 명령은 앱 데이터에서만 실행되고, 삭제/파괴 요청은 향후 명시적 승인 프롬프트에서 검토할 수 있을 때까지 차단됩니다.",
     "aiTools": {
       "currentTime": {
         "label": "현재 시간",
@@ -219,15 +219,15 @@
       },
       "appDataFileSearch": {
         "label": "앱 데이터 파일 검색",
-        "description": "AdminDeck 소유의 앱 데이터 내에서만 이름으로 파일을 찾습니다."
+        "description": "KKTerm 소유의 앱 데이터 내에서만 이름으로 파일을 찾습니다."
       },
       "appDataFileRead": {
         "label": "앱 데이터 파일 읽기",
-        "description": "AdminDeck 소유의 앱 데이터 내에서 작은 텍스트 파일만 읽습니다."
+        "description": "KKTerm 소유의 앱 데이터 내에서 작은 텍스트 파일만 읽습니다."
       },
       "shellCommand": {
         "label": "PowerShell / 배치 명령",
-        "description": "AdminDeck 앱 데이터에서만 비파괴적 PowerShell 또는 배치 명령을 실행합니다."
+        "description": "KKTerm 앱 데이터에서만 비파괴적 PowerShell 또는 배치 명령을 실행합니다."
       }
     },
     "appSlogan": "로컬 우선 관리 워크스페이스.",
@@ -264,7 +264,7 @@
     "connectedConnectionsRailHint": "연결된 각 Connection의 아이콘을 왼쪽 레일에 추가하여 빠르게 전환할 수 있도록 합니다.",
     "connectedConnectionsRailSaved": "왼쪽 레일에 연결 표시 설정이 저장되었습니다.",
     "allowClipboardRead": "붙여넣기를 위한 클립보드 읽기 허용",
-    "allowClipboardReadHint": "AdminDeck의 WebView2 표면이 네이티브 붙여넣기 프롬프트 없이 clipboard-read 권한을 사용할 수 있도록 합니다.",
+    "allowClipboardReadHint": "KKTerm의 WebView2 표면이 네이티브 붙여넣기 프롬프트 없이 clipboard-read 권한을 사용할 수 있도록 합니다.",
     "clipboardReadSaved": "클립보드 읽기 설정이 저장되었습니다.",
     "portRedirect": "포트 리다이렉트",
     "portRedirectHint": "SSH 터미널 포트 리다이렉트 메뉴에 표시될 원격 루프백 포트를 제어합니다.",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "{{label}} 미리 보기",
     "imageInputNotSupported": "이 모델은 이미지 입력을 지원하지 않으므로 붙여넣은 스크린샷은 전송되지 않습니다.",
     "apiKeyRequired": "{{provider}}는 AI 어시스턴트가 채팅을 시작하기 전에 API 키가 필요합니다.",
-    "extensionDraftPrompt": "AdminDeck 확장 초안 작성 대상: ",
+    "extensionDraftPrompt": "KKTerm 확장 초안 작성 대상: ",
     "modelRequired": "모델은 필수입니다.",
     "providerEndpointRequired": "제공자 엔드포인트는 필수입니다."
   },

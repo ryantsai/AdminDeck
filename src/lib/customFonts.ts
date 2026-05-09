@@ -12,7 +12,7 @@ export interface CustomFontOption extends CustomFont {
 }
 
 export function customFontCssFamily(path: string) {
-  return `AdminDeck Custom Font ${hashPath(path)}`;
+  return `KKTerm Custom Font ${hashPath(path)}`;
 }
 
 export function customFontCssValue(path: string) {

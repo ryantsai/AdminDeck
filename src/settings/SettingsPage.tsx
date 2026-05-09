@@ -56,7 +56,7 @@ export function SettingsPage({
     <main className="settings-page">
       <header className="settings-page-header">
         <div>
-          <p className="panel-label">AdminDeck</p>
+          <p className="panel-label">KKTerm</p>
           <h1>{t("settings.title")}</h1>
         </div>
         <button className="toolbar-button" type="button" onClick={onBack}>

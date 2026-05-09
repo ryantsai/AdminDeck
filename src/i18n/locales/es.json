@@ -69,7 +69,7 @@
     "importSettingsComplete": "Configuración importada. Copia de seguridad anterior de la base de datos: {{filename}}.",
     "openDatabaseFolder": "Abrir carpeta de base de datos",
     "settingsDataActions": "Acciones de copia de seguridad e importación de configuración",
-    "settingsExportFilter": "AdminDeck backup",
+    "settingsExportFilter": "KKTerm backup",
     "defaultFontHint": "Por defecto usa src/assets/fonts/inter/web/InterVariable.woff2.",
     "aiProvider": "Proveedor de IA",
     "provider": "Proveedor",
@@ -176,7 +176,7 @@
     "sectionUrl": "URL",
     "urlDefaults": "Datos y credenciales de URL",
     "savedWebsitePasswords": "Contraseñas de sitios guardadas",
-    "savedWebsitePasswordsHint": "Las contraseñas se guardan en el llavero del sistema operativo. AdminDeck mantiene la conexión URL, el nombre de usuario y los selectores de campo detectados en SQLite para que el autocompletado pueda apuntar a los mismos campos sin enviar el formulario.",
+    "savedWebsitePasswordsHint": "Las contraseñas se guardan en el llavero del sistema operativo. KKTerm mantiene la conexión URL, el nombre de usuario y los selectores de campo detectados en SQLite para que el autocompletado pueda apuntar a los mismos campos sin enviar el formulario.",
     "noSavedWebsitePasswords": "Aún no hay contraseñas de sitios guardadas.",
     "urlPasswordDeleted": "Contraseña de sitio guardada eliminada.",
     "urlPasswordDetails": "Usuario: {{username}} · Actualizado: {{updatedAt}}",
@@ -194,7 +194,7 @@
     "ignoreCertificateErrors": "Ignorar certificados HTTPS no válidos",
     "ignoreCertificateErrorsHint": "Carga Conexiones URL con certificados autofirmados o no confiables sin la advertencia del navegador. Se aplica a las pestañas URL recién abiertas.",
     "allowClipboardRead": "Permitir lectura del portapapeles para pegar",
-    "allowClipboardReadHint": "Permite que las superficies WebView2 de AdminDeck usen el permiso de lectura del portapapeles sin el aviso nativo de pegado.",
+    "allowClipboardReadHint": "Permite que las superficies WebView2 de KKTerm usen el permiso de lectura del portapapeles sin el aviso nativo de pegado.",
     "clipboardReadSaved": "Configuración de lectura del portapapeles guardada.",
     "urlSettingsSaved": "Configuración de URL guardada.",
     "sshBufferLines": "Líneas del búfer SSH",
@@ -212,7 +212,7 @@
     "sshKeyGenerating": "Generando...",
     "aiToolsTitle": "Herramientas del asistente",
     "aiToolsDescription": "Elija qué herramientas integradas puede usar el Asistente IA al responder. Mantenga las herramientas riesgosas desactivadas a menos que las necesite.",
-    "aiToolsSafety": "Protecciones: las herramientas de archivos se limitan a los datos de la aplicación AdminDeck, los comandos de shell se ejecutan solo desde los datos de la aplicación, y las solicitudes de eliminación/destructivas se bloquean hasta que un futuro aviso de aprobación explícita pueda revisarlas.",
+    "aiToolsSafety": "Protecciones: las herramientas de archivos se limitan a los datos de la aplicación KKTerm, los comandos de shell se ejecutan solo desde los datos de la aplicación, y las solicitudes de eliminación/destructivas se bloquean hasta que un futuro aviso de aprobación explícita pueda revisarlas.",
     "aiTools": {
       "currentTime": {
         "label": "Hora actual",
@@ -228,15 +228,15 @@
       },
       "appDataFileSearch": {
         "label": "Buscar archivos de datos de la app",
-        "description": "Encontrar archivos por nombre solo dentro de los datos de la aplicación AdminDeck."
+        "description": "Encontrar archivos por nombre solo dentro de los datos de la aplicación KKTerm."
       },
       "appDataFileRead": {
         "label": "Leer archivo de datos de la app",
-        "description": "Leer archivos de texto pequeños solo dentro de los datos de la aplicación AdminDeck."
+        "description": "Leer archivos de texto pequeños solo dentro de los datos de la aplicación KKTerm."
       },
       "shellCommand": {
         "label": "Comandos PowerShell / batch",
-        "description": "Ejecutar comandos PowerShell o batch no destructivos solo desde los datos de la aplicación AdminDeck."
+        "description": "Ejecutar comandos PowerShell o batch no destructivos solo desde los datos de la aplicación KKTerm."
       }
     },
     "appSlogan": "Espacio de trabajo de administración local.",
@@ -1048,7 +1048,7 @@
     "imagePreviewTitle": "Vista previa de {{label}}",
     "imageInputNotSupported": "Este modelo no admite entrada de imágenes, por lo que las capturas pegadas no se envían.",
     "apiKeyRequired": "{{provider}} necesita una clave API antes de que el Asistente IA pueda chatear.",
-    "extensionDraftPrompt": "Crear un borrador de extensión de AdminDeck para: ",
+    "extensionDraftPrompt": "Crear un borrador de extensión de KKTerm para: ",
     "modelRequired": "El modelo es obligatorio.",
     "providerEndpointRequired": "El endpoint del proveedor es obligatorio."
   },

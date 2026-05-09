@@ -149,7 +149,7 @@ fn unique_private_key_path(ssh_folder: &Path) -> Result<PathBuf, String> {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
-        let candidate = ssh_folder.join(format!("id_ed25519_admindeck_{suffix}"));
+        let candidate = ssh_folder.join(format!("id_ed25519_kkterm_{suffix}"));
         if !candidate.exists() && !public_key_path_for(&candidate).exists() {
             return Ok(candidate);
         }

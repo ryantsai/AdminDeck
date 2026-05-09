@@ -1371,7 +1371,7 @@ export async function selectWikiExportPath(defaultFilename: string) {
   }
   const path = await saveDialog({
     defaultPath: defaultFilename,
-    filters: [{ name: "AdminDeck wiki export", extensions: ["zip"] }],
+    filters: [{ name: "KKTerm wiki export", extensions: ["zip"] }],
     title: "Export wiki",
   });
   return typeof path === "string" ? path : null;

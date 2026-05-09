@@ -121,7 +121,7 @@ type CapturedCredentialPayload = {
   passwordSelector?: string;
 };
 
-const CREDENTIAL_TITLE_PREFIX = "__ADMINDECK_URL_CREDENTIAL__";
+const CREDENTIAL_TITLE_PREFIX = "__KKTERM_URL_CREDENTIAL__";
 
 function createCredentialCaptureNonce() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -486,7 +486,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
         setSavedCredentialUsername(payload.username ?? "");
         setHasSavedCredential(true);
         setFillStatus(t("webview.passwordSaved"));
-        window.dispatchEvent(new CustomEvent("admindeck:connection-tree-invalidated"));
+        window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
       })
       .catch((error) => {
         setFillStatus("");

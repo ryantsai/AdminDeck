@@ -17,7 +17,7 @@ const DEFAULT_PARTITION: &str = "shared";
 const HIDDEN_WEBVIEW_POSITION: f64 = -32_000.0;
 const AUTOFILL_AGENT: &str = r#"
 (() => {
-  const TITLE_CHANNEL = "__ADMINDECK_URL_CREDENTIAL__";
+  const TITLE_CHANNEL = "__KKTERM_URL_CREDENTIAL__";
   const agent = {
     fill(credential) {
       const result = fillCredential(credential);
@@ -220,7 +220,7 @@ const AUTOFILL_AGENT: &str = r#"
     return index >= 0 ? `input[type='${CSS.escape(type)}']:nth-of-type(${index + 1})` : "input";
   }
 
-  Object.defineProperty(window, "__ADMINDECK_URL_AUTOFILL__", {
+  Object.defineProperty(window, "__KKTERM_URL_AUTOFILL__", {
     configurable: true,
     value: agent,
   });
@@ -619,7 +619,7 @@ impl WebviewSessionManager {
             .ok_or_else(|| format!("webview session '{}' was not found", request.session_id))?;
         webview
             .eval(format!(
-                "window.__ADMINDECK_URL_AUTOFILL__?.fill({payload});"
+                "window.__KKTERM_URL_AUTOFILL__?.fill({payload});"
             ))
             .map_err(|error| format!("failed to fill webview credential: {error}"))
     }
@@ -636,7 +636,7 @@ impl WebviewSessionManager {
             .ok_or_else(|| format!("webview session '{}' was not found", request.session_id))?;
         webview
             .eval(format!(
-                "window.__ADMINDECK_URL_AUTOFILL__?.capture({nonce});"
+                "window.__KKTERM_URL_AUTOFILL__?.capture({nonce});"
             ))
             .map_err(|error| format!("failed to capture webview credential: {error}"))
     }

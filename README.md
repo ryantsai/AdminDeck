@@ -1,6 +1,6 @@
-# AdminDeck
+# KKTerm
 
-AdminDeck is a Windows-first, local-first desktop workspace for terminal sessions,
+KKTerm is a Windows-first, local-first desktop workspace for terminal sessions,
 SSH, SFTP, saved connections, and approval-based command assistance.
 
 This repository currently contains the v0.1 foundation:
@@ -9,7 +9,7 @@ This repository currently contains the v0.1 foundation:
 - React, TypeScript, and Vite frontend
 - Tailwind design-token setup
 - Zustand workspace state
-- Dense first-pass AdminDeck app shell with Dashboard and Settings rail entries
+- Dense first-pass KKTerm app shell with Dashboard and Settings rail entries
 - Rust command boundary with a typed frontend wrapper
 - SQLite-backed durable Connections, folders, reorder, and settings storage
 - OS keychain secret operations

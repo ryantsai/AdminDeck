@@ -1,10 +1,10 @@
 import packageManifest from "../../package.json";
 
 export const ABOUT_PRODUCT = {
-  name: "AdminDeck",
+  name: "KKTerm",
   slogan: "Local-first administration workspace.",
   developer: "Ryan Tsai",
-  repositoryUrl: "https://github.com/ryantsai/AdminDeck",
+  repositoryUrl: "https://github.com/ryantsai/KKTerm",
   version: packageManifest.version,
   license: "MIT",
 };
