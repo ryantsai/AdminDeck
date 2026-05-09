@@ -7268,7 +7268,8 @@ progress {
 .settings-reset-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 360px);
-  gap: 14px;
+  column-gap: 14px;
+  row-gap: 4px;
   align-items: center;
   min-width: 0;
   min-height: 54px;
@@ -7307,6 +7308,16 @@ progress {
 .settings-section label:not(.settings-toggle-row) > .input-with-button,
 .settings-section label:not(.settings-toggle-row) > datalist {
   grid-column: 2;
+}
+
+.settings-section label:not(.settings-toggle-row):has(> .field-hint) > input,
+.settings-section label:not(.settings-toggle-row):has(> .field-hint) > select,
+.settings-section label:not(.settings-toggle-row):has(> .field-hint) > .input-with-button,
+.settings-section label:not(.settings-toggle-row):has(> small) > input,
+.settings-section label:not(.settings-toggle-row):has(> small) > select,
+.settings-section label:not(.settings-toggle-row):has(> small) > .input-with-button {
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 
 .settings-section label:not(.settings-toggle-row) > .field-hint,
