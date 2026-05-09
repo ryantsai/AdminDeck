@@ -8,6 +8,8 @@ import {
   LayoutDashboard,
   Monitor,
   PanelTop,
+  Pin,
+  PinOff,
   ScanLine,
   Settings,
 } from "lucide-react";
@@ -28,6 +30,7 @@ import "./App.css";
 import { AssistantPanel } from "./ai/AssistantPanel";
 import { ConnectionIcon } from "./connections/ConnectionIcon";
 import { ConnectionSidebar } from "./connections/ConnectionSidebar";
+import { flattenConnections } from "./connections/treeUtils";
 import { StatusBar } from "./workspace/StatusBar";
 import { ScreenshotsPage } from "./workspace/ScreenshotsPage";
 import { TabStrip, WorkspaceCanvas } from "./workspace/WorkspaceCanvas";
@@ -63,7 +66,8 @@ const CONNECTION_RAIL_ORDER_KEY = "kkterm.connectionRail.order.v1";
 
 type ConnectedRailItem = {
   connection: Connection;
-  tabId: string;
+  tabId?: string;
+  pinned: boolean;
 };
 
 type ConnectionRailDragState = {
@@ -76,6 +80,13 @@ type ConnectionRailDragState = {
 type ConnectionRailDropTarget = {
   connectionId: string | null;
   position: "before" | "after" | "end";
+};
+
+type RailConnectionMenuState = {
+  connection: Connection;
+  pinned: boolean;
+  x: number;
+  y: number;
 };
 
 type ScreenshotRegionState = {
@@ -559,7 +570,10 @@ function ActivityRail({
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const tabs = useWorkspaceStore((state) => state.tabs);
   const generalSettings = useWorkspaceStore((state) => state.generalSettings);
+  const setGeneralSettings = useWorkspaceStore((state) => state.setGeneralSettings);
   const activateTab = useWorkspaceStore((state) => state.activateTab);
+  const openConnection = useWorkspaceStore((state) => state.openConnection);
+  const [savedConnections, setSavedConnections] = useState<Connection[]>([]);
   const [dontSleepEnabled, setDontSleepEnabled] = useState(false);
   const [dontSleepUpdating, setDontSleepUpdating] = useState(false);
   const [connectionRailOrder, setConnectionRailOrder] = useState(
@@ -571,9 +585,12 @@ function ActivityRail({
   const [connectionRailDropTarget, setConnectionRailDropTarget] =
     useState<ConnectionRailDropTarget | null>(null);
   const [screenshotMenu, setScreenshotMenu] = useState<{ x: number; y: number } | null>(null);
+  const [railConnectionMenu, setRailConnectionMenu] =
+    useState<RailConnectionMenuState | null>(null);
   const [screenshotRegionState, setScreenshotRegionState] =
     useState<ScreenshotRegionState | null>(null);
   const screenshotMenuRef = useRef<HTMLDivElement | null>(null);
+  const railConnectionMenuRef = useRef<HTMLDivElement | null>(null);
   const screenshotRegionTargetRef = useRef<HTMLDivElement | null>(null);
   const screenshotRegionSelectionRef = useRef<HTMLDivElement | null>(null);
   const connectionRailDragRef = useRef<ConnectionRailDragState | null>(null);
@@ -601,6 +618,33 @@ function ActivityRail({
     };
   }, []);
 
+  useEffect(() => {
+    let disposed = false;
+
+    async function loadSavedConnections() {
+      try {
+        const tree = await invokeCommand("list_connection_tree");
+        if (!disposed) {
+          setSavedConnections(flattenConnections(tree));
+        }
+      } catch {
+        if (!disposed) {
+          setSavedConnections([]);
+        }
+      }
+    }
+
+    void loadSavedConnections();
+    const handleTreeInvalidated = () => {
+      void loadSavedConnections();
+    };
+    window.addEventListener("kkterm:connection-tree-invalidated", handleTreeInvalidated);
+    return () => {
+      disposed = true;
+      window.removeEventListener("kkterm:connection-tree-invalidated", handleTreeInvalidated);
+    };
+  }, []);
+
   function handleConnectionsClick() {
     if (activePage === "workspace") {
       onConnectionsToggle();
@@ -609,9 +653,13 @@ function ActivityRail({
     }
   }
 
-  function handleConnectedConnectionClick(tabId: string) {
+  function handleRailConnectionClick(item: ConnectedRailItem) {
     onNavigate("workspace");
-    activateTab(tabId);
+    if (item.tabId) {
+      activateTab(item.tabId);
+      return;
+    }
+    openConnection(item.connection);
   }
 
   const activeTabConnectionId = useMemo(
@@ -620,23 +668,37 @@ function ActivityRail({
   );
 
   const connectedRailItems = useMemo<ConnectedRailItem[]>(() => {
-    if (!generalSettings.showConnectedConnectionsInRail) {
-      return [];
-    }
-
-    const seenConnectionIds = new Set<string>();
-    const items = tabs.flatMap((tab) => {
-      const connection = tab.connection;
-      if (
-        !connection ||
-        seenConnectionIds.has(connection.id) ||
-        !activeSessionCounts[connection.id]
-      ) {
+    const savedConnectionById = new Map(
+      savedConnections.map((connection) => [connection.id, connection]),
+    );
+    const pinnedConnectionIds = generalSettings.pinnedConnectionIds ?? [];
+    const pinnedConnectionIdSet = new Set(pinnedConnectionIds);
+    const pinnedItems: ConnectedRailItem[] = pinnedConnectionIds.flatMap((connectionId) => {
+      const connection = savedConnectionById.get(connectionId);
+      if (!connection) {
         return [];
       }
-      seenConnectionIds.add(connection.id);
-      return [{ connection, tabId: tab.id }];
+      const tabId = tabs.find((tab) => tab.connection?.id === connection.id)?.id;
+      return [{ connection, tabId, pinned: true }];
     });
+
+    const seenConnectionIds = new Set<string>();
+    pinnedItems.forEach((item) => seenConnectionIds.add(item.connection.id));
+    const items: ConnectedRailItem[] = generalSettings.showConnectedConnectionsInRail
+      ? tabs.flatMap((tab) => {
+          const connection = tab.connection;
+          if (
+            !connection ||
+            pinnedConnectionIdSet.has(connection.id) ||
+            seenConnectionIds.has(connection.id) ||
+            !activeSessionCounts[connection.id]
+          ) {
+            return [];
+          }
+          seenConnectionIds.add(connection.id);
+          return [{ connection, tabId: tab.id, pinned: false }];
+        })
+      : [];
 
     const itemByConnectionId = new Map(
       items.map((item) => [item.connection.id, item]),
@@ -650,11 +712,13 @@ function ActivityRail({
       return [item];
     });
 
-    return [...orderedItems, ...itemByConnectionId.values()];
+    return [...pinnedItems, ...orderedItems, ...itemByConnectionId.values()];
   }, [
     activeSessionCounts,
     connectionRailOrder,
+    generalSettings.pinnedConnectionIds,
     generalSettings.showConnectedConnectionsInRail,
+    savedConnections,
     tabs,
   ]);
 
@@ -662,9 +726,9 @@ function ActivityRail({
     sourceConnectionId: string,
     dropTarget: ConnectionRailDropTarget,
   ) {
-    const visibleConnectionIds = connectedRailItems.map(
-      (item) => item.connection.id,
-    );
+    const visibleConnectionIds = connectedRailItems
+      .filter((item) => !item.pinned)
+      .map((item) => item.connection.id);
     if (
       !visibleConnectionIds.includes(sourceConnectionId) ||
       sourceConnectionId === dropTarget.connectionId
@@ -709,23 +773,23 @@ function ActivityRail({
     }
 
     const target = document.elementFromPoint(clientX, clientY);
-    const button = target?.closest?.("[data-rail-connection-id]");
+    const button = target?.closest?.("[data-rail-connected-id]");
     if (button instanceof HTMLElement && list.contains(button)) {
       const rect = button.getBoundingClientRect();
       return {
-        connectionId: button.dataset.railConnectionId ?? null,
+        connectionId: button.dataset.railConnectedId ?? null,
         position: clientY < rect.top + rect.height / 2 ? "before" : "after",
       };
     }
 
     const firstButton = list.querySelector<HTMLElement>(
-      "[data-rail-connection-id]",
+      "[data-rail-connected-id]",
     );
     if (firstButton) {
       const rect = firstButton.getBoundingClientRect();
       if (clientY < rect.top) {
         return {
-          connectionId: firstButton.dataset.railConnectionId ?? null,
+          connectionId: firstButton.dataset.railConnectedId ?? null,
           position: "before",
         };
       }
@@ -801,12 +865,51 @@ function ActivityRail({
     setConnectionRailDropTarget(null);
   }
 
-  function handleConnectedConnectionButtonClick(tabId: string, connectionId: string) {
-    if (suppressConnectionClickRef.current === connectionId) {
-      suppressConnectionClickRef.current = null;
-      return;
+  async function updatePinnedRailConnections(
+    nextPinnedConnectionIds: string[],
+    successMessage: string,
+  ) {
+    const previousSettings = generalSettings;
+    const nextSettings = {
+      ...previousSettings,
+      pinnedConnectionIds: nextPinnedConnectionIds,
+    };
+    setGeneralSettings(nextSettings);
+    try {
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_general_settings", { request: nextSettings })
+        : nextSettings;
+      setGeneralSettings(saved);
+      showWorkspaceStatus(successMessage, { tone: "success" });
+    } catch (error) {
+      setGeneralSettings(previousSettings);
+      const message = error instanceof Error ? error.message : String(error);
+      showWorkspaceStatus(t("connections.pinRailError", { message }), {
+        tone: "error",
+      });
     }
-    handleConnectedConnectionClick(tabId);
+  }
+
+  async function pinRailConnection(connection: Connection) {
+    const nextPinnedConnectionIds = [
+      ...generalSettings.pinnedConnectionIds.filter(
+        (connectionId) => connectionId !== connection.id,
+      ),
+      connection.id,
+    ];
+    await updatePinnedRailConnections(
+      nextPinnedConnectionIds,
+      t("connections.pinnedToRailStatus", { name: connection.name }),
+    );
+  }
+
+  async function unpinRailConnection(connection: Connection) {
+    await updatePinnedRailConnections(
+      generalSettings.pinnedConnectionIds.filter(
+        (connectionId) => connectionId !== connection.id,
+      ),
+      t("connections.unpinnedFromRailStatus", { name: connection.name }),
+    );
   }
 
   function openScreenshotMenu(event: ReactMouseEvent<HTMLButtonElement>) {
@@ -836,6 +939,30 @@ function ActivityRail({
     };
   }, [screenshotMenu]);
 
+  useEffect(() => {
+    if (!railConnectionMenu) {
+      return;
+    }
+    function closeMenu(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (target && railConnectionMenuRef.current?.contains(target)) {
+        return;
+      }
+      setRailConnectionMenu(null);
+    }
+    function closeMenuOnKey(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        setRailConnectionMenu(null);
+      }
+    }
+    window.addEventListener("pointerdown", closeMenu);
+    window.addEventListener("keydown", closeMenuOnKey);
+    return () => {
+      window.removeEventListener("pointerdown", closeMenu);
+      window.removeEventListener("keydown", closeMenuOnKey);
+    };
+  }, [railConnectionMenu]);
+
   useLayoutEffect(() => {
     const node = screenshotMenuRef.current;
     if (!node || !screenshotMenu) {
@@ -844,6 +971,16 @@ function ActivityRail({
     node.style.left = `${screenshotMenu.x}px`;
     node.style.top = `${screenshotMenu.y}px`;
   }, [screenshotMenu]);
+
+  useLayoutEffect(() => {
+    const node = railConnectionMenuRef.current;
+    if (!node || !railConnectionMenu) {
+      return;
+    }
+    const bounds = node.getBoundingClientRect();
+    node.style.left = `${Math.max(8, Math.min(railConnectionMenu.x, window.innerWidth - bounds.width - 8))}px`;
+    node.style.top = `${Math.max(8, Math.min(railConnectionMenu.y, window.innerHeight - bounds.height - 8))}px`;
+  }, [railConnectionMenu]);
 
   async function captureScreenshot(kind: StoredScreenshotKind, rect?: CaptureScreenshotRequest) {
     if (!isTauriRuntime()) {
@@ -1089,50 +1226,92 @@ function ActivityRail({
               ? "rail-drop-end"
               : ""
           }`}
-          aria-label={t("app.connectedConnectionsRail")}
+          aria-label={t("app.connectionRail")}
         >
-          {connectedRailItems.map(({ connection, tabId }) => (
+          {connectedRailItems.map((item) => (
             <button
-              key={connection.id}
-              data-rail-connection-id={connection.id}
+              key={item.connection.id}
+              data-rail-connection-id={item.connection.id}
+              data-rail-connected-id={item.pinned ? undefined : item.connection.id}
               className={`rail-button rail-button-connection ${
-                activePage === "workspace" && activeTabConnectionId === connection.id
+                item.pinned ? "pinned" : ""
+              } ${
+                activePage === "workspace" && activeTabConnectionId === item.connection.id
                   ? "active"
                   : ""
-              } ${draggedConnectionId === connection.id ? "dragging" : ""} ${
+              } ${draggedConnectionId === item.connection.id ? "dragging" : ""} ${
                 draggedConnectionId &&
-                connectionRailDropTarget?.connectionId === connection.id &&
+                connectionRailDropTarget?.connectionId === item.connection.id &&
                 connectionRailDropTarget.position === "before"
                   ? "rail-drop-before"
                   : ""
               } ${
                 draggedConnectionId &&
-                connectionRailDropTarget?.connectionId === connection.id &&
+                connectionRailDropTarget?.connectionId === item.connection.id &&
                 connectionRailDropTarget.position === "after"
                   ? "rail-drop-after"
                   : ""
               }`}
-              aria-label={t("app.openConnectedConnection", {
-                name: connection.name,
+              aria-label={t(item.pinned ? "app.openPinnedConnection" : "app.openConnectedConnection", {
+                name: item.connection.name,
               })}
-              onClick={() =>
-                handleConnectedConnectionButtonClick(tabId, connection.id)
+              onClick={() => {
+                if (suppressConnectionClickRef.current === item.connection.id) {
+                  suppressConnectionClickRef.current = null;
+                  return;
+                }
+                handleRailConnectionClick(item);
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setRailConnectionMenu({
+                  connection: item.connection,
+                  pinned: item.pinned,
+                  x: event.clientX,
+                  y: event.clientY,
+                });
+              }}
+              onPointerCancel={item.pinned ? undefined : handleConnectedRailPointerEnd}
+              onPointerDown={
+                item.pinned
+                  ? undefined
+                  : (event) =>
+                    handleConnectedRailPointerDown(event, item.connection.id)
               }
-              onPointerCancel={handleConnectedRailPointerEnd}
-              onPointerDown={(event) =>
-                handleConnectedRailPointerDown(event, connection.id)
-              }
-              onPointerMove={handleConnectedRailPointerMove}
-              onPointerUp={handleConnectedRailPointerEnd}
+              onPointerMove={item.pinned ? undefined : handleConnectedRailPointerMove}
+              onPointerUp={item.pinned ? undefined : handleConnectedRailPointerEnd}
             >
               <ConnectionIcon
-                localShell={connection.localShell}
+                localShell={item.connection.localShell}
                 size={18}
-                type={connection.type}
+                type={item.connection.type}
               />
-              <RailTooltip label={connection.name} />
+              <RailTooltip label={item.connection.name} />
             </button>
           ))}
+        </div>
+      ) : null}
+      {railConnectionMenu ? (
+        <div
+          ref={railConnectionMenuRef}
+          className="terminal-menu rail-context-menu rail-connection-menu"
+          onContextMenu={(event) => event.preventDefault()}
+          role="menu"
+        >
+          <button
+            className="terminal-menu-item"
+            onClick={() => {
+              const connection = railConnectionMenu.connection;
+              const pinned = railConnectionMenu.pinned;
+              setRailConnectionMenu(null);
+              void (pinned ? unpinRailConnection(connection) : pinRailConnection(connection));
+            }}
+            role="menuitem"
+            type="button"
+          >
+            {railConnectionMenu.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+            {t(railConnectionMenu.pinned ? "connections.unpinFromRail" : "connections.pinToRail")}
+          </button>
         </div>
       ) : null}
       <button

@@ -2,7 +2,7 @@ import { ConnectionIcon } from "./ConnectionIcon";
 import { ImportDialog } from "./ImportDialog";
 import { confirmTrustedSshHostKey, defaultPortForConnectionType, connectionSubtitle, connectionTypeLabel, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
 import { collectConnectionFolderIds, countConnections, countFolders, filterConnectionTree, flattenConnections, flattenFolders, upsertRootConnection, withLiveConnectionStatuses } from "./treeUtils";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Download, Folder, FolderPlus, KeyRound, PanelRight, Play, Plus, Save, Search, Server, Terminal, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Download, Folder, FolderPlus, KeyRound, PanelRight, Pin, PinOff, Play, Plus, Save, Search, Server, Terminal, X } from "lucide-react";
 import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollapseTextInput, Delete as IconParkDelete, Edit as IconParkEdit, ExpandTextInput as IconParkExpandTextInput, FolderPlus as IconParkFolderPlus, Setting as IconParkSetting } from "@icon-park/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -119,6 +119,10 @@ function saveRecentConnectionIds(connectionIds: string[]) {
   );
 }
 
+function notifyConnectionTreeInvalidated() {
+  window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
+}
+
 export function ConnectionSidebar({
   onToggleCollapsed,
 }: {
@@ -134,6 +138,8 @@ export function ConnectionSidebar({
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
   const addConnectionToTerminalPane = useWorkspaceStore((state) => state.addConnectionToTerminalPane);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
+  const generalSettings = useWorkspaceStore((state) => state.generalSettings);
+  const setGeneralSettings = useWorkspaceStore((state) => state.setGeneralSettings);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
   const [tree, setTree] = useState<ConnectionTree>(connectionTree);
@@ -225,6 +231,7 @@ export function ConnectionSidebar({
     } else {
       setTree((currentTree) => upsertRootConnection(currentTree, connection));
     }
+    notifyConnectionTreeInvalidated();
     setFormMode(null);
     setFormError("");
     setTreeError("");
@@ -259,6 +266,49 @@ export function ConnectionSidebar({
   function handleOpenConnection(connection: Connection) {
     rememberConnection(connection);
     openConnection(connection);
+  }
+
+  async function updatePinnedRailConnections(
+    nextPinnedConnectionIds: string[],
+    successMessage: string,
+  ) {
+    const previousSettings = generalSettings;
+    const nextSettings = {
+      ...previousSettings,
+      pinnedConnectionIds: nextPinnedConnectionIds,
+    };
+    setGeneralSettings(nextSettings);
+    try {
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_general_settings", { request: nextSettings })
+        : nextSettings;
+      setGeneralSettings(saved);
+      showWorkspaceStatus(successMessage, { tone: "success" });
+    } catch (error) {
+      setGeneralSettings(previousSettings);
+      const message = error instanceof Error ? error.message : String(error);
+      showWorkspaceStatus(t("connections.pinRailError", { message }), {
+        tone: "error",
+      });
+    }
+  }
+
+  async function handleToggleRailPin(connection: Connection) {
+    if (generalSettings.pinnedConnectionIds.includes(connection.id)) {
+      await updatePinnedRailConnections(
+        generalSettings.pinnedConnectionIds.filter((connectionId) => connectionId !== connection.id),
+        t("connections.unpinnedFromRailStatus", { name: connection.name }),
+      );
+      return;
+    }
+
+    await updatePinnedRailConnections(
+      [
+        ...generalSettings.pinnedConnectionIds.filter((connectionId) => connectionId !== connection.id),
+        connection.id,
+      ],
+      t("connections.pinnedToRailStatus", { name: connection.name }),
+    );
   }
 
   function handleAddConnectionToFocusedPane(connection: Connection, direction: SplitDirection) {
@@ -495,6 +545,7 @@ export function ConnectionSidebar({
           (connection.type === "url" && Boolean(urlCredentialUsername && urlPassword)),
       });
       await reloadConnectionGroups();
+      notifyConnectionTreeInvalidated();
       setEditConnection(null);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : String(error));
@@ -539,6 +590,7 @@ export function ConnectionSidebar({
         request: { name, parentFolderId },
       });
       await reloadConnectionGroups();
+      notifyConnectionTreeInvalidated();
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
@@ -556,6 +608,7 @@ export function ConnectionSidebar({
         request: { id: folder.id, name },
       });
       await reloadConnectionGroups();
+      notifyConnectionTreeInvalidated();
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
@@ -568,6 +621,7 @@ export function ConnectionSidebar({
         folderId: folder.id,
       });
       await reloadConnectionGroups();
+      notifyConnectionTreeInvalidated();
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
@@ -586,6 +640,7 @@ export function ConnectionSidebar({
       });
       refreshOpenConnectionMetadata(renamedConnection);
       await reloadConnectionGroups();
+      notifyConnectionTreeInvalidated();
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
@@ -603,6 +658,7 @@ export function ConnectionSidebar({
           request: { id: folderId, parentFolderId, targetIndex },
         }),
       );
+      notifyConnectionTreeInvalidated();
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
@@ -620,6 +676,7 @@ export function ConnectionSidebar({
           request: { id: connectionId, folderId, targetIndex },
         }),
       );
+      notifyConnectionTreeInvalidated();
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
     }
@@ -632,6 +689,7 @@ export function ConnectionSidebar({
         connectionId: connection.id,
       });
       await reloadConnectionGroups();
+      notifyConnectionTreeInvalidated();
       showConnectionSuccessStatus(t("connections.deleteConnectionComplete", { name: connection.name }));
     } catch (error) {
       setTreeError(error instanceof Error ? error.message : String(error));
@@ -1100,6 +1158,10 @@ export function ConnectionSidebar({
         <TreeContextMenu
           menu={treeContextMenu}
           canAddToPane={Boolean(tabs.find((tab) => tab.id === activeTabId && tab.kind === "terminal"))}
+          isPinned={
+            treeContextMenu.kind === "connection" &&
+            generalSettings.pinnedConnectionIds.includes(treeContextMenu.connection.id)
+          }
           onClose={() => setTreeContextMenu(null)}
           onCreateConnection={() => {
             setTreeContextMenu(null);
@@ -1140,6 +1202,13 @@ export function ConnectionSidebar({
             setTreeContextMenu(null);
             if (menu.kind === "connection") {
               handleAddConnectionToFocusedPane(menu.connection, direction);
+            }
+          }}
+          onToggleRailPin={() => {
+            const menu = treeContextMenu;
+            setTreeContextMenu(null);
+            if (menu.kind === "connection") {
+              void handleToggleRailPin(menu.connection);
             }
           }}
           onTransferSshPublicKey={() => {
@@ -1486,6 +1555,7 @@ function NewFolderDraftRow({
 function TreeContextMenu({
   menu,
   canAddToPane,
+  isPinned,
   onClose,
   onCreateConnection,
   onCreateFolder,
@@ -1493,10 +1563,12 @@ function TreeContextMenu({
   onProperties,
   onRename,
   onAddToPane,
+  onToggleRailPin,
   onTransferSshPublicKey,
 }: {
   menu: TreeContextMenuState;
   canAddToPane: boolean;
+  isPinned: boolean;
   onClose: () => void;
   onCreateConnection: () => void;
   onCreateFolder: () => void;
@@ -1504,6 +1576,7 @@ function TreeContextMenu({
   onProperties: () => void;
   onRename: () => void;
   onAddToPane: (direction: SplitDirection) => void;
+  onToggleRailPin: () => void;
   onTransferSshPublicKey: () => void;
 }) {
   const { t } = useTranslation();
@@ -1577,6 +1650,14 @@ function TreeContextMenu({
       ) : null}
       {menu.kind === "connection" ? (
         <>
+          <button onClick={onToggleRailPin} role="menuitem" type="button">
+            {isPinned ? (
+              <PinOff className="menu-item-icon" size={15} />
+            ) : (
+              <Pin className="menu-item-icon" size={15} />
+            )}
+            <span>{t(isPinned ? "connections.unpinFromRail" : "connections.pinToRail")}</span>
+          </button>
           {canAddToPane ? (
             <div className="tree-context-submenu" role="none">
               <button aria-haspopup="menu" className="tree-submenu-trigger" role="menuitem" type="button">

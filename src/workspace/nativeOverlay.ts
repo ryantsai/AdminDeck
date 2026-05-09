@@ -4,7 +4,7 @@ export function documentHasWebviewOverlay() {
   // these menus/overlays are open.
   return Boolean(
     document.querySelector(
-      ".quick-connect-menu, .sftp-context-menu, .sftp-properties-popover, .screenshot-menu, .screenshot-region-overlay, .transfer-conflict-backdrop, .connection-dialog-backdrop, .settings-page",
+      ".quick-connect-menu, .rail-context-menu, .sftp-context-menu, .sftp-properties-popover, .screenshot-menu, .screenshot-region-overlay, .transfer-conflict-backdrop, .connection-dialog-backdrop, .settings-page",
     ),
   );
 }

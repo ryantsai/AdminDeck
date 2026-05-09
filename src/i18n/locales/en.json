@@ -13,8 +13,10 @@
     "resizeAiAssistant": "Resize AI Assistant panel",
     "aiAssistant": "AI Assistant",
     "wiki": "Wiki",
+    "connectionRail": "Connection Rail",
     "connectedConnectionsRail": "Connected Connections",
-    "openConnectedConnection": "Open {{name}}"
+    "openConnectedConnection": "Open {{name}}",
+    "openPinnedConnection": "Open pinned Connection {{name}}"
   },
   "screenshots": {
     "title": "Screenshots",
@@ -369,6 +371,11 @@
     "newConnection": "New Connection",
     "rename": "Rename",
     "delete": "Delete",
+    "pinToRail": "Pin to rail",
+    "unpinFromRail": "Unpin from rail",
+    "pinnedToRailStatus": "Pinned {{name}} to the rail.",
+    "unpinnedFromRailStatus": "Unpinned {{name}} from the rail.",
+    "pinRailError": "Could not update pinned Connections: {{message}}",
     "addTo": "Add to...",
     "left": "Left",
     "right": "Right",

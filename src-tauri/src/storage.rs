@@ -159,6 +159,8 @@ pub struct GeneralSettings {
     auto_backup_enabled: bool,
     #[serde(default = "default_show_connected_connections_in_rail")]
     show_connected_connections_in_rail: bool,
+    #[serde(default)]
+    pinned_connection_ids: Vec<String>,
     #[serde(default = "default_allow_clipboard_read")]
     allow_clipboard_read: bool,
     #[serde(default)]
@@ -2551,6 +2553,7 @@ fn default_general_settings() -> GeneralSettings {
     GeneralSettings {
         auto_backup_enabled: true,
         show_connected_connections_in_rail: true,
+        pinned_connection_ids: Vec::new(),
         allow_clipboard_read: default_allow_clipboard_read(),
         minimize_to_tray: false,
         last_backup_at: None,
@@ -2747,7 +2750,8 @@ fn default_ai_cli_execution_policy() -> String {
     "suggestOnly".to_string()
 }
 
-fn validate_general_settings(settings: GeneralSettings) -> Result<GeneralSettings, String> {
+fn validate_general_settings(mut settings: GeneralSettings) -> Result<GeneralSettings, String> {
+    settings.pinned_connection_ids = unique_non_empty_strings(settings.pinned_connection_ids);
     Ok(settings)
 }
 
@@ -2918,6 +2922,17 @@ fn trim_optional(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn unique_non_empty_strings(values: Vec<String>) -> Vec<String> {
+    let mut unique_values = Vec::new();
+    for value in values {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() && !unique_values.contains(&trimmed) {
+            unique_values.push(trimmed);
+        }
+    }
+    unique_values
 }
 
 fn default_ssh_user() -> String {
@@ -3708,6 +3723,7 @@ mod tests {
             .expect("default general settings load");
         assert!(defaults.auto_backup_enabled);
         assert!(defaults.show_connected_connections_in_rail);
+        assert!(defaults.pinned_connection_ids.is_empty());
         assert!(defaults.allow_clipboard_read);
         assert!(!defaults.minimize_to_tray);
         assert!(defaults.last_backup_at.is_none());
@@ -3716,6 +3732,12 @@ mod tests {
             .update_general_settings(GeneralSettings {
                 auto_backup_enabled: false,
                 show_connected_connections_in_rail: true,
+                pinned_connection_ids: vec![
+                    " connection-a ".to_string(),
+                    "connection-a".to_string(),
+                    "".to_string(),
+                    "connection-b".to_string(),
+                ],
                 allow_clipboard_read: false,
                 minimize_to_tray: true,
                 last_backup_at: None,
@@ -3723,12 +3745,20 @@ mod tests {
             .expect("general settings update");
         assert!(!updated.auto_backup_enabled);
         assert!(updated.show_connected_connections_in_rail);
+        assert_eq!(
+            updated.pinned_connection_ids,
+            vec!["connection-a".to_string(), "connection-b".to_string()]
+        );
         assert!(!updated.allow_clipboard_read);
         assert!(updated.minimize_to_tray);
 
         let reloaded = storage.general_settings().expect("general settings reload");
         assert!(!reloaded.auto_backup_enabled);
         assert!(reloaded.show_connected_connections_in_rail);
+        assert_eq!(
+            reloaded.pinned_connection_ids,
+            vec!["connection-a".to_string(), "connection-b".to_string()]
+        );
         assert!(!reloaded.allow_clipboard_read);
         assert!(reloaded.minimize_to_tray);
         assert!(reloaded.last_backup_at.is_none());
@@ -3742,6 +3772,7 @@ mod tests {
             .update_general_settings(GeneralSettings {
                 auto_backup_enabled: false,
                 show_connected_connections_in_rail: true,
+                pinned_connection_ids: vec!["connection-pinned".to_string()],
                 allow_clipboard_read: true,
                 minimize_to_tray: true,
                 last_backup_at: None,
@@ -3754,6 +3785,7 @@ mod tests {
             .update_general_settings(GeneralSettings {
                 auto_backup_enabled: true,
                 show_connected_connections_in_rail: false,
+                pinned_connection_ids: Vec::new(),
                 allow_clipboard_read: false,
                 minimize_to_tray: false,
                 last_backup_at: None,
@@ -3769,6 +3801,10 @@ mod tests {
 
         assert!(!imported.general_settings.auto_backup_enabled);
         assert!(imported.general_settings.show_connected_connections_in_rail);
+        assert_eq!(
+            imported.general_settings.pinned_connection_ids,
+            vec!["connection-pinned".to_string()]
+        );
         assert!(imported.general_settings.minimize_to_tray);
         assert_eq!(
             imported.general_settings.last_backup_at.as_deref(),
