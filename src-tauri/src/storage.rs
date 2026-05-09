@@ -194,6 +194,7 @@ pub struct ImportedDatabaseSnapshot {
     ssh_settings: SshSettings,
     sftp_settings: SftpSettings,
     url_settings: UrlSettings,
+    screenshot_settings: ScreenshotSettings,
     ai_provider_settings: AiProviderSettings,
     connection_tree: ConnectionTree,
     backup: DatabaseBackupInfo,
@@ -255,6 +256,18 @@ pub struct SftpSettings {
 pub struct UrlSettings {
     #[serde(default)]
     ignore_certificate_errors: bool,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScreenshotSettings {
+    folder_path: String,
+}
+
+impl ScreenshotSettings {
+    pub(crate) fn folder_path(&self) -> &str {
+        &self.folder_path
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -694,6 +707,7 @@ impl Storage {
             ssh_settings: self.ssh_settings()?,
             sftp_settings: self.sftp_settings()?,
             url_settings: self.url_settings()?,
+            screenshot_settings: self.screenshot_settings()?,
             ai_provider_settings: self.ai_provider_settings()?,
             connection_tree: self.list_connection_tree()?,
             backup,
@@ -930,6 +944,46 @@ impl Storage {
             .execute(
                 "INSERT INTO settings (key, value, updated_at)
                  VALUES ('url', ?1, CURRENT_TIMESTAMP)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![value],
+            )
+            .map_err(to_storage_error)?;
+        Ok(settings)
+    }
+
+    pub fn screenshot_settings(&self) -> Result<ScreenshotSettings, String> {
+        let connection = self.lock()?;
+        let value = connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'screenshots'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?;
+
+        match value {
+            Some(value) => serde_json::from_str(&value)
+                .map(validate_screenshot_settings)
+                .map_err(|error| format!("Screenshot settings are invalid: {error}"))?,
+            None => Ok(default_screenshot_settings()),
+        }
+    }
+
+    pub fn update_screenshot_settings(
+        &self,
+        request: ScreenshotSettings,
+    ) -> Result<ScreenshotSettings, String> {
+        let settings = validate_screenshot_settings(request)?;
+        let value = serde_json::to_string(&settings)
+            .map_err(|error| format!("failed to serialize Screenshot settings: {error}"))?;
+        let connection = self.lock()?;
+        connection
+            .execute(
+                "INSERT INTO settings (key, value, updated_at)
+                 VALUES ('screenshots', ?1, CURRENT_TIMESTAMP)
                  ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value,
                     updated_at = CURRENT_TIMESTAMP",
@@ -1873,6 +1927,7 @@ fn validate_import_database(path: &Path) -> Result<(), String> {
     storage.appearance_settings()?;
     storage.ssh_settings()?;
     storage.sftp_settings()?;
+    storage.screenshot_settings()?;
     storage.ai_provider_settings()?;
     storage.list_connection_tree()?;
     Ok(())
@@ -2991,6 +3046,80 @@ fn default_url_settings() -> UrlSettings {
     }
 }
 
+fn default_screenshot_settings() -> ScreenshotSettings {
+    ScreenshotSettings {
+        folder_path: default_screenshot_folder_path(),
+    }
+}
+
+pub(crate) fn default_screenshot_folder_path() -> String {
+    if let Some(path) = windows_screenshots_folder_path() {
+        return path;
+    }
+
+    std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .map(|home| {
+            PathBuf::from(home)
+                .join("Pictures")
+                .join("Screenshots")
+                .to_string_lossy()
+                .to_string()
+        })
+        .unwrap_or_else(|_| "%USERPROFILE%\\Pictures\\Screenshots".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn windows_screenshots_folder_path() -> Option<String> {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+
+    use windows_sys::core::GUID;
+    use windows_sys::Win32::System::Com::CoTaskMemFree;
+    use windows_sys::Win32::UI::Shell::SHGetKnownFolderPath;
+
+    const FOLDERID_SCREENSHOTS: GUID = GUID {
+        data1: 0xb7bede81,
+        data2: 0xdf94,
+        data3: 0x4682,
+        data4: [0xa7, 0xd8, 0x57, 0xa5, 0x26, 0x20, 0xb8, 0x6f],
+    };
+
+    unsafe {
+        let mut raw_path = std::ptr::null_mut();
+        if SHGetKnownFolderPath(
+            &FOLDERID_SCREENSHOTS,
+            0,
+            std::ptr::null_mut(),
+            &mut raw_path,
+        ) < 0
+            || raw_path.is_null()
+        {
+            return None;
+        }
+
+        let mut len = 0;
+        while *raw_path.add(len) != 0 {
+            len += 1;
+        }
+        let path = OsString::from_wide(std::slice::from_raw_parts(raw_path, len))
+            .to_string_lossy()
+            .to_string();
+        CoTaskMemFree(raw_path.cast());
+
+        if path.trim().is_empty() {
+            None
+        } else {
+            Some(path)
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn windows_screenshots_folder_path() -> Option<String> {
+    None
+}
+
 fn default_ai_provider_settings() -> AiProviderSettings {
     AiProviderSettings {
         enabled: false,
@@ -3112,6 +3241,26 @@ fn validate_sftp_settings(mut settings: SftpSettings) -> Result<SftpSettings, St
 
 fn validate_url_settings(settings: UrlSettings) -> Result<UrlSettings, String> {
     Ok(settings)
+}
+
+fn validate_screenshot_settings(
+    mut settings: ScreenshotSettings,
+) -> Result<ScreenshotSettings, String> {
+    settings.folder_path = required_field("screenshots folder", settings.folder_path)?;
+    let folder = expand_home_path(&settings.folder_path);
+    fs::create_dir_all(&folder)
+        .map_err(|error| format!("failed to create screenshots folder: {error}"))?;
+    Ok(settings)
+}
+
+fn expand_home_path(path: &str) -> PathBuf {
+    let trimmed = path.trim();
+    if let Some(rest) = trimmed.strip_prefix("%USERPROFILE%") {
+        if let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) {
+            return PathBuf::from(home).join(rest.trim_start_matches(['\\', '/']));
+        }
+    }
+    PathBuf::from(trimmed)
 }
 
 fn validate_ai_provider_settings(

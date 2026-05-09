@@ -498,6 +498,21 @@ fn update_url_settings(
 }
 
 #[tauri::command]
+fn get_screenshot_settings(
+    storage: tauri::State<'_, storage::Storage>,
+) -> Result<storage::ScreenshotSettings, String> {
+    storage.screenshot_settings()
+}
+
+#[tauri::command]
+fn update_screenshot_settings(
+    storage: tauri::State<'_, storage::Storage>,
+    request: storage::ScreenshotSettings,
+) -> Result<storage::ScreenshotSettings, String> {
+    storage.update_screenshot_settings(request)
+}
+
+#[tauri::command]
 fn get_ai_provider_settings(
     storage: tauri::State<'_, storage::Storage>,
 ) -> Result<storage::AiProviderSettings, String> {
@@ -593,6 +608,61 @@ fn capture_screenshot_for_assistant(
 fn capture_fullscreen_screenshot_for_assistant() -> Result<screenshot::AssistantScreenshot, String>
 {
     screenshot::capture_fullscreen_for_assistant()
+}
+
+#[tauri::command]
+fn capture_screenshot_to_library(
+    app: tauri::AppHandle,
+    storage: tauri::State<'_, storage::Storage>,
+    request: screenshot::CaptureScreenshotRequest,
+    kind: String,
+) -> Result<screenshot::StoredScreenshot, String> {
+    let settings = storage.screenshot_settings()?;
+    screenshot::capture_rect_to_library(&app, request, kind, settings.folder_path().to_string())
+}
+
+#[tauri::command]
+fn capture_fullscreen_screenshot_to_library(
+    app: tauri::AppHandle,
+    storage: tauri::State<'_, storage::Storage>,
+    kind: String,
+) -> Result<screenshot::StoredScreenshot, String> {
+    let settings = storage.screenshot_settings()?;
+    screenshot::capture_fullscreen_to_library(&app, kind, settings.folder_path().to_string())
+}
+
+#[tauri::command]
+fn capture_active_window_screenshot_to_library(
+    app: tauri::AppHandle,
+    storage: tauri::State<'_, storage::Storage>,
+    kind: String,
+) -> Result<screenshot::StoredScreenshot, String> {
+    let settings = storage.screenshot_settings()?;
+    screenshot::capture_active_window_to_library(&app, kind, settings.folder_path().to_string())
+}
+
+#[tauri::command]
+fn list_screenshots(
+    storage: tauri::State<'_, storage::Storage>,
+    request: screenshot::ListScreenshotsRequest,
+) -> Result<screenshot::ListScreenshotsResponse, String> {
+    let settings = storage.screenshot_settings()?;
+    screenshot::list_library_screenshots(request, settings.folder_path().to_string())
+}
+
+#[tauri::command]
+fn delete_screenshot(
+    storage: tauri::State<'_, storage::Storage>,
+    id: String,
+) -> Result<(), String> {
+    let settings = storage.screenshot_settings()?;
+    screenshot::delete_library_screenshot(id, settings.folder_path().to_string())
+}
+
+#[tauri::command]
+fn clear_screenshots(storage: tauri::State<'_, storage::Storage>) -> Result<(), String> {
+    let settings = storage.screenshot_settings()?;
+    screenshot::clear_library_screenshots(settings.folder_path().to_string())
 }
 
 #[tauri::command]
@@ -1461,6 +1531,8 @@ pub fn run() {
             update_sftp_settings,
             get_url_settings,
             update_url_settings,
+            get_screenshot_settings,
+            update_screenshot_settings,
             get_ai_provider_settings,
             update_ai_provider_settings,
             plan_command_proposal,
@@ -1474,6 +1546,12 @@ pub fn run() {
             capture_screenshot_to_clipboard,
             capture_screenshot_for_assistant,
             capture_fullscreen_screenshot_for_assistant,
+            capture_screenshot_to_library,
+            capture_fullscreen_screenshot_to_library,
+            capture_active_window_screenshot_to_library,
+            list_screenshots,
+            delete_screenshot,
+            clear_screenshots,
             ssh_transport_plan,
             import_ssh_config,
             parse_import_file,

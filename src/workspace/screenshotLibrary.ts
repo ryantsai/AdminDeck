@@ -1,64 +1,60 @@
-export type StoredScreenshotKind = "region" | "window" | "fullscreen";
+import {
+  invokeCommand,
+  isTauriRuntime,
+  type CaptureScreenshotRequest,
+  type ListScreenshotsResponse,
+  type StoredScreenshot,
+} from "../lib/tauri";
 
-export interface StoredScreenshot {
-  id: string;
-  dataUrl: string;
-  width: number;
-  height: number;
-  capturedAt: string;
-  kind: StoredScreenshotKind;
-  label: string;
-}
+export type StoredScreenshotKind = StoredScreenshot["kind"];
+export type { StoredScreenshot };
 
-const DATABASE_NAME = "admindeck.screenshots";
-const DATABASE_VERSION = 1;
-const STORE_NAME = "screenshots";
 const SCREENSHOTS_CHANGED_EVENT = "admindeck:screenshots-changed";
 
 type ScreenshotChangeListener = () => void;
 
-export async function listStoredScreenshots(): Promise<StoredScreenshot[]> {
-  const database = await openScreenshotDatabase();
-  const transaction = database.transaction(STORE_NAME, "readonly");
-  const store = transaction.objectStore(STORE_NAME);
-  const screenshots = await requestToPromise<StoredScreenshot[]>(store.getAll());
-  await transactionDone(transaction);
-  database.close();
-  return screenshots.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+export async function listStoredScreenshots(options: {
+  offset: number;
+  limit: number;
+}): Promise<ListScreenshotsResponse> {
+  if (!isTauriRuntime()) {
+    return { screenshots: [], total: 0, hasMore: false };
+  }
+  return invokeCommand("list_screenshots", { request: options });
 }
 
 export async function addStoredScreenshot(
-  screenshot: Omit<StoredScreenshot, "id" | "capturedAt">,
+  kind: StoredScreenshotKind,
+  request?: CaptureScreenshotRequest,
 ): Promise<StoredScreenshot> {
-  const stored: StoredScreenshot = {
-    ...screenshot,
-    id: crypto.randomUUID(),
-    capturedAt: new Date().toISOString(),
-  };
-  const database = await openScreenshotDatabase();
-  const transaction = database.transaction(STORE_NAME, "readwrite");
-  transaction.objectStore(STORE_NAME).put(stored);
-  await transactionDone(transaction);
-  database.close();
+  let stored: StoredScreenshot;
+  if (kind === "fullscreen") {
+    stored = await invokeCommand("capture_fullscreen_screenshot_to_library", { kind });
+  } else if (kind === "window" && !request) {
+    stored = await invokeCommand("capture_active_window_screenshot_to_library", { kind });
+  } else {
+    stored = await invokeCommand("capture_screenshot_to_library", {
+      kind,
+      request:
+        request ?? {
+          x: 0,
+          y: 0,
+          width: Math.max(1, Math.round(window.innerWidth)),
+          height: Math.max(1, Math.round(window.innerHeight)),
+        },
+    });
+  }
   notifyScreenshotsChanged();
   return stored;
 }
 
 export async function deleteStoredScreenshot(id: string): Promise<void> {
-  const database = await openScreenshotDatabase();
-  const transaction = database.transaction(STORE_NAME, "readwrite");
-  transaction.objectStore(STORE_NAME).delete(id);
-  await transactionDone(transaction);
-  database.close();
+  await invokeCommand("delete_screenshot", { id });
   notifyScreenshotsChanged();
 }
 
 export async function clearStoredScreenshots(): Promise<void> {
-  const database = await openScreenshotDatabase();
-  const transaction = database.transaction(STORE_NAME, "readwrite");
-  transaction.objectStore(STORE_NAME).clear();
-  await transactionDone(transaction);
-  database.close();
+  await invokeCommand("clear_screenshots");
   notifyScreenshotsChanged();
 }
 
@@ -69,35 +65,4 @@ export function subscribeToScreenshotChanges(listener: ScreenshotChangeListener)
 
 function notifyScreenshotsChanged() {
   window.dispatchEvent(new Event(SCREENSHOTS_CHANGED_EVENT));
-}
-
-function openScreenshotDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-    request.onerror = () => reject(request.error ?? new Error("Could not open screenshot store."));
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME, { keyPath: "id" });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-  });
-}
-
-function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onerror = () => reject(request.error ?? new Error("Screenshot store request failed."));
-    request.onsuccess = () => resolve(request.result);
-  });
-}
-
-function transactionDone(transaction: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    transaction.onabort = () =>
-      reject(transaction.error ?? new Error("Screenshot store transaction was aborted."));
-    transaction.onerror = () =>
-      reject(transaction.error ?? new Error("Screenshot store transaction failed."));
-    transaction.oncomplete = () => resolve();
-  });
 }

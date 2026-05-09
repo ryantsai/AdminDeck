@@ -1,8 +1,9 @@
-import { Copy, Grid2X2, List, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Camera, Copy, Grid2X2, List, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useWorkspaceStore } from "../store";
 import {
+  addStoredScreenshot,
   clearStoredScreenshots,
   deleteStoredScreenshot,
   listStoredScreenshots,
@@ -11,12 +12,18 @@ import {
 } from "./screenshotLibrary";
 
 type ScreenshotViewMode = "grid" | "list";
+const SCREENSHOT_PAGE_SIZE = 60;
 
 export function ScreenshotsPage() {
   const { t } = useTranslation();
   const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
   const [screenshots, setScreenshots] = useState<StoredScreenshot[]>([]);
+  const [hasMoreScreenshots, setHasMoreScreenshots] = useState(false);
+  const [loadingScreenshots, setLoadingScreenshots] = useState(false);
   const [viewMode, setViewMode] = useState<ScreenshotViewMode>("grid");
+  const loadMoreRef = useRef<HTMLButtonElement | null>(null);
+  const loadingScreenshotsRef = useRef(false);
+  const screenshotCountRef = useRef(0);
 
   const dateFormatter = useMemo(
     () =>
@@ -28,28 +35,59 @@ export function ScreenshotsPage() {
   );
 
   useEffect(() => {
-    let disposed = false;
-    async function refreshScreenshots() {
-      try {
-        const nextScreenshots = await listStoredScreenshots();
-        if (!disposed) {
-          setScreenshots(nextScreenshots);
-        }
-      } catch (error) {
-        if (!disposed) {
-          const message = error instanceof Error ? error.message : String(error);
-          showWorkspaceStatus(t("screenshots.loadError", { message }), { tone: "error" });
-        }
-      }
-    }
+    screenshotCountRef.current = screenshots.length;
+  }, [screenshots.length]);
 
-    void refreshScreenshots();
-    const unsubscribe = subscribeToScreenshotChanges(() => void refreshScreenshots());
-    return () => {
-      disposed = true;
-      unsubscribe();
-    };
-  }, [showWorkspaceStatus, t]);
+  const loadScreenshots = useCallback(
+    async (mode: "reset" | "append") => {
+      if (loadingScreenshotsRef.current) {
+        return;
+      }
+      loadingScreenshotsRef.current = true;
+      setLoadingScreenshots(true);
+      try {
+        const offset = mode === "append" ? screenshotCountRef.current : 0;
+        const response = await listStoredScreenshots({
+          offset,
+          limit: SCREENSHOT_PAGE_SIZE,
+        });
+        setHasMoreScreenshots(response.hasMore);
+        setScreenshots((current) =>
+          mode === "append" ? [...current, ...response.screenshots] : response.screenshots,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        showWorkspaceStatus(t("screenshots.loadError", { message }), { tone: "error" });
+      } finally {
+        loadingScreenshotsRef.current = false;
+        setLoadingScreenshots(false);
+      }
+    },
+    [showWorkspaceStatus, t],
+  );
+
+  useEffect(() => {
+    void loadScreenshots("reset");
+    const unsubscribe = subscribeToScreenshotChanges(() => void loadScreenshots("reset"));
+    return unsubscribe;
+  }, [loadScreenshots]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMoreScreenshots) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadScreenshots("append");
+        }
+      },
+      { root: null, rootMargin: "320px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMoreScreenshots, loadScreenshots]);
 
   async function copyScreenshot(screenshot: StoredScreenshot) {
     try {
@@ -85,6 +123,29 @@ export function ScreenshotsPage() {
     }
   }
 
+  async function takeScreenshot() {
+    try {
+      await addStoredScreenshot("fullscreen");
+      showWorkspaceStatus(t("screenshots.captureSuccess"), { tone: "success" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      showWorkspaceStatus(t("screenshots.captureError", { message }), { tone: "error" });
+    }
+  }
+
+  function screenshotLabel(screenshot: StoredScreenshot) {
+    switch (screenshot.kind) {
+      case "region":
+        return t("screenshots.regionCapture");
+      case "fullscreen":
+        return t("screenshots.fullscreenCapture");
+      case "window":
+        return t("screenshots.windowCapture");
+      default:
+        return screenshot.fileName;
+    }
+  }
+
   return (
     <main className="screenshots-page" role="region" aria-label={t("screenshots.title")}>
       <header className="screenshots-header">
@@ -93,6 +154,14 @@ export function ScreenshotsPage() {
           <p>{t("screenshots.subtitle")}</p>
         </div>
         <div className="screenshots-actions" role="toolbar" aria-label={t("screenshots.viewOptions")}>
+          <button
+            className="secondary-button"
+            onClick={() => void takeScreenshot()}
+            type="button"
+          >
+            <Camera size={15} />
+            {t("screenshots.takeScreenshot")}
+          </button>
           <button
             aria-label={t("screenshots.gridView")}
             aria-pressed={viewMode === "grid"}
@@ -134,10 +203,10 @@ export function ScreenshotsPage() {
           {screenshots.map((screenshot) => (
             <article className="screenshot-card" key={screenshot.id}>
               <div className="screenshot-preview">
-                <img alt={screenshot.label} src={screenshot.dataUrl} />
+                <img alt={screenshotLabel(screenshot)} loading="lazy" src={screenshot.dataUrl} />
               </div>
               <div className="screenshot-details">
-                <strong>{screenshot.label}</strong>
+                <strong>{screenshotLabel(screenshot)}</strong>
                 <span>
                   {t("screenshots.metadata", {
                     dimensions: `${screenshot.width} x ${screenshot.height}`,
@@ -165,6 +234,17 @@ export function ScreenshotsPage() {
               </div>
             </article>
           ))}
+          {hasMoreScreenshots ? (
+            <button
+              className="secondary-button screenshots-load-more"
+              disabled={loadingScreenshots}
+              onClick={() => void loadScreenshots("append")}
+              ref={loadMoreRef}
+              type="button"
+            >
+              {loadingScreenshots ? t("screenshots.loading") : t("screenshots.loadMore")}
+            </button>
+          ) : null}
         </section>
       )}
     </main>

@@ -26,6 +26,7 @@ export function useBootstrapSettings() {
   );
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
   const setSftpSettings = useWorkspaceStore((state) => state.setSftpSettings);
+  const setScreenshotSettings = useWorkspaceStore((state) => state.setScreenshotSettings);
   const setUrlSettings = useWorkspaceStore((state) => state.setUrlSettings);
   const setAiProviderSettings = useWorkspaceStore(
     (state) => state.setAiProviderSettings,
@@ -83,6 +84,12 @@ export function useBootstrapSettings() {
       })
       .catch(swallow);
 
+    void invokeCommand("get_screenshot_settings")
+      .then((settings) => {
+        if (!disposed) setScreenshotSettings(settings);
+      })
+      .catch(swallow);
+
     void invokeCommand("get_ai_provider_settings")
       .then((settings) => {
         if (!disposed) setAiProviderSettings(settings);
@@ -108,6 +115,7 @@ export function useBootstrapSettings() {
     setAiProviderSettings,
     setGeneralSettings,
     setAppearanceSettings,
+    setScreenshotSettings,
     setSftpSettings,
     setSshSettings,
     setUrlSettings,

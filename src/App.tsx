@@ -1,10 +1,10 @@
 import {
   BedSingle,
   BookOpen,
+  Camera,
   ChevronLeft,
   ChevronRight,
   Coffee,
-  Images,
   LayoutDashboard,
   Monitor,
   PanelTop,
@@ -851,25 +851,7 @@ function ActivityRail({
 
     try {
       await waitForScreenshotSurface();
-      const screenshot =
-        kind === "fullscreen"
-          ? await invokeCommand("capture_fullscreen_screenshot_for_assistant")
-          : await invokeCommand("capture_screenshot_for_assistant", {
-              request:
-                rect ?? {
-                  x: 0,
-                  y: 0,
-                  width: Math.max(1, Math.round(window.innerWidth)),
-                  height: Math.max(1, Math.round(window.innerHeight)),
-                },
-            });
-      await addStoredScreenshot({
-        dataUrl: screenshot.dataUrl,
-        width: screenshot.width,
-        height: screenshot.height,
-        kind,
-        label: t(`screenshots.${kind}Capture`),
-      });
+      await addStoredScreenshot(kind, rect);
       showWorkspaceStatus(t("screenshots.captureSuccess"), { tone: "success" });
     } catch (error) {
       showWorkspaceStatus(
@@ -1035,7 +1017,7 @@ function ActivityRail({
         onClick={() => onNavigate("screenshots")}
         onContextMenu={openScreenshotMenu}
       >
-        <Images size={18} />
+        <Camera size={18} />
         <RailTooltip label={t("screenshots.title")} />
       </button>
       {screenshotMenu ? (

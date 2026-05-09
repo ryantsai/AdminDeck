@@ -182,6 +182,7 @@ export interface ImportedDatabaseSnapshot {
   sshSettings: SshSettings;
   sftpSettings: SftpSettings;
   urlSettings: UrlSettings;
+  screenshotSettings: ScreenshotSettings;
   aiProviderSettings: AiProviderSettings;
   connectionTree: ConnectionTree;
   backup: DatabaseBackupInfo;
@@ -242,6 +243,10 @@ export interface SftpSettings {
 
 export interface UrlSettings {
   ignoreCertificateErrors: boolean;
+}
+
+export interface ScreenshotSettings {
+  folderPath: string;
 }
 
 export type AiProviderKind =

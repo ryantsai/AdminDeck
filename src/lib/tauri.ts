@@ -29,6 +29,7 @@ import type {
   SecretPresence,
   SecretReferenceRequest,
   SftpSettings,
+  ScreenshotSettings,
   SshSettings,
   StoreSecretRequest,
   TerminalSettings,
@@ -358,6 +359,24 @@ export interface AssistantScreenshot {
   dataUrl: string;
   width: number;
   height: number;
+}
+
+export interface StoredScreenshot {
+  id: string;
+  path: string;
+  fileName: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  capturedAt: number;
+  label: string;
+  kind: "region" | "window" | "fullscreen" | "screenshot";
+}
+
+export interface ListScreenshotsResponse {
+  screenshots: StoredScreenshot[];
+  total: number;
+  hasMore: boolean;
 }
 
 export interface StartWebviewSessionRequest {
@@ -756,9 +775,41 @@ type CommandMap = {
     args: { request: CaptureScreenshotRequest };
     result: AssistantScreenshot;
   };
+  get_screenshot_settings: {
+    args: undefined;
+    result: ScreenshotSettings;
+  };
+  update_screenshot_settings: {
+    args: { request: ScreenshotSettings };
+    result: ScreenshotSettings;
+  };
   capture_fullscreen_screenshot_for_assistant: {
     args: undefined;
     result: AssistantScreenshot;
+  };
+  capture_screenshot_to_library: {
+    args: { request: CaptureScreenshotRequest; kind: StoredScreenshot["kind"] };
+    result: StoredScreenshot;
+  };
+  capture_fullscreen_screenshot_to_library: {
+    args: { kind: StoredScreenshot["kind"] };
+    result: StoredScreenshot;
+  };
+  capture_active_window_screenshot_to_library: {
+    args: { kind: StoredScreenshot["kind"] };
+    result: StoredScreenshot;
+  };
+  list_screenshots: {
+    args: { request: { offset?: number; limit?: number } };
+    result: ListScreenshotsResponse;
+  };
+  delete_screenshot: {
+    args: { id: string };
+    result: null;
+  };
+  clear_screenshots: {
+    args: undefined;
+    result: null;
   };
   ssh_transport_plan: {
     args: undefined;
@@ -1335,6 +1386,22 @@ export async function selectWikiAttachmentFiles() {
     return selection;
   }
   return typeof selection === "string" ? [selection] : [];
+}
+
+export async function selectScreenshotFolder(options: {
+  defaultPath?: string;
+  title: string;
+}) {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+  const selectedPath = await openDialog({
+    defaultPath: options.defaultPath,
+    directory: true,
+    multiple: false,
+    title: options.title,
+  });
+  return typeof selectedPath === "string" ? selectedPath : null;
 }
 
 export async function openFilesystemPath(path: string) {

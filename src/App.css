@@ -5915,6 +5915,15 @@ progress {
   justify-content: flex-end;
 }
 
+.screenshots-load-more {
+  justify-self: center;
+  min-width: 148px;
+}
+
+.screenshots-grid .screenshots-load-more {
+  grid-column: 1 / -1;
+}
+
 .icon-button.danger:hover {
   color: var(--red);
 }
