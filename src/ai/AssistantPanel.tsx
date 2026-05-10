@@ -33,6 +33,7 @@ import {
 import { useWorkspaceStore } from "../store";
 import { sendTextToRdpPane, writeInputToPane } from "../workspace/paneRegistry";
 import i18next from "../i18n/config";
+import { prepareAssistantTerminalInput } from "./terminalCommandSend";
 
 function resolveAssistantOutputLanguage(outputLanguage: string): string | undefined {
   if (!outputLanguage) {
@@ -563,7 +564,7 @@ export function AssistantPanel({
 
   function handleSendCodeToTerminal(code: string) {
     if (activeTerminalPaneId) {
-      const data = code.endsWith("\n") ? code : `${code}\n`;
+      const data = prepareAssistantTerminalInput(code);
       writeInputToPane(activeTerminalPaneId, data);
       return;
     }
