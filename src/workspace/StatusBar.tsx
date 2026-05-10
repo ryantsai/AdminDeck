@@ -1,8 +1,9 @@
-import { ArrowDownToLine, ArrowUpFromLine, Cpu, MemoryStick } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, BedSingle, Coffee, Cpu, MemoryStick } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ActivePage } from "../app/ActivityRail";
+import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 
 const NOTIFICATION_FADE_MS = 220;
@@ -60,7 +61,79 @@ export function StatusBar({ activePage }: { activePage: ActivePage }) {
           </span>
         ) : null}
       </div>
+      <div className="status-bar-actions">
+        <DontSleepStatusButton />
+      </div>
     </footer>
+  );
+}
+
+function DontSleepStatusButton() {
+  const { t } = useTranslation();
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
+  const [enabled, setEnabled] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    let disposed = false;
+    void invokeCommand("get_dont_sleep_enabled")
+      .then((nextEnabled) => {
+        if (!disposed) {
+          setEnabled(nextEnabled);
+        }
+      })
+      .catch(() => {
+        // The status bar should still render if the desktop-only helper is unavailable.
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  async function handleClick() {
+    if (updating) {
+      return;
+    }
+
+    const nextEnabled = !enabled;
+    setUpdating(true);
+
+    try {
+      const savedEnabled = isTauriRuntime()
+        ? await invokeCommand("set_dont_sleep_enabled", { enabled: nextEnabled })
+        : nextEnabled;
+      setEnabled(savedEnabled);
+      showStatusBarNotice(
+        savedEnabled ? t("app.dontSleepEnabled") : t("app.dontSleepDisabled"),
+        { tone: savedEnabled ? "success" : "info" },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      showStatusBarNotice(t("app.dontSleepError", { message }), { tone: "error" });
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  const label = enabled ? t("app.dontSleepDisable") : t("app.dontSleepEnable");
+  const Icon = enabled ? Coffee : BedSingle;
+
+  return (
+    <button
+      className={`status-bar-action status-bar-dont-sleep ${enabled ? "active" : ""}`}
+      aria-label={label}
+      aria-pressed={enabled}
+      disabled={updating}
+      onClick={() => void handleClick()}
+      type="button"
+    >
+      <Icon size={14} />
+    </button>
   );
 }
 

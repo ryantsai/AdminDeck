@@ -509,16 +509,8 @@ button {
   bottom: -4px;
 }
 
-.rail-button-dont-sleep {
-  margin-top: auto;
-}
-
 .rail-button-settings {
-  margin-top: 0;
-}
-
-.rail-button-dont-sleep.dont-sleep-enabled {
-  color: var(--nav-toolbar-warning);
+  margin-top: auto;
 }
 
 .rail-button:disabled {
@@ -4077,13 +4069,9 @@ progress {
   border-top: 1px solid var(--border);
 }
 
-.status-bar::after {
-  content: "";
-  min-width: 0;
-}
-
 .status-bar-module,
 .status-bar-notice-area,
+.status-bar-actions,
 .host-metrics {
   display: flex;
   align-items: center;
@@ -4096,6 +4084,44 @@ progress {
 
 .status-bar-notice-area {
   justify-content: center;
+}
+
+.status-bar-actions {
+  justify-content: flex-end;
+}
+
+.status-bar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-faint);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  outline: none;
+}
+
+.status-bar-action:hover,
+.status-bar-action:focus-visible {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.status-bar-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.status-bar-dont-sleep.active {
+  color: var(--accent);
+}
+
+.status-bar-dont-sleep.active svg {
+  fill: currentColor;
+  stroke: currentColor;
 }
 
 .host-metrics {
@@ -4168,7 +4194,8 @@ progress {
 }
 
 .host-metric-network .host-metric-value {
-  width: 9ch;
+  width: auto;
+  min-width: 7ch;
 }
 
 .status-notification {

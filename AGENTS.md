@@ -4,6 +4,81 @@
 
 KKTerm is a Windows-first, local-first Tauri v2 desktop app — Rust backend, React/TypeScript frontend. Product direction: `docs/PRD.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/ADR/`. Before changing behavior or terminology, read `CONTEXT.md` and preserve its domain boundaries.
 
+## Constitution
+
+These rules apply to every task in this project unless explicitly overridden.
+Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
+
+## Rule 1 — Think Before Coding
+
+State assumptions explicitly. If uncertain, ask rather than guess.
+Present multiple interpretations when ambiguity exists.
+Push back when a simpler approach exists.
+Stop when confused. Name what's unclear.
+
+## Rule 2 — Simplicity First
+
+Minimum code that solves the problem. Nothing speculative.
+No features beyond what was asked. No abstractions for single-use code.
+Test: would a senior engineer say this is overcomplicated? If yes, simplify.
+
+## Rule 3 — Surgical Changes
+
+Touch only what you must. Clean up only your own mess.
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor what isn't broken. Match existing style.
+
+## Rule 4 — Goal-Driven Execution
+
+Define success criteria. Loop until verified.
+Don't follow steps. Define success and iterate.
+Strong success criteria let you loop independently.
+
+## Rule 5 — Use the model only for judgment calls
+
+Use me for: classification, drafting, summarization, extraction.
+Do NOT use me for: routing, retries, deterministic transforms.
+If code can answer, code answers.
+
+## Rule 6 — Token budgets are not advisory
+
+Per-task: 4,000 tokens. Per-session: 30,000 tokens.
+If approaching budget, summarize and start fresh.
+Surface the breach. Do not silently overrun.
+
+## Rule 7 — Surface conflicts, don't average them
+
+If two patterns contradict, pick one (more recent / more tested).
+Explain why. Flag the other for cleanup.
+Don't blend conflicting patterns.
+
+## Rule 8 — Read before you write
+
+Before adding code, read exports, immediate callers, shared utilities.
+"Looks orthogonal" is dangerous. If unsure why code is structured a way, ask.
+
+## Rule 9 — Tests verify intent, not just behavior
+
+Tests must encode WHY behavior matters, not just WHAT it does.
+A test that can't fail when business logic changes is wrong.
+
+## Rule 10 — Checkpoint after every significant step
+
+Summarize what was done, what's verified, what's left.
+Don't continue from a state you can't describe back.
+If you lose track, stop and restate.
+
+## Rule 11 — Match the codebase's conventions, even if you disagree
+
+Conformance > taste inside the codebase.
+If you genuinely think a convention is harmful, surface it. Don't fork silently.
+
+## Rule 12 — Fail loud
+
+"Completed" is wrong if anything was skipped silently.
+"Tests pass" is wrong if any were skipped.
+Default to surfacing uncertainty, not hiding it.
+
 ## Domain Language
 
 - **Connection**: durable, stored in SQLite. Kinds: local terminal, SSH terminal, URL (embedded WebView2), RDP, VNC. SFTP opens from an SSH Connection.
@@ -48,6 +123,7 @@ Use **Connection** (not "profile") for stored openable resources.
 Stack: **i18next + react-i18next**, in `src/i18n/`. English (`locales/en.json`, ~500 keys, 11 namespaces) is the source of truth and the only bundled locale; 12 others (fr, it, de, es, es-MX, pt-BR, zh-TW, zh-CN, ja, ko, th, id) load on demand via dynamic `import()`. Selection persists in `localStorage` (`kkterm.language`) and is hot-swapped via `switchLanguage()` in `src/i18n/config.ts`; `ensureI18nReady()` handles startup. Selector lives at Settings → General → Language. The typed `useT()` hook in `src/i18n/useT.ts` autocompletes keys from the English JSON shape.
 
 ### Rules
+
 1. **Every user-visible string MUST go through `t()`** — labels, aria-labels, titles, placeholders, status, errors. In React, `const { t } = useTranslation()`. In pure helpers that can't use hooks, import `i18next` from `src/i18n/config` and call `i18next.t(key)`.
 2. **Implement English first.** Add or change keys in `src/i18n/locales/en.json` under the appropriate namespace (dot-notation, e.g. `settings.general.language`). Do not block UI work translating every locale in the same change.
 3. **Track pending translations in `docs/LOCALIZATION.md`** for every new or changed English key not translated immediately. Each entry needs the key, English value, namespace, file/component, UI role (label/button/status/tooltip/error/fragment), surrounding user flow, tone, placeholder details, and domain notes. No context-free TODOs — standalone words are often ambiguous without nearby controls and state.
@@ -55,6 +131,7 @@ Stack: **i18next + react-i18next**, in `src/i18n/`. English (`locales/en.json`, 
 5. **When renaming or removing a key**, update `en.json`, revise/remove the matching `docs/LOCALIZATION.md` entry, and clean up any translated locale files that touched the key.
 
 ### Namespaces
+
 `app` (shell, ActivityRail, resize handles), `settings`, `connections` (sidebar, tree, dialogs, Quick Connect, context menus), `terminal` (workspace, toolbar, SSH host key dialogs), `sftp` (browser, transfers, conflicts, properties), `webview` (URL toolbar, credential fill), `remoteDesktop` (RDP/VNC status, toolbar), `ai` (assistant panel, markdown toolbar, chat history, waiting phrases), `workspace` (tab strip, canvas, status bar, screenshot menu), `common` (Save, Cancel, Close, Delete, Copy…), `languages` (native names).
 
 ## Codex Desktop UI Review

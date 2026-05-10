@@ -1,6 +1,4 @@
 import {
-  BedSingle,
-  Coffee,
   LayoutDashboard,
   Pin,
   PinOff,
@@ -93,8 +91,6 @@ export function ActivityRail({
   const activateTab = useWorkspaceStore((state) => state.activateTab);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
   const [savedConnections, setSavedConnections] = useState<Connection[]>([]);
-  const [dontSleepEnabled, setDontSleepEnabled] = useState(false);
-  const [dontSleepUpdating, setDontSleepUpdating] = useState(false);
   const [connectionRailOrder, setConnectionRailOrder] = useState(
     loadConnectionRailOrder,
   );
@@ -109,27 +105,6 @@ export function ActivityRail({
   const connectionRailDragRef = useRef<ConnectionRailDragState | null>(null);
   const connectionRailListRef = useRef<HTMLDivElement | null>(null);
   const suppressConnectionClickRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!isTauriRuntime()) {
-      return;
-    }
-
-    let disposed = false;
-    void invokeCommand("get_dont_sleep_enabled")
-      .then((enabled) => {
-        if (!disposed) {
-          setDontSleepEnabled(enabled);
-        }
-      })
-      .catch(() => {
-        // The rail should still render if the desktop-only helper is unavailable.
-      });
-
-    return () => {
-      disposed = true;
-    };
-  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -459,36 +434,6 @@ export function ActivityRail({
     node.style.top = `${Math.max(8, Math.min(railConnectionMenu.y, window.innerHeight - bounds.height - 8))}px`;
   }, [railConnectionMenu]);
 
-  async function handleDontSleepClick() {
-    if (dontSleepUpdating) {
-      return;
-    }
-
-    const nextEnabled = !dontSleepEnabled;
-    setDontSleepUpdating(true);
-
-    try {
-      const enabled = isTauriRuntime()
-        ? await invokeCommand("set_dont_sleep_enabled", { enabled: nextEnabled })
-        : nextEnabled;
-      setDontSleepEnabled(enabled);
-      showStatusBarNotice(
-        enabled ? t("app.dontSleepEnabled") : t("app.dontSleepDisabled"),
-        { tone: enabled ? "success" : "info" },
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      showStatusBarNotice(t("app.dontSleepError", { message }), { tone: "error" });
-    } finally {
-      setDontSleepUpdating(false);
-    }
-  }
-
-  const dontSleepLabel = dontSleepEnabled
-    ? t("app.dontSleepDisable")
-    : t("app.dontSleepEnable");
-  const DontSleepIcon = dontSleepEnabled ? Coffee : BedSingle;
-
   return (
     <nav className="activity-rail" aria-label={t("app.primaryNav")}>
       <button
@@ -598,18 +543,6 @@ export function ActivityRail({
           </button>
         </div>
       ) : null}
-      <button
-        className={`rail-button rail-button-dont-sleep ${
-          dontSleepEnabled ? "active dont-sleep-enabled" : ""
-        }`}
-        aria-label={dontSleepLabel}
-        aria-pressed={dontSleepEnabled}
-        disabled={dontSleepUpdating}
-        onClick={() => void handleDontSleepClick()}
-      >
-        <DontSleepIcon size={18} />
-        <RailTooltip label={t("app.dontSleep")} />
-      </button>
       <button
         className={`rail-button rail-button-settings ${activePage === "settings" ? "active" : ""}`}
         aria-label={t("app.settings")}

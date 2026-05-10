@@ -62,7 +62,7 @@
     "sectionSsh": "SSH",
     "sectionTerminal": "Terminal",
     "sectionScreenshots": "Screenshots",
-    "sectionRdp": "Remote Desktop(RDP)",
+    "sectionRdp": "Remote Desktop",
     "sectionVnc": "VNC",
     "sectionAbout": "About",
     "generalDefaults": "General defaults",
