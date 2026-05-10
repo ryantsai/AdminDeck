@@ -589,7 +589,7 @@ button {
   z-index: 70;
   min-height: 0;
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
   padding: 12px 14px;
 }
 
@@ -4091,7 +4091,7 @@ progress {
 }
 
 .status-bar-module {
-  min-width: 324px;
+  min-width: 438px;
 }
 
 .status-bar-notice-area {
@@ -4141,6 +4141,17 @@ progress {
 .host-metric svg {
   flex: 0 0 auto;
   color: var(--text-faint);
+}
+
+.status-bar .host-metric-transfer {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.status-bar .host-metric-transfer + .host-metric-transfer {
+  margin-left: 3px;
 }
 
 .host-metric-value {

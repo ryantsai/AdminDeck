@@ -338,7 +338,8 @@ export interface PerformanceSnapshot {
 export interface HostUsageSnapshot {
   cpuPercent?: number;
   ramPercent?: number;
-  networkBytesPerSecond?: number;
+  networkDownstreamBytesPerSecond?: number;
+  networkUpstreamBytesPerSecond?: number;
   sampledAtUnixSeconds: number;
   source: string;
 }

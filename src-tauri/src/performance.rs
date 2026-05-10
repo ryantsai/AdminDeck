@@ -25,7 +25,8 @@ pub struct PerformanceSnapshot {
 pub struct HostUsageSnapshot {
     cpu_percent: Option<f64>,
     ram_percent: Option<f64>,
-    network_bytes_per_second: Option<f64>,
+    network_downstream_bytes_per_second: Option<f64>,
+    network_upstream_bytes_per_second: Option<f64>,
     sampled_at_unix_seconds: u64,
     source: &'static str,
 }
@@ -51,8 +52,14 @@ struct SystemCpuTimes {
 
 #[derive(Clone, Copy)]
 struct NetworkSample {
-    bytes: u64,
+    in_bytes: u64,
+    out_bytes: u64,
     sampled_at: Instant,
+}
+
+struct NetworkTransferRates {
+    downstream_bytes_per_second: f64,
+    upstream_bytes_per_second: f64,
 }
 
 impl PerformanceMonitor {
@@ -94,12 +101,18 @@ impl PerformanceMonitor {
     pub fn host_usage_snapshot(&self) -> HostUsageSnapshot {
         let mut state = self.host_usage.lock().ok();
         let state = state.as_deref_mut();
-        let (cpu_percent, ram_percent, network_bytes_per_second, source) =
-            host_usage_counters(state);
+        let (cpu_percent, ram_percent, network_transfer_rates, source) = host_usage_counters(state);
         HostUsageSnapshot {
             cpu_percent: clamp_percent(cpu_percent),
             ram_percent: clamp_percent(ram_percent),
-            network_bytes_per_second: network_bytes_per_second
+            network_downstream_bytes_per_second: network_transfer_rates
+                .as_ref()
+                .map(|rates| rates.downstream_bytes_per_second)
+                .filter(|value| value.is_finite())
+                .map(|value| value.max(0.0)),
+            network_upstream_bytes_per_second: network_transfer_rates
+                .as_ref()
+                .map(|rates| rates.upstream_bytes_per_second)
                 .filter(|value| value.is_finite())
                 .map(|value| value.max(0.0)),
             sampled_at_unix_seconds: unix_seconds(),
@@ -117,7 +130,12 @@ fn clamp_percent(value: Option<f64>) -> Option<f64> {
 #[cfg(target_os = "windows")]
 fn host_usage_counters(
     state: Option<&mut HostUsageState>,
-) -> (Option<f64>, Option<f64>, Option<f64>, &'static str) {
+) -> (
+    Option<f64>,
+    Option<f64>,
+    Option<NetworkTransferRates>,
+    &'static str,
+) {
     let ram_percent = windows_memory_percent();
     let cpu_times = windows_cpu_times();
     let network_sample = windows_network_sample();
@@ -134,9 +152,9 @@ fn host_usage_counters(
         state.previous_cpu = None;
     }
 
-    let network_bytes_per_second = network_sample.and_then(|current| {
+    let network_transfer_rates = network_sample.and_then(|current| {
         let previous = state.previous_network.replace(current)?;
-        network_bytes_per_second_between(previous, current)
+        network_transfer_rates_between(previous, current)
     });
     if network_sample.is_none() {
         state.previous_network = None;
@@ -145,7 +163,7 @@ fn host_usage_counters(
     (
         cpu_percent,
         ram_percent,
-        network_bytes_per_second,
+        network_transfer_rates,
         "windows-win32",
     )
 }
@@ -153,7 +171,12 @@ fn host_usage_counters(
 #[cfg(not(target_os = "windows"))]
 fn host_usage_counters(
     _state: Option<&mut HostUsageState>,
-) -> (Option<f64>, Option<f64>, Option<f64>, &'static str) {
+) -> (
+    Option<f64>,
+    Option<f64>,
+    Option<NetworkTransferRates>,
+    &'static str,
+) {
     (None, None, None, "unsupported-platform")
 }
 
@@ -169,11 +192,12 @@ fn cpu_usage_between(previous: SystemCpuTimes, current: SystemCpuTimes) -> Optio
     Some((busy as f64 / total as f64) * 100.0)
 }
 
-fn network_bytes_per_second_between(
+fn network_transfer_rates_between(
     previous: NetworkSample,
     current: NetworkSample,
-) -> Option<f64> {
-    let bytes = current.bytes.checked_sub(previous.bytes)?;
+) -> Option<NetworkTransferRates> {
+    let in_bytes = current.in_bytes.checked_sub(previous.in_bytes)?;
+    let out_bytes = current.out_bytes.checked_sub(previous.out_bytes)?;
     let elapsed = current
         .sampled_at
         .checked_duration_since(previous.sampled_at)?;
@@ -181,7 +205,10 @@ fn network_bytes_per_second_between(
     if seconds <= 0.0 {
         return None;
     }
-    Some(bytes as f64 / seconds)
+    Some(NetworkTransferRates {
+        downstream_bytes_per_second: in_bytes as f64 / seconds,
+        upstream_bytes_per_second: out_bytes as f64 / seconds,
+    })
 }
 
 #[cfg(target_os = "windows")]
@@ -249,15 +276,19 @@ fn windows_network_sample() -> Option<NetworkSample> {
         }
 
         let rows = slice::from_raw_parts((*table).Table.as_ptr(), (*table).NumEntries as usize);
-        let bytes = rows.iter().fold(0_u64, |total, row| {
-            total
-                .saturating_add(row.InOctets)
-                .saturating_add(row.OutOctets)
-        });
+        let (in_bytes, out_bytes) =
+            rows.iter()
+                .fold((0_u64, 0_u64), |(in_total, out_total), row| {
+                    (
+                        in_total.saturating_add(row.InOctets),
+                        out_total.saturating_add(row.OutOctets),
+                    )
+                });
         FreeMibTable(table.cast());
 
         Some(NetworkSample {
-            bytes,
+            in_bytes,
+            out_bytes,
             sampled_at: Instant::now(),
         })
     }
@@ -355,21 +386,22 @@ mod tests {
     }
 
     #[test]
-    fn network_usage_calculates_bytes_per_second_from_deltas() {
+    fn network_usage_calculates_transfer_rates_from_deltas() {
         let start = Instant::now();
         let previous = NetworkSample {
-            bytes: 1_000,
+            in_bytes: 1_000,
+            out_bytes: 2_000,
             sampled_at: start,
         };
         let current = NetworkSample {
-            bytes: 6_000,
+            in_bytes: 6_000,
+            out_bytes: 17_000,
             sampled_at: start + Duration::from_secs(5),
         };
 
-        assert_eq!(
-            network_bytes_per_second_between(previous, current),
-            Some(1_000.0)
-        );
+        let rates = network_transfer_rates_between(previous, current).unwrap();
+        assert_eq!(rates.downstream_bytes_per_second, 1_000.0);
+        assert_eq!(rates.upstream_bytes_per_second, 3_000.0);
     }
 
     #[cfg(target_os = "windows")]

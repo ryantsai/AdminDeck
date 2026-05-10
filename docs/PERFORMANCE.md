@@ -4,7 +4,7 @@ KKTerm performance checks are local-only. They use manual observation, diagnosti
 
 The app-wide Status Bar is no longer a performance-budget readout. It remains visible across modules and pages, with a module-owned left segment and a universal center notifications text area. It is intentionally reserved for:
 
-- low-frequency host usage metrics in the Workspace module, sampled about every 5 seconds. CPU uses `GetSystemTimes`, RAM uses `GlobalMemoryStatusEx` with `GetPerformanceInfo` fallback, and aggregate network throughput uses the IP Helper interface table with Status Bar display rounded to MB/s.
+- low-frequency host usage metrics in the Workspace module, sampled about every 5 seconds. CPU uses `GetSystemTimes`, RAM uses `GlobalMemoryStatusEx` with `GetPerformanceInfo` fallback, and downstream/upstream network transfer rates use the IP Helper interface table with Status Bar display rounded to MB/s.
 - transient Status Bar notices, such as SSH public key transfer success, which appear in the center notifications text area and disappear after a short timeout
 
 Do not add debug-only timing indicators back to the Status Bar. Use diagnostics, logs, DevTools, measurement scripts, or a purpose-built debug build when validating budgets.

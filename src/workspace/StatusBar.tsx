@@ -1,4 +1,4 @@
-import { Cpu, MemoryStick, Network } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Cpu, MemoryStick } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -92,12 +92,14 @@ function WorkspaceHostMetrics({ t }: { t: (key: string) => string }) {
         title={t("workspace.ramUsage")}
         value={formatPercent(hostUsage?.ramPercent)}
       />
-      <Metric
-        icon={<Network size={13} />}
-        label={t("workspace.network")}
-        metric="network"
+      <NetworkMetric
+        downstreamLabel={t("workspace.networkDownstream")}
+        downstreamTitle={t("workspace.networkDownstreamUsage")}
+        downstreamValue={formatNetwork(hostUsage?.networkDownstreamBytesPerSecond)}
         title={t("workspace.networkUsage")}
-        value={formatNetwork(hostUsage?.networkBytesPerSecond)}
+        upstreamLabel={t("workspace.networkUpstream")}
+        upstreamTitle={t("workspace.networkUpstreamUsage")}
+        upstreamValue={formatNetwork(hostUsage?.networkUpstreamBytesPerSecond)}
       />
     </div>
   );
@@ -120,6 +122,41 @@ function Metric({
     <span className={`host-metric host-metric-${metric}`} aria-label={`${label} ${value}`} title={title}>
       {icon}
       <strong className="host-metric-value">{value}</strong>
+    </span>
+  );
+}
+
+function NetworkMetric({
+  downstreamLabel,
+  downstreamTitle,
+  downstreamValue,
+  title,
+  upstreamLabel,
+  upstreamTitle,
+  upstreamValue,
+}: {
+  downstreamLabel: string;
+  downstreamTitle: string;
+  downstreamValue: string;
+  title: string;
+  upstreamLabel: string;
+  upstreamTitle: string;
+  upstreamValue: string;
+}) {
+  return (
+    <span
+      className="host-metric host-metric-network"
+      aria-label={`${downstreamLabel} ${downstreamValue}, ${upstreamLabel} ${upstreamValue}`}
+      title={title}
+    >
+      <span className="host-metric-transfer" title={downstreamTitle}>
+        <ArrowDownToLine size={13} />
+        <strong className="host-metric-value">{downstreamValue}</strong>
+      </span>
+      <span className="host-metric-transfer" title={upstreamTitle}>
+        <ArrowUpFromLine size={13} />
+        <strong className="host-metric-value">{upstreamValue}</strong>
+      </span>
     </span>
   );
 }
