@@ -930,7 +930,7 @@ function ActivityRail({
               data-rail-connected-id={item.pinned ? undefined : item.connection.id}
               className={`rail-button rail-button-connection ${
                 item.pinned ? "pinned" : ""
-              } ${
+              } ${activeSessionCounts[item.connection.id] ? "connected" : ""} ${
                 activePage === "workspace" && activeTabConnectionId === item.connection.id
                   ? "active"
                   : ""

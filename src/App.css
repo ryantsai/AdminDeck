@@ -467,8 +467,8 @@ button {
   touch-action: none;
 }
 
-.rail-button-connection.pinned {
-  box-shadow: inset 0 0 0 1px rgb(245 193 80 / 72%);
+.rail-button-connection.connected {
+  box-shadow: inset 0 0 0 2px #32ff6a;
 }
 
 .rail-button-connection.rail-drop-before::before,
