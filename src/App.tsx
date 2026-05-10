@@ -84,7 +84,6 @@ function App() {
         <main className="workspace">
           <TabStrip />
           <WorkspaceCanvas workspaceActive={activePage === "workspace"} />
-          <StatusBar />
         </main>
         <PanelResizeHandle
           ariaLabel={t("app.resizeAiAssistant")}
@@ -106,6 +105,7 @@ function App() {
           onResetLayout={resetWorkspaceChromeLayout}
         />
       ) : null}
+      <StatusBar activePage={activePage} />
     </div>
   );
 }

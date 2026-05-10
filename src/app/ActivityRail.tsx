@@ -84,7 +84,7 @@ export function ActivityRail({
   onNavigate: (page: ActivePage) => void;
 }) {
   const { t } = useTranslation();
-  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const tabs = useWorkspaceStore((state) => state.tabs);
@@ -393,11 +393,11 @@ export function ActivityRail({
         ? await invokeCommand("update_general_settings", { request: nextSettings })
         : nextSettings;
       setGeneralSettings(saved);
-      showWorkspaceStatus(successMessage, { tone: "success" });
+      showStatusBarNotice(successMessage, { tone: "success" });
     } catch (error) {
       setGeneralSettings(previousSettings);
       const message = error instanceof Error ? error.message : String(error);
-      showWorkspaceStatus(t("connections.pinRailError", { message }), {
+      showStatusBarNotice(t("connections.pinRailError", { message }), {
         tone: "error",
       });
     }
@@ -472,13 +472,13 @@ export function ActivityRail({
         ? await invokeCommand("set_dont_sleep_enabled", { enabled: nextEnabled })
         : nextEnabled;
       setDontSleepEnabled(enabled);
-      showWorkspaceStatus(
+      showStatusBarNotice(
         enabled ? t("app.dontSleepEnabled") : t("app.dontSleepDisabled"),
         { tone: enabled ? "success" : "info" },
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      showWorkspaceStatus(t("app.dontSleepError", { message }), { tone: "error" });
+      showStatusBarNotice(t("app.dontSleepError", { message }), { tone: "error" });
     } finally {
       setDontSleepUpdating(false);
     }

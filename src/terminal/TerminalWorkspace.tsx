@@ -60,7 +60,7 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
   const setFocusedPane = useWorkspaceStore((state) => state.setFocusedPane);
   const saveTabLayout = useWorkspaceStore((state) => state.saveTabLayout);
   const resetTabLayout = useWorkspaceStore((state) => state.resetTabLayout);
-  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const { t } = useTranslation();
   const defaultFontSize = defaultTerminalSettings.fontSize;
   const canSplit = tab.panes.some((pane) => pane.connection);
@@ -94,7 +94,7 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
           : renderer.getBufferText();
       await saveTextFile(defaultFilename, text);
     } catch (error) {
-      showWorkspaceStatus(
+      showStatusBarNotice(
         t("terminal.bufferSaveFailed", { message: error instanceof Error ? error.message : String(error) }),
         { tone: "error" },
       );
@@ -637,7 +637,7 @@ function SshPortForwardMenu({ connection }: { connection: Connection }) {
   const [openingPort, setOpeningPort] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const openSshPortForwardBrowser = useWorkspaceStore((state) => state.openSshPortForwardBrowser);
-  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -697,7 +697,7 @@ function SshPortForwardMenu({ connection }: { connection: Connection }) {
         },
       });
       openSshPortForwardBrowser(connection, forward);
-      showWorkspaceStatus(t("terminal.sshPortForwardOpened", { port }));
+      showStatusBarNotice(t("terminal.sshPortForwardOpened", { port }));
       setOpen(false);
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : String(openError));

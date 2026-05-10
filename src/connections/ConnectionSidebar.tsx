@@ -141,7 +141,7 @@ export function ConnectionSidebar({
   const generalSettings = useWorkspaceStore((state) => state.generalSettings);
   const setGeneralSettings = useWorkspaceStore((state) => state.setGeneralSettings);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
-  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [tree, setTree] = useState<ConnectionTree>(connectionTree);
   const [formMode, setFormMode] = useState<"save" | "quick" | null>(null);
   const [newConnectionType, setNewConnectionType] = useState<ConnectionType | null>(null);
@@ -248,7 +248,7 @@ export function ConnectionSidebar({
   }
 
   function showConnectionSuccessStatus(message: string) {
-    showWorkspaceStatus(message, {
+    showStatusBarNotice(message, {
       tone: "success",
     });
   }
@@ -302,11 +302,11 @@ export function ConnectionSidebar({
         ? await invokeCommand("update_general_settings", { request: nextSettings })
         : nextSettings;
       setGeneralSettings(saved);
-      showWorkspaceStatus(successMessage, { tone: "success" });
+      showStatusBarNotice(successMessage, { tone: "success" });
     } catch (error) {
       setGeneralSettings(previousSettings);
       const message = error instanceof Error ? error.message : String(error);
-      showWorkspaceStatus(t("connections.pinRailError", { message }), {
+      showStatusBarNotice(t("connections.pinRailError", { message }), {
         tone: "error",
       });
     }

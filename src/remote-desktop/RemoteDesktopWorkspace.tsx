@@ -95,7 +95,7 @@ export function RemoteDesktopWorkspace({
   const setAssistantContextSnippet = useWorkspaceStore(
     (state) => state.setAssistantContextSnippet,
   );
-  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const rdpPreCaptureSignal = useWorkspaceStore((state) => state.rdpPreCaptureSignal);
   const [suppressed, setSuppressed] = useState(false);
   const [rdpError, setRdpError] = useState("");
@@ -208,7 +208,7 @@ export function RemoteDesktopWorkspace({
 
   const captureTargetScreenshotForAssistant = async () => {
     if (!isTauriRuntime()) {
-      showWorkspaceStatus(t("workspace.screenshotsRequireRuntime"), { tone: "warning" });
+      showStatusBarNotice(t("workspace.screenshotsRequireRuntime"), { tone: "warning" });
       return;
     }
     const target = hostRef.current;
@@ -238,9 +238,9 @@ export function RemoteDesktopWorkspace({
         height: screenshot.height,
         capturedAt: new Date().toISOString(),
       });
-      showWorkspaceStatus(t("workspace.sentToAi"), { tone: "success" });
+      showStatusBarNotice(t("workspace.sentToAi"), { tone: "success" });
     } catch (error) {
-      showWorkspaceStatus(
+      showStatusBarNotice(
         t("workspace.screenshotCaptureError", {
           message: error instanceof Error ? error.message : String(error),
         }),

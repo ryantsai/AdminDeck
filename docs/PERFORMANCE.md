@@ -2,12 +2,12 @@
 
 KKTerm performance checks are local-only. They use manual observation, diagnostics snapshots, scripts, and local process memory data; they do not upload telemetry and they should not capture terminal contents.
 
-The app chrome status bar is no longer a performance-budget readout. It is intentionally reserved for:
+The app-wide Status Bar is no longer a performance-budget readout. It remains visible across modules and pages, with a module-owned left segment and a universal center notifications text area. It is intentionally reserved for:
 
-- low-frequency host usage metrics sampled about every 5 seconds. CPU uses `GetSystemTimes`, RAM uses `GlobalMemoryStatusEx` with `GetPerformanceInfo` fallback, and aggregate network throughput uses the IP Helper interface table with status-bar display rounded to MB/s.
-- transient workspace notifications, such as SSH public key transfer success, which appear after the metrics and disappear after a short timeout
+- low-frequency host usage metrics in the Workspace module, sampled about every 5 seconds. CPU uses `GetSystemTimes`, RAM uses `GlobalMemoryStatusEx` with `GetPerformanceInfo` fallback, and aggregate network throughput uses the IP Helper interface table with Status Bar display rounded to MB/s.
+- transient Status Bar notices, such as SSH public key transfer success, which appear in the center notifications text area and disappear after a short timeout
 
-Do not add debug-only timing indicators back to the status bar. Use diagnostics, logs, DevTools, measurement scripts, or a purpose-built debug build when validating budgets.
+Do not add debug-only timing indicators back to the Status Bar. Use diagnostics, logs, DevTools, measurement scripts, or a purpose-built debug build when validating budgets.
 
 ## Budgets
 
@@ -70,7 +70,7 @@ Measured on 2026-05-02 11:50:35 +08:00 using the release executable built at `sr
 
 | Metric | Measurement | Budget | Status | Notes |
 | --- | ---: | ---: | --- | --- |
-| Cold launch to usable UI | 71 ms | <= 1,000 ms acceptable, <= 500 ms target | Pass | Historical measurement from the previous app chrome `UI ready` status value. External WebView2 CDP page availability was 247 ms. New runs should use explicit timing instrumentation because the status bar no longer shows this value. |
+| Cold launch to usable UI | 71 ms | <= 1,000 ms acceptable, <= 500 ms target | Pass | Historical measurement from the previous app chrome `UI ready` status value. External WebView2 CDP page availability was 247 ms. New runs should use explicit timing instrumentation because the Status Bar no longer shows this value. |
 | Idle memory | 27.9 MiB | <= 150 MiB target | Pass | Historical measurement from the previous app chrome `Memory` status value after 30 seconds idle. Process working set was 27.9 MiB and private bytes were 5.0 MiB. New runs should use diagnostics or OS process counters. |
 | Idle CPU | 0.000% | No formal budget | Informational | CPU delta over the 30 second idle window, normalized across 32 logical processors. |
 | New local terminal tab ready | 16 ms | <= 100 ms | Pass | Historical measurement from the previous app chrome `Local ready` value after triggering the `New local terminal` button in the release app. New runs should use explicit timing instrumentation. |

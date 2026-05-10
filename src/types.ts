@@ -361,7 +361,7 @@ export interface PerformanceMetrics {
   lastSshTerminalStart?: TerminalStartMetric;
 }
 
-export interface WorkspaceStatusNotification {
+export interface StatusBarNotice {
   id: number;
   message: string;
   tone: "success" | "info" | "warning" | "error";

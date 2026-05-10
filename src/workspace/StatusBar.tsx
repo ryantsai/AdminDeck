@@ -2,85 +2,104 @@ import { Cpu, MemoryStick, Network } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import type { ActivePage } from "../app/ActivityRail";
 import { useWorkspaceStore } from "../store";
 
 const NOTIFICATION_FADE_MS = 220;
 
-export function StatusBar() {
+export function StatusBar({ activePage }: { activePage: ActivePage }) {
   const { t } = useTranslation();
-  const hostUsage = useWorkspaceStore((state) => state.performanceMetrics.hostUsage);
-  const notification = useWorkspaceStore((state) => state.workspaceStatusNotification);
-  const clearWorkspaceStatus = useWorkspaceStore((state) => state.clearWorkspaceStatus);
-  const [renderedNotification, setRenderedNotification] = useState(notification);
-  const [isNotificationExiting, setIsNotificationExiting] = useState(false);
+  const notice = useWorkspaceStore((state) => state.statusBarNotice);
+  const clearStatusBarNotice = useWorkspaceStore((state) => state.clearStatusBarNotice);
+  const [renderedNotice, setRenderedNotice] = useState(notice);
+  const [isNoticeExiting, setIsNoticeExiting] = useState(false);
 
   useEffect(() => {
-    if (!notification) {
+    if (!notice) {
       return;
     }
-    setRenderedNotification(notification);
-    setIsNotificationExiting(false);
-    const remainingMs = Math.max(0, notification.expiresAt - Date.now());
+    setRenderedNotice(notice);
+    setIsNoticeExiting(false);
+    const remainingMs = Math.max(0, notice.expiresAt - Date.now());
     const fadeDelayMs = Math.max(0, remainingMs - NOTIFICATION_FADE_MS);
-    const fadeTimeout = window.setTimeout(() => setIsNotificationExiting(true), fadeDelayMs);
-    const clearTimeout = window.setTimeout(() => clearWorkspaceStatus(notification.id), remainingMs);
+    const fadeTimeout = window.setTimeout(() => setIsNoticeExiting(true), fadeDelayMs);
+    const clearTimeout = window.setTimeout(() => clearStatusBarNotice(notice.id), remainingMs);
     return () => {
       window.clearTimeout(fadeTimeout);
       window.clearTimeout(clearTimeout);
     };
-  }, [clearWorkspaceStatus, notification]);
+  }, [clearStatusBarNotice, notice]);
 
   useEffect(() => {
-    if (notification) {
+    if (notice) {
       return;
     }
-    if (!isNotificationExiting) {
-      setRenderedNotification(undefined);
+    if (!isNoticeExiting) {
+      setRenderedNotice(undefined);
       return;
     }
     const timeout = window.setTimeout(() => {
-      setRenderedNotification(undefined);
-      setIsNotificationExiting(false);
+      setRenderedNotice(undefined);
+      setIsNoticeExiting(false);
     }, NOTIFICATION_FADE_MS);
     return () => window.clearTimeout(timeout);
-  }, [isNotificationExiting, notification]);
+  }, [isNoticeExiting, notice]);
 
   return (
     <footer className="status-bar">
-      <div className="host-metrics" aria-label={t("workspace.hostUsage")}>
-        <Metric
-          icon={<Cpu size={13} />}
-          label={t("workspace.cpu")}
-          metric="percent"
-          title={t("workspace.cpuUsage")}
-          value={formatPercent(hostUsage?.cpuPercent)}
-        />
-        <Metric
-          icon={<MemoryStick size={13} />}
-          label={t("workspace.ram")}
-          metric="percent"
-          title={t("workspace.ramUsage")}
-          value={formatPercent(hostUsage?.ramPercent)}
-        />
-        <Metric
-          icon={<Network size={13} />}
-          label={t("workspace.network")}
-          metric="network"
-          title={t("workspace.networkUsage")}
-          value={formatNetwork(hostUsage?.networkBytesPerSecond)}
-        />
+      <div className="status-bar-module">{renderModuleStatus(activePage, t)}</div>
+      <div className="status-bar-notice-area">
+        {renderedNotice ? (
+          <span
+            className={`status-notification ${renderedNotice.tone} ${
+              isNoticeExiting ? "is-exiting" : "is-entering"
+            }`}
+            role="status"
+          >
+            {renderedNotice.message}
+          </span>
+        ) : null}
       </div>
-      {renderedNotification ? (
-        <span
-          className={`status-notification ${renderedNotification.tone} ${
-            isNotificationExiting ? "is-exiting" : "is-entering"
-          }`}
-          role="status"
-        >
-          {renderedNotification.message}
-        </span>
-      ) : null}
     </footer>
+  );
+}
+
+function renderModuleStatus(activePage: ActivePage, t: (key: string) => string) {
+  switch (activePage) {
+    case "workspace":
+      return <WorkspaceHostMetrics t={t} />;
+    case "settings":
+      return null;
+  }
+}
+
+function WorkspaceHostMetrics({ t }: { t: (key: string) => string }) {
+  const hostUsage = useWorkspaceStore((state) => state.performanceMetrics.hostUsage);
+
+  return (
+    <div className="host-metrics" aria-label={t("workspace.hostUsage")}>
+      <Metric
+        icon={<Cpu size={13} />}
+        label={t("workspace.cpu")}
+        metric="percent"
+        title={t("workspace.cpuUsage")}
+        value={formatPercent(hostUsage?.cpuPercent)}
+      />
+      <Metric
+        icon={<MemoryStick size={13} />}
+        label={t("workspace.ram")}
+        metric="percent"
+        title={t("workspace.ramUsage")}
+        value={formatPercent(hostUsage?.ramPercent)}
+      />
+      <Metric
+        icon={<Network size={13} />}
+        label={t("workspace.network")}
+        metric="network"
+        title={t("workspace.networkUsage")}
+        value={formatNetwork(hostUsage?.networkBytesPerSecond)}
+      />
+    </div>
   );
 }
 

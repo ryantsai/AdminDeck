@@ -245,7 +245,7 @@ export function ScreenshotToolbarButtons({
   targetRef: RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation();
-  const showWorkspaceStatus = useWorkspaceStore((state) => state.showWorkspaceStatus);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [regionState, setRegionState] = useState<ScreenshotRegionState | null>(null);
   const [copiedStatus, setCopiedStatus] = useState("");
   const regionTargetRef = useRef<HTMLDivElement | null>(null);
@@ -253,7 +253,7 @@ export function ScreenshotToolbarButtons({
 
   async function captureRect(rect: ScreenshotRect) {
     if (!isTauriRuntime()) {
-      showWorkspaceStatus(t("workspace.screenshotsRequireRuntime"), { tone: "warning" });
+      showStatusBarNotice(t("workspace.screenshotsRequireRuntime"), { tone: "warning" });
       return;
     }
 
@@ -261,10 +261,10 @@ export function ScreenshotToolbarButtons({
       await waitForScreenshotSurface();
       await invokeCommand("capture_screenshot_to_clipboard", { request: rect });
       setCopiedStatus(t("workspace.copied"));
-      showWorkspaceStatus(t("workspace.copied"), { tone: "success" });
+      showStatusBarNotice(t("workspace.copied"), { tone: "success" });
       window.setTimeout(() => setCopiedStatus(""), 1600);
     } catch (error) {
-      showWorkspaceStatus(
+      showStatusBarNotice(
         t("workspace.screenshotCaptureError", {
           message: error instanceof Error ? error.message : String(error),
         }),

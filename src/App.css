@@ -390,7 +390,7 @@ button {
     )
     minmax(0, 1fr) var(--ai-resize-width, 1px)
     var(--ai-panel-width, 334px);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 28px;
   height: 100vh;
   min-width: 1120px;
   overflow: hidden;
@@ -416,6 +416,7 @@ button {
 .activity-rail {
   display: flex;
   position: relative;
+  grid-row: 1;
   z-index: 120;
   flex-direction: column;
   gap: 6px;
@@ -584,6 +585,7 @@ button {
   display: flex;
   flex-direction: column;
   position: relative;
+  grid-row: 1;
   z-index: 70;
   min-height: 0;
   height: 100%;
@@ -605,6 +607,7 @@ button {
 
 .panel-resize-handle {
   position: relative;
+  grid-row: 1;
   z-index: 5;
   display: grid;
   place-items: center;
@@ -618,6 +621,7 @@ button {
 }
 
 .connection-collapsed-separator {
+  grid-row: 1;
   width: 1px;
   height: 100%;
   background: var(--border);
@@ -1339,7 +1343,8 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-rows: 38px minmax(0, 1fr) 28px;
+  grid-row: 1;
+  grid-template-rows: 38px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -2746,7 +2751,7 @@ progress {
   position: relative;
   gap: 10px;
   min-width: 0;
-  height: 100vh;
+  height: 100%;
   padding: 12px 14px;
   color: var(--text-muted);
   background: var(--chrome);
@@ -4059,7 +4064,10 @@ progress {
 }
 
 .status-bar {
-  justify-content: flex-start;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  grid-template-columns: minmax(324px, auto) minmax(0, 1fr) minmax(324px, auto);
   gap: 10px;
   min-width: 0;
   padding: 0 10px;
@@ -4069,10 +4077,25 @@ progress {
   border-top: 1px solid var(--border);
 }
 
+.status-bar::after {
+  content: "";
+  min-width: 0;
+}
+
+.status-bar-module,
+.status-bar-notice-area,
 .host-metrics {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.status-bar-module {
+  min-width: 324px;
+}
+
+.status-bar-notice-area {
+  justify-content: center;
 }
 
 .host-metrics {
@@ -4138,9 +4161,10 @@ progress {
 }
 
 .status-notification {
-  flex: 1 1 auto;
+  max-width: 100%;
   color: var(--text);
   opacity: 1;
+  text-align: center;
   transform: translateY(0);
   will-change: opacity, transform;
 }
@@ -4324,10 +4348,10 @@ progress {
 
 .settings-page {
   position: fixed;
-  inset: 0 0 0 48px;
+  inset: 0 0 28px 48px;
   z-index: 80;
   min-width: 0;
-  height: 100vh;
+  height: calc(100vh - 28px);
   overflow: auto;
   padding: 22px 24px 28px;
   background: var(--app-bg);
@@ -6919,6 +6943,10 @@ progress {
 .settings-nav-item:hover {
   color: var(--text);
   background: var(--chrome-strong);
+}
+
+.assistant-panel {
+  grid-row: 1;
 }
 
 .settings-nav-item.active {

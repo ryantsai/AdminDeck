@@ -35,7 +35,7 @@ import type {
   TerminalSettings,
   TerminalStartMetric,
   WorkspacePane,
-  WorkspaceStatusNotification,
+  StatusBarNotice,
   WorkspaceTab,
 } from "./types";
 import i18next from "./i18n/config";
@@ -570,7 +570,7 @@ interface WorkspaceState {
   rdpPreCaptureSignal: number;
   activeSessionCounts: Record<string, number>;
   performanceMetrics: PerformanceMetrics;
-  workspaceStatusNotification?: WorkspaceStatusNotification;
+  statusBarNotice?: StatusBarNotice;
   setQuery: (query: string) => void;
   setGeneralSettings: (settings: GeneralSettings) => void;
   setTerminalSettings: (settings: TerminalSettings) => void;
@@ -588,11 +588,11 @@ interface WorkspaceState {
   setHostUsageSnapshot: (snapshot: HostUsageSnapshot) => void;
   recordTerminalStartMetric: (metric: TerminalStartMetric) => void;
   clearTerminalStartMetric: (kind: TerminalStartMetric["kind"]) => void;
-  showWorkspaceStatus: (
+  showStatusBarNotice: (
     message: string,
-    options?: { tone?: WorkspaceStatusNotification["tone"]; durationMs?: number },
+    options?: { tone?: StatusBarNotice["tone"]; durationMs?: number },
   ) => void;
-  clearWorkspaceStatus: (id: number) => void;
+  clearStatusBarNotice: (id: number) => void;
   activateTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openConnection: (connection: Connection) => void;
@@ -649,7 +649,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   rdpPreCaptureSignal: 0,
   activeSessionCounts: {},
   performanceMetrics: {},
-  workspaceStatusNotification: undefined,
+  statusBarNotice: undefined,
   setQuery: (query) => set({ query }),
   setGeneralSettings: (generalSettings) => set({ generalSettings }),
   setTerminalSettings: (terminalSettings) => set({ terminalSettings }),
@@ -723,10 +723,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...(kind === "ssh" ? { lastSshTerminalStart: undefined } : {}),
       },
     })),
-  showWorkspaceStatus: (message, options) => {
+  showStatusBarNotice: (message, options) => {
     const durationMs = options?.durationMs ?? 5_000;
     set({
-      workspaceStatusNotification: {
+      statusBarNotice: {
         id: Date.now(),
         message,
         tone: options?.tone ?? "info",
@@ -734,10 +734,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       },
     });
   },
-  clearWorkspaceStatus: (id) =>
+  clearStatusBarNotice: (id) =>
     set((state) =>
-      state.workspaceStatusNotification?.id === id
-        ? { workspaceStatusNotification: undefined }
+      state.statusBarNotice?.id === id
+        ? { statusBarNotice: undefined }
         : {},
     ),
   activateTab: (tabId) => set({ activeTabId: tabId }),
