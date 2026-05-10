@@ -424,8 +424,9 @@ impl OpenAiCompatibleProvider {
             .map_err(|error| format!("failed to locate KKTerm app data: {error}"))?;
         let mut content = String::new();
         let mut reasoning_content: Option<String> = None;
+        let mut exhausted = true;
 
-        for _ in 0..4 {
+        for _ in 0..10 {
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
@@ -466,6 +467,7 @@ impl OpenAiCompatibleProvider {
             content = choice.message.content.trim().to_string();
             reasoning_content = choice.message.reasoning_content.clone();
             if choice.message.tool_calls.is_empty() {
+                exhausted = false;
                 break;
             }
 
@@ -499,6 +501,48 @@ impl OpenAiCompatibleProvider {
                     tool_calls: None,
                 });
             }
+        }
+
+        if exhausted {
+            let response = client
+                .post(endpoint.clone())
+                .headers(openai_compatible_headers(
+                    api_key.as_deref(),
+                    self.auth_style,
+                )?)
+                .json(&OpenAiCompatibleChatRequest {
+                    model: settings.model().to_string(),
+                    messages: messages.clone(),
+                    stream: false,
+                    tools: vec![],
+                    tool_choice: None,
+                })
+                .send()
+                .await
+                .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
+
+            let status = response.status();
+            let response_text = response
+                .text()
+                .await
+                .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+
+            if !status.is_success() {
+                return Err(format!(
+                    "{} returned HTTP {}: {}",
+                    self.label,
+                    status.as_u16(),
+                    truncate_error_body(&response_text)
+                ));
+            }
+
+            let completion: OpenAiCompatibleChatResponse = serde_json::from_str(&response_text)
+                .map_err(|error| format!("failed to parse {} response: {error}", self.label))?;
+            let Some(choice) = completion.choices.into_iter().next() else {
+                return Err(format!("{} response did not include a choice", self.label));
+            };
+            content = choice.message.content.trim().to_string();
+            reasoning_content = choice.message.reasoning_content.clone();
         }
 
         finish_agent_response(self, settings.model(), content, reasoning_content)
@@ -536,8 +580,9 @@ impl OpenAiCompatibleProvider {
             .map_err(|error| format!("failed to locate KKTerm app data: {error}"))?;
         let mut content = String::new();
         let mut reasoning_content: Option<String> = None;
+        let mut exhausted = true;
 
-        for _ in 0..4 {
+        for _ in 0..10 {
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
@@ -591,6 +636,7 @@ impl OpenAiCompatibleProvider {
 
             let tool_calls = extract_responses_tool_calls(&response_value);
             if tool_calls.is_empty() {
+                exhausted = false;
                 break;
             }
 
@@ -605,6 +651,59 @@ impl OpenAiCompatibleProvider {
                     "output": result,
                 }));
             }
+        }
+
+        if exhausted {
+            let response = client
+                .post(endpoint.clone())
+                .headers(openai_compatible_headers(
+                    api_key.as_deref(),
+                    self.auth_style,
+                )?)
+                .json(&OpenAiResponsesRequest {
+                    model: settings.model().to_string(),
+                    input: input.clone(),
+                    stream: false,
+                    store: false,
+                    tools: vec![],
+                    tool_choice: None,
+                })
+                .send()
+                .await
+                .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
+
+            let status = response.status();
+            let response_text = response
+                .text()
+                .await
+                .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+
+            if !status.is_success() {
+                return Err(format!(
+                    "{} returned HTTP {}: {}",
+                    self.label,
+                    status.as_u16(),
+                    truncate_error_body(&response_text)
+                ));
+            }
+
+            let response_value: Value = serde_json::from_str(&response_text)
+                .map_err(|error| format!("failed to parse {} response: {error}", self.label))?;
+            if let Some(text) = response_value
+                .get("output_text")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                content = text.to_string();
+            } else if let Some(text) = extract_responses_output_text(&response_value) {
+                content = text;
+            }
+            reasoning_content = response_value
+                .get("reasoning_content")
+                .and_then(Value::as_str)
+                .filter(|r| !r.trim().is_empty())
+                .map(String::from);
         }
 
         finish_agent_response(self, settings.model(), content, reasoning_content)
@@ -1216,6 +1315,7 @@ fn build_agent_messages(
         "When suggesting commands, explain intent and prefer commands the user can review before running.".to_string(),
         "Do not claim to have executed commands or observed live session state unless it is in the provided context.".to_string(),
         "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.".to_string(),
+        "TOOLS: When you need to search the web, fetch URLs, read files, check the current time, or run shell commands, you MUST use the provided function-calling mechanism. Always make the actual function call alongside your explanation. Do not describe what you plan to do with a tool without calling it — invoke the tool in the same response.".to_string(),
     ];
     if let Some(language) = normalize_output_language(output_language) {
         system_instructions.push(language);
