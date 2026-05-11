@@ -51,8 +51,8 @@ _Avoid_: landing page, overview
 The default landing view when no Sessions are open, showing recent Connections and a workspace overview. This replaces the old "Dashboard" concept that was the landing page.
 _Avoid_: dashboard, home
 
-**App Launcher Module**:
-A built-in activity-rail module where users pin favorite desktop applications for quick launch.
+**App Launcher Widget**:
+A Dashboard widget where users add local desktop apps, shortcuts, scripts, or files for quick launch. The widget presents each launcher entry as an icon with text; add/edit/remove actions, launch mode choices, and other entry management controls belong in an app-owned right-click context menu instead of the default widget surface.
 _Avoid_: dock, taskbar
 
 **File Explorer Module**:
@@ -68,7 +68,7 @@ Terminal Panes for tmux-enabled SSH Connections may carry a generated friendly t
 ## UI Layout
 
 **Activity Rail (Left Rail)**:
-The vertical icon bar on the far left of the app. Shows top-level built-in modules (Workspace, Dashboard, App Launcher, File Explorer), connected Connection shortcuts when enabled, and Settings at the bottom. Icons use app-owned delayed hover labels via `RailTooltip`, not native `title` tooltips.
+The vertical icon bar on the far left of the app. Shows top-level built-in modules (Workspace, Dashboard, File Explorer), connected Connection shortcuts when enabled, and Settings at the bottom. Icons use app-owned delayed hover labels via `RailTooltip`, not native `title` tooltips. App Launcher is intentionally not a rail module; it lives inside Dashboard as a widget.
 _Avoid_: sidebar, left sidebar, nav bar
 
 **Connection Tree (Connections Panel)**:
@@ -80,7 +80,7 @@ The right-side resizable panel for AI chat interactions. Collapsed/expanded stat
 _Avoid_: AI sidebar, chat panel
 
 **Dashboard Widget Playground**:
-The content area of the Dashboard module. Hosts dynamic, user-selectable widgets and reports. The AI Assistant can create new widgets on request.
+The content area of the Dashboard module. Hosts dynamic, user-selectable widgets and reports, including the App Launcher Widget. The AI Assistant can create new widgets on request.
 _Avoid_: landing page, overview
 
 **Default Launch State**:
@@ -88,7 +88,7 @@ The fallback view shown when no Sessions are open, displaying recent Connections
 _Avoid_: dashboard page, home screen
 
 **Workspace Canvas**:
-The central content area for the active built-in module. Each module (Workspace, Dashboard, App Launcher, File Explorer) owns its own content layout within this area. For the Workspace module, this includes the Tab Strip, active Tab content (terminals, RDP/VNC surfaces, WebView2 surfaces, SFTP browsers), and optional pane splits.
+The central content area for the active built-in module. Each module (Workspace, Dashboard, File Explorer) owns its own content layout within this area. For the Workspace module, this includes the Tab Strip, active Tab content (terminals, RDP/VNC surfaces, WebView2 surfaces, SFTP browsers), and optional pane splits.
 _Avoid_: main area, content area
 
 **Tab Strip**:

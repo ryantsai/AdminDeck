@@ -164,12 +164,12 @@ Latest validation on May 7, 2026: `npm run check`, `npm run build`, `cargo check
 - [x] Add MobaXterm/RDCMan import.
 - [ ] Add SFTP folder sync/diff/resume.
 
-### Workspace Modules (Dashboard, App Launcher, File Explorer)
+### Workspace Modules and Dashboard Widgets
 
 - [x] Implement the Dashboard module: a dynamic widget playground where users select from prebuilt widgets (hash calculators, IP subnet calculators, quick tools) or reports. Allow the built-in AI Assistant and coding agents to create new widgets.
-- [ ] Implement the App Launcher module: let users pin favorite desktop applications for quick launch from the activity rail.
+- [ ] Replace the standalone App Launcher module direction with a Dashboard App Launcher widget: users add the widget to a Dashboard view, add local app/shortcut/script/file entries inside it, and see each entry as an icon with text while edit/remove/alternate launch actions stay in a right-click context menu.
 - [ ] Implement the File Explorer module: a lightning-fast alternative local file explorer optimized for speed and dense professional workflows.
-- [ ] Wire all four built-in modules (Workspace, Dashboard, App Launcher, File Explorer) into the activity rail as peer top-level entries, each with its own content area and active-page routing.
+- [ ] Wire the built-in modules (Workspace, Dashboard, File Explorer) into the activity rail as peer top-level entries, each with its own content area and active-page routing.
 
 ### Distribution, Sync, and Trust
 
