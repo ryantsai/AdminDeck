@@ -141,6 +141,8 @@ function renderModuleStatus(activePage: ActivePage, t: (key: string) => string) 
   switch (activePage) {
     case "workspace":
       return <WorkspaceHostMetrics t={t} />;
+    case "dashboard":
+      return <span className="status-bar-module-text">{t("dashboard.statusReady")}</span>;
     case "settings":
       return null;
   }

@@ -1,4 +1,5 @@
 import {
+  Gauge,
   LayoutDashboard,
   Pin,
   PinOff,
@@ -14,7 +15,7 @@ import { useWorkspaceStore } from "../store";
 import type { Connection } from "../types";
 import { RailTooltip } from "./RailTooltip";
 
-export type ActivePage = "workspace" | "settings";
+export type ActivePage = "workspace" | "dashboard" | "settings";
 
 type ConnectedRailItem = {
   connection: Connection;
@@ -445,6 +446,14 @@ export function ActivityRail({
       >
         <LayoutDashboard size={18} />
         <RailTooltip label={t("workspace.workspace")} />
+      </button>
+      <button
+        className={`rail-button ${activePage === "dashboard" ? "active" : ""}`}
+        aria-label={t("dashboard.title")}
+        onClick={() => onNavigate("dashboard")}
+      >
+        <Gauge size={18} />
+        <RailTooltip label={t("dashboard.title")} />
       </button>
       {connectedRailItems.length > 0 ? (
         <div

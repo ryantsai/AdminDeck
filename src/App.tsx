@@ -14,6 +14,7 @@ import {
   useWorkspaceChromeLayout,
 } from "./app/workspaceChromeLayout";
 import { ConnectionSidebar } from "./connections/ConnectionSidebar";
+import { DashboardPage } from "./dashboard/DashboardPage";
 import { useBootstrapSettings } from "./lib/settings";
 import { SettingsPage } from "./settings/SettingsPage";
 import { useWorkspaceStore } from "./store";
@@ -105,6 +106,7 @@ function App() {
           onResetLayout={resetWorkspaceChromeLayout}
         />
       ) : null}
+      {activePage === "dashboard" ? <DashboardPage /> : null}
       <StatusBar activePage={activePage} />
     </div>
   );

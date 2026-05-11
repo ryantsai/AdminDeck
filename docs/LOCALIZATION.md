@@ -6,6 +6,17 @@ When a key is translated into every supported locale, remove its entry from this
 
 ## Pending Strings
 
+- Dashboard module keys added for `src/dashboard/DashboardPage.tsx`
+  - Keys: `dashboard.title`, `dashboard.moduleLabel`, `dashboard.subtitle`, `dashboard.statusReady`, `dashboard.catalog`, `dashboard.widgetCount`, `dashboard.categoriesLabel`, `dashboard.categories.hash`, `dashboard.categories.network`, `dashboard.categories.quick`, `dashboard.categories.report`, `dashboard.categoryAll`, `dashboard.playground`, `dashboard.playgroundHint`, `dashboard.addAgentWidget`, `dashboard.addWidget`, `dashboard.widgetAlreadySelected`, `dashboard.removeWidget`, `dashboard.deleteCustomWidget`, `dashboard.widgetDeleted`, `dashboard.emptyTitle`, `dashboard.emptyHint`, `dashboard.hashTitle`, `dashboard.hashSummary`, `dashboard.hashSample`, `dashboard.hashInput`, `dashboard.hashUnavailable`, `dashboard.characters`, `dashboard.bytes`, `dashboard.sha1`, `dashboard.sha256`, `dashboard.subnetTitle`, `dashboard.subnetSummary`, `dashboard.subnetSample`, `dashboard.subnetInput`, `dashboard.networkAddress`, `dashboard.broadcastAddress`, `dashboard.firstUsable`, `dashboard.lastUsable`, `dashboard.subnetMask`, `dashboard.wildcardMask`, `dashboard.totalAddresses`, `dashboard.usableHosts`, `dashboard.subnetError.invalidFormat`, `dashboard.subnetError.invalidAddress`, `dashboard.subnetError.invalidPrefix`, `dashboard.quickToolsTitle`, `dashboard.quickToolsSummary`, `dashboard.quickTool`, `dashboard.quickSample`, `dashboard.quickInput`, `dashboard.quickOutput`, `dashboard.quickToolOptions.urlEncode`, `dashboard.quickToolOptions.urlDecode`, `dashboard.quickToolOptions.base64Encode`, `dashboard.quickToolOptions.base64Decode`, `dashboard.quickToolOptions.unixToIso`, `dashboard.quickToolErrors.invalidInput`, `dashboard.quickToolErrors.invalidNumber`, `dashboard.reportTitle`, `dashboard.reportSummary`, `dashboard.reportBody`, `dashboard.copyValue`, `dashboard.agentWidgetDialogTitle`, `dashboard.agentWidgetDialogHint`, `dashboard.agentWidgetJson`, `dashboard.agentWidgetExample`, `dashboard.saveWidget`, `dashboard.agentWidgetSaved`, `dashboard.agentWidgetBuiltInId`, `dashboard.agentWidgetErrors.invalidJson`, `dashboard.agentWidgetErrors.invalidTitle`, `dashboard.agentWidgetErrors.invalidCategory`, `dashboard.agentWidgetErrors.invalidSummary`, `dashboard.agentWidgetErrors.invalidBody`
+  - English values: See `src/i18n/locales/en.json` under the `dashboard` namespace.
+  - Namespace: `dashboard`
+  - File/component: `src/dashboard/DashboardPage.tsx`, `src/dashboard/widgets.ts`, `src/app/ActivityRail.tsx`, `src/workspace/StatusBar.tsx`
+  - UI role: Activity Rail label, page title/subtitle, catalog labels, buttons, status messages, form labels, calculator output labels, validation errors, and report body text.
+  - Flow: User opens Dashboard from the Activity Rail, selects prebuilt widgets, uses hash/subnet/quick-tool widgets, removes widgets, or pastes reviewed AI Assistant/coding-agent JSON to create a local report widget.
+  - Tone: concise, professional desktop utility UI; status/error copy should be direct and non-chatty.
+  - Placeholders: `{{count}}` is the number of available widgets; `{{name}}` is a widget title; `{{label}}` is the copied output label.
+  - Domain notes: Dashboard is a widget playground, not the default launch state or a landing page. Custom widgets are saved local UI definitions only; they do not execute generated code.
+
 - `ai.attachedFiles`
   - English: `Attached files ({{count}})`
   - Namespace: `ai`
