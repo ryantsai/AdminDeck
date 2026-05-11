@@ -1322,6 +1322,20 @@ impl Storage {
 
     fn initialize_schema(&self) -> Result<(), String> {
         let connection = self.lock()?;
+        let stored_version: i32 = connection
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .map_err(to_storage_error)?;
+        if stored_version < SCHEMA_USER_VERSION {
+            connection
+                .execute_batch(
+                    r#"
+                    DROP TABLE IF EXISTS dashboard_widget_instances;
+                    DROP TABLE IF EXISTS dashboard_custom_widgets;
+                    DROP TABLE IF EXISTS dashboard_views;
+                "#,
+                )
+                .map_err(to_storage_error)?;
+        }
         connection
             .execute_batch(CURRENT_SCHEMA)
             .map_err(to_storage_error)?;
