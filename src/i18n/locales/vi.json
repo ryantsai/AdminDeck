@@ -1095,7 +1095,24 @@
       "Starship",
       "Sunspot",
       "Supernova"
-    ]
+    ],
+    "attachedFiles": "Tệp đính kèm ({{count}})",
+    "removeFileAttachment": "Xóa {{label}}",
+    "fileTooLarge": "{{name}} lớn hơn 10 MB.",
+    "preparingResponse": "Đang chuẩn bị phản hồi...",
+    "workedFor": "Đã làm việc trong {{duration}}",
+    "thinkingStep": "Đang suy nghĩ",
+    "toolCallRunning": "Đang chạy",
+    "toolCallComplete": "Hoàn tất",
+    "workDurationUnderSecond": "<1s",
+    "workDurationSeconds": "{{count}}s",
+    "workDurationMinutesSeconds": "{{minutes}}m {{seconds}}s",
+    "toolWebSearchDone": "Đã tìm kiếm trên web",
+    "toolWebFetchDone": "Đã tải trang web",
+    "toolShellCommandDone": "Đã chạy lệnh",
+    "toolFileSearchDone": "Đã tìm kiếm tệp",
+    "toolFileReadDone": "Đã đọc tệp",
+    "toolCurrentTimeDone": "Đã kiểm tra thời gian hiện tại"
   },
   "workspace": {
     "tabs": "Workspace tabs",

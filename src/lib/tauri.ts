@@ -4,7 +4,7 @@ import {
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import type {
   AppearanceSettings,
   AiProviderSettings,
@@ -1427,4 +1427,12 @@ export async function openFilesystemPath(path: string) {
     return;
   }
   await openPath(path);
+}
+
+export async function openExternalUrl(url: string) {
+  if (!isTauriRuntime()) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  await openUrl(url);
 }

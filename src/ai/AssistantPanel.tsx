@@ -26,11 +26,12 @@ import type {
   ClipboardEvent,
   FormEvent,
   KeyboardEvent,
+  MouseEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { dialogButtonAria, menuButtonAria } from "../lib/aria";
-import { invokeCommand, isTauriRuntime } from "../lib/tauri";
+import { invokeCommand, isTauriRuntime, openExternalUrl } from "../lib/tauri";
 import type { AiStreamEvent, CaptureScreenshotRequest } from "../lib/tauri";
 import {
   getAiProviderDefinition,
@@ -864,6 +865,12 @@ export function AssistantPanel({
     }
   }
 
+  function handleOpenAssistantLink(url: string) {
+    openExternalUrl(url).catch((error) => {
+      setChatError(error instanceof Error ? error.message : String(error));
+    });
+  }
+
   function handleAddScreenshot() {
     setAddContextMenuOpen(false);
     if (activeTab?.kind === "remoteDesktop" && activeTab.connection?.type === "rdp") {
@@ -1552,6 +1559,7 @@ export function AssistantPanel({
             message={message}
             onCopyCode={handleCopyCode}
             onCopyMessage={handleCopyMessage}
+            onOpenLink={handleOpenAssistantLink}
             onSendCode={handleSendCodeToTerminal}
           />
         ))}
@@ -1809,11 +1817,13 @@ function AssistantMessageView({
   message,
   onCopyCode,
   onCopyMessage,
+  onOpenLink,
   onSendCode,
 }: {
   message: AssistantChatMessage;
   onCopyCode: (code: string) => void;
   onCopyMessage: (message: AssistantChatMessage) => void;
+  onOpenLink: (url: string) => void;
   onSendCode: (code: string) => void;
 }) {
   const { t } = useTranslation();
@@ -1893,6 +1903,7 @@ function AssistantMessageView({
             canSendCode={canSendCode}
             content={message.content}
             onCopyCode={onCopyCode}
+            onOpenLink={onOpenLink}
             onSendCode={onSendCode}
           />
         </div>
@@ -2160,15 +2171,29 @@ function formatAssistantWorkDuration(
   return t("ai.workDurationMinutesSeconds", { minutes, seconds });
 }
 
+function externalAssistantLinkUrl(href: string | null) {
+  if (!href) {
+    return undefined;
+  }
+  try {
+    const url = new URL(href);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function MarkdownContent({
   canSendCode,
   content,
   onCopyCode,
+  onOpenLink,
   onSendCode,
 }: {
   canSendCode: boolean;
   content: string;
   onCopyCode: (code: string) => void;
+  onOpenLink: (url: string) => void;
   onSendCode: (code: string) => void;
 }) {
   const { t } = useTranslation();
@@ -2177,8 +2202,22 @@ function MarkdownContent({
     return lexed.filter((tok) => tok.type !== "space");
   }, [content]);
 
+  function handleMarkdownClick(event: MouseEvent<HTMLDivElement>) {
+    const link = (event.target as Element | null)?.closest("a");
+    if (!link) {
+      return;
+    }
+    const href = link.getAttribute("href");
+    const externalUrl = externalAssistantLinkUrl(href);
+    event.preventDefault();
+    event.stopPropagation();
+    if (externalUrl) {
+      onOpenLink(externalUrl);
+    }
+  }
+
   return (
-    <div className="markdown-content">
+    <div className="markdown-content" onClick={handleMarkdownClick}>
       {tokens.map((token, index) => {
         if (token.type === "code") {
           const codeToken = token as Tokens.Code;
