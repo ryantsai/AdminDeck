@@ -46,16 +46,6 @@ When a key is translated into every supported locale, remove its entry from this
   - Placeholders: none.
   - Domain notes: This replaces the rotating novelty waiting phrase during request setup only.
 
-- `ai.working`
-  - English: `Working...`
-  - Namespace: `ai`
-  - File/component: `src/ai/AssistantPanel.tsx`
-  - UI role: disclosure label/status
-  - Flow: AI Assistant response work panel while thinking or tools are still active.
-  - Tone: concise progress label.
-  - Placeholders: none.
-  - Domain notes: Refers to assistant work for the current chat response, not a saved workspace task.
-
 - `ai.workedFor`
   - English: `Worked for {{duration}}`
   - Namespace: `ai`

@@ -123,6 +123,14 @@ const ASSISTANT_IMAGE_MAX_EDGE = 1280;
 const ASSISTANT_IMAGE_JPEG_QUALITY = 0.72;
 const ASSISTANT_FILE_MAX_BYTES = 10 * 1024 * 1024;
 
+function randomAssistantWaitingPhrase() {
+  const phrases = i18next.t("ai.waitingPhrases", { returnObjects: true }) as readonly string[];
+  if (!Array.isArray(phrases) || phrases.length === 0) {
+    return i18next.t("ai.chargingBeacon");
+  }
+  return phrases[Math.floor(Math.random() * phrases.length)] ?? i18next.t("ai.chargingBeacon");
+}
+
 function createAssistantChatMessage(
   role: AssistantChatMessage["role"],
   content: string,
@@ -2018,17 +2026,54 @@ function toolCallLabel(
 
 function AssistantWorkPanel({ message }: { message: AssistantChatMessage }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(Boolean(message.isStreaming));
+  const [expanded, setExpanded] = useState(false);
+  const [waitingPhrase, setWaitingPhrase] = useState(randomAssistantWaitingPhrase);
+  const [waitingDots, setWaitingDots] = useState(0);
+  const wasStreamingRef = useRef(Boolean(message.isStreaming));
   const reasoningContent = message.reasoningContent?.trim() ?? "";
   const toolCalls = message.toolCalls ?? [];
-  const hasWork =
-    Boolean(message.workStartedAt) ||
-    Boolean(reasoningContent) ||
-    toolCalls.length > 0 ||
-    Boolean(message.isStreaming);
+  const hasWork = Boolean(reasoningContent) || toolCalls.length > 0 || Boolean(message.isStreaming);
 
   useEffect(() => {
-    setExpanded(Boolean(message.isStreaming));
+    setExpanded(false);
+    wasStreamingRef.current = Boolean(message.isStreaming);
+  }, [message.id]);
+
+  useEffect(() => {
+    if (wasStreamingRef.current && !message.isStreaming) {
+      setExpanded(false);
+    }
+    wasStreamingRef.current = Boolean(message.isStreaming);
+  }, [message.isStreaming]);
+
+  useEffect(() => {
+    if (!message.isStreaming) {
+      setWaitingDots(0);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setWaitingDots((current) => (current + 1) % 4);
+    }, 300);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [message.isStreaming]);
+
+  useEffect(() => {
+    if (!message.isStreaming) {
+      return;
+    }
+
+    setWaitingPhrase(randomAssistantWaitingPhrase());
+    const interval = window.setInterval(() => {
+      setWaitingPhrase(randomAssistantWaitingPhrase());
+    }, 3000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
   }, [message.isStreaming]);
 
   if (!hasWork) {
@@ -2040,7 +2085,7 @@ function AssistantWorkPanel({ message }: { message: AssistantChatMessage }) {
       ? formatAssistantWorkDuration(message.workStartedAt, message.workCompletedAt, t)
       : "";
   const label = message.isStreaming
-    ? t("ai.working")
+    ? waitingPhrase || t("ai.chargingBeacon")
     : t("ai.workedFor", { duration: duration || t("ai.workDurationUnderSecond") });
   const thinkingStatus = message.isStreaming ? "running" : "completed";
 
@@ -2052,7 +2097,14 @@ function AssistantWorkPanel({ message }: { message: AssistantChatMessage }) {
         onClick={() => setExpanded((e) => !e)}
         type="button"
       >
-        <span>{label}</span>
+        <span>
+          {label}
+          {message.isStreaming ? (
+            <span className="assistant-waiting-dots" aria-hidden="true">
+              {".".repeat(waitingDots)}
+            </span>
+          ) : null}
+        </span>
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       {expanded ? (
