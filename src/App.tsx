@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AssistantPanel } from "./ai/AssistantPanel";
+import type { AssistantPageContext } from "./ai/AssistantPanel";
 import { ActivityRail } from "./app/ActivityRail";
 import type { ActivePage } from "./app/ActivityRail";
 import {
@@ -27,6 +28,8 @@ import "./App.css";
 function App() {
   const { t } = useTranslation();
   const [activePage, setActivePage] = useState<ActivePage>("workspace");
+  const [dashboardAssistantContext, setDashboardAssistantContext] =
+    useState<AssistantPageContext>();
   const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
   const resetAllLayouts = useWorkspaceStore((state) => state.resetAllLayouts);
   const appShellRef = useRef<HTMLDivElement | null>(null);
@@ -86,6 +89,8 @@ function App() {
           <TabStrip />
           <WorkspaceCanvas workspaceActive={activePage === "workspace"} />
         </main>
+      </div>
+      {activePage !== "settings" ? (
         <PanelResizeHandle
           ariaLabel={t("app.resizeAiAssistant")}
           side="right"
@@ -94,19 +99,24 @@ function App() {
           onClick={aiPanelLayout.collapsed ? expandAiPanel : undefined}
           onPointerDown={handleAiPanelResize}
         />
+      ) : null}
+      {activePage !== "settings" ? (
         <AssistantPanel
           collapsed={aiPanelLayout.collapsed}
           onOpenSettings={() => setActivePage("settings")}
           onToggleCollapsed={toggleAiPanel}
+          pageContext={activePage === "dashboard" ? dashboardAssistantContext : undefined}
         />
-      </div>
+      ) : null}
       {activePage === "settings" ? (
         <SettingsPage
           onBack={() => setActivePage("workspace")}
           onResetLayout={resetWorkspaceChromeLayout}
         />
       ) : null}
-      {activePage === "dashboard" ? <DashboardPage /> : null}
+      {activePage === "dashboard" ? (
+        <DashboardPage onAssistantContextChange={setDashboardAssistantContext} />
+      ) : null}
       <StatusBar activePage={activePage} />
     </div>
   );

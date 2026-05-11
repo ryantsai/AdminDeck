@@ -312,14 +312,18 @@ export interface AgentChatMessage {
   reasoningContent?: string;
 }
 
-export interface AgentRunRequest {
-  prompt: string;
-  contextLabel: string;
-  intent?: "chat" | "extensionCreation";
-  selectedOutput?: string;
-  screenshot?: {
-    sourceLabel: string;
-    dataUrl: string;
+  export interface AgentRunRequest {
+    prompt: string;
+    contextLabel: string;
+    intent?: "chat" | "extensionCreation";
+    selectedOutput?: string;
+    pageContext?: {
+      sourceLabel: string;
+      text: string;
+    };
+    screenshot?: {
+      sourceLabel: string;
+      dataUrl: string;
   };
   screenshots?: Array<{
     sourceLabel: string;

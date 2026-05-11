@@ -563,14 +563,15 @@ button {
 }
 
 .dashboard-page {
-  position: fixed;
-  inset: 0 0 28px 48px;
+  position: relative;
+  grid-column: 2 / 5;
+  grid-row: 1;
   z-index: 75;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
-  height: calc(100vh - 28px);
+  height: 100%;
   overflow: hidden;
   padding: 18px 20px;
   background: var(--app-bg);
@@ -605,6 +606,43 @@ button {
   flex: 0 0 auto;
   gap: 7px;
   align-items: center;
+}
+
+.dashboard-view-tabs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.dashboard-view-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dashboard-view-tabs button.active,
+.dashboard-view-tabs button:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.dashboard-view-tabs .dashboard-add-view {
+  color: var(--text);
+  background: var(--surface-muted);
 }
 
 .dashboard-layout {
@@ -1010,6 +1048,7 @@ button {
   display: flex;
   flex-direction: column;
   position: relative;
+  grid-column: 2;
   grid-row: 1;
   z-index: 70;
   min-height: 0;
@@ -1018,7 +1057,13 @@ button {
   padding: 12px 14px;
 }
 
+.workspace {
+  grid-column: 4;
+}
+
 .assistant-panel {
+  grid-column: 6;
+  grid-row: 1;
   overflow: hidden;
 }
 
@@ -1043,6 +1088,15 @@ button {
   color: var(--text-faint);
   background: var(--border);
   cursor: col-resize;
+}
+
+.panel-resize-handle-left,
+.connection-collapsed-separator {
+  grid-column: 3;
+}
+
+.panel-resize-handle-right {
+  grid-column: 5;
 }
 
 .connection-collapsed-separator {

@@ -42,6 +42,7 @@
     "i18next": "^26.0.8",
     "lucide-react": "^1.14.0",
     "marked": "^18.0.3",
+    "motion": "^12.38.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^17.0.6",

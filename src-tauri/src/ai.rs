@@ -209,6 +209,13 @@ pub struct AgentFileContext {
     text: Option<String>,
 }
 
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentPageContext {
+    source_label: String,
+    text: String,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentRunRequest {
@@ -224,6 +231,7 @@ pub struct AgentRunRequest {
     system_context: Option<String>,
     messages: Vec<AgentChatMessage>,
     output_language: Option<String>,
+    page_context: Option<AgentPageContext>,
 }
 
 #[derive(Debug, Serialize)]
@@ -777,6 +785,7 @@ impl OpenAiCompatibleProvider {
             settings.reasoning_effort().to_string(),
             request.system_context,
             request.selected_output,
+            request.page_context,
             supports_image_input(self.provider_kind, settings.model()),
             request.screenshot,
             request.screenshots,
@@ -932,6 +941,7 @@ impl OpenAiCompatibleProvider {
             settings.reasoning_effort().to_string(),
             request.system_context,
             request.selected_output,
+            request.page_context,
             supports_image_input(self.provider_kind, settings.model()),
             request.screenshot,
             request.screenshots,
@@ -1095,6 +1105,7 @@ impl OpenAiCompatibleProvider {
             settings.reasoning_effort().to_string(),
             request.system_context,
             request.selected_output,
+            request.page_context,
             supports_image_input(self.provider_kind, settings.model()),
             request.screenshot,
             request.screenshots,
@@ -1264,6 +1275,7 @@ impl OpenAiCompatibleProvider {
             settings.reasoning_effort().to_string(),
             request.system_context,
             request.selected_output,
+            request.page_context,
             supports_image_input(self.provider_kind, settings.model()),
             request.screenshot,
             request.screenshots,
@@ -2003,6 +2015,7 @@ fn build_agent_messages(
     reasoning_effort: String,
     system_context: Option<String>,
     selected_output: Option<String>,
+    page_context: Option<AgentPageContext>,
     supports_image_input: bool,
     screenshot: Option<AgentScreenshotContext>,
     screenshots: Vec<AgentScreenshotContext>,
@@ -2064,6 +2077,13 @@ fn build_agent_messages(
         user_content.push_str(&selected_output);
         user_content.push_str("\n```");
     }
+    if let Some(page_context) = normalize_page_context(page_context) {
+        user_content.push_str("\n\nActive page context: ");
+        user_content.push_str(&page_context.source_label);
+        user_content.push_str("\n```text\n");
+        user_content.push_str(&page_context.text);
+        user_content.push_str("\n```");
+    }
     let mut image_contexts: Vec<AgentScreenshotContext> = vec![];
     if let Some(screenshot) = screenshot {
         image_contexts.push(screenshot);
@@ -2101,6 +2121,16 @@ fn build_agent_messages(
         tool_calls: None,
     });
     messages
+}
+
+fn normalize_page_context(page_context: Option<AgentPageContext>) -> Option<AgentPageContext> {
+    let page_context = page_context?;
+    let source_label = page_context.source_label.trim().to_string();
+    let text = page_context.text.trim().to_string();
+    if source_label.is_empty() || text.is_empty() {
+        return None;
+    }
+    Some(AgentPageContext { source_label, text })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2551,6 +2581,7 @@ mod tests {
             "high".to_string(),
             Some("OS: Ubuntu 24.04 LTS".to_string()),
             Some("ERROR service unavailable".to_string()),
+            None,
             true,
             None,
             vec![],
@@ -2580,12 +2611,40 @@ mod tests {
     }
 
     #[test]
+    fn agent_messages_include_page_context_separately_from_terminal_output() {
+        let messages = build_agent_messages(
+            "What should I add next?".to_string(),
+            "Dashboard - Default view".to_string(),
+            None,
+            "medium".to_string(),
+            None,
+            None,
+            Some(AgentPageContext {
+                source_label: "Dashboard Default view".to_string(),
+                text: "Active widgets: Hash Calculator, Quick Tools".to_string(),
+            }),
+            true,
+            None,
+            vec![],
+            vec![],
+            None,
+        );
+
+        let content = text_content(&messages[1]);
+        assert!(content.contains("Dashboard - Default view"));
+        assert!(content.contains("Active page context: Dashboard Default view"));
+        assert!(content.contains("Active widgets: Hash Calculator, Quick Tools"));
+        assert!(!content.contains("Selected terminal output"));
+    }
+
+    #[test]
     fn agent_messages_can_attach_screenshot_context() {
         let messages = build_agent_messages(
             "What is visible?".to_string(),
             "Router - URL view".to_string(),
             None,
             "medium".to_string(),
+            None,
             None,
             None,
             true,
@@ -2611,6 +2670,7 @@ mod tests {
             "Workspace".to_string(),
             None,
             "medium".to_string(),
+            None,
             None,
             None,
             true,
@@ -2644,6 +2704,7 @@ mod tests {
             "medium".to_string(),
             None,
             None,
+            None,
             false,
             Some(AgentScreenshotContext {
                 source_label: "Router screenshot".to_string(),
@@ -2672,6 +2733,7 @@ mod tests {
             "Workspace".to_string(),
             None,
             "medium".to_string(),
+            None,
             None,
             None,
             true,
@@ -2753,6 +2815,7 @@ mod tests {
             "Workspace".to_string(),
             Some("extensionCreation".to_string()),
             "medium".to_string(),
+            None,
             None,
             None,
             true,

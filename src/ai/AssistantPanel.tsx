@@ -120,6 +120,13 @@ type ScreenshotRegionState = {
   current?: { x: number; y: number };
 };
 
+export interface AssistantPageContext {
+  contextLabel: string;
+  connectionLabel: string;
+  sourceLabel: string;
+  text: string;
+}
+
 const ASSISTANT_IMAGE_MAX_EDGE = 1280;
 const ASSISTANT_IMAGE_JPEG_QUALITY = 0.72;
 const ASSISTANT_FILE_MAX_BYTES = 10 * 1024 * 1024;
@@ -529,10 +536,12 @@ export function AssistantPanel({
   collapsed,
   onOpenSettings,
   onToggleCollapsed,
+  pageContext,
 }: {
   collapsed: boolean;
   onOpenSettings: () => void;
   onToggleCollapsed: () => void;
+  pageContext?: AssistantPageContext;
 }) {
   const { t } = useTranslation();
   const activeTab = useWorkspaceStore((state) =>
@@ -572,12 +581,21 @@ export function AssistantPanel({
   const regionSelectionRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantRequestIdRef = useRef(0);
   const wasCollapsedRef = useRef(collapsed);
-  const contextLabel = activeTab
+  const workspaceContextLabel = activeTab
     ? `${activeTab.title} - ${workspaceKindLabel(activeTab)}`
     : t("ai.noActiveSession");
-  const connectionLabel = activeTab?.connection
+  const workspaceConnectionLabel = activeTab?.connection
     ? `${activeTab.connection.user}@${activeTab.connection.host}`
     : t("ai.workspace");
+  const contextLabel = pageContext?.contextLabel ?? workspaceContextLabel;
+  const connectionLabel = pageContext?.connectionLabel ?? workspaceConnectionLabel;
+  const pageContextPayload =
+    pageContext && pageContext.text.trim()
+      ? {
+          sourceLabel: pageContext.sourceLabel,
+          text: pageContext.text,
+        }
+      : undefined;
   const providerDefinition = getAiProviderDefinition(aiProviderSettings.providerKind);
   const currentModel = aiProviderSettings.model || providerDefinition.defaultModel;
   const modelOptionIds = useMemo(
@@ -600,7 +618,9 @@ export function AssistantPanel({
   const showImageNotSupportedNotice =
     !currentModelSupportsImageInput && (hasPendingImageContext || imagePasteRejected);
   const activeTerminalPaneId =
-    activeTab?.kind === "terminal" ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id : undefined;
+    !pageContext && activeTab?.kind === "terminal"
+      ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id
+      : undefined;
   const activeFocusedPane =
     activeTab?.kind === "terminal"
       ? activeTab.panes.find((pane) => pane.id === activeTerminalPaneId) ?? activeTab.panes[0]
@@ -615,7 +635,7 @@ export function AssistantPanel({
       activeFocusedTerminalPane.connection.type === "local" ||
       activeFocusedTerminalPane.connection.type === "ssh");
   const activeRdpPaneId =
-    activeTab?.kind === "remoteDesktop" && activeTab.connection?.type === "rdp"
+    !pageContext && activeTab?.kind === "remoteDesktop" && activeTab.connection?.type === "rdp"
       ? activeTab.focusedPaneId ?? activeTab.panes[0]?.id
       : undefined;
   const sortedChatHistory = useMemo(() => sortedAssistantThreads(chatHistory), [chatHistory]);
@@ -939,6 +959,7 @@ export function AssistantPanel({
         contextLabel,
         intent: requestIntent,
         messages: [],
+        pageContext: pageContextPayload,
         outputLanguage: resolveAssistantOutputLanguage(aiProviderSettings.outputLanguage),
       },
     });
@@ -1139,6 +1160,7 @@ export function AssistantPanel({
           contextLabel,
           intent: requestIntent,
           selectedOutput: textAttachments[0]?.text,
+          pageContext: pageContextPayload,
           screenshots: imageAttachments.map((attachment) => ({
             sourceLabel: attachment.sourceLabel,
             dataUrl: attachment.imageDataUrl,
@@ -1459,7 +1481,7 @@ export function AssistantPanel({
       </div>
 
       <div className="assistant-context active-session-hint">
-        {activeTab?.connection ? (
+        {!pageContext && activeTab?.connection ? (
           <ConnectionIcon
             localShell={activeTab.connection.localShell}
             size={32}
