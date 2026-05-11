@@ -1,6 +1,7 @@
 mod ai;
 mod app_launcher;
 mod app_tray;
+mod dashboard_commands;
 mod dashboard_storage;
 mod dashboard_validation;
 mod diagnostics;
@@ -1726,7 +1727,20 @@ pub fn run() {
             save_wiki_attachment,
             delete_wiki_attachment,
             export_wiki_zip,
-            get_wiki_attachments_folder
+            get_wiki_attachments_folder,
+            dashboard_commands::dashboard_load_state,
+            dashboard_commands::dashboard_create_view,
+            dashboard_commands::dashboard_update_view,
+            dashboard_commands::dashboard_remove_view,
+            dashboard_commands::dashboard_reorder_views,
+            dashboard_commands::dashboard_add_instance,
+            dashboard_commands::dashboard_update_instance,
+            dashboard_commands::dashboard_remove_instance,
+            dashboard_commands::dashboard_apply_layout,
+            dashboard_commands::dashboard_create_custom_widget,
+            dashboard_commands::dashboard_update_custom_widget,
+            dashboard_commands::dashboard_remove_custom_widget,
+            dashboard_commands::dashboard_reset
         ])
         .run(tauri::generate_context!())
         .expect("error while running KKTerm");
