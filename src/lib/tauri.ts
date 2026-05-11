@@ -54,6 +54,22 @@ import type {
   WikiSearchHit,
   WikiTree,
 } from "../types";
+import type {
+  DashboardCustomWidget,
+  DashboardLoadState,
+  DashboardView,
+  DashboardWidgetInstance,
+  CustomWidgetPatch,
+  InstancePatch,
+  LayoutEntry,
+  ViewPatch,
+  WidgetKind,
+  WidgetCustomKind,
+  WidgetPreset,
+  AccentName,
+  IconName,
+  GridDensity,
+} from "../dashboard/types";
 
 type BrowserFileHandle = {
   createWritable: () => Promise<{
@@ -1284,6 +1300,65 @@ type CommandMap = {
   get_wiki_attachments_folder: {
     args: undefined;
     result: string;
+  };
+  dashboard_load_state: {
+    args: undefined;
+    result: DashboardLoadState;
+  };
+  dashboard_create_view: {
+    args: { title: string; gridDensity?: GridDensity };
+    result: DashboardView;
+  };
+  dashboard_update_view: {
+    args: { id: string; patch: ViewPatch };
+    result: DashboardView;
+  };
+  dashboard_remove_view: {
+    args: { id: string };
+    result: null;
+  };
+  dashboard_reorder_views: {
+    args: { orderedIds: string[] };
+    result: null;
+  };
+  dashboard_add_instance: {
+    args: {
+      viewId: string; kind: WidgetKind; sourceId: string;
+      preset: WidgetPreset; accentName: AccentName; iconName: IconName;
+      gridX: number; gridY: number; gridW: number; gridH: number;
+    };
+    result: DashboardWidgetInstance;
+  };
+  dashboard_update_instance: {
+    args: { id: string; patch: InstancePatch };
+    result: DashboardWidgetInstance;
+  };
+  dashboard_remove_instance: {
+    args: { id: string };
+    result: null;
+  };
+  dashboard_apply_layout: {
+    args: { viewId: string; layout: LayoutEntry[] };
+    result: null;
+  };
+  dashboard_create_custom_widget: {
+    args: {
+      kind: WidgetCustomKind; title: string; summary: string;
+      category: string; bodyJson: string; createdBy: "user" | "agent";
+    };
+    result: DashboardCustomWidget;
+  };
+  dashboard_update_custom_widget: {
+    args: { id: string; patch: CustomWidgetPatch };
+    result: DashboardCustomWidget;
+  };
+  dashboard_remove_custom_widget: {
+    args: { id: string; forceDeleteInstances: boolean };
+    result: null;
+  };
+  dashboard_reset: {
+    args: undefined;
+    result: null;
   };
 };
 
