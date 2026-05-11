@@ -1,6 +1,7 @@
 mod ai;
 mod app_launcher;
 mod app_tray;
+mod dashboard_storage;
 mod dashboard_validation;
 mod diagnostics;
 mod import;
