@@ -1,74 +1,13 @@
-import {
-  Bot,
-  Check,
-  Copy,
-  FileText,
-  Hash,
-  Network,
-  Plus,
-  Trash2,
-  Wrench,
-  X,
-} from "lucide-react";
-import { AnimatePresence } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { Edit3, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssistantPageContext } from "../ai/AssistantPanel";
-import { AppLauncherWidget } from "../app-launcher/AppLauncherWidget";
-import { useWorkspaceStore } from "../store";
-import {
-  DashboardMotionAside,
-  DashboardMotionDialog,
-  DashboardMotionDialogBackdrop,
-  DashboardMotionItem,
-  DashboardMotionList,
-  DashboardMotionPanel,
-  DashboardMotionRoot,
-} from "./motion";
-import {
-  calculateIpv4Subnet,
-  calculateTextHashes,
-  DASHBOARD_BUILTIN_WIDGETS,
-  normalizeAgentWidgetDefinition,
-  transformQuickTool,
-} from "./widgets";
-import type {
-  DashboardWidgetCategory,
-  DashboardWidgetDefinition,
-  QuickToolId,
-} from "./widgets";
-
-const CUSTOM_WIDGET_STORAGE_KEY = "kkterm.dashboard.customWidgets.v1";
-const SELECTED_WIDGET_STORAGE_KEY = "kkterm.dashboard.selectedWidgets.v1";
-const DASHBOARD_VIEWS_STORAGE_KEY = "kkterm.dashboard.views.v1";
-const ACTIVE_DASHBOARD_VIEW_STORAGE_KEY = "kkterm.dashboard.activeView.v1";
-
-interface DashboardView {
-  id: string;
-  title: string;
-  selectedWidgetIds: string[];
-}
-
-const DEFAULT_WIDGET_IDS = [
-  "hash-calculator",
-  "ipv4-subnet-calculator",
-  "quick-tools",
-];
-
-const CATEGORY_ORDER: DashboardWidgetCategory[] = [
-  "hash",
-  "network",
-  "quick",
-  "report",
-];
-
-const QUICK_TOOL_OPTIONS: QuickToolId[] = [
-  "urlEncode",
-  "urlDecode",
-  "base64Encode",
-  "base64Decode",
-  "unixToIso",
-];
+import { CatalogOverlay } from "./edit/CatalogOverlay";
+import { CustomizePopover } from "./edit/CustomizePopover";
+import "./dashboard.css";
+import { useDashboardStore } from "./state/dashboardStore";
+import type { DashboardWidgetInstance, GridDensity } from "./types";
+import { DashboardCanvas } from "./view/DashboardCanvas";
 
 export function DashboardPage({
   onAssistantContextChange,
@@ -76,709 +15,146 @@ export function DashboardPage({
   onAssistantContextChange: (context: AssistantPageContext) => void;
 }) {
   const { t } = useTranslation();
-  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
-  const [customWidgets, setCustomWidgets] = useState(loadCustomWidgets);
-  const [views, setViews] = useState(loadDashboardViews);
-  const [activeViewId, setActiveViewId] = useState(loadActiveDashboardViewId);
-  const [categoryFilter, setCategoryFilter] = useState<DashboardWidgetCategory | "all">("all");
-  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
+  const ready = useDashboardStore((s) => s.ready);
+  const load = useDashboardStore((s) => s.load);
+  const views = useDashboardStore((s) => s.views);
+  const instances = useDashboardStore((s) => s.instances);
+  const customWidgets = useDashboardStore((s) => s.customWidgets);
+  const activeViewId = useDashboardStore((s) => s.activeViewId);
+  const setActiveView = useDashboardStore((s) => s.setActiveView);
+  const editMode = useDashboardStore((s) => s.editMode);
+  const toggleEditMode = useDashboardStore((s) => s.toggleEditMode);
+  const setViewDensity = useDashboardStore((s) => s.setViewDensity);
+  const createView = useDashboardStore((s) => s.createView);
+  const renameView = useDashboardStore((s) => s.renameView);
+  const removeView = useDashboardStore((s) => s.removeView);
 
-  const widgets = useMemo(
-    () => [...DASHBOARD_BUILTIN_WIDGETS, ...customWidgets],
-    [customWidgets],
-  );
-  const activeView = views.find((view) => view.id === activeViewId) ?? views[0] ?? createDefaultDashboardView();
-  const activeViewTitle = dashboardViewTitle(activeView, t);
-  const selectedWidgetIds = activeView.selectedWidgetIds;
-  const selectedWidgets = useMemo(
-    () =>
-      selectedWidgetIds
-        .map((id) => widgets.find((widget) => widget.id === id))
-        .filter((widget): widget is DashboardWidgetDefinition => Boolean(widget)),
-    [selectedWidgetIds, widgets],
-  );
-  const visibleCatalogWidgets =
-    categoryFilter === "all"
-      ? widgets
-      : widgets.filter((widget) => widget.category === categoryFilter);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [customize, setCustomize] = useState<{ instance: DashboardWidgetInstance; rect: DOMRect } | null>(null);
 
   useEffect(() => {
-    persistDashboardViews(views);
-  }, [views]);
+    if (!ready) void load();
+  }, [ready, load]);
 
   useEffect(() => {
-    persistActiveDashboardViewId(activeView.id);
-  }, [activeView.id]);
-
-  useEffect(() => {
-    persistCustomWidgets(customWidgets);
-  }, [customWidgets]);
-
-  useEffect(() => {
-    onAssistantContextChange(
-      buildDashboardAssistantContext(activeViewTitle, selectedWidgets, t),
-    );
-  }, [activeViewTitle, onAssistantContextChange, selectedWidgets, t]);
-
-  function addWidget(widgetId: string) {
-    setViews((current) =>
-      current.map((view) =>
-        view.id !== activeView.id || view.selectedWidgetIds.includes(widgetId)
-          ? view
-          : { ...view, selectedWidgetIds: [...view.selectedWidgetIds, widgetId] },
-      ),
-    );
-  }
-
-  function removeWidget(widgetId: string) {
-    setViews((current) =>
-      current.map((view) =>
-        view.id === activeView.id
-          ? {
-              ...view,
-              selectedWidgetIds: view.selectedWidgetIds.filter((id) => id !== widgetId),
-            }
-          : view,
-      ),
-    );
-  }
-
-  function deleteCustomWidget(widgetId: string) {
-    setCustomWidgets((current) => current.filter((widget) => widget.id !== widgetId));
-    setViews((current) =>
-      current.map((view) => ({
-        ...view,
-        selectedWidgetIds: view.selectedWidgetIds.filter((id) => id !== widgetId),
-      })),
-    );
-    showStatusBarNotice(t("dashboard.widgetDeleted"), { tone: "success" });
-  }
-
-  function saveAgentWidget(widget: DashboardWidgetDefinition) {
-    if (DASHBOARD_BUILTIN_WIDGETS.some((entry) => entry.id === widget.id)) {
-      showStatusBarNotice(t("dashboard.agentWidgetBuiltInId"), { tone: "error" });
-      return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && editMode) toggleEditMode();
     }
-    setCustomWidgets((current) => [
-      ...current.filter((entry) => entry.id !== widget.id),
-      widget,
-    ]);
-    addWidget(widget.id);
-    setAgentDialogOpen(false);
-    showStatusBarNotice(t("dashboard.agentWidgetSaved"), { tone: "success" });
-  }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [editMode, toggleEditMode]);
 
-  function addView() {
-    const nextView: DashboardView = {
-      id: `dashboard-view-${Date.now()}`,
-      title: t("dashboard.newViewName", { count: views.length + 1 }),
-      selectedWidgetIds: [],
-    };
-    setViews((current) => [...current, nextView]);
-    setActiveViewId(nextView.id);
-  }
-
-  return (
-    <DashboardMotionRoot className="dashboard-page" aria-labelledby="dashboard-title">
-      <header className="dashboard-header">
-        <div>
-          <p className="panel-label">{t("dashboard.moduleLabel")}</p>
-          <h1 id="dashboard-title">{t("dashboard.title")}</h1>
-          <p>{t("dashboard.subtitle")}</p>
-        </div>
-        <button
-          className="primary-button dashboard-agent-button"
-          onClick={() => setAgentDialogOpen(true)}
-          type="button"
-        >
-          <Bot size={15} />
-          {t("dashboard.addAgentWidget")}
-        </button>
-      </header>
-      <nav className="dashboard-view-tabs" aria-label={t("dashboard.viewsLabel")}>
-        {views.map((view) => (
-          <button
-            aria-current={view.id === activeView.id ? "page" : undefined}
-            className={view.id === activeView.id ? "active" : ""}
-            key={view.id}
-            onClick={() => setActiveViewId(view.id)}
-            type="button"
-          >
-            {dashboardViewTitle(view, t)}
-          </button>
-        ))}
-        <button
-          className="dashboard-add-view"
-          onClick={addView}
-          type="button"
-          aria-label={t("dashboard.addView")}
-        >
-          <Plus size={14} />
-          {t("dashboard.addView")}
-        </button>
-      </nav>
-      <div className="dashboard-layout">
-        <DashboardMotionAside className="dashboard-catalog" aria-label={t("dashboard.catalog")}>
-          <div className="dashboard-catalog-header">
-            <h2>{t("dashboard.catalog")}</h2>
-            <span>{t("dashboard.widgetCount", { count: widgets.length })}</span>
-          </div>
-          <div className="dashboard-category-tabs" aria-label={t("dashboard.categoriesLabel")}>
-            <button
-              className={categoryFilter === "all" ? "active" : ""}
-              onClick={() => setCategoryFilter("all")}
-              type="button"
-            >
-              {t("dashboard.categoryAll")}
-            </button>
-            {CATEGORY_ORDER.map((category) => (
-              <button
-                key={category}
-                className={categoryFilter === category ? "active" : ""}
-                onClick={() => setCategoryFilter(category)}
-                type="button"
-              >
-                {t(categoryKey(category))}
-              </button>
-            ))}
-          </div>
-          <DashboardMotionList className="dashboard-widget-list">
-            <AnimatePresence>
-              {visibleCatalogWidgets.map((widget) => {
-                const selected = selectedWidgetIds.includes(widget.id);
-                return (
-                  <DashboardMotionItem className="dashboard-catalog-item" key={widget.id}>
-                    <div className="dashboard-widget-icon">{widgetIcon(widget.category)}</div>
-                    <div>
-                      <strong>{widgetTitle(widget, t)}</strong>
-                      <p>{widgetSummary(widget, t)}</p>
-                    </div>
-                    <button
-                      className={`dashboard-add-widget ${selected ? "selected" : ""}`}
-                      aria-label={t(
-                        selected
-                          ? "dashboard.widgetAlreadySelected"
-                          : "dashboard.addWidget",
-                        { name: widgetTitle(widget, t) },
-                      )}
-                      disabled={selected}
-                      onClick={() => addWidget(widget.id)}
-                      type="button"
-                    >
-                      {selected ? <Check size={15} /> : <Plus size={15} />}
-                    </button>
-                  </DashboardMotionItem>
-                );
-              })}
-            </AnimatePresence>
-          </DashboardMotionList>
-        </DashboardMotionAside>
-        <DashboardMotionPanel className="dashboard-playground" aria-label={t("dashboard.playground")}>
-          <div className="dashboard-playground-header">
-            <div>
-              <h2>{t("dashboard.playground")}</h2>
-              <p>{t("dashboard.playgroundHint")}</p>
-            </div>
-          </div>
-          <AnimatePresence mode="wait">
-            {selectedWidgets.length > 0 ? (
-              <DashboardMotionList className="dashboard-widget-grid" key="dashboard-widgets">
-                <AnimatePresence>
-                  {selectedWidgets.map((widget) => (
-                    <DashboardWidgetCard
-                      key={widget.id}
-                      onDeleteCustomWidget={deleteCustomWidget}
-                      onRemove={removeWidget}
-                      widget={widget}
-                    />
-                  ))}
-                </AnimatePresence>
-              </DashboardMotionList>
-            ) : (
-              <DashboardMotionPanel className="dashboard-empty" key="dashboard-empty">
-                <Wrench size={28} />
-                <h2>{t("dashboard.emptyTitle")}</h2>
-                <p>{t("dashboard.emptyHint")}</p>
-              </DashboardMotionPanel>
-            )}
-          </AnimatePresence>
-        </DashboardMotionPanel>
-      </div>
-      <AnimatePresence>
-        {agentDialogOpen ? (
-          <AgentWidgetDialog
-            onClose={() => setAgentDialogOpen(false)}
-            onSave={saveAgentWidget}
-          />
-        ) : null}
-      </AnimatePresence>
-    </DashboardMotionRoot>
-  );
-}
-
-function DashboardWidgetCard({
-  onDeleteCustomWidget,
-  onRemove,
-  widget,
-}: {
-  onDeleteCustomWidget: (widgetId: string) => void;
-  onRemove: (widgetId: string) => void;
-  widget: DashboardWidgetDefinition;
-}) {
-  const { t } = useTranslation();
-  return (
-    <DashboardMotionItem className="dashboard-widget-card">
-      <header>
-        <div className="dashboard-widget-card-title">
-          <span className="dashboard-widget-icon">{widgetIcon(widget.category)}</span>
-          <div>
-            <h3>{widgetTitle(widget, t)}</h3>
-            <p>{widgetSummary(widget, t)}</p>
-          </div>
-        </div>
-        <div className="dashboard-widget-actions">
-          {widget.createdBy === "agent" ? (
-            <button
-              className="icon-button"
-              aria-label={t("dashboard.deleteCustomWidget", {
-                name: widgetTitle(widget, t),
-              })}
-              onClick={() => onDeleteCustomWidget(widget.id)}
-              type="button"
-            >
-              <Trash2 size={15} />
-            </button>
-          ) : null}
-          <button
-            className="icon-button"
-            aria-label={t("dashboard.removeWidget", { name: widgetTitle(widget, t) })}
-            onClick={() => onRemove(widget.id)}
-            type="button"
-          >
-            <X size={15} />
-          </button>
-        </div>
-      </header>
-      {widget.kind === "hashCalculator" ? <HashCalculatorWidget /> : null}
-      {widget.kind === "subnetCalculator" ? <SubnetCalculatorWidget /> : null}
-      {widget.kind === "quickTools" ? <QuickToolsWidget /> : null}
-      {widget.kind === "appLauncher" ? <AppLauncherWidget /> : null}
-      {widget.kind === "report" || widget.kind === "agent" ? (
-        <ReportWidget body={widget.body ?? t("dashboard.reportBody")} />
-      ) : null}
-    </DashboardMotionItem>
-  );
-}
-
-function HashCalculatorWidget() {
-  const { t } = useTranslation();
-  const [input, setInput] = useState(t("dashboard.hashSample"));
-  const [hashes, setHashes] = useState<Awaited<ReturnType<typeof calculateTextHashes>>>();
+  const activeView = views.find((v) => v.id === activeViewId) ?? views[0];
+  const viewInstances = activeView ? instances.filter((i) => i.viewId === activeView.id) : [];
 
   useEffect(() => {
-    let disposed = false;
-    void calculateTextHashes(input).then((nextHashes) => {
-      if (!disposed) {
-        setHashes(nextHashes);
-      }
+    if (!activeView) return;
+    const widgetLines = viewInstances.length > 0
+      ? viewInstances.map((i) => `- ${i.customTitle ?? i.sourceId} (${i.kind})`)
+      : [`- ${t("dashboard.emptyTitle")}: ${t("dashboard.emptyHint")}`];
+    onAssistantContextChange({
+      contextLabel: `${t("dashboard.title")} - ${activeView.title}`,
+      connectionLabel: t("dashboard.assistantContextLabel"),
+      sourceLabel: t("dashboard.assistantContextSource", { view: activeView.title }),
+      text: [
+        `${t("dashboard.title")}: ${activeView.title}`,
+        t("dashboard.assistantContextIntro"),
+        "",
+        ...widgetLines,
+        "",
+        `customWidgets: ${customWidgets.map((c) => c.title).join(", ") || "none"}`,
+      ].join("\n"),
     });
-    return () => {
-      disposed = true;
-    };
-  }, [input]);
+  }, [activeView, viewInstances, customWidgets, onAssistantContextChange, t]);
+
+  if (!ready || !activeView) return <div className="dashboard-loading">{t("common.loading")}</div>;
 
   return (
-    <div className="dashboard-widget-body">
-      <label className="dashboard-field">
-        <span>{t("dashboard.hashInput")}</span>
-        <textarea
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          rows={4}
-        />
-      </label>
-      <dl className="dashboard-output-grid">
-        <OutputRow label={t("dashboard.characters")} value={hashes?.characters ?? "--"} />
-        <OutputRow label={t("dashboard.bytes")} value={hashes?.bytes ?? "--"} />
-        <OutputRow label={t("dashboard.sha1")} value={hashes?.sha1 || t("dashboard.hashUnavailable")} />
-        <OutputRow label={t("dashboard.sha256")} value={hashes?.sha256 || t("dashboard.hashUnavailable")} />
-      </dl>
-    </div>
-  );
-}
-
-function SubnetCalculatorWidget() {
-  const { t } = useTranslation();
-  const [input, setInput] = useState(t("dashboard.subnetSample"));
-  const result = calculateIpv4Subnet(input);
-
-  return (
-    <div className="dashboard-widget-body">
-      <label className="dashboard-field">
-        <span>{t("dashboard.subnetInput")}</span>
-        <input value={input} onChange={(event) => setInput(event.target.value)} />
-      </label>
-      {result.ok ? (
-        <dl className="dashboard-output-grid">
-          <OutputRow label={t("dashboard.networkAddress")} value={result.networkAddress} />
-          <OutputRow label={t("dashboard.broadcastAddress")} value={result.broadcastAddress} />
-          <OutputRow label={t("dashboard.firstUsable")} value={result.firstUsableAddress} />
-          <OutputRow label={t("dashboard.lastUsable")} value={result.lastUsableAddress} />
-          <OutputRow label={t("dashboard.subnetMask")} value={result.subnetMask} />
-          <OutputRow label={t("dashboard.wildcardMask")} value={result.wildcardMask} />
-          <OutputRow label={t("dashboard.totalAddresses")} value={result.totalAddresses} />
-          <OutputRow label={t("dashboard.usableHosts")} value={result.usableHosts} />
-        </dl>
-      ) : (
-        <p className="dashboard-error">{t(`dashboard.subnetError.${result.reason}`)}</p>
-      )}
-    </div>
-  );
-}
-
-function QuickToolsWidget() {
-  const { t } = useTranslation();
-  const [toolId, setToolId] = useState<QuickToolId>("urlEncode");
-  const [input, setInput] = useState(t("dashboard.quickSample"));
-  const result = transformQuickTool(toolId, input);
-
-  return (
-    <div className="dashboard-widget-body">
-      <div className="dashboard-field-row">
-        <label className="dashboard-field">
-          <span>{t("dashboard.quickTool")}</span>
-          <select
-            value={toolId}
-            onChange={(event) => setToolId(event.target.value as QuickToolId)}
+    <main className="dashboard-page">
+      <header className="dashboard-topbar">
+        <div className="dashboard-brand">
+          <span className="crumb">{t("dashboard.title")}</span>
+          <h1>{activeView.title}</h1>
+        </div>
+        <div className="dashboard-view-pills">
+          {views.map((v) => (
+            <button
+              key={v.id}
+              className={`dashboard-pill${v.id === activeView.id ? " active" : ""}`}
+              onClick={() => setActiveView(v.id)}
+              onDoubleClick={() => {
+                const next = window.prompt(t("dashboard.renameView"), v.title);
+                if (next && next.trim()) void renameView(v.id, next.trim());
+              }}
+            >
+              {v.title}
+              {views.length > 1 && (
+                <span
+                  className="dashboard-pill-close"
+                  onClick={(e) => { e.stopPropagation(); void removeView(v.id); }}
+                  role="button"
+                  aria-label={t("dashboard.removeView")}
+                >×</span>
+              )}
+            </button>
+          ))}
+          <button
+            className="dashboard-pill-add"
+            onClick={async () => {
+              const title = window.prompt(t("dashboard.newViewPrompt"), `View ${views.length + 1}`);
+              if (title && title.trim()) await createView(title.trim());
+            }}
           >
-            {QUICK_TOOL_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {t(`dashboard.quickToolOptions.${option}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <label className="dashboard-field">
-        <span>{t("dashboard.quickInput")}</span>
-        <textarea
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          rows={3}
+            <Plus size={12} /> {t("dashboard.addView")}
+          </button>
+        </div>
+        <div className="dashboard-actions">
+          {editMode && (
+            <DensityControl
+              value={activeView.gridDensity}
+              onChange={(d) => void setViewDensity(activeView.id, d)}
+            />
+          )}
+          <button className="btn-ghost" onClick={toggleEditMode}>
+            <Edit3 size={13} /> {editMode ? t("dashboard.editDone") : t("dashboard.editLayout")}
+          </button>
+          <button className="btn-primary" onClick={() => setCatalogOpen(true)}>
+            <Plus size={13} /> {t("dashboard.addWidgetLabel")}
+          </button>
+        </div>
+      </header>
+
+      <DashboardCanvas
+        view={activeView}
+        instances={viewInstances}
+        onCustomize={(instance, anchor) => setCustomize({ instance, rect: anchor.getBoundingClientRect() })}
+      />
+
+      {catalogOpen && (
+        <CatalogOverlay viewId={activeView.id} onClose={() => setCatalogOpen(false)} />
+      )}
+      {customize && (
+        <CustomizePopover
+          instance={customize.instance}
+          anchorRect={customize.rect}
+          onClose={() => setCustomize(null)}
         />
-      </label>
-      <label className="dashboard-field">
-        <span>{t("dashboard.quickOutput")}</span>
-        <textarea readOnly value={result.output} rows={3} />
-      </label>
-      {!result.ok ? (
-        <p className="dashboard-error">{t(`dashboard.quickToolErrors.${result.reason}`)}</p>
-      ) : null}
-    </div>
+      )}
+    </main>
   );
 }
 
-function ReportWidget({ body }: { body: string }) {
+function DensityControl({ value, onChange }: { value: GridDensity; onChange: (v: GridDensity) => void }) {
+  const { t } = useTranslation();
   return (
-    <div className="dashboard-report-body">
-      {body.split(/\r?\n/).map((line, index) => (
-        <p key={`${line}-${index}`}>{line}</p>
+    <div className="dashboard-density">
+      {(["compact", "default", "roomy"] as const).map((d) => (
+        <button
+          key={d}
+          className={d === value ? "active" : ""}
+          onClick={() => onChange(d)}
+        >{t(`dashboard.density.${d}`)}</button>
       ))}
     </div>
-  );
-}
-
-function AgentWidgetDialog({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: (widget: DashboardWidgetDefinition) => void;
-}) {
-  const { t } = useTranslation();
-  const [rawJson, setRawJson] = useState(t("dashboard.agentWidgetExample"));
-  const [error, setError] = useState<string | null>(null);
-
-  function handleSave() {
-    const result = normalizeAgentWidgetDefinition(rawJson);
-    if (!result.ok) {
-      setError(t(`dashboard.agentWidgetErrors.${result.reason}`));
-      return;
-    }
-    setError(null);
-    onSave(result.widget);
-  }
-
-  return (
-    <DashboardMotionDialogBackdrop className="dialog-backdrop dashboard-dialog-backdrop">
-      <DashboardMotionDialog
-        className="dashboard-agent-dialog"
-        aria-labelledby="dashboard-agent-dialog-title"
-        role="dialog"
-        aria-modal="true"
-      >
-        <header>
-          <div>
-            <h2 id="dashboard-agent-dialog-title">{t("dashboard.agentWidgetDialogTitle")}</h2>
-            <p>{t("dashboard.agentWidgetDialogHint")}</p>
-          </div>
-          <button
-            className="icon-button"
-            aria-label={t("common.close")}
-            onClick={onClose}
-            type="button"
-          >
-            <X size={16} />
-          </button>
-        </header>
-        <label className="dashboard-field">
-          <span>{t("dashboard.agentWidgetJson")}</span>
-          <textarea
-            value={rawJson}
-            onChange={(event) => setRawJson(event.target.value)}
-            rows={12}
-            spellCheck={false}
-          />
-        </label>
-        {error ? <p className="dashboard-error">{error}</p> : null}
-        <div className="dashboard-dialog-actions">
-          <button className="secondary-button" onClick={onClose} type="button">
-            {t("common.cancel")}
-          </button>
-          <button className="primary-button" onClick={handleSave} type="button">
-            {t("dashboard.saveWidget")}
-          </button>
-        </div>
-      </DashboardMotionDialog>
-    </DashboardMotionDialogBackdrop>
-  );
-}
-
-function OutputRow({ label, value }: { label: string; value: string }) {
-  const { t } = useTranslation();
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>
-        <code>{value}</code>
-        <button
-          className="dashboard-copy-button"
-          aria-label={t("dashboard.copyValue", { label })}
-          onClick={() => void navigator.clipboard?.writeText(value)}
-          type="button"
-        >
-          <Copy size={13} />
-        </button>
-      </dd>
-    </div>
-  );
-}
-
-function widgetTitle(
-  widget: DashboardWidgetDefinition,
-  t: (key: string, values?: Record<string, unknown>) => string,
-) {
-  return widget.titleKey ? t(widget.titleKey) : (widget.title ?? widget.id);
-}
-
-function widgetSummary(
-  widget: DashboardWidgetDefinition,
-  t: (key: string, values?: Record<string, unknown>) => string,
-) {
-  return widget.summaryKey ? t(widget.summaryKey) : (widget.summary ?? "");
-}
-
-function widgetIcon(category: DashboardWidgetCategory) {
-  switch (category) {
-    case "hash":
-      return <Hash size={16} />;
-    case "network":
-      return <Network size={16} />;
-    case "quick":
-      return <Wrench size={16} />;
-    case "report":
-      return <FileText size={16} />;
-  }
-}
-
-function categoryKey(category: DashboardWidgetCategory) {
-  return `dashboard.categories.${category}`;
-}
-
-function buildDashboardAssistantContext(
-  viewTitle: string,
-  widgets: DashboardWidgetDefinition[],
-  t: (key: string, values?: Record<string, unknown>) => string,
-): AssistantPageContext {
-  const widgetLines =
-    widgets.length > 0
-      ? widgets.map((widget) => `- ${widgetTitle(widget, t)}: ${widgetSummary(widget, t)}`)
-      : [`- ${t("dashboard.emptyTitle")}: ${t("dashboard.emptyHint")}`];
-  return {
-    contextLabel: `${t("dashboard.title")} - ${viewTitle}`,
-    connectionLabel: t("dashboard.assistantContextLabel"),
-    sourceLabel: t("dashboard.assistantContextSource", { view: viewTitle }),
-    text: [
-      `${t("dashboard.title")}: ${viewTitle}`,
-      t("dashboard.assistantContextIntro"),
-      "",
-      ...widgetLines,
-    ].join("\n"),
-  };
-}
-
-function dashboardViewTitle(
-  view: DashboardView,
-  t: (key: string, values?: Record<string, unknown>) => string,
-) {
-  return view.id === "default" && view.title === i18nDefaultDashboardViewTitle()
-    ? t("dashboard.defaultView")
-    : view.title;
-}
-
-function createDefaultDashboardView(): DashboardView {
-  return {
-    id: "default",
-    title: i18nDefaultDashboardViewTitle(),
-    selectedWidgetIds: loadSelectedWidgetIds(),
-  };
-}
-
-function i18nDefaultDashboardViewTitle() {
-  return "Default view";
-}
-
-function loadDashboardViews(): DashboardView[] {
-  if (typeof window === "undefined") {
-    return [createDefaultDashboardView()];
-  }
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(DASHBOARD_VIEWS_STORAGE_KEY) ?? "null",
-    );
-    if (!Array.isArray(parsed)) {
-      return [createDefaultDashboardView()];
-    }
-    const views = parsed.flatMap(normalizeStoredDashboardView);
-    return views.length > 0 ? views : [createDefaultDashboardView()];
-  } catch {
-    return [createDefaultDashboardView()];
-  }
-}
-
-function persistDashboardViews(views: DashboardView[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    window.localStorage.setItem(DASHBOARD_VIEWS_STORAGE_KEY, JSON.stringify(views));
-  } catch {
-    // Dashboard views are local UI state; storage failures should not break the module.
-  }
-}
-
-function loadActiveDashboardViewId() {
-  if (typeof window === "undefined") {
-    return "default";
-  }
-  try {
-    return window.localStorage.getItem(ACTIVE_DASHBOARD_VIEW_STORAGE_KEY) || "default";
-  } catch {
-    return "default";
-  }
-}
-
-function persistActiveDashboardViewId(viewId: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    window.localStorage.setItem(ACTIVE_DASHBOARD_VIEW_STORAGE_KEY, viewId);
-  } catch {
-    // Active Dashboard view is convenience UI state.
-  }
-}
-
-function normalizeStoredDashboardView(value: unknown): DashboardView[] {
-  if (!value || typeof value !== "object") {
-    return [];
-  }
-  const candidate = value as Partial<DashboardView>;
-  if (typeof candidate.id !== "string" || !candidate.id.trim()) {
-    return [];
-  }
-  const title =
-    typeof candidate.title === "string" && candidate.title.trim()
-      ? candidate.title.trim().slice(0, 64)
-      : i18nDefaultDashboardViewTitle();
-  const selectedWidgetIds = Array.isArray(candidate.selectedWidgetIds)
-    ? candidate.selectedWidgetIds.filter((entry): entry is string => typeof entry === "string")
-    : [];
-  return [
-    {
-      id: candidate.id.trim().slice(0, 80),
-      title,
-      selectedWidgetIds,
-    },
-  ];
-}
-
-function loadCustomWidgets(): DashboardWidgetDefinition[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(CUSTOM_WIDGET_STORAGE_KEY) ?? "[]",
-    );
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed.filter(isStoredAgentWidget);
-  } catch {
-    return [];
-  }
-}
-
-function persistCustomWidgets(widgets: DashboardWidgetDefinition[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    window.localStorage.setItem(CUSTOM_WIDGET_STORAGE_KEY, JSON.stringify(widgets));
-  } catch {
-    // Custom Dashboard widgets are convenience UI state; storage failures should not break the module.
-  }
-}
-
-function loadSelectedWidgetIds() {
-  if (typeof window === "undefined") {
-    return DEFAULT_WIDGET_IDS;
-  }
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(SELECTED_WIDGET_STORAGE_KEY) ?? "null",
-    );
-    return Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string")
-      ? parsed
-      : DEFAULT_WIDGET_IDS;
-  } catch {
-    return DEFAULT_WIDGET_IDS;
-  }
-}
-
-function isStoredAgentWidget(value: unknown): value is DashboardWidgetDefinition {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const widget = value as Partial<DashboardWidgetDefinition>;
-  return (
-    typeof widget.id === "string" &&
-    widget.kind === "agent" &&
-    widget.createdBy === "agent" &&
-    typeof widget.title === "string" &&
-    typeof widget.summary === "string" &&
-    typeof widget.body === "string" &&
-    CATEGORY_ORDER.includes(widget.category as DashboardWidgetCategory)
   );
 }
