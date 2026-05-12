@@ -4,7 +4,7 @@ import { ImportDialog } from "./ImportDialog";
 import { confirmTrustedSshHostKey, defaultPortForConnectionType, connectionTypeLabel, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
 import { RECENT_CONNECTION_LIMIT, createStoredSecretMask, loadRecentConnectionIds, notifyConnectionTreeInvalidated, saveRecentConnectionIds } from "./connectionSidebarState";
 import { collectConnectionFolderIds, countConnections, countFolders, filterConnectionTree, flattenConnections, flattenFolders, upsertRootConnection, withLiveConnectionStatuses } from "./treeUtils";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, KeyRound, PanelRight, Pin, PinOff, Play, Plus, Save, Search, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, KeyRound, LayoutDashboard, PanelRight, Pin, PinOff, Play, Plus, RotateCcw, Save, Search, X } from "lucide-react";
 import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollapseTextInput, Delete as IconParkDelete, Edit as IconParkEdit, ExpandTextInput as IconParkExpandTextInput, FolderPlus as IconParkFolderPlus, Setting as IconParkSetting } from "@icon-park/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -98,6 +98,8 @@ export function ConnectionSidebar({
   const tabs = useWorkspaceStore((state) => state.tabs);
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
   const addConnectionToTerminalPane = useWorkspaceStore((state) => state.addConnectionToTerminalPane);
+  const saveConnectionLayout = useWorkspaceStore((state) => state.saveConnectionLayout);
+  const resetConnectionLayout = useWorkspaceStore((state) => state.resetConnectionLayout);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const generalSettings = useWorkspaceStore((state) => state.generalSettings);
   const setGeneralSettings = useWorkspaceStore((state) => state.setGeneralSettings);
@@ -1203,6 +1205,20 @@ export function ConnectionSidebar({
               handleAddConnectionToFocusedPane(menu.connection, direction);
             }
           }}
+          onSaveLayout={() => {
+            const menu = treeContextMenu;
+            setTreeContextMenu(null);
+            if (menu.kind === "connection") {
+              saveConnectionLayout(menu.connection.id);
+            }
+          }}
+          onResetLayout={() => {
+            const menu = treeContextMenu;
+            setTreeContextMenu(null);
+            if (menu.kind === "connection") {
+              resetConnectionLayout(menu.connection.id);
+            }
+          }}
           onToggleRailPin={() => {
             const menu = treeContextMenu;
             setTreeContextMenu(null);
@@ -1564,6 +1580,10 @@ function NewFolderDraftRow({
   );
 }
 
+function isTerminalConnectionType(type: ConnectionType) {
+  return type === "local" || type === "ssh" || type === "telnet" || type === "serial";
+}
+
 function TreeContextMenu({
   menu,
   canAddToPane,
@@ -1575,6 +1595,8 @@ function TreeContextMenu({
   onProperties,
   onRename,
   onAddToPane,
+  onSaveLayout,
+  onResetLayout,
   onToggleRailPin,
   onTransferSshPublicKey,
 }: {
@@ -1588,6 +1610,8 @@ function TreeContextMenu({
   onProperties: () => void;
   onRename: () => void;
   onAddToPane: (direction: SplitDirection) => void;
+  onSaveLayout: () => void;
+  onResetLayout: () => void;
   onToggleRailPin: () => void;
   onTransferSshPublicKey: () => void;
 }) {
@@ -1693,6 +1717,25 @@ function TreeContextMenu({
                 <button onClick={() => onAddToPane("up")} role="menuitem" type="button">
                   <ArrowUp className="menu-item-icon" size={15} />
                   <span>{t("connections.upper")}</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {isTerminalConnectionType(menu.connection.type) ? (
+            <div className="tree-context-submenu" role="none">
+              <button aria-haspopup="menu" className="tree-submenu-trigger" role="menuitem" type="button">
+                <LayoutDashboard className="menu-item-icon" size={15} />
+                <span>{t("connections.layout")}</span>
+                <ChevronRight className="menu-item-chevron" size={13} />
+              </button>
+              <div className="tree-context-submenu-menu" role="menu" aria-label={t("connections.layout")}>
+                <button onClick={onSaveLayout} role="menuitem" type="button">
+                  <Save className="menu-item-icon" size={15} />
+                  <span>{t("common.save")}</span>
+                </button>
+                <button onClick={onResetLayout} role="menuitem" type="button">
+                  <RotateCcw className="menu-item-icon" size={15} />
+                  <span>{t("common.reset")}</span>
                 </button>
               </div>
             </div>

@@ -178,6 +178,15 @@ export function forgetTmuxSessionId(connectionId: string, sessionId: string) {
   persistTmuxSessionIds(connectionId, sessionIds);
 }
 
+function replaceTmuxSessionId(connectionId: string, previousSessionId: string, nextSessionId: string) {
+  const sessionIds = loadStoredTmuxSessionIds(connectionId);
+  const nextSessionIds = sessionIds.map((entry) => (entry === previousSessionId ? nextSessionId : entry));
+  if (!nextSessionIds.includes(nextSessionId)) {
+    nextSessionIds.push(nextSessionId);
+  }
+  persistTmuxSessionIds(connectionId, Array.from(new Set(nextSessionIds)));
+}
+
 function loadStoredLayout(
   connectionId: string,
 ): StoredConnectionLayout | undefined {
@@ -631,9 +640,16 @@ interface WorkspaceState {
     tmuxSessionId: string,
     direction: SplitDirection,
   ) => void;
+  renameTmuxSessionInOpenPanes: (
+    connectionId: string,
+    previousSessionId: string,
+    nextSessionId: string,
+  ) => void;
   setFocusedPane: (tabId: string, paneId: string) => void;
   saveTabLayout: (tabId: string) => void;
   resetTabLayout: (tabId: string) => void;
+  saveConnectionLayout: (connectionId: string) => void;
+  resetConnectionLayout: (connectionId: string) => void;
   resetAllLayouts: () => void;
   updateWebviewTabMetadata: (
     tabId: string,
@@ -1204,6 +1220,31 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }),
     }));
   },
+  renameTmuxSessionInOpenPanes: (connectionId, previousSessionId, nextSessionId) => {
+    const trimmedSessionId = nextSessionId.trim();
+    if (!trimmedSessionId || !isCurrentTmuxSessionId(trimmedSessionId)) {
+      return;
+    }
+    replaceTmuxSessionId(connectionId, previousSessionId, trimmedSessionId);
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.kind !== "terminal") {
+          return tab;
+        }
+        const panes = tab.panes.map((pane) => {
+          if (!isTerminalPane(pane) || pane.connection?.id !== connectionId || pane.tmuxSessionId !== previousSessionId) {
+            return pane;
+          }
+          return {
+            ...pane,
+            tmuxSessionId: trimmedSessionId,
+            title: pane.title === previousSessionId ? trimmedSessionId : pane.title,
+          };
+        });
+        return panes.some((pane, index) => pane !== tab.panes[index]) ? { ...tab, panes } : tab;
+      }),
+    }));
+  },
   setFocusedPane: (tabId, paneId) => {
     set((state) => ({
       tabs: state.tabs.map((tab) => {
@@ -1242,6 +1283,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
     persistLayout(tab.connection.id, undefined);
+  },
+  saveConnectionLayout: (connectionId) => {
+    const { activeTabId, tabs } = get();
+    const tab =
+      tabs.find(
+        (entry) =>
+          entry.id === activeTabId &&
+          entry.kind === "terminal" &&
+          entry.connection?.id === connectionId,
+      ) ??
+      tabs.find(
+        (entry) =>
+          entry.kind === "terminal" && entry.connection?.id === connectionId,
+      );
+    if (!tab || tab.kind !== "terminal") {
+      return;
+    }
+    get().saveTabLayout(tab.id);
+  },
+  resetConnectionLayout: (connectionId) => {
+    persistLayout(connectionId, undefined);
   },
   resetAllLayouts: () => {
     clearStoredLayouts();

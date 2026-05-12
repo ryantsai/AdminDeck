@@ -2506,6 +2506,14 @@ h2 {
   position: relative;
 }
 
+.tmux-session-tag-group,
+.tmux-session-rename {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
 .tmux-session-tag {
   max-width: 220px;
   height: 24px;
@@ -2520,6 +2528,57 @@ h2 {
   border: 1px solid rgba(86, 166, 255, 0.28);
   border-radius: 5px;
   cursor: pointer;
+}
+
+.tmux-session-edit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: #95a7bb;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.tmux-session-edit-button:hover {
+  color: #d9e5f4;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(149, 167, 187, 0.28);
+}
+
+.tmux-session-rename input {
+  width: 180px;
+  height: 24px;
+  padding: 0 7px;
+  color: #d9e5f4;
+  font-size: 11px;
+  font-weight: 700;
+  background: #101824;
+  border: 1px solid #526178;
+  border-radius: 5px;
+  outline: none;
+}
+
+.tmux-session-rename input:focus {
+  border-color: #56a6ff;
+  box-shadow: 0 0 0 2px rgba(86, 166, 255, 0.18);
+}
+
+.tmux-session-rename-error {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  z-index: 61;
+  width: 240px;
+  padding: 7px 8px;
+  color: #ffd1d1;
+  background: #2a1216;
+  border: 1px solid #8a3a42;
+  border-radius: 6px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
 }
 
 .tmux-session-menu {
@@ -3092,6 +3151,15 @@ h2 {
 
 .tree-context-submenu {
   position: relative;
+}
+
+.tree-context-submenu::after {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 8px;
+  height: 100%;
+  content: "";
 }
 
 .tree-context-submenu-menu {

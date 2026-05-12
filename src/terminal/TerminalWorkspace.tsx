@@ -4,10 +4,10 @@ import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
 
 import { RemoteDesktopWorkspace } from "../remote-desktop/RemoteDesktopWorkspace";
 import { WebViewWorkspace } from "../webview/WebViewWorkspace";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bot, Mouse, ChevronRight, Circle, ClipboardPaste, Columns2, Copy, Globe2, LayoutDashboard, Menu, Network, RefreshCw, Save, Search, SplitSquareHorizontal, Type, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bot, Check, Mouse, ChevronRight, Circle, ClipboardPaste, Columns2, Copy, Globe2, Menu, Network, Pencil, RefreshCw, Save, Search, SplitSquareHorizontal, Type, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import i18next from "../i18n/config";
 import { dialogButtonAria, menuButtonAria } from "../lib/aria";
@@ -58,8 +58,6 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
   const openSftpBrowser = useWorkspaceStore((state) => state.openSftpBrowser);
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const setFocusedPane = useWorkspaceStore((state) => state.setFocusedPane);
-  const saveTabLayout = useWorkspaceStore((state) => state.saveTabLayout);
-  const resetTabLayout = useWorkspaceStore((state) => state.resetTabLayout);
   const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const { t } = useTranslation();
   const defaultFontSize = defaultTerminalSettings.fontSize;
@@ -128,14 +126,6 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
     applyFontSizeToPanes(clamped);
   }
 
-  function handleSaveView() {
-    saveTabLayout(tab.id);
-  }
-
-  function handleResetView() {
-    resetTabLayout(tab.id);
-  }
-
   return (
     <section
       className={[
@@ -158,9 +148,7 @@ export function TerminalWorkspace({ isActive, tab }: { isActive: boolean; tab: W
             canSplit={canSplit}
             onFontChange={handleFontChange}
             onOpenSftp={(connection) => openSftpBrowser(connection)}
-            onResetView={handleResetView}
             onSaveBuffer={(paneId) => void handleSaveBuffer(paneId)}
-            onSaveView={handleSaveView}
             onSplit={handleSplit}
           />
         ) : null}
@@ -179,9 +167,7 @@ function TerminalLayoutView({
   canSplit,
   onFontChange,
   onOpenSftp,
-  onResetView,
   onSaveBuffer,
-  onSaveView,
   onSplit,
 }: {
   isActive: boolean;
@@ -193,9 +179,7 @@ function TerminalLayoutView({
   canSplit: boolean;
   onFontChange: (delta: number | "reset") => void;
   onOpenSftp: (connection: Connection) => void;
-  onResetView: () => void;
   onSaveBuffer: (paneId: string) => void;
-  onSaveView: () => void;
   onSplit: (paneId: string, direction: "right" | "left" | "down" | "up") => void;
 }) {
   if (layout.type === "leaf") {
@@ -215,9 +199,7 @@ function TerminalLayoutView({
             canSplit={canSplit}
             onFontChange={onFontChange}
             onOpenSftp={onOpenSftp}
-            onResetView={onResetView}
             onSaveBuffer={onSaveBuffer}
-            onSaveView={onSaveView}
             onSplit={onSplit}
           />
         ) : (
@@ -251,9 +233,7 @@ function TerminalLayoutView({
           canSplit={canSplit}
           onFontChange={onFontChange}
           onOpenSftp={onOpenSftp}
-          onResetView={onResetView}
           onSaveBuffer={onSaveBuffer}
-          onSaveView={onSaveView}
           onSplit={onSplit}
         />
       ))}
@@ -340,6 +320,10 @@ function TmuxSessionTag({
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState<TmuxSession[]>([]);
   const [error, setError] = useState("");
+  const [renameDraft, setRenameDraft] = useState(sessionId ?? "");
+  const [renameError, setRenameError] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [editingSessionName, setEditingSessionName] = useState(false);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [mouseEnabledIds, setMouseEnabledIds] = useState<Set<string>>(
     () => new Set(sessionId ? [sessionId] : []),
@@ -351,6 +335,8 @@ function TmuxSessionTag({
   const activateTab = useWorkspaceStore((state) => state.activateTab);
   const setFocusedPane = useWorkspaceStore((state) => state.setFocusedPane);
   const openTmuxSessionInPane = useWorkspaceStore((state) => state.openTmuxSessionInPane);
+  const renameTmuxSessionInOpenPanes = useWorkspaceStore((state) => state.renameTmuxSessionInOpenPanes);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
 
   const enabled = connection.type === "ssh" && connection.useTmuxSessions !== false && sessionId;
 
@@ -367,6 +353,13 @@ function TmuxSessionTag({
       return next;
     });
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!editingSessionName) {
+      setRenameDraft(sessionId ?? "");
+      setRenameError("");
+    }
+  }, [editingSessionName, sessionId]);
 
   useEffect(() => {
     if (!open) {
@@ -450,6 +443,78 @@ function TmuxSessionTag({
     }
   }
 
+  function validateTmuxSessionName(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return t("terminal.tmuxSessionNameRequired");
+    }
+    if (!/^[^\s:;]+$/u.test(trimmed)) {
+      return t("terminal.tmuxSessionNameInvalid");
+    }
+    return "";
+  }
+
+  function handleStartRename() {
+    setRenameDraft(sessionId ?? "");
+    setRenameError("");
+    setOpen(false);
+    setEditingSessionName(true);
+  }
+
+  function handleCancelRename() {
+    setEditingSessionName(false);
+    setRenameDraft(sessionId ?? "");
+    setRenameError("");
+  }
+
+  async function handleRenameSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!sessionId) {
+      return;
+    }
+    const nextSessionId = renameDraft.trim();
+    const validationError = validateTmuxSessionName(nextSessionId);
+    if (validationError) {
+      setRenameError(validationError);
+      return;
+    }
+    if (nextSessionId === sessionId) {
+      handleCancelRename();
+      return;
+    }
+    setRenaming(true);
+    setRenameError("");
+    try {
+      await invokeCommand("rename_tmux_session", {
+        request: {
+          ...tmuxConnectionRequest(connection),
+          tmuxSessionId: sessionId,
+          newTmuxSessionId: nextSessionId,
+        },
+      });
+      renameTmuxSessionInOpenPanes(connection.id, sessionId, nextSessionId);
+      setMouseEnabledIds((prev) => {
+        const next = new Set(prev);
+        if (next.delete(sessionId)) {
+          next.add(nextSessionId);
+        }
+        return next;
+      });
+      setSessions((current) =>
+        current.map((session) =>
+          session.id === sessionId ? { ...session, id: nextSessionId } : session,
+        ),
+      );
+      setEditingSessionName(false);
+      setOpen(false);
+      showStatusBarNotice(t("terminal.tmuxSessionRenamed"));
+    } catch (renameErrorValue) {
+      setRenameError(renameErrorValue instanceof Error ? renameErrorValue.message : String(renameErrorValue));
+    } finally {
+      setRenaming(false);
+    }
+  }
+
   async function handleToggleMouse(targetSessionId: string) {
     const nextEnabled = !mouseEnabledIds.has(targetSessionId);
     try {
@@ -496,15 +561,70 @@ function TmuxSessionTag({
 
   return (
     <div className="tmux-session-wrapper" ref={menuRef}>
-      <button
-        className="tmux-session-tag"
-        {...dialogButtonAria(open)}
-        onClick={() => void handleToggle()}
-        title={t("terminal.showTmux")}
-        type="button"
-      >
-        tmux {sessionId ? getTmuxSessionLabel(sessionId) : sessionId}
-      </button>
+      {editingSessionName ? (
+        <form className="tmux-session-rename" onSubmit={(event) => void handleRenameSubmit(event)}>
+          <label className="sr-only" htmlFor={`tmux-session-name-${tabId}`}>
+            {t("terminal.tmuxSessionName")}
+          </label>
+          <input
+            autoFocus
+            id={`tmux-session-name-${tabId}`}
+            value={renameDraft}
+            onChange={(event) => {
+              setRenameDraft(event.target.value);
+              setRenameError("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                handleCancelRename();
+              }
+            }}
+            aria-invalid={renameError ? "true" : undefined}
+          />
+          <button
+            className="terminal-pane-action"
+            aria-label={t("common.save")}
+            disabled={renaming}
+            title={t("common.save")}
+            type="submit"
+          >
+            <Check size={13} />
+          </button>
+          <button
+            className="terminal-pane-action"
+            aria-label={t("common.cancel")}
+            disabled={renaming}
+            onClick={handleCancelRename}
+            title={t("common.cancel")}
+            type="button"
+          >
+            <X size={13} />
+          </button>
+        </form>
+      ) : (
+        <div className="tmux-session-tag-group">
+          <button
+            className="tmux-session-tag"
+            {...dialogButtonAria(open)}
+            onClick={() => void handleToggle()}
+            title={t("terminal.showTmux")}
+            type="button"
+          >
+            tmux {sessionId ? getTmuxSessionLabel(sessionId) : sessionId}
+          </button>
+          <button
+            className="tmux-session-edit-button"
+            aria-label={t("terminal.editTmuxSession")}
+            onClick={handleStartRename}
+            title={t("terminal.editTmuxSession")}
+            type="button"
+          >
+            <Pencil size={12} />
+          </button>
+        </div>
+      )}
+      {renameError ? <p className="tmux-session-rename-error form-error">{renameError}</p> : null}
       {open ? (
         <div className="tmux-session-menu" role="dialog" aria-label={t("terminal.tmuxSessions")}>
           <header>
@@ -801,9 +921,7 @@ function TerminalPaneView({
   canSplit,
   onFontChange,
   onOpenSftp,
-  onResetView,
   onSaveBuffer,
-  onSaveView,
   onSplit,
 }: {
   isActive: boolean;
@@ -814,9 +932,7 @@ function TerminalPaneView({
   canSplit: boolean;
   onFontChange: (delta: number | "reset") => void;
   onOpenSftp: (connection: Connection) => void;
-  onResetView: () => void;
   onSaveBuffer: (paneId: string) => void;
-  onSaveView: () => void;
   onSplit: (paneId: string, direction: "right" | "left" | "down" | "up") => void;
 }) {
   const paneRef = useRef<HTMLElement | null>(null);
@@ -1378,16 +1494,6 @@ function TerminalPaneView({
     onSaveBuffer(pane.id);
   }
 
-  function handleSaveView() {
-    setActionsMenuOpen(false);
-    onSaveView();
-  }
-
-  function handleResetView() {
-    setActionsMenuOpen(false);
-    onResetView();
-  }
-
   function handleFontChange(delta: number | "reset") {
     onFontChange(delta);
   }
@@ -1597,35 +1703,6 @@ function TerminalPaneView({
                       type="button"
                     >
                       {t("terminal.resetSize")}
-                    </button>
-                  </div>
-                </div>
-                <div className="terminal-menu-submenu">
-                  <button
-                    className="terminal-menu-item"
-                    role="menuitem"
-                    type="button"
-                  >
-                    <LayoutDashboard size={13} />
-                    {t("terminal.view")}
-                    <ChevronRight size={13} className="terminal-menu-chevron" />
-                  </button>
-                  <div className="terminal-menu terminal-menu-submenu-panel" role="menu">
-                    <button
-                      className="terminal-menu-item"
-                      onClick={handleSaveView}
-                      role="menuitem"
-                      type="button"
-                    >
-                      {t("terminal.save")}
-                    </button>
-                    <button
-                      className="terminal-menu-item"
-                      onClick={handleResetView}
-                      role="menuitem"
-                      type="button"
-                    >
-                      {t("terminal.reset")}
                     </button>
                   </div>
                 </div>

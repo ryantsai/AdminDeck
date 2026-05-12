@@ -919,6 +919,19 @@ async fn close_tmux_session(
 }
 
 #[tauri::command]
+async fn rename_tmux_session(
+    app: tauri::AppHandle,
+    request: sessions::RenameTmuxSessionRequest,
+) -> Result<(), String> {
+    run_blocking_command("tmux rename session", move || {
+        let sessions = app.state::<sessions::SessionManager>();
+        let secrets = app.state::<secrets::Secrets>();
+        sessions.rename_tmux_session(app.clone(), &secrets, request)
+    })
+    .await
+}
+
+#[tauri::command]
 async fn set_tmux_mouse(
     app: tauri::AppHandle,
     request: sessions::SetTmuxSessionMouseRequest,
@@ -1692,6 +1705,7 @@ pub fn run() {
             close_terminal_session,
             list_tmux_sessions,
             close_tmux_session,
+            rename_tmux_session,
             set_tmux_mouse,
             capture_tmux_pane,
             inspect_ssh_system_context,

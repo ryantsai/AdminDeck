@@ -104,6 +104,15 @@ pub struct CloseTmuxSessionRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RenameTmuxSessionRequest {
+    #[serde(flatten)]
+    pub connection: TmuxConnectionRequest,
+    pub tmux_session_id: String,
+    pub new_tmux_session_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CaptureTmuxPaneRequest {
     #[serde(flatten)]
     pub connection: TmuxConnectionRequest,
@@ -434,6 +443,23 @@ impl SessionManager {
             secrets,
             &request.connection,
             tmux_close_command(&tmux_session_id),
+        )?;
+        Ok(())
+    }
+
+    pub fn rename_tmux_session(
+        &self,
+        app: AppHandle,
+        secrets: &secrets::Secrets,
+        request: RenameTmuxSessionRequest,
+    ) -> Result<(), String> {
+        let tmux_session_id = required_tmux_session_id(request.tmux_session_id)?;
+        let new_tmux_session_id = required_tmux_session_id(request.new_tmux_session_id)?;
+        run_tmux_command(
+            app,
+            secrets,
+            &request.connection,
+            tmux_rename_session_command(&tmux_session_id, &new_tmux_session_id),
         )?;
         Ok(())
     }
@@ -1261,6 +1287,14 @@ fn tmux_close_command(tmux_session_id: &str) -> String {
     )
 }
 
+fn tmux_rename_session_command(tmux_session_id: &str, new_tmux_session_id: &str) -> String {
+    format!(
+        "if command -v tmux >/dev/null 2>&1; then tmux rename-session -t {} {}; fi",
+        shell_single_quote(tmux_session_id),
+        shell_single_quote(new_tmux_session_id)
+    )
+}
+
 const DEFAULT_SSH_BUFFER_LINES: u32 = 5_000;
 
 fn ssh_buffer_lines_for(value: Option<u32>) -> u32 {
@@ -1662,6 +1696,14 @@ mod tests {
         assert_eq!(
             tmux_capture_pane_command("kkterm-test", 12_000),
             "if ! command -v tmux >/dev/null 2>&1; then printf 'tmux is not available on the remote host\\n' >&2; exit 127; fi; tmux capture-pane -p -S -12000 -t 'kkterm-test':"
+        );
+    }
+
+    #[test]
+    fn tmux_rename_session_command_quotes_old_and_new_session_ids() {
+        assert_eq!(
+            tmux_rename_session_command("kkterm-test'old", "kkterm-test'new"),
+            "if command -v tmux >/dev/null 2>&1; then tmux rename-session -t 'kkterm-test'\\''old' 'kkterm-test'\\''new'; fi"
         );
     }
 
