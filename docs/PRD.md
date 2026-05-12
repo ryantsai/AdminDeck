@@ -80,61 +80,15 @@ The product will be light chrome with dark terminal panes by default, optimized 
 
 ## Implementation Decisions
 
-- Product name: KKTerm.
-- First shippable target: desktop app.
-- Primary acceptance platform: Windows.
-- Follow-on platforms: macOS and Linux using the same architecture.
-- v0.1 protocols: local terminal, SSH terminal, and SFTP launched from SSH connections only.
-- v0.2 protocols in progress: URL, RDP, and VNC Connections.
-- Deferred protocols beyond the current desktop set: additional remote desktop/import integrations and any team/cloud transport.
-- Desktop shell: Tauri v2.
-- Core/backend: Rust.
-- Frontend: React, TypeScript, and Vite.
-- UI primitives: Radix UI or Ariakit.
-- Icons: lucide-react.
-- Styling: Tailwind with strict design tokens and CSS variables.
-- Variant helpers: class-variance-authority where useful.
-- State management: Zustand or TanStack Store.
-- Command boundary: typed Tauri command wrapper.
-- Terminal parsing/state: evaluate and prefer alacritty_terminal.
-- PTY/session handling: evaluate portable-pty and lower-level platform-specific options.
-- Rendering: staged approach. Prove sessions/UI first with the fastest reliable terminal view, while isolating renderer responsibilities for a later WGPU renderer.
-- Renderer boundary must isolate terminal state/input, glyph atlas/shaping, scrollback, selection/copy, cursor rendering, and dirty-region updates.
-- SSH/SFTP implementation: in-process Rust implementation as primary path.
-- SSH library candidates: evaluate russh first, ssh2/libssh2 as fallback candidate.
-- System ssh: optional fallback/debug path only.
-- Storage: local SQLite for connections, optional nested tree folders, settings, layout, recent sessions, non-secret SSH tmux launch preferences, and non-secret AI provider metadata.
-- Secrets: OS keychain for passwords, SSH passphrases, and AI API keys.
-- Optional later idea: portable vault mode could store credentials encrypted in SQLite for portable installs, but only with explicit opt-in, a user-supplied master password, clear lock/unlock behavior, and no plaintext or disk-stored encryption key.
-- SSH keys: reference existing key files by path; do not manage/generate keypairs in v0.1.
-- AI model: approval-based command assist only.
-- AI providers: OpenAI-compatible BYO API key plus Claude Code CLI and Codex CLI adapters.
-- CLI agent integrations: suggest-only/ask-before-execute where possible.
-- UI model: left Activity Rail with Workspace, Dashboard, File Explorer, and Settings entries, left-side connection manager/tree with root Connections and optional nested folders (visible inside the Workspace module), main module content area, right AI Assistant panel, and a bottom app-wide **Status Bar** that remains visible across modules and pages.
-- Dashboard/App Launcher model: App Launcher is a Dashboard widget, not a standalone module. Users add the App Launcher widget to a Dashboard view, then add local app, shortcut, script, or file entries inside that widget. Once an entry exists, the visible widget surface should stay reduced to an icon and text label per entry; edit, remove, launch-as-administrator, launch-as-different-user, and other management controls belong in an app-owned right-click context menu.
-- Status Bar model: the left segment is module-owned; Workspace shows host CPU, RAM, downstream transfer rate, and upstream transfer rate, while Settings intentionally leaves this segment empty for now. The center segment is the universal notifications text area used by all modules for transient status and error notices.
-- Tab model: VSCode-style tabs with split panes inside terminal tabs. Switching Tabs preserves live local terminal, SSH terminal, and SSH-launched SFTP Sessions; only an explicit tab close action should disconnect or tear down the Session owned by that Tab.
-- SSH tmux model: SSH Connections can opt into tmux session launch by default. Each SSH terminal Pane gets a generated friendly tmux session id like `kkterm-cockpit001`, starts or attaches with `tmux new-session -A`, falls back to a normal remote shell if `tmux` is missing, and exposes a Pane-toolbar tag that lists attached and detached remote tmux sessions with explicit close actions. Quiet native SSH Sessions should not disconnect because the app is idle or unfocused; tmux-backed native SSH terminal Sessions may silently make a small bounded attempt to reattach to the same Pane tmux id if the transport breaks.
-- SFTP model: dual-pane file manager with multi-select drag/drop transfer, scoped file actions, remote properties, chmod/chown editing, and transfer queue, opened from an SSH terminal tab rather than saved as a standalone Connection.
-- Screenshot model: explicit user action only. Terminal Panes expose screenshot capture in the Pane toolbar; SFTP, URL, RDP, and VNC workspaces expose it in the top toolbar. Region and Entire Window/Panel captures can be copied to the system clipboard or attached as transient AI Assistant screenshot context. KKTerm does not persist captured screenshots. There is no standalone screenshot gallery page.
-- RDP overlay model: the Windows RDP ActiveX host is a native child HWND and must not be expected to layer beneath React UI through CSS alone. When app-owned DOM overlays such as Add Connection, connection tree context menus, screenshot menus, or Region selection appear over an active RDP workspace, KKTerm should snapshot the visible RDP view, park/hide the ActiveX host, and show the snapshot beneath the overlay until normal RDP visibility resumes. Product designs that require live UI above RDP without parking the host require a native popup/owned-window overlay or a different RDP rendering architecture, not z-index tuning.
-- Extension draft model: the AI Assistant may draft extension designs, manifests, permission requests, and source files when explicitly asked. Until the extension platform exists, this is review-only and must not install, enable, write, run, load, or verify generated extension code.
-- Extension platform model: v0.2 extension support must be manifest-first, permissioned, user-mediated, and isolated. See `docs/ADR/0005-extension-platform-architecture.md` for the initial permission, lifecycle, storage, and trust-boundary decision.
-- Settings: each section is a separate page component under `src/settings/`, routed by the Settings shell (`src/settings/SettingsPage.tsx`) with a sidebar nav. Sections are General, Appearance, AI Assistant, SSH, Terminal, URL, Remote Desktop (RDP), VNC, and About. General contains Language (i18n), workspace access toggles, Settings data actions, backup/import/database-folder actions, and Reset All Settings; Appearance contains App UI font, layout reset, and Color Scheme; AI Assistant contains provider connection, response defaults, and Assistant tool calling; SSH contains SSH defaults, authentication defaults, SSH terminal behavior, and port redirect visibility; Terminal contains editable local terminal behavior; URL contains URL security, saved website password metadata, and URL data shard management; RDP and VNC expose planned quality default summaries. Settings controls should use consistent fieldset/legend group boxes, editable inputs should look editable in the default color scheme, and destructive global actions should stay in General → Settings data with app-owned confirmation dialogs. Diagnostics, update, SSH config import, and keybinding controls should be reintroduced only when their UX is clear and backed by the existing local storage/keychain boundaries.
-- SSH config import: the parser and typed Tauri command remain in place, but the previous top chrome import button has been removed. A visible import entry point should return through the connection tree or Settings only when that flow has a clear home.
-- Privacy: no telemetry or automatic crash upload in v0.1.
-- Distribution: Windows .msi or .exe installer, portable ZIP for dev/test, GitHub Releases. macOS .dmg and Linux AppImage/deb/rpm later.
-- v0.2 update mechanism: Windows installed app only, stable channel only, GitHub Releases static updater metadata, signed Tauri updater artifacts required for any user-facing update flow, update checks enabled by default with clear local-first wording, and user-mediated install from Settings plus a lightweight app-chrome update notification.
-- v0.2 update limitations: normal forward updates only. Defer rollback, downgrade, preview channels, managed update servers, silent installs, cross-platform updater support, and portable ZIP self-update.
+High-level product decisions that are not duplicated elsewhere:
 
-## Performance Budgets
+- Product name: **KKTerm**. Primary acceptance platform: Windows. Follow-on: macOS and Linux on the same architecture.
+- v0.1 protocols: local terminal, SSH terminal, SFTP launched from SSH. v0.2 protocols in progress: URL (WebView2), RDP (ActiveX), VNC (`vnc-rs`).
+- License: MIT. Dependencies should be MIT/Apache-2.0/BSD/MPL-style; avoid GPL in the core runtime.
+- Privacy: no telemetry or automatic crash upload in v0.1. Update checks (v0.2) are described separately from telemetry.
+- AI model: approval-based command assist only; CLI agent integrations are suggest-only/ask-before-execute.
 
-- Cold launch to usable window: under 500 ms target, under 1 second acceptable on a normal development machine.
-- New local terminal tab: under 100 ms.
-- SSH tab after authentication: under 150 ms to terminal ready, excluding network time.
-- Terminal rendering: 60 FPS under normal output and graceful behavior under heavy output.
-- Idle memory: under 150 MB target.
-- Package size: small enough to feel native, not Electron-scale if avoidable.
+The full stack, module map, storage/secrets boundaries, command-runtime rules, RDP overlay model, Settings layout, and Activity Rail layout live in `docs/ARCHITECTURE.md`. Standalone decision records (SSH transport, security/privacy, extension platform, etc.) live in `docs/ADR/`. Performance budgets and the measurement runbook live in `docs/PERFORMANCE.md`. Distribution, packaging scripts, and the v0.2 updater scope live in `docs/RELEASE.md`.
 
 ## Testing Decisions
 
@@ -143,9 +97,9 @@ The product will be light chrome with dark terminal panes by default, optimized 
 - SQLite schema initialization gets integration tests.
 - Frontend component tests cover connection tree, search/filter, tabs, and split pane behavior where useful.
 - Playwright smoke tests cover core UI flows.
-- Manual terminal compatibility checklist includes vim, tmux, htop/btop, git, npm, and cargo.
+- Manual terminal compatibility checklist (`docs/TERMINAL_COMPATIBILITY_CHECKLIST.md`) covers vim, tmux, htop/btop, git, npm, and cargo.
 - Windows installer gets a smoke test before v0.1 release.
-- Performance checks verify the documented budgets.
+- Performance checks verify the budgets documented in `docs/PERFORMANCE.md`.
 
 ## Out of Scope
 

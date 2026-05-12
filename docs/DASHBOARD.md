@@ -214,7 +214,7 @@ Destructive "Reset Dashboard" lives in General → Settings data (per AGENTS.md:
 
 ## i18n
 
-All new strings route through `t()` in the `dashboard.*` namespace. English (`src/i18n/locales/en.json`) is the source of truth and the only locale updated alongside Dashboard changes; other locales are tracked in `docs/LOCALIZATION.md` per the i18n rules in AGENTS.md. Built-in widget titles use `titleKey`; AI-authored custom widget titles are not translated and are persisted in the language the AI used.
+All new strings route through `t()` in the `dashboard.*` namespace. English (`src/i18n/locales/en.json`) is the source of truth and the only locale updated alongside Dashboard changes; other locales are tracked per key under `docs/localization_todo/<namespace>.<keyPath>.md` per the i18n rules in AGENTS.md. Built-in widget titles use `titleKey`; AI-authored custom widget titles are not translated and are persisted in the language the AI used.
 
 ## Relationships to Other Modules
 

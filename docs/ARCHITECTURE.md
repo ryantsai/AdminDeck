@@ -350,7 +350,7 @@ Color schemes are defined in `src/App.css` as CSS custom property blocks keyed b
 - `src/settings/AppearanceSettings.tsx` — `COLOR_SCHEME_OPTIONS` and `SCHEME_PREVIEW_COLORS`
 - `src/i18n/locales/en.json` — display label under `settings.scheme*`
 - `src-tauri/src/storage.rs` — `validate_appearance_settings()` whitelist
-- `docs/LOCALIZATION.md` — pending translation entries
+- `docs/localization_todo/` — add a per-key `<namespace>.<keyPath>.md` from `_TEMPLATE.md` for any new untranslated label
 
 ### Variable → UI Area Mapping
 
@@ -387,37 +387,10 @@ Color schemes are defined in `src/App.css` as CSS custom property blocks keyed b
 | `--shadow` | `box-shadow` of elevated surfaces | Dropdowns, popovers, tooltips |
 | `--app-ui-font-family` | `font-family` of `:root` | App-wide UI font stack |
 
-## Performance Strategy
+## Performance and Release
 
-Startup and session creation should avoid unnecessary frontend work, heavyweight dependencies, and eager initialization. Expensive subsystems should initialize lazily where possible.
+Performance budgets, measurement runbook, terminal renderer notes, and the latest measured numbers live in `docs/PERFORMANCE.md`. The manual terminal compatibility checklist lives in `docs/TERMINAL_COMPATIBILITY_CHECKLIST.md`.
 
-Budgets:
+Distribution targets, packaging scripts, the no-telemetry posture, diagnostics bundle shape, and v0.2 updater scope live in `docs/RELEASE.md`.
 
-- cold launch to usable window: under 500 ms target, under 1 second acceptable
-- new local terminal tab: under 100 ms
-- SSH tab after auth: under 150 ms to terminal ready, excluding network
-- idle memory: under 150 MB target
-- rendering: 60 FPS under normal output
-
-## Release Strategy
-
-v0.1 distribution targets:
-
-- Windows .msi or .exe installer
-- Windows portable ZIP for dev/test
-- GitHub Releases
-
-Deferred:
-
-- macOS .dmg
-- Linux AppImage/deb/rpm
-- optional portable encrypted credential vault
-
-v0.2 update target:
-
-- Windows installed-app auto-update mechanism
-- signed Tauri updater artifacts as a release gate
-- GitHub Releases static updater metadata
-- stable update channel only
-- update checks enabled by default with local-first privacy wording
-- user-mediated install from Settings plus a lightweight app-chrome notification
+Architectural principle: startup and session creation must avoid eager initialization and heavyweight dependencies; expensive subsystems initialize lazily. When a change risks regressing a budget in `docs/PERFORMANCE.md`, treat that doc as the authority.
