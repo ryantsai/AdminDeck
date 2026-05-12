@@ -583,7 +583,6 @@
     "dashboardTitle": "Impostazioni dashboard",
     "dashboardDescription": "Configura layout predefinito, comportamento dei widget e gestione delle viste per il dashboard.",
     "dashboardGeneral": "Generale",
-    "dashboardConfirmRemove": "Chiedi conferma prima di rimuovere un widget",
     "dashboardDefaultLanding": "Vista predefinita all'apertura",
     "dashboardLandingLast": "Ultima vista attiva",
     "dashboardReset": "Reimposta dashboard",

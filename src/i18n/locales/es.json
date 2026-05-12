@@ -581,7 +581,6 @@
     "dashboardTitle": "Ajustes del panel",
     "dashboardDescription": "Configure el diseño predeterminado, el comportamiento de los widgets y la gestión de vistas del panel.",
     "dashboardGeneral": "General",
-    "dashboardConfirmRemove": "Pedir confirmación antes de eliminar un widget",
     "dashboardDefaultLanding": "Vista predeterminada al abrir",
     "dashboardLandingLast": "Última vista activa",
     "dashboardReset": "Restablecer panel",

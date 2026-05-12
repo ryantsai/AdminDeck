@@ -18,9 +18,6 @@ import { AboutSettings } from "./AboutSettings";
 import { AiSettings } from "./AiSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { DashboardSettings } from "./DashboardSettings";
-import { invokeCommand, isTauriRuntime } from "../lib/tauri";
-import { useWorkspaceStore } from "../store";
-import type { DashboardSettings as DashboardSettingsState } from "../types";
 import { GeneralSettings } from "./GeneralSettings";
 import { RdpSettings } from "./RdpSettings";
 import { SshSettings } from "./SshSettings";
@@ -52,27 +49,6 @@ export function SettingsPage({
   const { t } = useTranslation();
   const [activeSectionId, setActiveSectionId] =
     useState<SettingsSectionId>("general-settings");
-  const dashboardSettings = useWorkspaceStore((state) => state.dashboardSettings);
-  const setDashboardSettings = useWorkspaceStore((state) => state.setDashboardSettings);
-
-  async function handleDashboardSettingsChange(next: DashboardSettingsState) {
-    const previous = useWorkspaceStore.getState().dashboardSettings;
-    setDashboardSettings(next);
-    if (!isTauriRuntime()) {
-      return;
-    }
-    try {
-      const saved = await invokeCommand("update_dashboard_settings", { request: next });
-      setDashboardSettings(saved);
-    } catch {
-      try {
-        const current = await invokeCommand("get_dashboard_settings");
-        setDashboardSettings(current);
-      } catch {
-        setDashboardSettings(previous);
-      }
-    }
-  }
 
   return (
     <main className="settings-page">
@@ -176,12 +152,7 @@ export function SettingsPage({
           {activeSectionId === "appearance-settings" && (
             <AppearanceSettings onResetLayout={onResetLayout} />
           )}
-          {activeSectionId === "dashboard-settings" && (
-            <DashboardSettings
-              draft={dashboardSettings}
-              onChange={(next) => void handleDashboardSettingsChange(next)}
-            />
-          )}
+          {activeSectionId === "dashboard-settings" && <DashboardSettings />}
           {activeSectionId === "assistant-settings" && <AiSettings />}
           {activeSectionId === "ssh-settings" && <SshSettings />}
           {activeSectionId === "terminal-settings" && <TerminalSettingsPage />}

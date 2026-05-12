@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FolderOpen, Palette, RotateCcw } from "lucide-react";
+import { FolderOpen, Palette, RotateCcw, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   listCustomFontOptions,
@@ -174,12 +174,43 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
   const { t } = useTranslation();
   const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
   const setAppearanceSettings = useWorkspaceStore((state) => state.setAppearanceSettings);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [customFonts, setCustomFonts] = useState<CustomFontOption[]>([]);
+  const [draft, setDraft] = useState<AppearanceSettingsType>(appearanceSettings);
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(appearanceSettings);
+
+  useEffect(() => {
+    setDraft(appearanceSettings);
+  }, [appearanceSettings]);
 
   async function applyAppearance(settings: AppearanceSettingsType) {
     setAppearanceSettings(settings);
     if (isTauriRuntime()) {
       invokeCommand("update_appearance_settings", { request: settings }).catch(() => undefined);
+    }
+  }
+
+  async function handleSave() {
+    try {
+      const selectedCustomFont = customFonts.find((font) => font.cssValue === draft.appFontFamily);
+      if (selectedCustomFont) {
+        await loadCustomFontOptions([selectedCustomFont]);
+      }
+      const next: AppearanceSettingsType = {
+        ...draft,
+        customFontPath: selectedCustomFont?.path,
+      };
+      const saved = isTauriRuntime()
+        ? await invokeCommand("update_appearance_settings", { request: next })
+        : next;
+      setAppearanceSettings(saved);
+      setDraft(saved);
+      showStatusBarNotice(t("settings.appearanceSaved"), { tone: "success" });
+    } catch (saveError) {
+      showStatusBarNotice(
+        saveError instanceof Error ? saveError.message : String(saveError),
+        { tone: "error" },
+      );
     }
   }
 
@@ -214,13 +245,24 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
     await invokeCommand("open_custom_fonts_folder");
   }
 
-  const previewColors = SCHEME_PREVIEW_COLORS[appearanceSettings.colorScheme];
-  const knownFontSelected = APP_UI_FONT_OPTIONS.some((option) => option.value === appearanceSettings.appFontFamily);
-  const customFontSelected = customFonts.some((font) => font.cssValue === appearanceSettings.appFontFamily);
+  const previewColors = SCHEME_PREVIEW_COLORS[draft.colorScheme];
+  const knownFontSelected = APP_UI_FONT_OPTIONS.some((option) => option.value === draft.appFontFamily);
+  const customFontSelected = customFonts.some((font) => font.cssValue === draft.appFontFamily);
 
   return (
     <section className="settings-card settings-section">
       <SettingsSectionHeader
+        actions={
+          <button
+            className="toolbar-button"
+            disabled={!hasChanges}
+            onClick={() => void handleSave()}
+            type="button"
+          >
+            <Save size={15} />
+            {t("settings.save")}
+          </button>
+        }
         icon={<Palette size={18} />}
         label={t("settings.sectionAppearance")}
         title={t("settings.appearanceInterface")}
@@ -237,22 +279,12 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
               <select
                 onChange={(event) => {
                   const selectedValue = event.currentTarget.value;
-                  const selectedCustomFont = customFonts.find((font) => font.cssValue === selectedValue);
-                  void (async () => {
-                    if (selectedCustomFont) {
-                      await loadCustomFontOptions([selectedCustomFont]);
-                    }
-                    await applyAppearance({
-                      ...appearanceSettings,
-                      appFontFamily: selectedValue,
-                      customFontPath: selectedCustomFont?.path,
-                    });
-                  })();
+                  setDraft((s) => ({ ...s, appFontFamily: selectedValue }));
                 }}
-                value={appearanceSettings.appFontFamily}
+                value={draft.appFontFamily}
               >
                 {knownFontSelected || customFontSelected ? null : (
-                  <option value={appearanceSettings.appFontFamily}>{t("settings.customFont")}</option>
+                  <option value={draft.appFontFamily}>{t("settings.customFont")}</option>
                 )}
                 {APP_UI_FONT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -293,12 +325,9 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
             <select
               onChange={(event) => {
                 const colorScheme = event.currentTarget.value as ColorScheme;
-                void applyAppearance({
-                  ...appearanceSettings,
-                  colorScheme,
-                });
+                setDraft((s) => ({ ...s, colorScheme }));
               }}
-              value={appearanceSettings.colorScheme}
+              value={draft.colorScheme}
             >
               {COLOR_SCHEME_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>

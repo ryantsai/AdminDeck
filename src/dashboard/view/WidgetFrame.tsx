@@ -3,7 +3,6 @@ import * as Icons from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useWorkspaceStore } from "../../store";
 import { useDashboardStore } from "../state/dashboardStore";
 import { getBuiltInWidget } from "../registry/builtInRegistry";
 import { PRESET_RENDERERS } from "../registry/presetRegistry";
@@ -21,7 +20,6 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
   const editMode = useDashboardStore((s) => s.editMode);
   const removeInstance = useDashboardStore((s) => s.removeInstance);
   const customWidgets = useDashboardStore((s) => s.customWidgets);
-  const confirmRemove = useWorkspaceStore((s) => s.dashboardSettings.confirmRemove);
   const [confirming, setConfirming] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -50,10 +48,6 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
 
   function handleRemoveClick(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirmRemove) {
-      void removeInstance(instance.id);
-      return;
-    }
     if (confirming) {
       if (confirmTimerRef.current !== null) clearTimeout(confirmTimerRef.current);
       setConfirming(false);

@@ -7982,8 +7982,8 @@ progress {
 }
 
 .settings-page-header {
-  max-width: 1370px;
-  margin-bottom: 14px;
+  max-width: 1290px;
+  margin: 0 auto 14px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
 }
@@ -8007,7 +8007,7 @@ progress {
 .settings-layout {
   grid-template-columns: 240px minmax(0, 1020px);
   gap: 30px;
-  max-width: 1370px;
+  max-width: 1290px;
   align-items: start;
 }
 

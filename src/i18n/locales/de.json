@@ -583,7 +583,6 @@
     "dashboardTitle": "Dashboard-Einstellungen",
     "dashboardDescription": "Konfigurieren Sie Standardlayout, Widget-Verhalten und Ansichtsverwaltung für das Dashboard.",
     "dashboardGeneral": "Allgemein",
-    "dashboardConfirmRemove": "Vor dem Entfernen eines Widgets bestätigen",
     "dashboardDefaultLanding": "Standardansicht beim Öffnen",
     "dashboardLandingLast": "Letzte aktive Ansicht",
     "dashboardReset": "Dashboard zurücksetzen",

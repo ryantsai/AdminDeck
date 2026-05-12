@@ -588,7 +588,6 @@
     "dashboardTitle": "仪表板设置",
     "dashboardDescription": "配置仪表板的默认布局、小部件行为和视图管理。",
     "dashboardGeneral": "通用",
-    "dashboardConfirmRemove": "移除小部件前要求确认",
     "dashboardDefaultLanding": "打开时的默认视图",
     "dashboardLandingLast": "上次活动的视图",
     "dashboardReset": "重置仪表板",

@@ -583,7 +583,6 @@
     "dashboardTitle": "Paramètres du tableau de bord",
     "dashboardDescription": "Configurez la mise en page par défaut, le comportement des widgets et la gestion des vues du tableau de bord.",
     "dashboardGeneral": "Général",
-    "dashboardConfirmRemove": "Demander confirmation avant de supprimer un widget",
     "dashboardDefaultLanding": "Vue par défaut à l'ouverture",
     "dashboardLandingLast": "Dernière vue active",
     "dashboardReset": "Réinitialiser le tableau de bord",

@@ -352,7 +352,6 @@
     "dashboardTitle": "Pengaturan Dasbor",
     "dashboardDescription": "Konfigurasikan tata letak default, perilaku widget, dan manajemen tampilan untuk Dasbor.",
     "dashboardGeneral": "Umum",
-    "dashboardConfirmRemove": "Minta konfirmasi sebelum menghapus widget",
     "dashboardDefaultLanding": "Tampilan default saat dibuka",
     "dashboardLandingLast": "Tampilan terakhir aktif",
     "dashboardReset": "Reset Dasbor",
