@@ -110,7 +110,64 @@
       "invalidCategory": "Use uma categoria: hash, network, quick ou report.",
       "invalidSummary": "Adicione um resumo de até 180 caracteres.",
       "invalidBody": "Adicione texto para o corpo do widget."
-    }
+    },
+    "addWidgetLabel": "Adicionar widget",
+    "newViewPrompt": "Nome da visão",
+    "renameView": "Renomear visão",
+    "removeView": "Remover visão",
+    "editLayout": "Editar layout",
+    "editDone": "Concluído",
+    "density": {
+      "compact": "Compacto",
+      "default": "Padrão",
+      "roomy": "Espaçoso"
+    },
+    "catalogTitle": "Catálogo de widgets",
+    "catalogSearch": "Buscar widgets…",
+    "catalogAll": "Todos",
+    "catalogNoMatches": "Nenhum widget correspondente.",
+    "presetLabel": "Estilo predefinido",
+    "preset": {
+      "panel": "Painel",
+      "ambient": "Ambiente",
+      "glass": "Vidro",
+      "tile": "Azulejo",
+      "hero": "Hero",
+      "mono": "Mono",
+      "stack": "Pilha",
+      "action": "Ação",
+      "band": "Faixa"
+    },
+    "removeConfirmHint": "Clique novamente para remover",
+    "accent": "Destaque",
+    "icon": "Ícone",
+    "titlePlaceholder": "Título personalizado…",
+    "advanced": "Avançado",
+    "advancedNothing": "Sem configurações avançadas para widgets integrados.",
+    "scriptNetwork": "Permitir rede",
+    "scriptPollSeconds": "Intervalo de pesquisa (segundos)",
+    "scriptViewSource": "Ver fonte",
+    "scriptInvalidBody": "O corpo do script não é JSON válido.",
+    "invalidScriptWidgetBody": "O corpo do widget de script não é JSON válido.",
+    "invalidContentWidgetBody": "O corpo do widget de conteúdo não é JSON válido.",
+    "missingBuiltInWidget": "Widget integrado ausente: {{sourceId}}",
+    "missingCustomWidget": "Widget personalizado ausente: {{sourceId}}",
+    "untitledWidget": "Widget",
+    "customize": "Personalizar widget",
+    "cidrInput": "Bloco CIDR",
+    "network": "Rede",
+    "broadcast": "Broadcast",
+    "mask": "Máscara de sub-rede",
+    "usable": "Hosts utilizáveis",
+    "subnetInvalid": "Insira um bloco CIDR válido, ex. 192.168.1.0/24.",
+    "reportStep1": "Confirme a idade do backup atual.",
+    "reportStep2": "Revise as Conexões alteradas antes da manutenção.",
+    "reportStep3": "Capture evidências do terminal apenas quando explicitamente necessário.",
+    "reportStep4": "Mantenha a execução de comandos baseada em aprovação.",
+    "tool": "Ferramenta",
+    "input": "Entrada",
+    "output": "Saída",
+    "assistantSummary": "Navegue e gerencie os widgets do painel através do Assistente IA."
   },
   "appLauncher": {
     "title": "Lançador de apps",
@@ -457,6 +514,10 @@
       "shellCommand": {
         "label": "Comandos PowerShell / batch",
         "description": "Executar comandos PowerShell ou batch não destrutivos apenas a partir dos dados do aplicativo KKTerm."
+      },
+      "dashboard": {
+        "label": "Painel",
+        "description": "Ler e modificar visões do painel, instâncias de widgets e widgets personalizados."
       }
     },
     "appSlogan": "Área de trabalho de administração local-first.",
@@ -515,7 +576,20 @@
     "vncRemoteResizeHint": "Depende do servidor VNC suportar atualizações de tamanho de desktop.",
     "connectedConnectionsRail": "Mostrar Conexão na barra esquerda",
     "connectedConnectionsRailHint": "Adiciona um ícone para cada Conexão conectada à barra esquerda para que você possa voltar a ela rapidamente.",
-    "connectedConnectionsRailSaved": "Configuração de Mostrar Conexão na barra esquerda salva."
+    "connectedConnectionsRailSaved": "Configuração de Mostrar Conexão na barra esquerda salva.",
+    "sectionDashboard": "Painel",
+    "dashboardTitle": "Configurações do painel",
+    "dashboardDescription": "Configure o layout padrão, o comportamento dos widgets e o gerenciamento de visões do painel.",
+    "dashboardGeneral": "Geral",
+    "dashboardConfirmRemove": "Pedir confirmação antes de remover um widget",
+    "dashboardDefaultLanding": "Visão padrão ao abrir",
+    "dashboardLandingLast": "Última visão ativa",
+    "dashboardReset": "Redefinir painel",
+    "dashboardResetTitle": "Redefinir painel",
+    "dashboardResetBody": "Isso exclui todas as visões do painel, instâncias de widgets e widgets personalizados criados por IA. A visão padrão será restaurada com um widget Lançador de apps. Isso não pode ser desfeito.",
+    "dashboardResetConfirm": "Redefinir painel",
+    "dashboardResetDone": "Painel redefinido para os padrões.",
+    "generalDefaultsSaved": "Configurações gerais salvas."
   },
   "connections": {
     "title": "Conexões",

@@ -110,7 +110,64 @@
       "invalidCategory": "Utilisez une catégorie : hash, network, quick ou report.",
       "invalidSummary": "Ajoutez un résumé jusqu'à 180 caractères.",
       "invalidBody": "Ajoutez le texte du corps du widget."
-    }
+    },
+    "addWidgetLabel": "Ajouter un widget",
+    "newViewPrompt": "Nom de la vue",
+    "renameView": "Renommer la vue",
+    "removeView": "Supprimer la vue",
+    "editLayout": "Modifier la mise en page",
+    "editDone": "Terminé",
+    "density": {
+      "compact": "Compact",
+      "default": "Par défaut",
+      "roomy": "Spacieux"
+    },
+    "catalogTitle": "Catalogue de widgets",
+    "catalogSearch": "Rechercher des widgets…",
+    "catalogAll": "Tous",
+    "catalogNoMatches": "Aucun widget correspondant.",
+    "presetLabel": "Style prédéfini",
+    "preset": {
+      "panel": "Panneau",
+      "ambient": "Ambiance",
+      "glass": "Verre",
+      "tile": "Tuile",
+      "hero": "Hero",
+      "mono": "Mono",
+      "stack": "Pile",
+      "action": "Action",
+      "band": "Bande"
+    },
+    "removeConfirmHint": "Cliquez à nouveau pour supprimer",
+    "accent": "Accent",
+    "icon": "Icône",
+    "titlePlaceholder": "Titre personnalisé…",
+    "advanced": "Avancé",
+    "advancedNothing": "Aucun paramètre avancé pour les widgets intégrés.",
+    "scriptNetwork": "Autoriser le réseau",
+    "scriptPollSeconds": "Intervalle d'interrogation (secondes)",
+    "scriptViewSource": "Voir la source",
+    "scriptInvalidBody": "Le corps du script n'est pas un JSON valide.",
+    "invalidScriptWidgetBody": "Le corps du widget de script n'est pas un JSON valide.",
+    "invalidContentWidgetBody": "Le corps du widget de contenu n'est pas un JSON valide.",
+    "missingBuiltInWidget": "Widget intégré manquant : {{sourceId}}",
+    "missingCustomWidget": "Widget personnalisé manquant : {{sourceId}}",
+    "untitledWidget": "Widget",
+    "customize": "Personnaliser le widget",
+    "cidrInput": "Bloc CIDR",
+    "network": "Réseau",
+    "broadcast": "Diffusion",
+    "mask": "Masque de sous-réseau",
+    "usable": "Hôtes utilisables",
+    "subnetInvalid": "Saisissez un bloc CIDR valide, ex. 192.168.1.0/24.",
+    "reportStep1": "Confirmer l'âge de la sauvegarde actuelle.",
+    "reportStep2": "Examiner les connexions modifiées avant la maintenance.",
+    "reportStep3": "Capturer des preuves terminal uniquement lorsque nécessaire.",
+    "reportStep4": "Garder l'exécution des commandes basée sur approbation.",
+    "tool": "Outil",
+    "input": "Entrée",
+    "output": "Sortie",
+    "assistantSummary": "Parcourez et gérez les widgets du tableau de bord via l'Assistant IA."
   },
   "appLauncher": {
     "title": "Lanceur d'applications",
@@ -451,6 +508,10 @@
       "shellCommand": {
         "label": "Commandes PowerShell / batch",
         "description": "Exécuter des commandes PowerShell ou batch non destructives uniquement depuis les données d'application KKTerm."
+      },
+      "dashboard": {
+        "label": "Tableau de bord",
+        "description": "Lire et modifier les vues du tableau de bord, les instances de widgets et les widgets personnalisés."
       }
     },
     "appSlogan": "Espace de travail d'administration local-first.",
@@ -517,7 +578,20 @@
     "vncSharedSessionHint": "Permettre à un autre visualiseur VNC de rester connecté lorsque KKTerm ouvre cette session.",
     "vncViewOnly": "Visualisation seule",
     "vncViewOnlyHint": "Se connecter sans envoyer d'entrée de pointeur ou de clavier.",
-    "vncSettingsSaved": "Paramètres VNC par défaut enregistrés."
+    "vncSettingsSaved": "Paramètres VNC par défaut enregistrés.",
+    "sectionDashboard": "Tableau de bord",
+    "dashboardTitle": "Paramètres du tableau de bord",
+    "dashboardDescription": "Configurez la mise en page par défaut, le comportement des widgets et la gestion des vues du tableau de bord.",
+    "dashboardGeneral": "Général",
+    "dashboardConfirmRemove": "Demander confirmation avant de supprimer un widget",
+    "dashboardDefaultLanding": "Vue par défaut à l'ouverture",
+    "dashboardLandingLast": "Dernière vue active",
+    "dashboardReset": "Réinitialiser le tableau de bord",
+    "dashboardResetTitle": "Réinitialiser le tableau de bord",
+    "dashboardResetBody": "Cela supprime toutes les vues du tableau de bord, les instances de widgets et les widgets personnalisés créés par IA. La vue par défaut sera restaurée avec un widget Lanceur d'applications. Cette action est irréversible.",
+    "dashboardResetConfirm": "Réinitialiser le tableau de bord",
+    "dashboardResetDone": "Tableau de bord réinitialisé aux valeurs par défaut.",
+    "generalDefaultsSaved": "Paramètres généraux enregistrés."
   },
   "connections": {
     "title": "Connexions",

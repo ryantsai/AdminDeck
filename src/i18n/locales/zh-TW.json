@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "connections": "連線",
     "settings": "設定",
@@ -110,6 +110,63 @@
       "invalidCategory": "請使用以下類別之一：hash、network、quick 或 report。",
       "invalidSummary": "請新增最多 180 個字元的摘要。",
       "invalidBody": "請新增小工具內文。"
+    },
+    "addWidgetLabel": "新增小工具",
+    "newViewPrompt": "檢視名稱",
+    "renameView": "重新命名檢視",
+    "removeView": "移除檢視",
+    "editLayout": "編輯版面配置",
+    "editDone": "完成",
+    "catalogTitle": "小工具目錄",
+    "catalogSearch": "搜尋小工具…",
+    "catalogAll": "全部",
+    "catalogNoMatches": "無符合的小工具。",
+    "presetLabel": "樣式預設",
+    "removeConfirmHint": "再次點擊以移除",
+    "accent": "強調色",
+    "icon": "圖示",
+    "titlePlaceholder": "自訂標題…",
+    "advanced": "進階",
+    "advancedNothing": "內建小工具無進階設定。",
+    "scriptNetwork": "允許網路",
+    "scriptPollSeconds": "輪詢間隔（秒）",
+    "scriptViewSource": "檢視原始碼",
+    "scriptInvalidBody": "指令碼本文不是有效的 JSON。",
+    "invalidScriptWidgetBody": "指令碼小工具本文不是有效的 JSON。",
+    "invalidContentWidgetBody": "內容小工具本文不是有效的 JSON。",
+    "missingBuiltInWidget": "缺少內建小工具：{{sourceId}}",
+    "missingCustomWidget": "缺少自訂小工具：{{sourceId}}",
+    "untitledWidget": "小工具",
+    "customize": "自訂小工具",
+    "cidrInput": "CIDR 區塊",
+    "network": "網路",
+    "broadcast": "廣播",
+    "mask": "子網路遮罩",
+    "usable": "可用主機",
+    "subnetInvalid": "請輸入有效的 CIDR 區塊，例如 192.168.1.0/24。",
+    "reportStep1": "確認目前備份時效。",
+    "reportStep2": "在維護前檢查已變更的連線。",
+    "reportStep3": "僅在明確需要時擷取終端機證據。",
+    "reportStep4": "保持命令執行基於審批。",
+    "tool": "工具",
+    "input": "輸入",
+    "output": "輸出",
+    "assistantSummary": "透過 AI 助理瀏覽和管理儀表板小工具。",
+    "density": {
+      "compact": "緊湊",
+      "default": "預設",
+      "roomy": "寬鬆"
+    },
+    "preset": {
+      "panel": "面板",
+      "ambient": "氛圍",
+      "glass": "玻璃",
+      "tile": "磁磚",
+      "hero": "主角",
+      "mono": "單色",
+      "stack": "堆疊",
+      "action": "動作",
+      "band": "帶狀"
     }
   },
   "appLauncher": {
@@ -437,6 +494,10 @@
       "shellCommand": {
         "label": "PowerShell / 批次命令",
         "description": "僅從 KKTerm 應用程式資料執行非破壞性的 PowerShell 或批次命令。"
+      },
+      "dashboard": {
+        "label": "儀表板",
+        "description": "讀取和修改儀表板檢視、小工具實例和自訂小工具。"
       }
     },
     "appSlogan": "以本機為優先的管理工作區。",
@@ -522,7 +583,19 @@
     "vncSharedSessionHint": "允許其他 VNC 檢視器在 KKTerm 開啟此工作階段時保持連線。",
     "vncViewOnly": "僅檢視",
     "vncViewOnlyHint": "連線時不傳送指標或鍵盤輸入。",
-    "vncSettingsSaved": "VNC 預設值已儲存。"
+    "vncSettingsSaved": "VNC 預設值已儲存。",
+    "sectionDashboard": "儀表板",
+    "dashboardTitle": "儀表板設定",
+    "dashboardDescription": "設定儀表板的預設版面配置、小工具行為和檢視管理。",
+    "dashboardGeneral": "一般",
+    "dashboardConfirmRemove": "移除小工具前要求確認",
+    "dashboardDefaultLanding": "開啟時的預設檢視",
+    "dashboardLandingLast": "上次使用的檢視",
+    "dashboardReset": "重設儀表板",
+    "dashboardResetTitle": "重設儀表板",
+    "dashboardResetBody": "這將刪除所有儀表板檢視、小工具實例和 AI 撰寫的自訂小工具。預設檢視將恢復並帶有一個應用程式啟動器小工具。此操作無法復原。",
+    "dashboardResetConfirm": "重設儀表板",
+    "dashboardResetDone": "儀表板已重設為預設值。"
   },
   "connections": {
     "title": "連線",

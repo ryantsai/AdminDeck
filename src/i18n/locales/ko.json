@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "connections": "연결",
     "settings": "설정",
@@ -258,6 +258,10 @@
       "shellCommand": {
         "label": "PowerShell / 배치 명령",
         "description": "KKTerm 앱 데이터에서만 비파괴적 PowerShell 또는 배치 명령을 실행합니다."
+      },
+      "dashboard": {
+        "label": "대시보드",
+        "description": "대시보드 보기, 위젯 인스턴스, 사용자 정의 위젯을 읽고 수정합니다."
       }
     },
     "appSlogan": "로컬 우선 관리 워크스페이스.",
@@ -343,7 +347,19 @@
     "vncSharedSessionHint": "KKTerm이 이 세션을 열 때 다른 VNC 뷰어가 연결된 상태로 유지되도록 허용합니다.",
     "vncViewOnly": "보기 전용",
     "vncViewOnlyHint": "포인터 또는 키보드 입력을 보내지 않고 연결합니다.",
-    "vncSettingsSaved": "VNC 기본값이 저장되었습니다."
+    "vncSettingsSaved": "VNC 기본값이 저장되었습니다.",
+    "sectionDashboard": "대시보드",
+    "dashboardTitle": "대시보드 설정",
+    "dashboardDescription": "대시보드의 기본 레이아웃, 위젯 동작 및 보기 관리를 구성합니다.",
+    "dashboardGeneral": "일반",
+    "dashboardConfirmRemove": "위젯 제거 전 확인 요청",
+    "dashboardDefaultLanding": "열 때 기본 보기",
+    "dashboardLandingLast": "마지막 활성 보기",
+    "dashboardReset": "대시보드 초기화",
+    "dashboardResetTitle": "대시보드 초기화",
+    "dashboardResetBody": "모든 대시보드 보기, 위젯 인스턴스 및 AI 작성 사용자 정의 위젯을 삭제합니다. 기본 보기는 앱 런처 위젯 하나와 함께 복원됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "dashboardResetConfirm": "대시보드 초기화",
+    "dashboardResetDone": "대시보드가 기본값으로 초기화되었습니다."
   },
   "connections": {
     "title": "연결",
@@ -1409,6 +1425,63 @@
       "invalidCategory": "hash, network, quick, report 중 하나의 카테고리를 사용하세요.",
       "invalidSummary": "180자 이하의 요약을 추가하세요.",
       "invalidBody": "위젯 본문 텍스트를 추가하세요."
+    },
+    "addWidgetLabel": "위젯 추가",
+    "newViewPrompt": "보기 이름",
+    "renameView": "보기 이름 변경",
+    "removeView": "보기 제거",
+    "editLayout": "레이아웃 편집",
+    "editDone": "완료",
+    "catalogTitle": "위젯 카탈로그",
+    "catalogSearch": "위젯 검색…",
+    "catalogAll": "전체",
+    "catalogNoMatches": "일치하는 위젯이 없습니다.",
+    "presetLabel": "스타일 프리셋",
+    "removeConfirmHint": "다시 클릭하면 제거",
+    "accent": "강조",
+    "icon": "아이콘",
+    "titlePlaceholder": "사용자 정의 제목…",
+    "advanced": "고급",
+    "advancedNothing": "내장 위젯에는 고급 설정이 없습니다.",
+    "scriptNetwork": "네트워크 허용",
+    "scriptPollSeconds": "폴링 간격（초）",
+    "scriptViewSource": "소스 보기",
+    "scriptInvalidBody": "스크립트 본문이 유효한 JSON이 아닙니다.",
+    "invalidScriptWidgetBody": "스크립트 위젯 본문이 유효한 JSON이 아닙니다.",
+    "invalidContentWidgetBody": "콘텐츠 위젯 본문이 유효한 JSON이 아닙니다.",
+    "missingBuiltInWidget": "내장 위젯이 누락됨: {{sourceId}}",
+    "missingCustomWidget": "사용자 정의 위젯이 누락됨: {{sourceId}}",
+    "untitledWidget": "위젯",
+    "customize": "위젯 사용자 정의",
+    "cidrInput": "CIDR 블록",
+    "network": "네트워크",
+    "broadcast": "브로드캐스트",
+    "mask": "서브넷 마스크",
+    "usable": "사용 가능 호스트",
+    "subnetInvalid": "유효한 CIDR 블록을 입력하세요（예: 192.168.1.0/24）。",
+    "reportStep1": "현재 백업 기간을 확인합니다.",
+    "reportStep2": "유지보수 전에 변경된 연결을 검토합니다.",
+    "reportStep3": "명시적으로 필요할 때만 터미널 증거를 캡처합니다.",
+    "reportStep4": "명령 실행은 승인 기반으로 유지합니다.",
+    "tool": "도구",
+    "input": "입력",
+    "output": "출력",
+    "assistantSummary": "AI 어시스턴트를 통해 대시보드 위젯을 탐색하고 관리합니다.",
+    "density": {
+      "compact": "좁게",
+      "default": "기본",
+      "roomy": "넓게"
+    },
+    "preset": {
+      "panel": "패널",
+      "ambient": "앰비언트",
+      "glass": "글래스",
+      "tile": "타일",
+      "hero": "히어로",
+      "mono": "모노",
+      "stack": "스택",
+      "action": "액션",
+      "band": "밴드"
     }
   },
   "appLauncher": {

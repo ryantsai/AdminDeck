@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "connections": "接続",
     "settings": "設定",
@@ -110,6 +110,63 @@
       "invalidCategory": "次のいずれかのカテゴリを使用してください：hash、network、quick、report。",
       "invalidSummary": "180 文字以内の概要を追加してください。",
       "invalidBody": "ウィジェット本文を追加してください。"
+    },
+    "addWidgetLabel": "ウィジェットを追加",
+    "newViewPrompt": "ビュー名",
+    "renameView": "ビュー名を変更",
+    "removeView": "ビューを削除",
+    "editLayout": "レイアウトを編集",
+    "editDone": "完了",
+    "catalogTitle": "ウィジェットカタログ",
+    "catalogSearch": "ウィジェットを検索…",
+    "catalogAll": "すべて",
+    "catalogNoMatches": "一致するウィジェットはありません。",
+    "presetLabel": "スタイルプリセット",
+    "removeConfirmHint": "もう一度クリックすると削除",
+    "accent": "アクセント",
+    "icon": "アイコン",
+    "titlePlaceholder": "カスタムタイトル…",
+    "advanced": "詳細",
+    "advancedNothing": "組み込みウィジェットには詳細設定はありません。",
+    "scriptNetwork": "ネットワークを許可",
+    "scriptPollSeconds": "ポーリング間隔（秒）",
+    "scriptViewSource": "ソースを表示",
+    "scriptInvalidBody": "スクリプト本文が有効なJSONではありません。",
+    "invalidScriptWidgetBody": "スクリプトウィジェット本文が有効なJSONではありません。",
+    "invalidContentWidgetBody": "コンテンツウィジェット本文が有効なJSONではありません。",
+    "missingBuiltInWidget": "組み込みウィジェットが見つかりません：{{sourceId}}",
+    "missingCustomWidget": "カスタムウィジェットが見つかりません：{{sourceId}}",
+    "untitledWidget": "ウィジェット",
+    "customize": "ウィジェットをカスタマイズ",
+    "cidrInput": "CIDRブロック",
+    "network": "ネットワーク",
+    "broadcast": "ブロードキャスト",
+    "mask": "サブネットマスク",
+    "usable": "使用可能ホスト",
+    "subnetInvalid": "有効なCIDRブロックを入力してください（例：192.168.1.0/24）。",
+    "reportStep1": "現在のバックアップの経過時間を確認します。",
+    "reportStep2": "メンテナンス前に変更された接続を確認します。",
+    "reportStep3": "明示的に必要な場合のみ端末の証跡を取得します。",
+    "reportStep4": "コマンド実行は承認ベースで行います。",
+    "tool": "ツール",
+    "input": "入力",
+    "output": "出力",
+    "assistantSummary": "AIアシスタントを通じてダッシュボードウィジェットを参照・管理します。",
+    "density": {
+      "compact": "コンパクト",
+      "default": "デフォルト",
+      "roomy": "ゆったり"
+    },
+    "preset": {
+      "panel": "パネル",
+      "ambient": "アンビエント",
+      "glass": "グラス",
+      "tile": "タイル",
+      "hero": "ヒーロー",
+      "mono": "モノ",
+      "stack": "スタック",
+      "action": "アクション",
+      "band": "バンド"
     }
   },
   "appLauncher": {
@@ -437,6 +494,10 @@
       "shellCommand": {
         "label": "PowerShell / バッチコマンド",
         "description": "KKTerm アプリデータからのみ非破壊的な PowerShell またはバッチコマンドを実行します。"
+      },
+      "dashboard": {
+        "label": "ダッシュボード",
+        "description": "ダッシュボードビュー、ウィジェットインスタンス、カスタムウィジェットを読み取り・変更します。"
       }
     },
     "appSlogan": "ローカルファーストの管理ワークスペース。",
@@ -522,7 +583,19 @@
     "vncSharedSessionHint": "KKTerm がこのセッションを開いたときに、他の VNC ビューアが接続を維持できるようにします。",
     "vncViewOnly": "表示のみ",
     "vncViewOnlyHint": "ポインタまたはキーボード入力を送信せずに接続します。",
-    "vncSettingsSaved": "VNC デフォルトを保存しました。"
+    "vncSettingsSaved": "VNC デフォルトを保存しました。",
+    "sectionDashboard": "ダッシュボード",
+    "dashboardTitle": "ダッシュボード設定",
+    "dashboardDescription": "ダッシュボードのデフォルトレイアウト、ウィジェットの動作、ビュー管理を設定します。",
+    "dashboardGeneral": "一般",
+    "dashboardConfirmRemove": "ウィジェットを削除する前に確認を求める",
+    "dashboardDefaultLanding": "開いたときのデフォルトビュー",
+    "dashboardLandingLast": "最後にアクティブだったビュー",
+    "dashboardReset": "ダッシュボードをリセット",
+    "dashboardResetTitle": "ダッシュボードをリセット",
+    "dashboardResetBody": "すべてのダッシュボードビュー、ウィジェットインスタンス、AI作成のカスタムウィジェットを削除します。デフォルトビューはアプリランチャーウィジェット付きで復元されます。この操作は元に戻せません。",
+    "dashboardResetConfirm": "ダッシュボードをリセット",
+    "dashboardResetDone": "ダッシュボードをデフォルトにリセットしました。"
   },
   "connections": {
     "title": "接続",

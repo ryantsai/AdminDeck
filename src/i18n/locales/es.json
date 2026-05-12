@@ -110,7 +110,64 @@
       "invalidCategory": "Use una categoría: hash, network, quick o report.",
       "invalidSummary": "Añada un resumen de hasta 180 caracteres.",
       "invalidBody": "Añada texto para el cuerpo del widget."
-    }
+    },
+    "addWidgetLabel": "Añadir widget",
+    "newViewPrompt": "Nombre de vista",
+    "renameView": "Renombrar vista",
+    "removeView": "Eliminar vista",
+    "editLayout": "Editar diseño",
+    "editDone": "Hecho",
+    "density": {
+      "compact": "Compacto",
+      "default": "Predeterminado",
+      "roomy": "Espacioso"
+    },
+    "catalogTitle": "Catálogo de widgets",
+    "catalogSearch": "Buscar widgets…",
+    "catalogAll": "Todos",
+    "catalogNoMatches": "Ningún widget coincide.",
+    "presetLabel": "Estilo predefinido",
+    "preset": {
+      "panel": "Panel",
+      "ambient": "Ambiente",
+      "glass": "Vidrio",
+      "tile": "Baldosa",
+      "hero": "Hero",
+      "mono": "Mono",
+      "stack": "Pila",
+      "action": "Acción",
+      "band": "Banda"
+    },
+    "removeConfirmHint": "Haga clic de nuevo para eliminar",
+    "accent": "Acento",
+    "icon": "Icono",
+    "titlePlaceholder": "Título personalizado…",
+    "advanced": "Avanzado",
+    "advancedNothing": "Sin ajustes avanzados para widgets integrados.",
+    "scriptNetwork": "Permitir red",
+    "scriptPollSeconds": "Intervalo de sondeo (segundos)",
+    "scriptViewSource": "Ver fuente",
+    "scriptInvalidBody": "El cuerpo del script no es JSON válido.",
+    "invalidScriptWidgetBody": "El cuerpo del widget de script no es JSON válido.",
+    "invalidContentWidgetBody": "El cuerpo del widget de contenido no es JSON válido.",
+    "missingBuiltInWidget": "Widget integrado faltante: {{sourceId}}",
+    "missingCustomWidget": "Widget personalizado faltante: {{sourceId}}",
+    "untitledWidget": "Widget",
+    "customize": "Personalizar widget",
+    "cidrInput": "Bloque CIDR",
+    "network": "Red",
+    "broadcast": "Broadcast",
+    "mask": "Máscara de subred",
+    "usable": "Hosts utilizables",
+    "subnetInvalid": "Introduzca un bloque CIDR válido, p. ej. 192.168.1.0/24.",
+    "reportStep1": "Confirme la antigüedad de la copia de seguridad actual.",
+    "reportStep2": "Revise las conexiones modificadas antes del mantenimiento.",
+    "reportStep3": "Capture evidencia de terminal solo cuando sea explícitamente necesario.",
+    "reportStep4": "Mantenga la ejecución de comandos basada en aprobación.",
+    "tool": "Herramienta",
+    "input": "Entrada",
+    "output": "Salida",
+    "assistantSummary": "Explore y gestione los widgets del panel a través del Asistente IA."
   },
   "appLauncher": {
     "title": "Lanzador de aplicaciones",
@@ -450,6 +507,10 @@
       "shellCommand": {
         "label": "Comandos PowerShell / batch",
         "description": "Ejecutar comandos PowerShell o batch no destructivos solo desde los datos de la aplicación KKTerm."
+      },
+      "dashboard": {
+        "label": "Panel",
+        "description": "Leer y modificar vistas del panel, instancias de widgets y widgets personalizados."
       }
     },
     "appSlogan": "Espacio de trabajo de administración local.",
@@ -515,7 +576,20 @@
     "vncRemoteResizeHint": "Depende de que el servidor VNC admita actualizaciones de desktop-size.",
     "connectedConnectionsRail": "Mostrar Conexión en la barra izquierda",
     "connectedConnectionsRailHint": "Añade un icono por cada Conexión conectada a la barra izquierda para que pueda volver a ella rápidamente.",
-    "connectedConnectionsRailSaved": "Configuración de Mostrar Conexión en la barra izquierda guardada."
+    "connectedConnectionsRailSaved": "Configuración de Mostrar Conexión en la barra izquierda guardada.",
+    "sectionDashboard": "Panel",
+    "dashboardTitle": "Ajustes del panel",
+    "dashboardDescription": "Configure el diseño predeterminado, el comportamiento de los widgets y la gestión de vistas del panel.",
+    "dashboardGeneral": "General",
+    "dashboardConfirmRemove": "Pedir confirmación antes de eliminar un widget",
+    "dashboardDefaultLanding": "Vista predeterminada al abrir",
+    "dashboardLandingLast": "Última vista activa",
+    "dashboardReset": "Restablecer panel",
+    "dashboardResetTitle": "Restablecer panel",
+    "dashboardResetBody": "Esto elimina todas las vistas del panel, instancias de widgets y widgets personalizados creados por IA. Se restaurará la vista predeterminada con un widget de lanzador de aplicaciones. Esto no se puede deshacer.",
+    "dashboardResetConfirm": "Restablecer panel",
+    "dashboardResetDone": "Panel restablecido a valores predeterminados.",
+    "generalDefaultsSaved": "Ajustes generales guardados."
   },
   "connections": {
     "title": "Conexiones",

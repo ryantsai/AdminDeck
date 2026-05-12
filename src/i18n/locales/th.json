@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "connections": "การเชื่อมต่อ",
     "settings": "การตั้งค่า",
@@ -265,6 +265,10 @@
       "shellCommand": {
         "label": "คำสั่ง PowerShell / batch",
         "description": "รันคำสั่ง PowerShell หรือ batch แบบไม่ทำลายจากข้อมูลแอป KKTerm เท่านั้น"
+      },
+      "dashboard": {
+        "label": "แดชบอร์ด",
+        "description": "อ่านและแก้ไขมุมมองแดชบอร์ด อินสแตนซ์วิดเจ็ต และวิดเจ็ตที่กำหนดเอง"
       }
     },
     "portRedirect": "การเปลี่ยนเส้นทางพอร์ต",
@@ -343,7 +347,19 @@
     "vncSharedSessionHint": "อนุญาตให้โปรแกรมดู VNC อื่นเชื่อมต่ออยู่เมื่อ KKTerm เปิดเซสชันนี้",
     "vncViewOnly": "ดูอย่างเดียว",
     "vncViewOnlyHint": "เชื่อมต่อโดยไม่ส่งอินพุตตัวชี้หรือคีย์บอร์ด",
-    "vncSettingsSaved": "บันทึกค่าเริ่มต้น VNC แล้ว"
+    "vncSettingsSaved": "บันทึกค่าเริ่มต้น VNC แล้ว",
+    "sectionDashboard": "แดชบอร์ด",
+    "dashboardTitle": "การตั้งค่าแดชบอร์ด",
+    "dashboardDescription": "กำหนดค่าเค้าโครงเริ่มต้น พฤติกรรมวิดเจ็ต และการจัดการมุมมองสำหรับแดชบอร์ด",
+    "dashboardGeneral": "ทั่วไป",
+    "dashboardConfirmRemove": "ขอยืนยันก่อนลบวิดเจ็ต",
+    "dashboardDefaultLanding": "มุมมองเริ่มต้นเมื่อเปิด",
+    "dashboardLandingLast": "มุมมองที่ใช้งานล่าสุด",
+    "dashboardReset": "รีเซ็ตแดชบอร์ด",
+    "dashboardResetTitle": "รีเซ็ตแดชบอร์ด",
+    "dashboardResetBody": "การดำเนินการนี้จะลบมุมมองแดชบอร์ดทั้งหมด อินสแตนซ์วิดเจ็ต และวิดเจ็ตที่กำหนดเองที่เขียนโดย AI มุมมองเริ่มต้นจะถูกกู้คืนพร้อมวิดเจ็ตตัวเรียกใช้แอปหนึ่งรายการ การดำเนินการนี้ไม่สามารถยกเลิกได้",
+    "dashboardResetConfirm": "รีเซ็ตแดชบอร์ด",
+    "dashboardResetDone": "แดชบอร์ดถูกรีเซ็ตเป็นค่าเริ่มต้นแล้ว"
   },
   "connections": {
     "title": "การเชื่อมต่อ",
@@ -1409,6 +1425,63 @@
       "invalidCategory": "ใช้หนึ่งหมวดหมู่: hash, network, quick หรือ report",
       "invalidSummary": "เพิ่มสรุปไม่เกิน 180 ตัวอักษร",
       "invalidBody": "เพิ่มข้อความเนื้อหาวิดเจ็ต"
+    },
+    "addWidgetLabel": "เพิ่มวิดเจ็ต",
+    "newViewPrompt": "ชื่อมุมมอง",
+    "renameView": "เปลี่ยนชื่อมุมมอง",
+    "removeView": "ลบมุมมอง",
+    "editLayout": "แก้ไขเค้าโครง",
+    "editDone": "เสร็จ",
+    "catalogTitle": "แคตตาล็อกวิดเจ็ต",
+    "catalogSearch": "ค้นหาวิดเจ็ต…",
+    "catalogAll": "ทั้งหมด",
+    "catalogNoMatches": "ไม่มีวิดเจ็ตที่ตรงกัน",
+    "presetLabel": "ค่าที่ตั้งไว้ล่วงหน้าสำหรับสไตล์",
+    "removeConfirmHint": "คลิกอีกครั้งเพื่อลบ",
+    "accent": "สีเน้น",
+    "icon": "ไอคอน",
+    "titlePlaceholder": "ชื่อที่กำหนดเอง…",
+    "advanced": "ขั้นสูง",
+    "advancedNothing": "ไม่มีค่าขั้นสูงสำหรับวิดเจ็ตในตัว",
+    "scriptNetwork": "อนุญาตเครือข่าย",
+    "scriptPollSeconds": "ช่วงเวลาการโพล（วินาที）",
+    "scriptViewSource": "ดูซอร์ส",
+    "scriptInvalidBody": "เนื้อหาสคริปต์ไม่ใช่ JSON ที่ถูกต้อง",
+    "invalidScriptWidgetBody": "เนื้อหาวิดเจ็ตสคริปต์ไม่ใช่ JSON ที่ถูกต้อง",
+    "invalidContentWidgetBody": "เนื้อหาวิดเจ็ตคอนเทนต์ไม่ใช่ JSON ที่ถูกต้อง",
+    "missingBuiltInWidget": "ไม่มีวิดเจ็ตในตัว: {{sourceId}}",
+    "missingCustomWidget": "ไม่มีวิดเจ็ตที่กำหนดเอง: {{sourceId}}",
+    "untitledWidget": "วิดเจ็ต",
+    "customize": "ปรับแต่งวิดเจ็ต",
+    "cidrInput": "บล็อก CIDR",
+    "network": "เครือข่าย",
+    "broadcast": "บรอดคาสต์",
+    "mask": "ซับเน็ตมาสก์",
+    "usable": "โฮสต์ที่ใช้งานได้",
+    "subnetInvalid": "ป้อนบล็อก CIDR ที่ถูกต้อง เช่น 192.168.1.0/24",
+    "reportStep1": "ยืนยันอายุข้อมูลสำรองปัจจุบัน",
+    "reportStep2": "ตรวจสอบการเชื่อมต่อที่เปลี่ยนแปลงก่อนการบำรุงรักษา",
+    "reportStep3": "จับหลักฐานเทอร์มินัลเมื่อจำเป็นอย่างชัดแจ้งเท่านั้น",
+    "reportStep4": "รักษาการดำเนินการคำสั่งตามการอนุมัติ",
+    "tool": "เครื่องมือ",
+    "input": "อินพุต",
+    "output": "เอาต์พุต",
+    "assistantSummary": "เรียกดูและจัดการวิดเจ็ตแดชบอร์ดผ่าน AI Assistant",
+    "density": {
+      "compact": "กะทัดรัด",
+      "default": "ค่าเริ่มต้น",
+      "roomy": "กว้าง"
+    },
+    "preset": {
+      "panel": "แผง",
+      "ambient": "บรรยากาศ",
+      "glass": "กระจก",
+      "tile": "ไทล์",
+      "hero": "ฮีโร่",
+      "mono": "โมโน",
+      "stack": "สแต็ก",
+      "action": "แอ็คชัน",
+      "band": "แบนด์"
     }
   },
   "appLauncher": {

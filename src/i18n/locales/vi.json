@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "connections": "Connections",
     "settings": "Settings",
@@ -265,6 +265,10 @@
       "shellCommand": {
         "label": "Lệnh PowerShell / batch",
         "description": "Chạy lệnh PowerShell hoặc batch không phá hủy từ dữ liệu ứng dụng KKTerm."
+      },
+      "dashboard": {
+        "label": "Bảng điều khiển",
+        "description": "Đọc và sửa đổi góc nhìn Bảng điều khiển, phiên bản tiện ích và tiện ích tùy chỉnh."
       }
     },
     "portRedirect": "Chuyển Hướng Cổng",
@@ -343,7 +347,19 @@
     "vncSharedSessionHint": "Cho phép trình xem VNC khác giữ kết nối khi KKTerm mở phiên này.",
     "vncViewOnly": "Chỉ xem",
     "vncViewOnlyHint": "Kết nối mà không gửi đầu vào chuột hoặc bàn phím.",
-    "vncSettingsSaved": "Đã lưu mặc định VNC."
+    "vncSettingsSaved": "Đã lưu mặc định VNC.",
+    "sectionDashboard": "Bảng điều khiển",
+    "dashboardTitle": "Cài đặt Bảng điều khiển",
+    "dashboardDescription": "Cấu hình bố cục mặc định, hành vi tiện ích và quản lý góc nhìn cho Bảng điều khiển.",
+    "dashboardGeneral": "Chung",
+    "dashboardConfirmRemove": "Yêu cầu xác nhận trước khi xóa tiện ích",
+    "dashboardDefaultLanding": "Góc nhìn mặc định khi mở",
+    "dashboardLandingLast": "Góc nhìn hoạt động cuối cùng",
+    "dashboardReset": "Đặt lại Bảng điều khiển",
+    "dashboardResetTitle": "Đặt lại Bảng điều khiển",
+    "dashboardResetBody": "Thao tác này xóa tất cả góc nhìn Bảng điều khiển, phiên bản tiện ích và tiện ích tùy chỉnh do AI tạo. Góc nhìn Mặc định sẽ được khôi phục với một tiện ích Trình Khởi chạy Ứng dụng. Không thể hoàn tác.",
+    "dashboardResetConfirm": "Đặt lại Bảng điều khiển",
+    "dashboardResetDone": "Bảng điều khiển đã được đặt lại về mặc định."
   },
   "connections": {
     "title": "Connections",
@@ -1409,6 +1425,63 @@
       "invalidCategory": "Dùng một danh mục: hash, network, quick, hoặc report.",
       "invalidSummary": "Thêm tóm tắt tối đa 180 ký tự.",
       "invalidBody": "Thêm văn bản nội dung tiện ích."
+    },
+    "addWidgetLabel": "Thêm Tiện ích",
+    "newViewPrompt": "Tên góc nhìn",
+    "renameView": "Đổi tên góc nhìn",
+    "removeView": "Xóa góc nhìn",
+    "editLayout": "Chỉnh sửa Bố cục",
+    "editDone": "Xong",
+    "catalogTitle": "Danh mục Tiện ích",
+    "catalogSearch": "Tìm kiếm tiện ích…",
+    "catalogAll": "Tất cả",
+    "catalogNoMatches": "Không có tiện ích nào khớp.",
+    "presetLabel": "Cài đặt sẵn kiểu",
+    "removeConfirmHint": "Nhấp lại để xóa",
+    "accent": "Nhấn",
+    "icon": "Biểu tượng",
+    "titlePlaceholder": "Tiêu đề tùy chỉnh…",
+    "advanced": "Nâng cao",
+    "advancedNothing": "Không có cài đặt nâng cao cho tiện ích tích hợp.",
+    "scriptNetwork": "Cho phép mạng",
+    "scriptPollSeconds": "Khoảng thời gian thăm dò（giây）",
+    "scriptViewSource": "Xem nguồn",
+    "scriptInvalidBody": "Nội dung tập lệnh không phải JSON hợp lệ.",
+    "invalidScriptWidgetBody": "Nội dung tiện ích tập lệnh không phải JSON hợp lệ.",
+    "invalidContentWidgetBody": "Nội dung tiện ích không phải JSON hợp lệ.",
+    "missingBuiltInWidget": "Thiếu tiện ích tích hợp: {{sourceId}}",
+    "missingCustomWidget": "Thiếu tiện ích tùy chỉnh: {{sourceId}}",
+    "untitledWidget": "Tiện ích",
+    "customize": "Tùy chỉnh tiện ích",
+    "cidrInput": "Khối CIDR",
+    "network": "Mạng",
+    "broadcast": "Broadcast",
+    "mask": "Mặt nạ mạng con",
+    "usable": "Máy khả dụng",
+    "subnetInvalid": "Nhập khối CIDR hợp lệ, v.d. 192.168.1.0/24.",
+    "reportStep1": "Xác nhận tuổi bản sao lưu hiện tại.",
+    "reportStep2": "Xem lại Kết nối đã thay đổi trước khi bảo trì.",
+    "reportStep3": "Chỉ ghi lại bằng chứng terminal khi thực sự cần.",
+    "reportStep4": "Giữ thực thi lệnh dựa trên phê duyệt.",
+    "tool": "Công cụ",
+    "input": "Đầu vào",
+    "output": "Đầu ra",
+    "assistantSummary": "Duyệt và quản lý tiện ích Bảng điều khiển qua Trợ lý AI.",
+    "density": {
+      "compact": "Gọn",
+      "default": "Mặc định",
+      "roomy": "Rộng rãi"
+    },
+    "preset": {
+      "panel": "Bảng",
+      "ambient": "Không gian",
+      "glass": "Kính",
+      "tile": "Gạch",
+      "hero": "Nổi bật",
+      "mono": "Đơn sắc",
+      "stack": "Chồng",
+      "action": "Hành động",
+      "band": "Dải"
     }
   },
   "appLauncher": {

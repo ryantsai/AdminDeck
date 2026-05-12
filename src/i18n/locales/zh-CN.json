@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "connections": "连接",
     "settings": "设置",
@@ -110,6 +110,63 @@
       "invalidCategory": "请使用以下类别之一：hash、network、quick 或 report。",
       "invalidSummary": "请添加最多 180 个字符的摘要。",
       "invalidBody": "请添加小部件正文文本。"
+    },
+    "addWidgetLabel": "添加小部件",
+    "newViewPrompt": "视图名称",
+    "renameView": "重命名视图",
+    "removeView": "删除视图",
+    "editLayout": "编辑布局",
+    "editDone": "完成",
+    "catalogTitle": "小部件目录",
+    "catalogSearch": "搜索小部件…",
+    "catalogAll": "全部",
+    "catalogNoMatches": "无匹配的小部件。",
+    "presetLabel": "样式预设",
+    "removeConfirmHint": "再次点击以移除",
+    "accent": "强调色",
+    "icon": "图标",
+    "titlePlaceholder": "自定义标题…",
+    "advanced": "高级",
+    "advancedNothing": "内置小部件无高级设置。",
+    "scriptNetwork": "允许网络",
+    "scriptPollSeconds": "轮询间隔（秒）",
+    "scriptViewSource": "查看源码",
+    "scriptInvalidBody": "脚本正文不是有效的JSON。",
+    "invalidScriptWidgetBody": "脚本小部件正文不是有效的JSON。",
+    "invalidContentWidgetBody": "内容小部件正文不是有效的JSON。",
+    "missingBuiltInWidget": "缺少内置小部件：{{sourceId}}",
+    "missingCustomWidget": "缺少自定义小部件：{{sourceId}}",
+    "untitledWidget": "小部件",
+    "customize": "自定义小部件",
+    "cidrInput": "CIDR 块",
+    "network": "网络",
+    "broadcast": "广播",
+    "mask": "子网掩码",
+    "usable": "可用主机",
+    "subnetInvalid": "请输入有效的 CIDR 块，例如 192.168.1.0/24。",
+    "reportStep1": "确认当前备份时效。",
+    "reportStep2": "在维护前检查已更改的连接。",
+    "reportStep3": "仅在明确需要时捕获终端证据。",
+    "reportStep4": "保持命令执行基于审批。",
+    "tool": "工具",
+    "input": "输入",
+    "output": "输出",
+    "assistantSummary": "通过 AI 助手浏览和管理仪表板小部件。",
+    "density": {
+      "compact": "紧凑",
+      "default": "默认",
+      "roomy": "宽松"
+    },
+    "preset": {
+      "panel": "面板",
+      "ambient": "环境",
+      "glass": "玻璃",
+      "tile": "瓷砖",
+      "hero": "主角",
+      "mono": "单色",
+      "stack": "堆叠",
+      "action": "动作",
+      "band": "带状"
     }
   },
   "appLauncher": {
@@ -437,6 +494,10 @@
       "shellCommand": {
         "label": "PowerShell / 批处理命令",
         "description": "仅从 KKTerm 应用数据运行非破坏性的 PowerShell 或批处理命令。"
+      },
+      "dashboard": {
+        "label": "仪表板",
+        "description": "读取和修改仪表板视图、小部件实例和自定义小部件。"
       }
     },
     "appSlogan": "本地优先的管理工作区。",
@@ -522,7 +583,19 @@
     "vncSharedSessionHint": "允许其他 VNC 查看器在 KKTerm 打开此会话时保持连接。",
     "vncViewOnly": "仅查看",
     "vncViewOnlyHint": "连接时不发送指针或键盘输入。",
-    "vncSettingsSaved": "VNC 默认值已保存。"
+    "vncSettingsSaved": "VNC 默认值已保存。",
+    "sectionDashboard": "仪表板",
+    "dashboardTitle": "仪表板设置",
+    "dashboardDescription": "配置仪表板的默认布局、小部件行为和视图管理。",
+    "dashboardGeneral": "通用",
+    "dashboardConfirmRemove": "移除小部件前要求确认",
+    "dashboardDefaultLanding": "打开时的默认视图",
+    "dashboardLandingLast": "上次活动的视图",
+    "dashboardReset": "重置仪表板",
+    "dashboardResetTitle": "重置仪表板",
+    "dashboardResetBody": "这将删除所有仪表板视图、小部件实例和 AI 创作的自定义小部件。默认视图将恢复并带有一个应用启动器小部件。此操作无法撤消。",
+    "dashboardResetConfirm": "重置仪表板",
+    "dashboardResetDone": "仪表板已重置为默认值。"
   },
   "connections": {
     "title": "连接",

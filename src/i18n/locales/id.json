@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "connections": "Koneksi",
     "settings": "Pengaturan",
@@ -265,6 +265,10 @@
       "shellCommand": {
         "label": "Perintah PowerShell / batch",
         "description": "Jalankan perintah PowerShell atau batch non-destruktif dari data aplikasi KKTerm saja."
+      },
+      "dashboard": {
+        "label": "Dasbor",
+        "description": "Membaca dan memodifikasi tampilan Dasbor, instans widget, dan widget kustom."
       }
     },
     "portRedirect": "Pengalihan Port",
@@ -343,7 +347,19 @@
     "vncSharedSessionHint": "Izinkan penampil VNC lain tetap terhubung saat KKTerm membuka sesi ini.",
     "vncViewOnly": "Hanya lihat",
     "vncViewOnlyHint": "Hubungkan tanpa mengirim input pointer atau keyboard.",
-    "vncSettingsSaved": "Default VNC disimpan."
+    "vncSettingsSaved": "Default VNC disimpan.",
+    "sectionDashboard": "Dasbor",
+    "dashboardTitle": "Pengaturan Dasbor",
+    "dashboardDescription": "Konfigurasikan tata letak default, perilaku widget, dan manajemen tampilan untuk Dasbor.",
+    "dashboardGeneral": "Umum",
+    "dashboardConfirmRemove": "Minta konfirmasi sebelum menghapus widget",
+    "dashboardDefaultLanding": "Tampilan default saat dibuka",
+    "dashboardLandingLast": "Tampilan terakhir aktif",
+    "dashboardReset": "Reset Dasbor",
+    "dashboardResetTitle": "Reset Dasbor",
+    "dashboardResetBody": "Ini menghapus semua tampilan Dasbor, instans widget, dan widget kustom buatan AI. Tampilan Default akan dipulihkan dengan satu widget Peluncur Aplikasi. Ini tidak dapat dibatalkan.",
+    "dashboardResetConfirm": "Reset Dasbor",
+    "dashboardResetDone": "Dasbor direset ke default."
   },
   "connections": {
     "title": "Koneksi",
@@ -1409,6 +1425,63 @@
       "invalidCategory": "Gunakan satu kategori: hash, network, quick, atau report.",
       "invalidSummary": "Tambahkan ringkasan hingga 180 karakter.",
       "invalidBody": "Tambahkan teks isi widget."
+    },
+    "addWidgetLabel": "Tambah Widget",
+    "newViewPrompt": "Nama tampilan",
+    "renameView": "Ganti nama tampilan",
+    "removeView": "Hapus tampilan",
+    "editLayout": "Edit Tata Letak",
+    "editDone": "Selesai",
+    "catalogTitle": "Katalog Widget",
+    "catalogSearch": "Cari widget…",
+    "catalogAll": "Semua",
+    "catalogNoMatches": "Tidak ada widget yang cocok.",
+    "presetLabel": "Preset gaya",
+    "removeConfirmHint": "Klik lagi untuk menghapus",
+    "accent": "Aksen",
+    "icon": "Ikon",
+    "titlePlaceholder": "Judul kustom…",
+    "advanced": "Lanjutan",
+    "advancedNothing": "Tidak ada pengaturan lanjutan untuk widget bawaan.",
+    "scriptNetwork": "Izinkan jaringan",
+    "scriptPollSeconds": "Interval polling（detik）",
+    "scriptViewSource": "Lihat sumber",
+    "scriptInvalidBody": "Bodi skrip bukan JSON yang valid.",
+    "invalidScriptWidgetBody": "Bodi widget skrip bukan JSON yang valid.",
+    "invalidContentWidgetBody": "Bodi widget konten bukan JSON yang valid.",
+    "missingBuiltInWidget": "Widget bawaan hilang: {{sourceId}}",
+    "missingCustomWidget": "Widget kustom hilang: {{sourceId}}",
+    "untitledWidget": "Widget",
+    "customize": "Sesuaikan widget",
+    "cidrInput": "Blok CIDR",
+    "network": "Jaringan",
+    "broadcast": "Broadcast",
+    "mask": "Subnet mask",
+    "usable": "Host yang dapat digunakan",
+    "subnetInvalid": "Masukkan blok CIDR yang valid, mis. 192.168.1.0/24.",
+    "reportStep1": "Konfirmasi usia backup saat ini.",
+    "reportStep2": "Tinjau Koneksi yang berubah sebelum pemeliharaan.",
+    "reportStep3": "Tangkap bukti terminal hanya saat diperlukan secara eksplisit.",
+    "reportStep4": "Pertahankan eksekusi perintah berbasis persetujuan.",
+    "tool": "Alat",
+    "input": "Input",
+    "output": "Output",
+    "assistantSummary": "Jelajahi dan kelola widget Dasbor melalui AI Assistant.",
+    "density": {
+      "compact": "Rapat",
+      "default": "Default",
+      "roomy": "Longgar"
+    },
+    "preset": {
+      "panel": "Panel",
+      "ambient": "Ambient",
+      "glass": "Kaca",
+      "tile": "Ubin",
+      "hero": "Hero",
+      "mono": "Mono",
+      "stack": "Tumpuk",
+      "action": "Aksi",
+      "band": "Pita"
     }
   },
   "appLauncher": {

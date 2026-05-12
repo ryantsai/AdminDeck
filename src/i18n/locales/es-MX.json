@@ -110,7 +110,64 @@
       "invalidCategory": "Usa una categoría: hash, network, quick o report.",
       "invalidSummary": "Agrega un resumen de hasta 180 caracteres.",
       "invalidBody": "Agrega texto para el cuerpo del widget."
-    }
+    },
+    "addWidgetLabel": "Agregar widget",
+    "newViewPrompt": "Nombre de vista",
+    "renameView": "Renombrar vista",
+    "removeView": "Eliminar vista",
+    "editLayout": "Editar diseño",
+    "editDone": "Listo",
+    "density": {
+      "compact": "Compacto",
+      "default": "Predeterminado",
+      "roomy": "Espacioso"
+    },
+    "catalogTitle": "Catálogo de widgets",
+    "catalogSearch": "Buscar widgets…",
+    "catalogAll": "Todos",
+    "catalogNoMatches": "Ningún widget coincide.",
+    "presetLabel": "Estilo predefinido",
+    "preset": {
+      "panel": "Panel",
+      "ambient": "Ambiente",
+      "glass": "Vidrio",
+      "tile": "Azulejo",
+      "hero": "Hero",
+      "mono": "Mono",
+      "stack": "Pila",
+      "action": "Acción",
+      "band": "Banda"
+    },
+    "removeConfirmHint": "Haz clic de nuevo para eliminar",
+    "accent": "Acento",
+    "icon": "Ícono",
+    "titlePlaceholder": "Título personalizado…",
+    "advanced": "Avanzado",
+    "advancedNothing": "Sin ajustes avanzados para widgets integrados.",
+    "scriptNetwork": "Permitir red",
+    "scriptPollSeconds": "Intervalo de sondeo (segundos)",
+    "scriptViewSource": "Ver fuente",
+    "scriptInvalidBody": "El cuerpo del script no es JSON válido.",
+    "invalidScriptWidgetBody": "El cuerpo del widget de script no es JSON válido.",
+    "invalidContentWidgetBody": "El cuerpo del widget de contenido no es JSON válido.",
+    "missingBuiltInWidget": "Widget integrado faltante: {{sourceId}}",
+    "missingCustomWidget": "Widget personalizado faltante: {{sourceId}}",
+    "untitledWidget": "Widget",
+    "customize": "Personalizar widget",
+    "cidrInput": "Bloque CIDR",
+    "network": "Red",
+    "broadcast": "Broadcast",
+    "mask": "Máscara de subred",
+    "usable": "Hosts usables",
+    "subnetInvalid": "Ingresa un bloque CIDR válido, p. ej. 192.168.1.0/24.",
+    "reportStep1": "Confirma la antigüedad del respaldo actual.",
+    "reportStep2": "Revisa las Conexiones modificadas antes del mantenimiento.",
+    "reportStep3": "Captura evidencia de terminal solo cuando sea explícitamente necesario.",
+    "reportStep4": "Mantén la ejecución de comandos basada en aprobación.",
+    "tool": "Herramienta",
+    "input": "Entrada",
+    "output": "Salida",
+    "assistantSummary": "Explora y administra los widgets del tablero a través del Asistente IA."
   },
   "appLauncher": {
     "title": "Lanzador de apps",
@@ -457,6 +514,10 @@
       "shellCommand": {
         "label": "Comandos PowerShell / batch",
         "description": "Ejecutar comandos PowerShell o batch no destructivos solo desde los datos de la aplicación KKTerm."
+      },
+      "dashboard": {
+        "label": "Tablero",
+        "description": "Leer y modificar vistas del tablero, instancias de widgets y widgets personalizados."
       }
     },
     "appSlogan": "Espacio de trabajo de administración local.",
@@ -515,7 +576,20 @@
     "vncRemoteResizeHint": "Depende de que el servidor VNC admita actualizaciones de desktop-size.",
     "connectedConnectionsRail": "Mostrar Conexión en la barra izquierda",
     "connectedConnectionsRailHint": "Agrega un icono por cada Conexión conectada a la barra izquierda para que puedas volver a ella rápidamente.",
-    "connectedConnectionsRailSaved": "Configuración de Mostrar Conexión en la barra izquierda guardada."
+    "connectedConnectionsRailSaved": "Configuración de Mostrar Conexión en la barra izquierda guardada.",
+    "sectionDashboard": "Tablero",
+    "dashboardTitle": "Configuración del tablero",
+    "dashboardDescription": "Configura el diseño predeterminado, el comportamiento de los widgets y la gestión de vistas del tablero.",
+    "dashboardGeneral": "General",
+    "dashboardConfirmRemove": "Pedir confirmación antes de eliminar un widget",
+    "dashboardDefaultLanding": "Vista predeterminada al abrir",
+    "dashboardLandingLast": "Última vista activa",
+    "dashboardReset": "Restablecer tablero",
+    "dashboardResetTitle": "Restablecer tablero",
+    "dashboardResetBody": "Esto elimina todas las vistas del tablero, instancias de widgets y widgets personalizados creados por IA. Se restaurará la vista predeterminada con un widget de lanzador de apps. Esto no se puede deshacer.",
+    "dashboardResetConfirm": "Restablecer tablero",
+    "dashboardResetDone": "Tablero restablecido a valores predeterminados.",
+    "generalDefaultsSaved": "Configuración general guardada."
   },
   "connections": {
     "title": "Conexiones",

@@ -110,7 +110,64 @@
       "invalidCategory": "Verwenden Sie eine Kategorie: hash, network, quick oder report.",
       "invalidSummary": "Fügen Sie eine Zusammenfassung mit bis zu 180 Zeichen hinzu.",
       "invalidBody": "Fügen Sie Widget-Body-Text hinzu."
-    }
+    },
+    "addWidgetLabel": "Widget hinzufügen",
+    "newViewPrompt": "Ansichtsname",
+    "renameView": "Ansicht umbenennen",
+    "removeView": "Ansicht entfernen",
+    "editLayout": "Layout bearbeiten",
+    "editDone": "Fertig",
+    "density": {
+      "compact": "Kompakt",
+      "default": "Standard",
+      "roomy": "Geräumig"
+    },
+    "catalogTitle": "Widget-Katalog",
+    "catalogSearch": "Widgets durchsuchen…",
+    "catalogAll": "Alle",
+    "catalogNoMatches": "Keine passenden Widgets.",
+    "presetLabel": "Stilvorlage",
+    "preset": {
+      "panel": "Panel",
+      "ambient": "Ambient",
+      "glass": "Glas",
+      "tile": "Kachel",
+      "hero": "Hero",
+      "mono": "Mono",
+      "stack": "Stapel",
+      "action": "Aktion",
+      "band": "Band"
+    },
+    "removeConfirmHint": "Erneut klicken zum Entfernen",
+    "accent": "Akzent",
+    "icon": "Symbol",
+    "titlePlaceholder": "Eigener Titel…",
+    "advanced": "Erweitert",
+    "advancedNothing": "Keine erweiterten Einstellungen für integrierte Widgets.",
+    "scriptNetwork": "Netzwerk erlauben",
+    "scriptPollSeconds": "Abfrageintervall (Sekunden)",
+    "scriptViewSource": "Quelle anzeigen",
+    "scriptInvalidBody": "Script-Body ist kein gültiges JSON.",
+    "invalidScriptWidgetBody": "Script-Widget-Body ist kein gültiges JSON.",
+    "invalidContentWidgetBody": "Content-Widget-Body ist kein gültiges JSON.",
+    "missingBuiltInWidget": "Fehlendes integriertes Widget: {{sourceId}}",
+    "missingCustomWidget": "Fehlendes benutzerdefiniertes Widget: {{sourceId}}",
+    "untitledWidget": "Widget",
+    "customize": "Widget anpassen",
+    "cidrInput": "CIDR-Block",
+    "network": "Netzwerk",
+    "broadcast": "Broadcast",
+    "mask": "Subnetzmaske",
+    "usable": "Nutzbare Hosts",
+    "subnetInvalid": "Geben Sie einen gültigen CIDR-Block ein, z. B. 192.168.1.0/24.",
+    "reportStep1": "Aktuelles Backup-Alter bestätigen.",
+    "reportStep2": "Geänderte Verbindungen vor der Wartung überprüfen.",
+    "reportStep3": "Terminal-Nachweise nur bei explizitem Bedarf erfassen.",
+    "reportStep4": "Befehlsausführung genehmigungsbasiert halten.",
+    "tool": "Werkzeug",
+    "input": "Eingabe",
+    "output": "Ausgabe",
+    "assistantSummary": "Durchsuchen und verwalten Sie Dashboard-Widgets über den KI-Assistenten."
   },
   "appLauncher": {
     "title": "App-Starter",
@@ -451,6 +508,10 @@
       "shellCommand": {
         "label": "PowerShell / Batch-Befehle",
         "description": "Nicht-destruktive PowerShell- oder Batch-Befehle nur aus KKTerm-App-Daten ausführen."
+      },
+      "dashboard": {
+        "label": "Dashboard",
+        "description": "Dashboard-Ansichten, Widget-Instanzen und benutzerdefinierte Widgets lesen und ändern."
       }
     },
     "appSlogan": "Lokal-zentrierter Administrations-Arbeitsbereich.",
@@ -517,7 +578,20 @@
     "vncSharedSessionHint": "Einem anderen VNC-Viewer erlauben, verbunden zu bleiben, wenn KKTerm diese Sitzung öffnet.",
     "vncViewOnly": "Nur anzeigen",
     "vncViewOnlyHint": "Verbinden, ohne Zeiger- oder Tastatureingaben zu senden.",
-    "vncSettingsSaved": "VNC-Standards gespeichert."
+    "vncSettingsSaved": "VNC-Standards gespeichert.",
+    "sectionDashboard": "Dashboard",
+    "dashboardTitle": "Dashboard-Einstellungen",
+    "dashboardDescription": "Konfigurieren Sie Standardlayout, Widget-Verhalten und Ansichtsverwaltung für das Dashboard.",
+    "dashboardGeneral": "Allgemein",
+    "dashboardConfirmRemove": "Vor dem Entfernen eines Widgets bestätigen",
+    "dashboardDefaultLanding": "Standardansicht beim Öffnen",
+    "dashboardLandingLast": "Letzte aktive Ansicht",
+    "dashboardReset": "Dashboard zurücksetzen",
+    "dashboardResetTitle": "Dashboard zurücksetzen",
+    "dashboardResetBody": "Dadurch werden alle Dashboard-Ansichten, Widget-Instanzen und KI-erstellte benutzerdefinierte Widgets gelöscht. Die Standardansicht wird mit einem App-Starter-Widget wiederhergestellt. Dies kann nicht rückgängig gemacht werden.",
+    "dashboardResetConfirm": "Dashboard zurücksetzen",
+    "dashboardResetDone": "Dashboard auf Standardwerte zurückgesetzt.",
+    "generalDefaultsSaved": "Allgemeine Einstellungen gespeichert."
   },
   "connections": {
     "title": "Verbindungen",
