@@ -5281,6 +5281,7 @@ progress {
   min-width: 0;
   height: calc(100vh - 28px);
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: 22px 24px 28px;
   background: var(--app-bg);
 }
