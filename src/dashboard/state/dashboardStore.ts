@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import * as persistence from "./persistence";
+import { useWorkspaceStore } from "../../store";
 import type {
   DashboardCustomWidget, DashboardView, DashboardWidgetInstance,
   GridDensity, InstancePatch, LayoutEntry, WidgetCustomKind,
@@ -71,10 +72,17 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
     try {
       const state = await persistence.loadDashboardState();
       const currentActiveViewId = get().activeViewId;
+      const defaultLandingView =
+        useWorkspaceStore.getState().dashboardSettings.defaultLandingView;
+      const preferred =
+        defaultLandingView !== "lastActive"
+          ? state.views.find((view) => view.id === defaultLandingView)?.id
+          : undefined;
       const activeViewId =
-        currentActiveViewId && state.views.some((view) => view.id === currentActiveViewId)
+        preferred
+        ?? (currentActiveViewId && state.views.some((view) => view.id === currentActiveViewId)
           ? currentActiveViewId
-          : (state.views[0]?.id ?? null);
+          : (state.views[0]?.id ?? null));
       set({ ...state, activeViewId, ready: true, loading: false, lastError: null });
     } catch (e) {
       set({ lastError: String(e), loading: false });

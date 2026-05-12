@@ -588,7 +588,6 @@
     "dashboardTitle": "ダッシュボード設定",
     "dashboardDescription": "ダッシュボードのデフォルトレイアウト、ウィジェットの動作、ビュー管理を設定します。",
     "dashboardGeneral": "一般",
-    "dashboardConfirmRemove": "ウィジェットを削除する前に確認を求める",
     "dashboardDefaultLanding": "開いたときのデフォルトビュー",
     "dashboardLandingLast": "最後にアクティブだったビュー",
     "dashboardReset": "ダッシュボードをリセット",

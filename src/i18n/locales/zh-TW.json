@@ -588,7 +588,6 @@
     "dashboardTitle": "儀表板設定",
     "dashboardDescription": "設定儀表板的預設版面配置、小工具行為和檢視管理。",
     "dashboardGeneral": "一般",
-    "dashboardConfirmRemove": "移除小工具前要求確認",
     "dashboardDefaultLanding": "開啟時的預設檢視",
     "dashboardLandingLast": "上次使用的檢視",
     "dashboardReset": "重設儀表板",

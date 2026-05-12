@@ -352,7 +352,6 @@
     "dashboardTitle": "Cài đặt Bảng điều khiển",
     "dashboardDescription": "Cấu hình bố cục mặc định, hành vi tiện ích và quản lý góc nhìn cho Bảng điều khiển.",
     "dashboardGeneral": "Chung",
-    "dashboardConfirmRemove": "Yêu cầu xác nhận trước khi xóa tiện ích",
     "dashboardDefaultLanding": "Góc nhìn mặc định khi mở",
     "dashboardLandingLast": "Góc nhìn hoạt động cuối cùng",
     "dashboardReset": "Đặt lại Bảng điều khiển",

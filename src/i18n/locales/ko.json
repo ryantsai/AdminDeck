@@ -352,7 +352,6 @@
     "dashboardTitle": "대시보드 설정",
     "dashboardDescription": "대시보드의 기본 레이아웃, 위젯 동작 및 보기 관리를 구성합니다.",
     "dashboardGeneral": "일반",
-    "dashboardConfirmRemove": "위젯 제거 전 확인 요청",
     "dashboardDefaultLanding": "열 때 기본 보기",
     "dashboardLandingLast": "마지막 활성 보기",
     "dashboardReset": "대시보드 초기화",

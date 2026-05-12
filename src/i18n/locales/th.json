@@ -352,7 +352,6 @@
     "dashboardTitle": "การตั้งค่าแดชบอร์ด",
     "dashboardDescription": "กำหนดค่าเค้าโครงเริ่มต้น พฤติกรรมวิดเจ็ต และการจัดการมุมมองสำหรับแดชบอร์ด",
     "dashboardGeneral": "ทั่วไป",
-    "dashboardConfirmRemove": "ขอยืนยันก่อนลบวิดเจ็ต",
     "dashboardDefaultLanding": "มุมมองเริ่มต้นเมื่อเปิด",
     "dashboardLandingLast": "มุมมองที่ใช้งานล่าสุด",
     "dashboardReset": "รีเซ็ตแดชบอร์ด",

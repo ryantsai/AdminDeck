@@ -581,7 +581,6 @@
     "dashboardTitle": "Configurações do painel",
     "dashboardDescription": "Configure o layout padrão, o comportamento dos widgets e o gerenciamento de visões do painel.",
     "dashboardGeneral": "Geral",
-    "dashboardConfirmRemove": "Pedir confirmação antes de remover um widget",
     "dashboardDefaultLanding": "Visão padrão ao abrir",
     "dashboardLandingLast": "Última visão ativa",
     "dashboardReset": "Redefinir painel",

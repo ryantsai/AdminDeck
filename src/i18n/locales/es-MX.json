@@ -581,7 +581,6 @@
     "dashboardTitle": "Configuración del tablero",
     "dashboardDescription": "Configura el diseño predeterminado, el comportamiento de los widgets y la gestión de vistas del tablero.",
     "dashboardGeneral": "General",
-    "dashboardConfirmRemove": "Pedir confirmación antes de eliminar un widget",
     "dashboardDefaultLanding": "Vista predeterminada al abrir",
     "dashboardLandingLast": "Última vista activa",
     "dashboardReset": "Restablecer tablero",
