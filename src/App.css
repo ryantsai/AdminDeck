@@ -4124,12 +4124,11 @@ progress {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  margin-top: 6px;
-  padding: 7px 0 4px;
+  padding: 4px 0 7px;
   color: var(--text-muted);
   background: transparent;
   border: 0;
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   border-radius: 0;
   cursor: pointer;
   font-family: inherit;

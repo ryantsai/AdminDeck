@@ -514,6 +514,199 @@ struct ToolCallAccumulator {
     arguments: String,
 }
 
+#[derive(Default)]
+struct ResponsesStreamState {
+    content: Option<String>,
+    reasoning: String,
+    tool_call_items: HashMap<String, ResponsesStreamToolCall>,
+    tool_call_order: Vec<String>,
+}
+
+struct ResponsesStreamToolCall {
+    call_id: String,
+    name: String,
+    arguments: String,
+}
+
+#[derive(Default)]
+struct ResponsesStreamDeltas {
+    content_delta: Option<String>,
+    reasoning_delta: Option<String>,
+}
+
+impl ResponsesStreamState {
+    fn append_content(&mut self, delta: &str) {
+        if delta.is_empty() {
+            return;
+        }
+        self.content = Some(
+            self.content
+                .take()
+                .unwrap_or_default()
+                .chars()
+                .chain(delta.chars())
+                .collect(),
+        );
+    }
+
+    fn into_tool_calls(self) -> Vec<OpenAiToolCall> {
+        let mut items = self.tool_call_items;
+        let mut tool_calls = Vec::new();
+        for item_id in self.tool_call_order {
+            let Some(item) = items.remove(&item_id) else {
+                continue;
+            };
+            if !item.name.is_empty() && !item.call_id.is_empty() {
+                tool_calls.push(OpenAiToolCall {
+                    id: item.call_id,
+                    function: OpenAiToolCallFunction {
+                        name: item.name,
+                        arguments: item.arguments,
+                    },
+                });
+            }
+        }
+        tool_calls
+    }
+}
+
+fn append_completed_responses_message_text(
+    state: &mut ResponsesStreamState,
+    item: &Value,
+) -> Option<String> {
+    if item.get("type").and_then(Value::as_str) != Some("message") {
+        return None;
+    }
+    let text = item
+        .get("content")
+        .and_then(Value::as_array)
+        .map(|content| {
+            content
+                .iter()
+                .filter_map(|part| {
+                    (part.get("type").and_then(Value::as_str) == Some("output_text"))
+                        .then(|| part.get("text").and_then(Value::as_str))
+                        .flatten()
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })?
+        .trim()
+        .to_string();
+    if text.is_empty() {
+        return None;
+    }
+
+    match state.content.as_deref() {
+        Some(current) if current == text => None,
+        Some(current) if text.starts_with(current) => {
+            let delta = text[current.len()..].to_string();
+            state.append_content(&delta);
+            (!delta.is_empty()).then_some(delta)
+        }
+        Some(_) => None,
+        None => {
+            state.append_content(&text);
+            Some(text)
+        }
+    }
+}
+
+fn apply_responses_stream_event(
+    state: &mut ResponsesStreamState,
+    event: &Value,
+) -> ResponsesStreamDeltas {
+    let mut deltas = ResponsesStreamDeltas::default();
+    let event_type = event.get("type").and_then(Value::as_str).unwrap_or("");
+
+    match event_type {
+        "response.output_text.delta" => {
+            if let Some(delta) = event.get("delta").and_then(Value::as_str) {
+                if !delta.is_empty() {
+                    state.append_content(delta);
+                    deltas.content_delta = Some(delta.to_string());
+                }
+            }
+        }
+        "response.reasoning_text.delta" | "response.reasoning_summary_text.delta" => {
+            if let Some(delta) = event.get("delta").and_then(Value::as_str) {
+                if !delta.is_empty() {
+                    state.reasoning.push_str(delta);
+                    deltas.reasoning_delta = Some(delta.to_string());
+                }
+            }
+        }
+        "response.output_item.added" => {
+            if let Some(item) = event.get("item") {
+                if item.get("type").and_then(Value::as_str) == Some("function_call") {
+                    let item_id = item
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    if item_id.is_empty() {
+                        return deltas;
+                    }
+                    let call_id = item
+                        .get("call_id")
+                        .or_else(|| item.get("id"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    let name = item
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    if !state.tool_call_items.contains_key(&item_id) {
+                        state.tool_call_order.push(item_id.clone());
+                    }
+                    state.tool_call_items.insert(
+                        item_id,
+                        ResponsesStreamToolCall {
+                            call_id,
+                            name,
+                            arguments: String::new(),
+                        },
+                    );
+                }
+            }
+        }
+        "response.output_item.done" => {
+            if let Some(item) = event.get("item") {
+                deltas.content_delta = append_completed_responses_message_text(state, item);
+            }
+        }
+        "response.function_call_arguments.delta" => {
+            let item_id = event
+                .get("item_id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            if let Some(delta) = event.get("delta").and_then(Value::as_str) {
+                if let Some(entry) = state.tool_call_items.get_mut(&item_id) {
+                    entry.arguments.push_str(delta);
+                }
+            }
+        }
+        "response.function_call_arguments.done" => {
+            let item_id = event
+                .get("item_id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            if let Some(arguments) = event.get("arguments").and_then(Value::as_str) {
+                if let Some(entry) = state.tool_call_items.get_mut(&item_id) {
+                    entry.arguments = arguments.to_string();
+                }
+            }
+        }
+        _ => {}
+    }
+
+    deltas
+}
+
 fn emit_stream(channel: &Channel<Value>, event: &AiStreamEvent) -> Result<(), String> {
     channel
         .send(serde_json::to_value(event).map_err(|e| e.to_string())?)
@@ -621,9 +814,7 @@ async fn stream_responses_completions(
     response: reqwest::Response,
     channel: &Channel<Value>,
 ) -> Result<(Option<String>, Vec<OpenAiToolCall>, Option<String>), String> {
-    let mut content: Option<String> = None;
-    let mut reasoning = String::new();
-    let mut tool_call_items: HashMap<String, (String, String)> = HashMap::new();
+    let mut state = ResponsesStreamState::default();
     let mut current_event = String::new();
 
     let mut stream = response.bytes_stream();
@@ -653,120 +844,26 @@ async fn stream_responses_completions(
             let event: Value =
                 serde_json::from_str(data).map_err(|e| format!("SSE parse error: {e}"))?;
 
-            let event_type = event
-                .get("type")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-
-            match event_type {
-                "response.output_text.delta" => {
-                    if let Some(delta) = event.get("delta").and_then(Value::as_str) {
-                        if !delta.is_empty() {
-                            content = Some(
-                                content
-                                    .unwrap_or_default()
-                                    .chars()
-                                    .chain(delta.chars())
-                                    .collect(),
-                            );
-                            emit_stream(
-                                channel,
-                                &AiStreamEvent::ContentDelta {
-                                    delta: delta.to_string(),
-                                },
-                            )?;
-                        }
-                    }
-                }
-                "response.reasoning_text.delta" => {
-                    if let Some(delta) = event.get("delta").and_then(Value::as_str) {
-                        if !delta.is_empty() {
-                            reasoning.push_str(delta);
-                            emit_stream(
-                                channel,
-                                &AiStreamEvent::ReasoningDelta {
-                                    delta: delta.to_string(),
-                                },
-                            )?;
-                        }
-                    }
-                }
-                "response.reasoning_summary_text.delta" => {
-                    if let Some(delta) = event.get("delta").and_then(Value::as_str) {
-                        if !delta.is_empty() {
-                            reasoning.push_str(delta);
-                            emit_stream(
-                                channel,
-                                &AiStreamEvent::ReasoningDelta {
-                                    delta: delta.to_string(),
-                                },
-                            )?;
-                        }
-                    }
-                }
-                "response.output_item.added" => {
-                    if let Some(item) = event.get("item") {
-                        if item.get("type").and_then(Value::as_str) == Some("function_call") {
-                            let item_id = item
-                                .get("id")
-                                .and_then(Value::as_str)
-                                .unwrap_or("")
-                                .to_string();
-                            let name = item
-                                .get("name")
-                                .and_then(Value::as_str)
-                                .unwrap_or("")
-                                .to_string();
-                            tool_call_items.insert(item_id, (name, String::new()));
-                        }
-                    }
-                }
-                "response.function_call_arguments.delta" => {
-                    let item_id = event
-                        .get("item_id")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .to_string();
-                    if let Some(delta) = event.get("delta").and_then(Value::as_str) {
-                        if let Some(entry) = tool_call_items.get_mut(&item_id) {
-                            entry.1.push_str(delta);
-                        }
-                    }
-                }
-                "response.function_call_arguments.done" => {
-                    let item_id = event
-                        .get("item_id")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .to_string();
-                    if let Some(arguments) = event.get("arguments").and_then(Value::as_str) {
-                        if let Some(entry) = tool_call_items.get_mut(&item_id) {
-                            entry.1 = arguments.to_string();
-                        }
-                    }
-                }
-                _ => {}
+            let deltas = apply_responses_stream_event(&mut state, &event);
+            if let Some(delta) = deltas.content_delta {
+                emit_stream(channel, &AiStreamEvent::ContentDelta { delta })?;
+            }
+            if let Some(delta) = deltas.reasoning_delta {
+                emit_stream(channel, &AiStreamEvent::ReasoningDelta { delta })?;
             }
 
             current_event.clear();
         }
     }
 
-    let mut tool_calls: Vec<OpenAiToolCall> = Vec::new();
-    for (item_id, (name, arguments)) in tool_call_items.into_iter() {
-        if !name.is_empty() {
-            tool_calls.push(OpenAiToolCall {
-                id: item_id,
-                function: OpenAiToolCallFunction { name, arguments },
-            });
-        }
-    }
-
-    let reasoning_content = reasoning
+    let content = state.content.clone();
+    let reasoning_content = state
+        .reasoning
         .trim()
         .is_empty()
         .then(|| None)
-        .unwrap_or(Some(reasoning));
+        .unwrap_or(Some(state.reasoning.clone()));
+    let tool_calls = state.into_tool_calls();
 
     Ok((content, tool_calls, reasoning_content))
 }
@@ -1174,6 +1271,7 @@ impl OpenAiCompatibleProvider {
                 stream_chat_completions(response, &channel).await?;
 
             if tool_calls.is_empty() {
+                require_streamed_assistant_content(self, &content)?;
                 emit_stream(
                     &channel,
                     &AiStreamEvent::Done {
@@ -1262,7 +1360,9 @@ impl OpenAiCompatibleProvider {
                 ));
             }
 
-            stream_chat_completions(response, &channel).await?;
+            let (content, _tool_calls, _streamed_reasoning) =
+                stream_chat_completions(response, &channel).await?;
+            require_streamed_assistant_content(self, &content)?;
         }
 
         emit_stream(
@@ -1356,6 +1456,7 @@ impl OpenAiCompatibleProvider {
             }
 
             if tool_calls.is_empty() {
+                require_streamed_assistant_content(self, content.as_deref().unwrap_or(""))?;
                 emit_stream(
                     &channel,
                     &AiStreamEvent::Done {
@@ -1431,7 +1532,9 @@ impl OpenAiCompatibleProvider {
                 ));
             }
 
-            stream_responses_completions(response, &channel).await?;
+            let (content, _tool_calls, _streamed_reasoning) =
+                stream_responses_completions(response, &channel).await?;
+            require_streamed_assistant_content(self, content.as_deref().unwrap_or(""))?;
         }
 
         emit_stream(
@@ -1546,6 +1649,20 @@ fn finish_agent_response(
         content,
         reasoning_content: reasoning_content.filter(|r| !r.trim().is_empty()),
     })
+}
+
+fn require_streamed_assistant_content(
+    provider: &OpenAiCompatibleProvider,
+    content: &str,
+) -> Result<(), String> {
+    if content.trim().is_empty() {
+        Err(format!(
+            "{} response did not include assistant content",
+            provider.label
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 fn responses_tool_definitions(tools: &[OpenAiToolDefinition]) -> Vec<Value> {
@@ -3046,6 +3163,62 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, "call_123");
         assert_eq!(tool_calls[0].function.name, "current_time");
+    }
+
+    #[test]
+    fn responses_stream_parser_uses_done_text_and_function_call_id() {
+        let mut state = ResponsesStreamState::default();
+
+        apply_responses_stream_event(
+            &mut state,
+            &json!({
+                "type": "response.output_item.added",
+                "item": {
+                    "id": "fc_123",
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "current_time"
+                }
+            }),
+        );
+        apply_responses_stream_event(
+            &mut state,
+            &json!({
+                "type": "response.function_call_arguments.done",
+                "item_id": "fc_123",
+                "arguments": "{}"
+            }),
+        );
+        apply_responses_stream_event(
+            &mut state,
+            &json!({
+                "type": "response.output_item.done",
+                "item": {
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": "It is 11:34 PM."}]
+                }
+            }),
+        );
+
+        assert_eq!(state.content.as_deref(), Some("It is 11:34 PM."));
+        let tool_calls = state.into_tool_calls();
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].id, "call_123");
+        assert_eq!(tool_calls[0].function.name, "current_time");
+    }
+
+    #[test]
+    fn streamed_final_answer_requires_visible_content() {
+        let provider = provider_for("deepseek").expect("DeepSeek provider is wired");
+
+        let error = require_streamed_assistant_content(&provider, "   ")
+            .expect_err("empty streamed assistant turns are rejected");
+
+        assert_eq!(
+            error,
+            "DeepSeek response did not include assistant content"
+        );
+        assert!(require_streamed_assistant_content(&provider, "It is 11:34 PM.").is_ok());
     }
 
     #[test]

@@ -39,6 +39,10 @@ import {
   normalizeAiProviderDraft,
   validateAiProviderForChat,
 } from "./providers";
+import {
+  applyAssistantStreamEventToMessage,
+  type AssistantToolCallStatus,
+} from "./streamMessage";
 import { useWorkspaceStore } from "../store";
 import { useDashboardStore } from "../dashboard/state/dashboardStore";
 import { getPaneRenderer, sendTextToRdpPane, writeInputToPane } from "../workspace/paneRegistry";
@@ -70,14 +74,6 @@ type AssistantChatMessage = {
   workStartedAt?: string;
   workCompletedAt?: string;
   isStreaming?: boolean;
-};
-
-type AssistantToolCallStatus = {
-  toolId: string;
-  toolName: string;
-  status: "running" | "completed";
-  startedAt: string;
-  endedAt?: string;
 };
 
 type AssistantChatThread = {
@@ -1100,65 +1096,19 @@ export function AssistantPanel({
         if (event.type === "toolCallEnd" && isDashboardMutatingTool(event.toolName)) {
           void useDashboardStore.getState().load();
         }
-        setMessages((current) => {
-          const lastIndex = current.length - 1;
-          if (lastIndex < 0 || current[lastIndex].id !== streamingMessage.id) {
-            return current;
-          }
-          const updated = [...current];
-          const msg = { ...updated[lastIndex] };
-          switch (event.type) {
-            case "reasoningDelta":
-              msg.reasoningContent = (msg.reasoningContent ?? "") + event.delta;
-              break;
-            case "contentDelta":
-              msg.content += event.delta;
-              break;
-            case "toolCallStart":
-              msg.workStartedAt = msg.workStartedAt ?? workStartedAt;
-              msg.toolCalls = [
-                ...(msg.toolCalls ?? []).filter((tc) => tc.toolId !== event.toolId),
-                {
-                  toolId: event.toolId,
-                  toolName: event.toolName,
-                  status: "running",
-                  startedAt: new Date().toISOString(),
-                },
-              ];
-              break;
-            case "toolCallEnd":
-              msg.toolCalls = (msg.toolCalls ?? []).map((tc) =>
-                tc.toolId === event.toolId
-                  ? {
-                      ...tc,
-                      toolName: event.toolName,
-                      status: "completed",
-                      endedAt: new Date().toISOString(),
-                    }
-                  : tc,
-              );
-              break;
-            case "done":
-              msg.isStreaming = false;
-              msg.workCompletedAt = new Date().toISOString();
-              msg.toolCalls = (msg.toolCalls ?? []).map((tc) =>
-                tc.status === "running"
-                  ? { ...tc, status: "completed", endedAt: new Date().toISOString() }
-                  : tc,
-              );
-              break;
-            case "error":
-              msg.isStreaming = false;
-              msg.workCompletedAt = new Date().toISOString();
-              if (!msg.content) {
-                msg.content = `${t("ai.errorPrefix")}: ${event.message}`;
-              }
-              break;
-          }
-          updated[lastIndex] = msg;
-          streamingMessageSnapshot = msg;
-          return updated;
-        });
+        streamingMessageSnapshot = {
+          ...streamingMessageSnapshot,
+          ...applyAssistantStreamEventToMessage(streamingMessageSnapshot, event, {
+            errorPrefix: t("ai.errorPrefix"),
+            now: () => new Date().toISOString(),
+            workStartedAt,
+          }),
+        };
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === streamingMessage.id ? streamingMessageSnapshot : message,
+          ),
+        );
       };
 
       await invokeCommand("run_ai_agent_streaming", {
@@ -1938,6 +1888,7 @@ function AssistantMessageView({
               ))}
             </div>
           ) : null}
+          {message.role === "assistant" ? <AssistantWorkPanel message={message} /> : null}
           <MarkdownContent
             canSendCode={canSendCode}
             content={message.content}
@@ -1945,7 +1896,6 @@ function AssistantMessageView({
             onOpenLink={onOpenLink}
             onSendCode={onSendCode}
           />
-          {message.role === "assistant" ? <AssistantWorkPanel message={message} /> : null}
         </div>
         <div className="assistant-message-actions">
           <time dateTime={message.createdAt}>{formatAssistantMessageTime(message.createdAt)}</time>
