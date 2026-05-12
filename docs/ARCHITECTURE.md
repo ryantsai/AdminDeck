@@ -297,7 +297,10 @@ Workspace chrome layout is global state. Connection-specific live context may ch
 - `src/app/RailTooltip.tsx` — shared app-owned Activity Rail tooltip surface; use this instead of browser-native `title` tooltips for rail icon labels.
 - `src/app/workspaceChromeLayout.tsx` — global Workspace chrome panel widths/collapse state, panel resize handles, layout reset, and localStorage persistence for the Connection panel and AI Assistant Panel.
 - `src/app/appShellEffects.ts` — app-shell effects for frontend launch timing, host usage polling, global context-menu suppression, and app-shell CSS variables/color scheme.
-- `src/connections/ConnectionSidebar.tsx` — connection tree, search, drag/drop, CRUD, quick connect, connection dialog, connection glyphs, folder rows, tree context menu.
+- `src/connections/ConnectionSidebar.tsx` — connection tree orchestration: search, drag/drop, CRUD command handlers, folder rows, tree context menu, and modal/menu wiring.
+- `src/connections/ConnectionMenus.tsx` — Quick Connect and Add Connection menu surfaces.
+- `src/connections/ConnectionGlyph.tsx` — shared Connection glyph, type glyph, and Connection subtitle helpers used by rows, menus, and dialogs.
+- `src/connections/connectionSidebarState.ts` — sidebar-local persistence/event helpers for recent Connections, stored-secret masking, and connection-tree invalidation.
 - `src/connections/treeUtils.ts` — pure connection tree transforms, filtering, flattening, folder counts, and live status projection.
 - `src/connections/utils.tsx` — connection labels/icons, default ports, Quick Connect runtime ids, local shell options, and SSH host-key confirmation helpers shared by terminal/SFTP.
 - `src/workspace/WorkspaceCanvas.tsx` — `TabStrip` and `WorkspaceCanvas`, including active Tab dispatch to terminal, SFTP, URL, and remote desktop surfaces.
