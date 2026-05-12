@@ -11,9 +11,8 @@ export function RdpSettings() {
   const { t } = useTranslation();
   const rdpSettings = useWorkspaceStore((state) => state.rdpSettings);
   const setRdpSettings = useWorkspaceStore((state) => state.setRdpSettings);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [draft, setDraft] = useState(rdpSettings);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(rdpSettings);
 
   useEffect(() => {
@@ -21,17 +20,15 @@ export function RdpSettings() {
   }, [rdpSettings]);
 
   async function handleSave() {
-    setStatus("");
-    setError("");
     try {
       const saved = isTauriRuntime()
         ? await invokeCommand("update_rdp_settings", { request: draft })
         : draft;
       setRdpSettings(saved);
       setDraft(saved);
-      setStatus(t("settings.rdpSettingsSaved"));
+      showStatusBarNotice(t("settings.rdpSettingsSaved"), { tone: "success" });
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : String(saveError));
+      showStatusBarNotice(saveError instanceof Error ? saveError.message : String(saveError), { tone: "error" });
     }
   }
 
@@ -48,8 +45,6 @@ export function RdpSettings() {
         label={t("settings.sectionRdp")}
         title={t("settings.qualityDefaults")}
       />
-      {status ? <p className="settings-status success">{status}</p> : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
       <fieldset className="settings-subsection settings-fieldset">
         <legend>{t("settings.display")}</legend>
         <div className="form-grid two-columns">

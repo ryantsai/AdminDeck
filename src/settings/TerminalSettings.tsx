@@ -43,9 +43,8 @@ export function TerminalSettings() {
   const { t } = useTranslation();
   const terminalSettings = useWorkspaceStore((state) => state.terminalSettings);
   const setTerminalSettings = useWorkspaceStore((state) => state.setTerminalSettings);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [draft, setDraft] = useState(terminalSettings);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(terminalSettings);
 
   useEffect(() => {
@@ -54,17 +53,15 @@ export function TerminalSettings() {
 
   async function handleSave() {
     try {
-      setError("");
-      setStatus("");
       const nextSettings = normalizeTerminalSettingsDraft(draft, t);
       const saved = isTauriRuntime()
         ? await invokeCommand("update_terminal_settings", { request: nextSettings })
         : nextSettings;
       setTerminalSettings(saved);
       setDraft(saved);
-      setStatus(t("settings.terminalSaved"));
+      showStatusBarNotice(t("settings.terminalSaved"), { tone: "success" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      showStatusBarNotice(err instanceof Error ? err.message : String(err), { tone: "error" });
     }
   }
 
@@ -249,8 +246,6 @@ export function TerminalSettings() {
         </div>
       </fieldset>
 
-      {status ? <p className="settings-status success">{status}</p> : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
     </section>
   );
 }

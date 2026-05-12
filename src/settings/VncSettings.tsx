@@ -11,9 +11,8 @@ export function VncSettings() {
   const { t } = useTranslation();
   const vncSettings = useWorkspaceStore((state) => state.vncSettings);
   const setVncSettings = useWorkspaceStore((state) => state.setVncSettings);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [draft, setDraft] = useState(vncSettings);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(vncSettings);
 
   useEffect(() => {
@@ -21,17 +20,15 @@ export function VncSettings() {
   }, [vncSettings]);
 
   async function handleSave() {
-    setStatus("");
-    setError("");
     try {
       const saved = isTauriRuntime()
         ? await invokeCommand("update_vnc_settings", { request: draft })
         : draft;
       setVncSettings(saved);
       setDraft(saved);
-      setStatus(t("settings.vncSettingsSaved"));
+      showStatusBarNotice(t("settings.vncSettingsSaved"), { tone: "success" });
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : String(saveError));
+      showStatusBarNotice(saveError instanceof Error ? saveError.message : String(saveError), { tone: "error" });
     }
   }
 
@@ -48,8 +45,6 @@ export function VncSettings() {
         label={t("settings.sectionVnc")}
         title={t("settings.qualityDefaults")}
       />
-      {status ? <p className="settings-status success">{status}</p> : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
       <fieldset className="settings-subsection settings-fieldset">
         <legend>{t("settings.encoding")}</legend>
         <div className="form-grid two-columns">

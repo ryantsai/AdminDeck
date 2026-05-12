@@ -32,13 +32,12 @@ export function UrlSettings() {
   const { t } = useTranslation();
   const urlSettings = useWorkspaceStore((state) => state.urlSettings);
   const setUrlSettings = useWorkspaceStore((state) => state.setUrlSettings);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [draft, setDraft] = useState(urlSettings);
   const [credentials, setCredentials] = useState<UrlCredentialSummary[]>([]);
   const [partitions, setPartitions] = useState<UrlDataPartitionSummary[]>([]);
   const [editingCredentialId, setEditingCredentialId] = useState<string | null>(null);
   const [credentialDraft, setCredentialDraft] = useState<UrlCredentialEditDraft | null>(null);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(urlSettings);
 
   useEffect(() => {
@@ -49,7 +48,6 @@ export function UrlSettings() {
     if (!isTauriRuntime()) {
       return;
     }
-    setError("");
     try {
       const [credentialRows, partitionRows] = await Promise.all([
         invokeCommand("list_url_credentials", undefined),
@@ -62,7 +60,7 @@ export function UrlSettings() {
         setCredentialDraft(null);
       }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      showStatusBarNotice(loadError instanceof Error ? loadError.message : String(loadError), { tone: "error" });
     }
   }
 
@@ -71,24 +69,20 @@ export function UrlSettings() {
   }, []);
 
   async function handleSave() {
-    setStatus("");
-    setError("");
     try {
       const saved = isTauriRuntime() ? await invokeCommand("update_url_settings", { request: draft }) : draft;
       setUrlSettings(saved);
       setDraft(saved);
-      setStatus(t("settings.urlSettingsSaved"));
+      showStatusBarNotice(t("settings.urlSettingsSaved"), { tone: "success" });
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : String(saveError));
+      showStatusBarNotice(saveError instanceof Error ? saveError.message : String(saveError), { tone: "error" });
     }
   }
 
   async function deleteCredential(connectionId: string) {
-    setStatus("");
-    setError("");
     try {
       await invokeCommand("delete_url_credential", { connectionId });
-      setStatus(t("settings.urlPasswordDeleted"));
+      showStatusBarNotice(t("settings.urlPasswordDeleted"), { tone: "success" });
       if (editingCredentialId === connectionId) {
         setEditingCredentialId(null);
         setCredentialDraft(null);
@@ -96,13 +90,11 @@ export function UrlSettings() {
       window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
       await load();
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : String(deleteError));
+      showStatusBarNotice(deleteError instanceof Error ? deleteError.message : String(deleteError), { tone: "error" });
     }
   }
 
   function beginCredentialEdit(credential: UrlCredentialSummary) {
-    setStatus("");
-    setError("");
     setEditingCredentialId(credential.connectionId);
     setCredentialDraft(draftFromCredential(credential));
   }
@@ -120,8 +112,6 @@ export function UrlSettings() {
     if (!credentialDraft) {
       return;
     }
-    setStatus("");
-    setError("");
     try {
       if (credentialDraft.password) {
         await invokeCommand("store_secret", {
@@ -141,26 +131,24 @@ export function UrlSettings() {
           passwordSelector: credentialDraft.passwordSelector || undefined,
         },
       });
-      setStatus(t("settings.urlPasswordUpdated"));
+      showStatusBarNotice(t("settings.urlPasswordUpdated"), { tone: "success" });
       setEditingCredentialId(null);
       setCredentialDraft(null);
       window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
       await load();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : String(saveError));
+      showStatusBarNotice(saveError instanceof Error ? saveError.message : String(saveError), { tone: "error" });
     }
   }
 
   async function clearPartition(name: string) {
-    setStatus("");
-    setError("");
     try {
       await invokeCommand("clear_url_data_partition", { name });
-      setStatus(t("settings.urlDataShardCleared", { name }));
+      showStatusBarNotice(t("settings.urlDataShardCleared", { name }), { tone: "success" });
       window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
       await load();
     } catch (clearError) {
-      setError(clearError instanceof Error ? clearError.message : String(clearError));
+      showStatusBarNotice(clearError instanceof Error ? clearError.message : String(clearError), { tone: "error" });
     }
   }
 
@@ -177,9 +165,6 @@ export function UrlSettings() {
         label={t("settings.sectionUrl")}
         title={t("settings.urlDefaults")}
       />
-
-      {status ? <p className="settings-status success">{status}</p> : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
 
       <fieldset className="settings-subsection settings-fieldset">
         <legend>{t("settings.urlSecurity")}</legend>

@@ -40,11 +40,11 @@ export function SshSettings() {
   const { t } = useTranslation();
   const sshSettings = useWorkspaceStore((state) => state.sshSettings);
   const setSshSettings = useWorkspaceStore((state) => state.setSshSettings);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [sshDraft, setSshDraft] = useState(sshSettings);
   const [keyEmailDialogOpen, setKeyEmailDialogOpen] = useState(false);
   const [keyEmailDraft, setKeyEmailDraft] = useState("");
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
-  const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const hasChanges = JSON.stringify(sshDraft) !== JSON.stringify(sshSettings);
 
@@ -53,8 +53,6 @@ export function SshSettings() {
   }, [sshSettings]);
 
   async function handleBrowseKeyFile() {
-    setStatus("");
-    setError("");
     try {
       const selectedPath = await selectKeyFile(sshDraft.defaultKeyPath);
       if (!selectedPath) {
@@ -65,13 +63,12 @@ export function SshSettings() {
         defaultKeyPath: selectedPath,
       }));
     } catch (browseError) {
-      setError(browseError instanceof Error ? browseError.message : String(browseError));
+      showStatusBarNotice(browseError instanceof Error ? browseError.message : String(browseError), { tone: "error" });
     }
   }
 
   function handleOpenKeyEmailDialog() {
     setError("");
-    setStatus("");
     setKeyEmailDraft("");
     setKeyEmailDialogOpen(true);
   }
@@ -84,7 +81,6 @@ export function SshSettings() {
     try {
       setIsGeneratingKey(true);
       setError("");
-      setStatus("");
       const generated = await invokeCommand("generate_ssh_key_pair", {
         request: { email },
       });
@@ -98,11 +94,12 @@ export function SshSettings() {
         : normalized;
       setSshSettings(saved);
       setSshDraft(saved);
-      setStatus(
+      showStatusBarNotice(
         t("settings.sshKeyGenerated", {
           privateKeyPath: generated.privateKeyPath,
           publicKeyPath: generated.publicKeyPath,
         }),
+        { tone: "success" },
       );
       setKeyEmailDialogOpen(false);
       setKeyEmailDraft("");
@@ -115,17 +112,15 @@ export function SshSettings() {
 
   async function handleSave() {
     try {
-      setError("");
-      setStatus("");
       const nextSshSettings = normalizeSshSettingsDraft(sshDraft, t);
       const savedSshSettings = isTauriRuntime()
         ? await invokeCommand("update_ssh_settings", { request: nextSshSettings })
         : nextSshSettings;
       setSshSettings(savedSshSettings);
       setSshDraft(savedSshSettings);
-      setStatus(t("settings.sshDefaultsSaved"));
+      showStatusBarNotice(t("settings.sshDefaultsSaved"), { tone: "success" });
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : String(saveError));
+      showStatusBarNotice(saveError instanceof Error ? saveError.message : String(saveError), { tone: "error" });
     }
   }
 
@@ -310,8 +305,6 @@ export function SshSettings() {
         </div>
       </fieldset>
 
-      {status ? <p className="settings-status success">{status}</p> : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
       {keyEmailDialogOpen ? (
         <SshKeyEmailDialog
           email={keyEmailDraft}

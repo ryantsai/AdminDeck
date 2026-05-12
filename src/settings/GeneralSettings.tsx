@@ -82,9 +82,8 @@ export function GeneralSettings() {
   const setAiProviderHasApiKey = useWorkspaceStore(
     (state) => state.setAiProviderHasApiKey,
   );
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [draft, setDraft] = useState(generalSettings);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [dashboardResetDialogOpen, setDashboardResetDialogOpen] = useState(false);
@@ -96,56 +95,40 @@ export function GeneralSettings() {
 
   async function handleSave() {
     try {
-      setError("");
-      setStatus("");
       const saved = isTauriRuntime()
         ? await invokeCommand("update_general_settings", { request: draft })
         : draft;
       setGeneralSettings(saved);
       setDraft(saved);
-      setStatus(t("settings.generalDefaultsSaved"));
+      showStatusBarNotice(t("settings.generalDefaultsSaved"), { tone: "success" });
     } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : String(saveError),
-      );
+      showStatusBarNotice(saveError instanceof Error ? saveError.message : String(saveError), { tone: "error" });
     }
   }
 
   async function handleBackupSettings() {
-    setStatus("");
-    setError("");
     try {
       const backup = await invokeCommand("backup_settings_database");
       setGeneralSettings({
         ...generalSettings,
         lastBackupAt: backup.createdAt,
       });
-      setStatus(
-        t("settings.backupSettingsComplete", { filename: backup.filename }),
-      );
+      showStatusBarNotice(t("settings.backupSettingsComplete", { filename: backup.filename }), { tone: "success" });
     } catch (backupError) {
-      setError(
-        backupError instanceof Error
-          ? backupError.message
-          : String(backupError),
-      );
+      showStatusBarNotice(backupError instanceof Error ? backupError.message : String(backupError), { tone: "error" });
     }
   }
 
   async function handleOpenDatabaseFolder() {
-    setStatus("");
-    setError("");
     try {
       const path = await invokeCommand("get_database_folder");
       await openFilesystemPath(path);
     } catch (openError) {
-      setError(openError instanceof Error ? openError.message : String(openError));
+      showStatusBarNotice(openError instanceof Error ? openError.message : String(openError), { tone: "error" });
     }
   }
 
   async function handleImportSettings() {
-    setStatus("");
-    setError("");
     try {
       const path = await selectSettingsImportFile({
         title: t("settings.importSettings"),
@@ -172,24 +155,14 @@ export function GeneralSettings() {
       window.dispatchEvent(
         new CustomEvent("kkterm:connection-tree-invalidated"),
       );
-      setStatus(
-        t("settings.importSettingsComplete", {
-          filename: snapshot.backup.filename,
-        }),
-      );
+      showStatusBarNotice(t("settings.importSettingsComplete", { filename: snapshot.backup.filename }), { tone: "success" });
       setImportDialogOpen(false);
     } catch (importError) {
-      setError(
-        importError instanceof Error
-          ? importError.message
-          : String(importError),
-      );
+      showStatusBarNotice(importError instanceof Error ? importError.message : String(importError), { tone: "error" });
     }
   }
 
   async function handleResetAllSettings() {
-    setStatus("");
-    setError("");
     try {
       closeAllTabs();
       resetAllLayouts();
@@ -262,22 +235,20 @@ export function GeneralSettings() {
       window.dispatchEvent(
 new CustomEvent("kkterm:connection-tree-invalidated"),
       );
-      setStatus(t("settings.resetAllSettingsComplete"));
+      showStatusBarNotice(t("settings.resetAllSettingsComplete"), { tone: "success" });
       setResetDialogOpen(false);
     } catch (resetError) {
-      setError(resetError instanceof Error ? resetError.message : String(resetError));
+      showStatusBarNotice(resetError instanceof Error ? resetError.message : String(resetError), { tone: "error" });
     }
   }
 
   async function handleResetDashboard() {
-    setStatus("");
-    setError("");
     try {
       await useDashboardStore.getState().resetDashboard();
-      setStatus(t("settings.dashboardResetDone"));
+      showStatusBarNotice(t("settings.dashboardResetDone"), { tone: "success" });
       setDashboardResetDialogOpen(false);
     } catch (resetError) {
-      setError(resetError instanceof Error ? resetError.message : String(resetError));
+      showStatusBarNotice(resetError instanceof Error ? resetError.message : String(resetError), { tone: "error" });
     }
   }
 
@@ -439,8 +410,6 @@ new CustomEvent("kkterm:connection-tree-invalidated"),
         </div>
       </fieldset>
 
-      {status ? <p className="settings-status success">{status}</p> : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
       {importDialogOpen ? (
         <div className="dialog-backdrop connection-dialog-backdrop" role="presentation">
           <div

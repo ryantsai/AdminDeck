@@ -260,11 +260,10 @@ export function AiSettings() {
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
+  const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [draft, setDraft] = useState(aiProviderSettings);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyStoredMask, setApiKeyStoredMask] = useState(createStoredApiKeyMask);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
   const hasChanges =
     JSON.stringify(draft) !== JSON.stringify(aiProviderSettings) || apiKeyDraft.trim().length > 0;
   const aiProviderDefinition = getAiProviderDefinition(draft.providerKind);
@@ -275,8 +274,6 @@ export function AiSettings() {
 
   async function handleSave() {
     try {
-      setError("");
-      setStatus("");
       const nextSettings = normalizeAiProviderDraft(draft);
 
       if (apiKeyDraft.trim()) {
@@ -299,9 +296,9 @@ export function AiSettings() {
         : nextSettings;
       setAiProviderSettings(saved);
       setDraft(saved);
-      setStatus(t("settings.aiProviderSaved"));
+      showStatusBarNotice(t("settings.aiProviderSaved"), { tone: "success" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      showStatusBarNotice(err instanceof Error ? err.message : String(err), { tone: "error" });
     }
   }
 
@@ -315,8 +312,6 @@ export function AiSettings() {
       reasoningEffort: defaults.reasoningEffort,
     }));
     setApiKeyDraft("");
-    setStatus("");
-    setError("");
   }
 
   return (
@@ -424,8 +419,6 @@ export function AiSettings() {
           value={formatReasoningEffort(draft.reasoningEffort)}
         />
       </div>
-      {status ? <p className="settings-status success">{status}</p> : null}
-      {error ? <p className="settings-status error">{error}</p> : null}
     </section>
   );
 }
