@@ -83,7 +83,7 @@ export function SettingsPage({
         </div>
         <button className="toolbar-button" type="button" onClick={onBack}>
           <ArrowLeft size={15} />
-          {t("settings.workspace")}
+          {t("common.back")}
         </button>
       </header>
 

@@ -28,6 +28,15 @@ import "./App.css";
 function App() {
   const { t } = useTranslation();
   const [activePage, setActivePage] = useState<ActivePage>("workspace");
+  const previousNonSettingsPageRef = useRef<Exclude<ActivePage, "settings">>("workspace");
+
+  function navigateToPage(page: ActivePage) {
+    if (page === "settings" && activePage !== "settings") {
+      previousNonSettingsPageRef.current = activePage as Exclude<ActivePage, "settings">;
+    }
+    setActivePage(page);
+  }
+
   const [dashboardAssistantContext, setDashboardAssistantContext] =
     useState<AssistantPageContext>();
   const appearanceSettings = useWorkspaceStore((state) => state.appearanceSettings);
@@ -69,7 +78,7 @@ function App() {
         activePage={activePage}
         connectionsCollapsed={connectionPanelLayout.collapsed}
         onConnectionsToggle={toggleConnectionPanel}
-        onNavigate={setActivePage}
+        onNavigate={navigateToPage}
       />
       <div className="workspace-page" aria-hidden={activePage !== "workspace"}>
         <ConnectionSidebar
@@ -103,14 +112,14 @@ function App() {
       {activePage !== "settings" ? (
         <AssistantPanel
           collapsed={aiPanelLayout.collapsed}
-          onOpenSettings={() => setActivePage("settings")}
+          onOpenSettings={() => navigateToPage("settings")}
           onToggleCollapsed={toggleAiPanel}
           pageContext={activePage === "dashboard" ? dashboardAssistantContext : undefined}
         />
       ) : null}
       {activePage === "settings" ? (
         <SettingsPage
-          onBack={() => setActivePage("workspace")}
+          onBack={() => setActivePage(previousNonSettingsPageRef.current)}
           onResetLayout={resetWorkspaceChromeLayout}
         />
       ) : null}
