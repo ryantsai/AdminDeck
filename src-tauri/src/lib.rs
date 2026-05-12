@@ -1552,6 +1552,8 @@ pub fn run() {
                 .map_err(setup_error)?;
             }
             if let Some(main_window) = app.get_window(window_state::MAIN_WINDOW_LABEL) {
+                let title = format!("KKTerm v{}", env!("CARGO_PKG_VERSION"));
+                main_window.set_title(&title).map_err(|e| setup_error(e.to_string()))?;
                 let initial_window_settings =
                     window_state::restore_main_window(&main_window, main_window_settings);
                 app.manage(window_state::MainWindowState::new(initial_window_settings));

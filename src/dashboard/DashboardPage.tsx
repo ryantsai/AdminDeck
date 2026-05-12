@@ -1,5 +1,5 @@
 import { Edit3, Plus } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssistantPageContext } from "../ai/AssistantPanel";
 import { useWorkspaceStore } from "../store";
@@ -8,7 +8,7 @@ import { CustomizePopover } from "./edit/CustomizePopover";
 import "./dashboard.css";
 import { useDashboardStore } from "./state/dashboardStore";
 import type { DashboardWidgetInstance, GridDensity } from "./types";
-import { DashboardCanvas } from "./view/DashboardCanvas";
+import { DashboardCanvas, DENSITY_SETTINGS } from "./view/DashboardCanvas";
 
 export function DashboardPage({
   onAssistantContextChange,
@@ -60,10 +60,18 @@ export function DashboardPage({
   }, [editMode, toggleEditMode]);
 
   const activeView = views.find((v) => v.id === activeViewId) ?? views[0];
+  const customizeInstance =
+    customize ? instances.find((instance) => instance.id === customize.instance.id) : null;
   const viewInstances = useMemo(
     () => (activeView ? instances.filter((i) => i.viewId === activeView.id) : []),
     [activeView, instances],
   );
+  const densitySettings = DENSITY_SETTINGS[activeView?.gridDensity ?? "default"];
+  const canvasGridStyle = {
+    "--dw-row-height": `${densitySettings.rowHeight}px`,
+    "--dw-grid-gap-x": `${densitySettings.margin[0]}px`,
+    "--dw-grid-gap-y": `${densitySettings.margin[1]}px`,
+  } as CSSProperties;
 
   useEffect(() => {
     if (!activeView) return;
@@ -116,7 +124,6 @@ export function DashboardPage({
       <header className="dashboard-topbar">
         <div className="dashboard-brand">
           <span className="crumb">{t("dashboard.title")}</span>
-          <h1>{activeView.title}</h1>
         </div>
         <div className="dashboard-view-pills">
           {views.map((v) => (
@@ -189,18 +196,20 @@ export function DashboardPage({
         </div>
       </header>
 
-      <DashboardCanvas
-        view={activeView}
-        instances={viewInstances}
-        onCustomize={(instance, anchor) => setCustomize({ instance, rect: anchor.getBoundingClientRect() })}
-      />
+      <div className={`dw-canvas-scroll${editMode ? " is-editing" : ""}`} style={canvasGridStyle}>
+        <DashboardCanvas
+          view={activeView}
+          instances={viewInstances}
+          onCustomize={(instance, anchor) => setCustomize({ instance, rect: anchor.getBoundingClientRect() })}
+        />
+      </div>
 
       {catalogOpen && (
         <CatalogOverlay viewId={activeView.id} onClose={() => setCatalogOpen(false)} />
       )}
-      {customize && (
+      {customize && customizeInstance && (
         <CustomizePopover
-          instance={customize.instance}
+          instance={customizeInstance}
           anchorRect={customize.rect}
           onClose={() => setCustomize(null)}
         />

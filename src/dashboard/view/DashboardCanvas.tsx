@@ -8,10 +8,10 @@ import { WidgetFrame } from "./WidgetFrame";
 
 const ResponsiveGrid = WidthProvider(GridLayout);
 
-const DENSITY_SETTINGS: Record<GridDensity, { rowHeight: number; margin: [number, number] }> = {
-  compact:  { rowHeight: 56, margin: [8, 8]   },
-  default:  { rowHeight: 64, margin: [12, 12] },
-  roomy:    { rowHeight: 80, margin: [16, 16] },
+export const DENSITY_SETTINGS: Record<GridDensity, { rowHeight: number; margin: [number, number] }> = {
+  compact:  { rowHeight: 52, margin: [6, 6]   },
+  default:  { rowHeight: 68, margin: [16, 16] },
+  roomy:    { rowHeight: 92, margin: [30, 30] },
 };
 
 export interface DashboardCanvasProps {
@@ -49,6 +49,8 @@ export function DashboardCanvas({ view, instances, onCustomize }: DashboardCanva
       compactType="vertical"
       preventCollision={false}
       draggableHandle=".drag-handle"
+      draggableCancel=".dw-controls, .dw-ctrl, button, input, textarea, select, a, [role='button']"
+      resizeHandles={editMode ? ["n", "e", "s", "w"] : []}
       onLayoutChange={onLayoutChange}
     >
       {instances.map((i) => (

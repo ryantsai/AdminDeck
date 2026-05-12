@@ -142,7 +142,7 @@ function renderModuleStatus(activePage: ActivePage, t: (key: string) => string) 
     case "workspace":
       return <WorkspaceHostMetrics t={t} />;
     case "dashboard":
-      return <span className="status-bar-module-text">{t("dashboard.statusReady")}</span>;
+      return null;
     case "settings":
       return null;
   }

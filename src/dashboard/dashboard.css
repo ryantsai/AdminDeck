@@ -1,4 +1,4 @@
-.dashboard-page {
+main.dashboard-page {
   --dashboard-shadow-card:
     0 1px 0 rgb(20 30 60 / 4%),
     0 4px 14px -8px rgb(20 30 60 / 18%);
@@ -11,6 +11,7 @@
   z-index: 75;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
   min-width: 0;
   height: 100%;
   min-height: 0;
@@ -46,33 +47,18 @@
   display: flex;
   flex: 0 0 auto;
   align-items: baseline;
-  gap: 10px;
   min-width: 0;
 }
 
 .dashboard-brand .crumb {
-  color: var(--text-faint);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: 0;
 }
 
 .dashboard-brand .crumb::after {
-  content: " / ";
-  opacity: 0.5;
-}
-
-.dashboard-brand h1 {
-  max-width: 220px;
-  margin: 0;
-  overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: 0;
+  content: none;
 }
 
 .dashboard-view-pills {
@@ -254,13 +240,64 @@
   filter: brightness(1.05);
 }
 
+.dw-canvas-scroll {
+  box-sizing: border-box;
+  --dw-grid-line: rgb(23 32 43 / 11%);
+  --dw-grid-column-width: calc((100% - (var(--dw-grid-gap-x, 16px) * 13)) / 12);
+  --dw-grid-step-x: calc(var(--dw-grid-column-width) + var(--dw-grid-gap-x, 16px));
+  --dw-grid-step-y: calc(var(--dw-row-height, 68px) + var(--dw-grid-gap-y, 16px));
+  min-height: 0;
+  padding: 18px 20px 60px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.dw-canvas-scroll.is-editing {
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent var(--dw-grid-gap-x, 16px),
+      var(--dw-grid-line) var(--dw-grid-gap-x, 16px),
+      var(--dw-grid-line) calc(var(--dw-grid-gap-x, 16px) + 1px),
+      transparent calc(var(--dw-grid-gap-x, 16px) + 1px),
+      transparent calc(var(--dw-grid-gap-x, 16px) + var(--dw-grid-column-width)),
+      var(--dw-grid-line) calc(var(--dw-grid-gap-x, 16px) + var(--dw-grid-column-width)),
+      var(--dw-grid-line) calc(var(--dw-grid-gap-x, 16px) + var(--dw-grid-column-width) + 1px),
+      transparent calc(var(--dw-grid-gap-x, 16px) + var(--dw-grid-column-width) + 1px),
+      transparent var(--dw-grid-step-x)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent var(--dw-grid-gap-y, 16px),
+      var(--dw-grid-line) var(--dw-grid-gap-y, 16px),
+      var(--dw-grid-line) calc(var(--dw-grid-gap-y, 16px) + 1px),
+      transparent calc(var(--dw-grid-gap-y, 16px) + 1px),
+      transparent calc(var(--dw-grid-gap-y, 16px) + var(--dw-row-height, 68px)),
+      var(--dw-grid-line) calc(var(--dw-grid-gap-y, 16px) + var(--dw-row-height, 68px)),
+      var(--dw-grid-line) calc(var(--dw-grid-gap-y, 16px) + var(--dw-row-height, 68px) + 1px),
+      transparent calc(var(--dw-grid-gap-y, 16px) + var(--dw-row-height, 68px) + 1px),
+      transparent var(--dw-grid-step-y)
+    );
+  background-origin: content-box;
+  background-position: 0 0;
+}
+
 .dw-canvas {
   min-height: 100%;
-  padding: 18px 20px 60px;
 }
 
 .react-grid-layout.dw-canvas {
-  overflow: auto;
+  overflow: visible;
+}
+
+.dw-canvas .react-grid-item.react-grid-placeholder {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--dashboard-radius-lg);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 45%);
+  opacity: 0.14;
 }
 
 .dw-instance {
@@ -276,6 +313,59 @@
   outline: 1px dashed var(--border-strong);
   outline-offset: 2px;
   border-radius: var(--dashboard-radius-lg);
+}
+
+.dw-instance.dw-edit .drag-handle {
+  cursor: grab;
+}
+
+.react-grid-item.react-draggable-dragging .dw-instance.dw-edit .drag-handle {
+  cursor: grabbing;
+}
+
+.react-grid-item > .react-resizable-handle {
+  z-index: 3;
+  background-image: none !important;
+  opacity: 1;
+  padding: 0 !important;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  display: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-e,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-w {
+  top: 0 !important;
+  width: 10px !important;
+  height: 100% !important;
+  margin-top: 0 !important;
+  transform: none !important;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-e {
+  right: -5px !important;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-w {
+  left: -5px !important;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-n,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-s {
+  left: 0 !important;
+  width: 100% !important;
+  height: 10px !important;
+  margin-left: 0 !important;
+  transform: none !important;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-n {
+  top: -5px !important;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-s {
+  bottom: -5px !important;
 }
 
 .dw-preset {
