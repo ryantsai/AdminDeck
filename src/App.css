@@ -243,6 +243,7 @@
   --text-faint: #6f86aa;
   --border: #8bcf4c;
   --border-strong: #5ea72c;
+  --toggle-off-bg: #9eaab7;
   --accent: #082d68;
   --accent-soft: #dde8fa;
   --green-soft: #edfbdc;
@@ -5759,6 +5760,18 @@ progress {
   padding: 0 16px;
 }
 
+fieldset.connection-session-fields {
+  padding-top: 10px;
+}
+
+fieldset.connection-session-fields > legend {
+  padding: 0 2px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
 .connection-session-toggle {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -5781,7 +5794,7 @@ progress {
   height: 28px;
   padding: 0;
   appearance: none;
-  background: var(--border-strong);
+  background: var(--toggle-off-bg, var(--border-strong));
   border: 0;
   border-radius: 999px;
   cursor: pointer;
@@ -7934,7 +7947,7 @@ progress {
   width: 36px;
   height: 20px;
   border-radius: 20px;
-  background: var(--border);
+  background: var(--toggle-off-bg, var(--border));
   transition: background 0.2s ease;
 }
 
@@ -8372,7 +8385,7 @@ progress {
   width: 48px;
   height: 28px;
   border-radius: 999px;
-  background: #c7c8cc;
+  background: var(--toggle-off-bg, #c7c8cc);
 }
 
 .toggle-switch-on .toggle-switch-track {

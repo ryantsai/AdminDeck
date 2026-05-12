@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FolderOpen, Palette, RotateCcw, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -177,18 +177,17 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
   const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [customFonts, setCustomFonts] = useState<CustomFontOption[]>([]);
   const [draft, setDraft] = useState<AppearanceSettingsType>(appearanceSettings);
-  const hasChanges = JSON.stringify(draft) !== JSON.stringify(appearanceSettings);
+  // Tracks the last persisted settings so we can revert live preview on navigate-away
+  const savedRef = useRef<AppearanceSettingsType>(appearanceSettings);
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(savedRef.current);
 
+  // Revert live preview when navigating away without saving
   useEffect(() => {
-    setDraft(appearanceSettings);
-  }, [appearanceSettings]);
-
-  async function applyAppearance(settings: AppearanceSettingsType) {
-    setAppearanceSettings(settings);
-    if (isTauriRuntime()) {
-      invokeCommand("update_appearance_settings", { request: settings }).catch(() => undefined);
-    }
-  }
+    return () => {
+      setAppearanceSettings(savedRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSave() {
     try {
@@ -205,6 +204,7 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
         : next;
       setAppearanceSettings(saved);
       setDraft(saved);
+      savedRef.current = saved;
       showStatusBarNotice(t("settings.appearanceSaved"), { tone: "success" });
     } catch (saveError) {
       showStatusBarNotice(
@@ -226,9 +226,13 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
       .then((fonts) => {
         if (disposed) return;
         setCustomFonts(fonts);
-        const normalized = normalizeAvailableAppearance(appearanceSettings, fonts);
-        if (JSON.stringify(normalized) !== JSON.stringify(appearanceSettings)) {
-          void applyAppearance(normalized);
+        const base = savedRef.current;
+        const normalized = normalizeAvailableAppearance(base, fonts);
+        if (JSON.stringify(normalized) !== JSON.stringify(base)) {
+          savedRef.current = normalized;
+          setDraft(normalized);
+          setAppearanceSettings(normalized);
+          invokeCommand("update_appearance_settings", { request: normalized }).catch(() => undefined);
         }
       })
       .catch(() => undefined);
@@ -236,7 +240,7 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
     return () => {
       disposed = true;
     };
-  }, [appearanceSettings]);
+  }, []);
 
   async function handleOpenCustomFontsFolder() {
     if (!isTauriRuntime()) {
@@ -279,7 +283,11 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
               <select
                 onChange={(event) => {
                   const selectedValue = event.currentTarget.value;
-                  setDraft((s) => ({ ...s, appFontFamily: selectedValue }));
+                  setDraft((s) => {
+                    const next = { ...s, appFontFamily: selectedValue };
+                    setAppearanceSettings(next);
+                    return next;
+                  });
                 }}
                 value={draft.appFontFamily}
               >
@@ -325,7 +333,11 @@ export function AppearanceSettings({ onResetLayout }: { onResetLayout: () => voi
             <select
               onChange={(event) => {
                 const colorScheme = event.currentTarget.value as ColorScheme;
-                setDraft((s) => ({ ...s, colorScheme }));
+                setDraft((s) => {
+                  const next = { ...s, colorScheme };
+                  setAppearanceSettings(next);
+                  return next;
+                });
               }}
               value={draft.colorScheme}
             >
