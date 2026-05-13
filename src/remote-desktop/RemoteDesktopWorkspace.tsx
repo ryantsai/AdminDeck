@@ -1,5 +1,5 @@
 import { connectionIconForType, connectionSubtitle, connectionToolbarTitle, connectionTypeLabel } from "../connections/utils";
-import { ScreenshotToolbarButtons } from "../workspace/ScreenshotMenu";
+import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
 
 import { documentHasRdpBlockingOverlay } from "../workspace/nativeOverlay";
 import { Bot, Keyboard, Monitor, RotateCcw } from "lucide-react";
@@ -1133,7 +1133,7 @@ export function RemoteDesktopWorkspace({
               <RotateCcw size={13} />
             </button>
           ) : null}
-          <ScreenshotToolbarButtons
+          <ScreenshotMenu
             buttonClassName="terminal-pane-action"
             targetRef={connection?.type === "rdp" || connection?.type === "vnc" ? hostRef : workspaceRef}
           />

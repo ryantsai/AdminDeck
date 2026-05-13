@@ -10,6 +10,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { flattenConnections } from "../connections/treeUtils";
+import { showNativeContextMenu, type NativeContextMenuItem } from "../lib/nativeContextMenu";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import type { Connection } from "../types";
@@ -401,6 +402,32 @@ export function ActivityRail({
     );
   }
 
+  function buildRailConnectionMenuItems(
+    menu: RailConnectionMenuState,
+  ): NativeContextMenuItem[] {
+    return [
+      {
+        kind: "item",
+        label: t(menu.pinned ? "connections.unpinFromRail" : "connections.pinToRail"),
+        action: () => {
+          void (menu.pinned
+            ? unpinRailConnection(menu.connection)
+            : pinRailConnection(menu.connection));
+        },
+      },
+    ];
+  }
+
+  async function openRailConnectionMenu(menu: RailConnectionMenuState) {
+    const opened = await showNativeContextMenu(buildRailConnectionMenuItems(menu), {
+      x: menu.x,
+      y: menu.y,
+    });
+    if (!opened) {
+      setRailConnectionMenu(menu);
+    }
+  }
+
   useEffect(() => {
     if (!railConnectionMenu) {
       return;
@@ -502,7 +529,7 @@ export function ActivityRail({
               }}
               onContextMenu={(event) => {
                 event.preventDefault();
-                setRailConnectionMenu({
+                void openRailConnectionMenu({
                   connection: item.connection,
                   pinned: item.pinned,
                   x: event.clientX,

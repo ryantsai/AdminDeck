@@ -151,6 +151,10 @@ Run these checks after generating substantial output in at least two Panes.
 | Search after command output | Run another command after closing search, then search for new output. | New output is searchable and old decorations do not reappear. | |
 | Pane isolation | Search in one Pane, then focus another Pane and search for different text. | Search state and highlights do not bleed across Panes. | |
 
+## Native Menu Regression Check
+
+Simple Workspace command menus must be native Tauri context menus in the desktop runtime, not DOM flyouts that force WebView2 or terminal visibility changes. Check Quick Connect, Add Connection, right-click on empty Connection Tree space, right-click on a Connection, right-click on a pinned/connected Activity Rail Connection, right-click on a workspace Tab, and the screenshot toolbar menu on URL/RDP/VNC workspaces. Opening these menus should not blank, hide, resize, or park WebView2, terminal, SFTP, or VNC surfaces. RDP ActiveX parking is reserved for registered DOM overlays such as Region selection or dialogs that actually intersect the RDP host.
+
 ## Notes for Failures
 
 For each failure, record:

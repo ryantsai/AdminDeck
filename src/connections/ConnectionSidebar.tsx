@@ -15,6 +15,7 @@ import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPoi
 import { useTranslation } from "react-i18next";
 import i18next from "../i18n/config";
 import { ariaExpanded, dialogButtonAria } from "../lib/aria";
+import { showNativeContextMenu, type NativeContextMenuItem } from "../lib/nativeContextMenu";
 import { invokeCommand, isTauriRuntime, selectKeyFile } from "../lib/tauri";
 import { connectionTree } from "../app-defaults";
 import { useWorkspaceStore } from "../store";
@@ -162,7 +163,7 @@ export function ConnectionSidebar({
       if (!detail?.connection) {
         return;
       }
-      setTreeContextMenu({
+      void openTreeContextMenu({
         kind: "connection",
         connection: detail.connection,
         x: detail.x,
@@ -174,7 +175,7 @@ export function ConnectionSidebar({
     return () => {
       window.removeEventListener(CONNECTION_TAB_CONTEXT_MENU_EVENT, handleConnectionTabContextMenu);
     };
-  }, []);
+  });
 
   useEffect(() => {
     saveCollapsedFolderIds(collapsedFolderIds);
@@ -262,6 +263,21 @@ export function ConnectionSidebar({
     setFormError("");
     setNewConnectionType(connectionType);
     setFormMode("save");
+  }
+
+  function handleQuickSshRequested() {
+    setAddConnectionMenuOpen(false);
+    setQuickConnectMenuOpen(false);
+    setFormError("");
+    setNewConnectionType("ssh");
+    setFormMode("quick");
+  }
+
+  function handleImportRequested() {
+    setAddConnectionMenuOpen(false);
+    setFormError("");
+    setNewConnectionType(null);
+    setImportDialogOpen(true);
   }
 
   function rememberConnection(connection: Connection) {
@@ -733,6 +749,118 @@ export function ConnectionSidebar({
   }, [recentConnectionIds, treeWithLiveStatuses]);
   const isTreeFiltered = query.trim().length > 0;
 
+  function menuPositionFromElement(element: HTMLElement) {
+    const bounds = element.getBoundingClientRect();
+    return {
+      x: bounds.left,
+      y: bounds.bottom,
+    };
+  }
+
+  function buildAddConnectionMenuItems(): NativeContextMenuItem[] {
+    const connectionTypes: ConnectionType[] = [
+      "local",
+      "ssh",
+      "telnet",
+      "serial",
+      "url",
+      "rdp",
+      "vnc",
+      "ftp",
+    ];
+    return [
+      ...connectionTypes.map((connectionType) => ({
+        kind: "item" as const,
+        label: connectionType === "ssh" ? t("connections.ssh") : connectionTypeLabel(connectionType),
+        action: () => handleNewConnectionTypeSelected(connectionType),
+      })),
+      { kind: "separator" as const },
+      {
+        kind: "item" as const,
+        label: t("connections.import.tileTitle"),
+        action: handleImportRequested,
+      },
+    ];
+  }
+
+  function buildQuickConnectMenuItems(): NativeContextMenuItem[] {
+    return [
+      {
+        kind: "item",
+        label: t("connections.ssh"),
+        action: handleQuickSshRequested,
+      },
+      ...quickConnectShellOptions.map((option) =>
+        option.canElevate
+          ? {
+              kind: "submenu" as const,
+              label: option.label,
+              items: [
+                {
+                  kind: "item" as const,
+                  label: t("connections.normal"),
+                  action: () => handleQuickLocalShell(option),
+                },
+                {
+                  kind: "item" as const,
+                  label: t("connections.admin"),
+                  action: () => void handleQuickAdminShell(option),
+                },
+              ],
+            }
+          : {
+              kind: "item" as const,
+              label: option.label,
+              action: () => handleQuickLocalShell(option),
+            },
+      ),
+      { kind: "separator" as const },
+      ...(recentConnections.length > 0
+        ? recentConnections.map((connection) => ({
+            kind: "item" as const,
+            label: `${connection.name} - ${connectionSubtitle(connection)}`,
+            action: () => {
+              setQuickConnectMenuOpen(false);
+              handleOpenConnection(connection);
+            },
+          }))
+        : [
+            {
+              kind: "item" as const,
+              label: t("connections.noRecent"),
+              disabled: true,
+              action: () => undefined,
+            },
+          ]),
+    ];
+  }
+
+  async function handleAddConnectionButtonClick(event: ReactMouseEvent<HTMLButtonElement>) {
+    setQuickConnectMenuOpen(false);
+    const opened = await showNativeContextMenu(
+      buildAddConnectionMenuItems(),
+      menuPositionFromElement(event.currentTarget),
+    );
+    if (opened) {
+      setAddConnectionMenuOpen(false);
+      return;
+    }
+    setAddConnectionMenuOpen((isOpen) => !isOpen);
+  }
+
+  async function handleQuickConnectButtonClick(event: ReactMouseEvent<HTMLButtonElement>) {
+    setAddConnectionMenuOpen(false);
+    const opened = await showNativeContextMenu(
+      buildQuickConnectMenuItems(),
+      menuPositionFromElement(event.currentTarget),
+    );
+    if (opened) {
+      setQuickConnectMenuOpen(false);
+      return;
+    }
+    setQuickConnectMenuOpen((isOpen) => !isOpen);
+  }
+
   function handleDragEnd() {
     draggedItemRef.current = null;
     pointerDragTargetRef.current = null;
@@ -754,7 +882,7 @@ export function ConnectionSidebar({
   function handleTreeContextMenu(event: ReactMouseEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
-    setTreeContextMenu({
+    void openTreeContextMenu({
       kind: "tree",
       x: event.clientX,
       y: event.clientY,
@@ -768,7 +896,7 @@ export function ConnectionSidebar({
   ) {
     event.preventDefault();
     event.stopPropagation();
-    setTreeContextMenu({
+    void openTreeContextMenu({
       kind: "connection",
       connection,
       folderId,
@@ -780,12 +908,206 @@ export function ConnectionSidebar({
   function handleFolderContextMenu(folder: ConnectionFolder, event: ReactMouseEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
-    setTreeContextMenu({
+    void openTreeContextMenu({
       kind: "folder",
       folder,
       x: event.clientX,
       y: event.clientY,
     });
+  }
+
+  async function openTreeContextMenu(menu: TreeContextMenuState) {
+    const opened = await showNativeContextMenu(buildTreeContextMenuItems(menu), {
+      x: menu.x,
+      y: menu.y,
+    });
+    if (!opened) {
+      setTreeContextMenu(menu);
+    }
+  }
+
+  function buildTreeContextMenuItems(menu: TreeContextMenuState): NativeContextMenuItem[] {
+    if (menu.kind === "tree") {
+      return [
+        {
+          kind: "item",
+          label: t("connections.newConnection"),
+          action: handleTreeMenuCreateConnection,
+        },
+        {
+          kind: "item",
+          label: t("connections.newFolder"),
+          action: handleTreeMenuCreateFolder,
+        },
+      ];
+    }
+
+    const items: NativeContextMenuItem[] = [
+      {
+        kind: "item",
+        label: t("connections.rename"),
+        action: () => void handleTreeMenuRename(menu),
+      },
+      {
+        kind: "item",
+        label: t("connections.delete"),
+        action: () => handleTreeMenuDelete(menu),
+      },
+    ];
+
+    if (menu.kind !== "connection") {
+      return items;
+    }
+
+    const isPinned = generalSettings.pinnedConnectionIds.includes(menu.connection.id);
+    const canAddToPane = Boolean(tabs.find((tab) => tab.id === activeTabId && tab.kind === "terminal"));
+    items.push(
+      { kind: "separator" },
+      {
+        kind: "item",
+        label: t(isPinned ? "connections.unpinFromRail" : "connections.pinToRail"),
+        action: () => void handleTreeMenuToggleRailPin(menu),
+      },
+    );
+
+    if (canAddToPane) {
+      items.push({
+        kind: "submenu",
+        label: t("connections.addTo"),
+        items: [
+          {
+            kind: "item",
+            label: t("connections.left"),
+            action: () => handleTreeMenuAddToPane(menu, "left"),
+          },
+          {
+            kind: "item",
+            label: t("connections.right"),
+            action: () => handleTreeMenuAddToPane(menu, "right"),
+          },
+          {
+            kind: "item",
+            label: t("connections.lower"),
+            action: () => handleTreeMenuAddToPane(menu, "down"),
+          },
+          {
+            kind: "item",
+            label: t("connections.upper"),
+            action: () => handleTreeMenuAddToPane(menu, "up"),
+          },
+        ],
+      });
+    }
+
+    if (isTerminalConnectionType(menu.connection.type)) {
+      items.push({
+        kind: "submenu",
+        label: t("connections.layout"),
+        items: [
+          {
+            kind: "item",
+            label: t("common.save"),
+            action: () => handleTreeMenuSaveLayout(menu),
+          },
+          {
+            kind: "item",
+            label: t("common.reset"),
+            action: () => handleTreeMenuResetLayout(menu),
+          },
+        ],
+      });
+    }
+
+    if (menu.connection.type === "ssh") {
+      items.push({
+        kind: "item",
+        label: t("connections.transferSshPublicKey"),
+        action: () => handleTreeMenuTransferSshPublicKey(menu),
+      });
+    }
+
+    items.push({
+      kind: "item",
+      label: t("connections.properties"),
+      action: () => handleTreeMenuProperties(menu),
+    });
+    return items;
+  }
+
+  function handleTreeMenuCreateConnection() {
+    setTreeContextMenu(null);
+    handleNewConnectionTypeSelected("local");
+  }
+
+  function handleTreeMenuCreateFolder() {
+    setTreeContextMenu(null);
+    handleCreateFolder();
+  }
+
+  function handleTreeMenuDelete(menu: TreeContextMenuState) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection") {
+      setConfirmDeleteTarget({ kind: "connection", connection: menu.connection });
+    } else if (menu.kind === "folder") {
+      setConfirmDeleteTarget({ kind: "folder", folder: menu.folder });
+    }
+  }
+
+  function handleTreeMenuProperties(menu: TreeContextMenuState) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection") {
+      setFormError("");
+      setEditConnection({ connection: menu.connection, folderId: menu.folderId });
+    }
+  }
+
+  async function handleTreeMenuRename(menu: TreeContextMenuState) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection") {
+      await handleRenameConnection(menu.connection);
+    } else if (menu.kind === "folder") {
+      await handleRenameFolder(menu.folder);
+    }
+  }
+
+  function handleTreeMenuAddToPane(menu: TreeContextMenuState, direction: SplitDirection) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection") {
+      handleAddConnectionToFocusedPane(menu.connection, direction);
+    }
+  }
+
+  function handleTreeMenuSaveLayout(menu: TreeContextMenuState) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection") {
+      saveConnectionLayout(menu.connection.id);
+    }
+  }
+
+  function handleTreeMenuResetLayout(menu: TreeContextMenuState) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection") {
+      resetConnectionLayout(menu.connection.id);
+    }
+  }
+
+  async function handleTreeMenuToggleRailPin(menu: TreeContextMenuState) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection") {
+      await handleToggleRailPin(menu.connection);
+    }
+  }
+
+  function handleTreeMenuTransferSshPublicKey(menu: TreeContextMenuState) {
+    setTreeContextMenu(null);
+    if (menu.kind === "connection" && menu.connection.type === "ssh") {
+      setTreeError("");
+      setTransferSshPublicKeyDialog({
+        connection: menu.connection,
+        keyPath: menu.connection.keyPath ?? sshSettings.defaultKeyPath,
+      });
+      setTransferSshPublicKeyError("");
+    }
   }
 
   function handleToggleFolder(folderId: string) {
@@ -1023,22 +1345,14 @@ export function ConnectionSidebar({
               className="icon-button"
               aria-label={t("connections.addConnection")}
               title={t("connections.addConnection")}
-              onClick={() => {
-                setQuickConnectMenuOpen(false);
-                setAddConnectionMenuOpen((isOpen) => !isOpen);
-              }}
+              onClick={(event) => void handleAddConnectionButtonClick(event)}
               type="button"
             >
               <Plus size={16} />
             </button>
             {addConnectionMenuOpen ? (
               <AddConnectionMenu
-                onImportRequested={() => {
-                  setAddConnectionMenuOpen(false);
-                  setFormError("");
-                  setNewConnectionType(null);
-                  setImportDialogOpen(true);
-                }}
+                onImportRequested={handleImportRequested}
                 onSelectType={handleNewConnectionTypeSelected}
               />
             ) : null}
@@ -1068,7 +1382,7 @@ export function ConnectionSidebar({
         <button
           {...dialogButtonAria(quickConnectMenuOpen)}
           className="quick-connect"
-          onClick={() => setQuickConnectMenuOpen((isOpen) => !isOpen)}
+          onClick={(event) => void handleQuickConnectButtonClick(event)}
         >
           <Play size={15} />
           {t("connections.quickConnect")}
@@ -1192,80 +1506,16 @@ export function ConnectionSidebar({
             generalSettings.pinnedConnectionIds.includes(treeContextMenu.connection.id)
           }
           onClose={() => setTreeContextMenu(null)}
-          onCreateConnection={() => {
-            setTreeContextMenu(null);
-            handleNewConnectionTypeSelected("local");
-          }}
-          onCreateFolder={() => {
-            setTreeContextMenu(null);
-            handleCreateFolder();
-          }}
-          onDelete={() => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection") {
-              setConfirmDeleteTarget({ kind: "connection", connection: menu.connection });
-            } else if (menu.kind === "folder") {
-              setConfirmDeleteTarget({ kind: "folder", folder: menu.folder });
-            }
-          }}
-          onProperties={() => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection") {
-              setFormError("");
-              setEditConnection({ connection: menu.connection, folderId: menu.folderId });
-            }
-          }}
-          onRename={() => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection") {
-              void handleRenameConnection(menu.connection);
-            } else if (menu.kind === "folder") {
-              void handleRenameFolder(menu.folder);
-            }
-          }}
-          onAddToPane={(direction) => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection") {
-              handleAddConnectionToFocusedPane(menu.connection, direction);
-            }
-          }}
-          onSaveLayout={() => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection") {
-              saveConnectionLayout(menu.connection.id);
-            }
-          }}
-          onResetLayout={() => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection") {
-              resetConnectionLayout(menu.connection.id);
-            }
-          }}
-          onToggleRailPin={() => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection") {
-              void handleToggleRailPin(menu.connection);
-            }
-          }}
-          onTransferSshPublicKey={() => {
-            const menu = treeContextMenu;
-            setTreeContextMenu(null);
-            if (menu.kind === "connection" && menu.connection.type === "ssh") {
-              setTreeError("");
-              setTransferSshPublicKeyDialog({
-                connection: menu.connection,
-                keyPath: menu.connection.keyPath ?? sshSettings.defaultKeyPath,
-              });
-              setTransferSshPublicKeyError("");
-            }
-          }}
+          onCreateConnection={handleTreeMenuCreateConnection}
+          onCreateFolder={handleTreeMenuCreateFolder}
+          onDelete={() => handleTreeMenuDelete(treeContextMenu)}
+          onProperties={() => handleTreeMenuProperties(treeContextMenu)}
+          onRename={() => void handleTreeMenuRename(treeContextMenu)}
+          onAddToPane={(direction) => handleTreeMenuAddToPane(treeContextMenu, direction)}
+          onSaveLayout={() => handleTreeMenuSaveLayout(treeContextMenu)}
+          onResetLayout={() => handleTreeMenuResetLayout(treeContextMenu)}
+          onToggleRailPin={() => void handleTreeMenuToggleRailPin(treeContextMenu)}
+          onTransferSshPublicKey={() => handleTreeMenuTransferSshPublicKey(treeContextMenu)}
         />
       ) : null}
 

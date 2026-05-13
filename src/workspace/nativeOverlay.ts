@@ -1,12 +1,6 @@
 const NATIVE_BLOCKING_OVERLAY_SELECTOR = [
-  ".quick-connect-menu",
-  ".tree-context-menu",
-  ".tree-context-submenu-menu",
-  ".add-connection-menu",
-  ".rail-context-menu",
   ".sftp-context-menu",
   ".sftp-properties-popover",
-  ".screenshot-menu",
   ".screenshot-region-overlay",
   ".transfer-conflict-backdrop",
   ".connection-dialog-backdrop",
