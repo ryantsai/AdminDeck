@@ -12,7 +12,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 use suppaftp::{
-    list::{File as FtpListFile, PosixPexQuery},
+    list::{File as FtpListFile, ListParser, PosixPexQuery},
     tokio::{AsyncFtpStream, AsyncNativeTlsConnector, AsyncNativeTlsFtpStream},
     types::{FileType, FormatControl, Mode as FtpConnMode},
 };
@@ -105,18 +105,21 @@ impl Default for FtpOptions {
 }
 
 impl FtpOptions {
+    /// Returns the canonical effective TLS mode for FTPS connections.
+    /// Defaults to Explicit when protocol is FTPS but tls_mode is absent.
+    pub fn effective_tls_mode(&self) -> FtpTlsMode {
+        self.tls_mode.unwrap_or(FtpTlsMode::Explicit)
+    }
+}
+
+#[cfg(test)]
+impl FtpOptions {
     pub fn from_json(value: &str) -> Result<Self, String> {
         serde_json::from_str(value).map_err(|e| format!("invalid ftp options: {e}"))
     }
 
     pub fn to_json(&self) -> Result<String, String> {
         serde_json::to_string(self).map_err(|e| format!("failed to serialize ftp options: {e}"))
-    }
-
-    /// Returns the canonical effective TLS mode for FTPS connections.
-    /// Defaults to Explicit when protocol is FTPS but tls_mode is absent.
-    pub fn effective_tls_mode(&self) -> FtpTlsMode {
-        self.tls_mode.unwrap_or(FtpTlsMode::Explicit)
     }
 }
 
@@ -768,7 +771,7 @@ async fn read_directory(
 
     let mut entries: Vec<FtpDirectoryEntry> = Vec::with_capacity(raw_lines.len());
     for line in raw_lines {
-        match FtpListFile::from_posix_line(&line) {
+        match ListParser::parse_posix(&line) {
             Ok(file) => {
                 let name = file.name().to_string();
                 if name == "." || name == ".." {
@@ -1510,10 +1513,6 @@ fn emit_progress(app: &AppHandle, transfer_id: &str, transferred: u64, total: u6
         },
     );
     let _ = Duration::from_secs(0);
-}
-
-pub fn is_transfer_canceled(message: &str) -> bool {
-    message == TRANSFER_CANCELED
 }
 
 // --------------------------------- tests ------------------------------------

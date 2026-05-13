@@ -5302,20 +5302,25 @@ progress {
 }
 
 .connection-dialog {
-  gap: 14px;
-  width: min(620px, calc(100vw - 40px));
-  padding: 18px;
+  gap: 10px;
+  width: min(560px, calc(100vw - 40px));
+  padding: 14px;
   overflow: hidden;
   background: var(--chrome);
   border-color: var(--border-strong);
   box-shadow: var(--shadow);
+  font-size: 13px;
 }
 
 .connection-dialog-backdrop .connection-dialog {
-  width: min(620px, calc(100vw - 40px));
+  width: min(560px, calc(100vw - 40px));
   min-width: 0;
-  padding: 18px;
+  padding: 14px;
   box-shadow: var(--shadow);
+}
+
+.connection-dialog-backdrop .connection-dialog-wide {
+  width: min(900px, calc(100vw - 40px));
 }
 
 .settings-dialog {
@@ -5696,14 +5701,14 @@ progress {
 }
 
 .connection-dialog-header {
-  padding-bottom: 14px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
 
 .connection-dialog-header .panel-label {
   margin-bottom: 0;
   color: var(--text);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1.25;
   text-transform: none;
@@ -5715,11 +5720,11 @@ progress {
 
 .connection-type-summary {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
   min-width: 0;
-  padding: 10px;
+  padding: 8px;
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -5751,10 +5756,25 @@ progress {
 
 .connection-dialog-fields {
   display: grid;
-  gap: 11px;
+  gap: 8px;
   min-width: 0;
   padding-top: 2px;
   animation: fields-in 170ms ease-out;
+}
+
+.connection-dialog-fields-two-column {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+  column-gap: 10px;
+  align-items: start;
+}
+
+.connection-dialog-fields-two-column > :not(.connection-specific-options) {
+  grid-column: 1;
+}
+
+.connection-dialog-fields-two-column > .connection-specific-options {
+  grid-column: 2;
+  grid-row: 1 / span 20;
 }
 
 .connection-endpoint-fields,
@@ -5763,14 +5783,14 @@ progress {
 .connection-option-fields {
   display: grid;
   min-width: 0;
-  padding: 16px;
+  padding: 10px;
   background: var(--surface-muted);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .connection-endpoint-fields {
   grid-template-columns: minmax(0, 1fr) 104px;
-  column-gap: 14px;
+  column-gap: 9px;
   row-gap: 0;
 }
 
@@ -5791,24 +5811,24 @@ progress {
 }
 
 .connection-endpoint-fields:has(.proxy-jump-input) .endpoint-host-input {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
 .connection-endpoint-fields:has(.proxy-jump-input) .endpoint-port-input {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
 .connection-endpoint-fields .proxy-jump-input {
   grid-column: 1;
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
 .connection-auth-fields .auth-mode-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 224px);
-  column-gap: 14px;
+  column-gap: 9px;
   row-gap: 4px;
   align-items: center;
 }
@@ -5819,7 +5839,7 @@ progress {
 
 .connection-auth-fields > label,
 .connection-option-fields > label {
-  padding: 12px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -5841,7 +5861,7 @@ progress {
 .connection-option-fields .option-mode-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 224px);
-  column-gap: 14px;
+  column-gap: 9px;
   row-gap: 4px;
   align-items: center;
 }
@@ -5851,11 +5871,11 @@ progress {
 }
 
 .connection-session-fields {
-  padding: 0 16px;
+  padding: 0 10px;
 }
 
 fieldset.connection-session-fields {
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 fieldset.connection-session-fields > legend {
@@ -5871,21 +5891,21 @@ fieldset.connection-session-fields > legend {
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 14px;
   align-items: center;
-  min-height: 54px;
+  min-height: 42px;
   padding: 0;
 }
 
 .connection-session-toggle span {
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .connection-dialog .connection-session-toggle input[type="checkbox"] {
   position: relative;
-  width: 46px;
-  min-width: 46px;
-  height: 28px;
+  width: 38px;
+  min-width: 38px;
+  height: 22px;
   padding: 0;
   appearance: none;
   background: var(--toggle-off-bg, var(--border-strong));
@@ -5897,10 +5917,10 @@ fieldset.connection-session-fields > legend {
 
 .connection-dialog .connection-session-toggle input[type="checkbox"]::after {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
   content: "";
   background: #ffffff;
   border-radius: 999px;
@@ -5913,7 +5933,7 @@ fieldset.connection-session-fields > legend {
 }
 
 .connection-dialog .connection-session-toggle input[type="checkbox"]:checked::after {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 @keyframes fields-in {
@@ -5937,14 +5957,14 @@ fieldset.connection-session-fields > legend {
 .connection-dialog label,
 .settings-section label {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
 .connection-dialog label span,
 .settings-section label span {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -5962,13 +5982,30 @@ fieldset.connection-session-fields > legend {
 .settings-section select {
   width: 100%;
   min-width: 0;
-  height: 34px;
-  padding: 0 9px;
+  height: 30px;
+  padding: 0 8px;
   color: var(--text);
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: 6px;
   outline: 0;
+  font-size: 13px;
+}
+
+.settings-section label {
+  gap: 5px;
+}
+
+.settings-section label span {
+  font-size: 13px;
+}
+
+.settings-dialog input,
+.settings-dialog select,
+.settings-section input,
+.settings-section select {
+  height: 34px;
+  padding: 0 9px;
   font-size: 14px;
 }
 
@@ -6016,9 +6053,14 @@ fieldset.connection-session-fields > legend {
 }
 
 .input-with-button .toolbar-button {
+  height: 30px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.settings-section .input-with-button .toolbar-button {
   height: 34px;
   padding: 0 12px;
-  white-space: nowrap;
 }
 
 .connection-dialog .dialog-actions {

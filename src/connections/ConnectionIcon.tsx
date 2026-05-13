@@ -1,4 +1,5 @@
 import type { ConnectionType } from "../types";
+import ftpIcon from "../assets/connection-icons/ftp.png";
 import rdpIcon from "../assets/connection-icons/rdp.png";
 import serialIcon from "../assets/connection-icons/serial.png";
 import sshIcon from "../assets/connection-icons/ssh.png";
@@ -16,9 +17,7 @@ const CONNECTION_ICON_SRC: Record<ConnectionType, string> = {
   url: urlIcon,
   rdp: rdpIcon,
   vnc: vncIcon,
-  // Placeholder reusing the SSH icon for FTP/SFTP/FTPS file-transfer
-  // Connections; swap in a dedicated FTP asset when available.
-  ftp: sshIcon,
+  ftp: ftpIcon,
 };
 
 export function connectionIconSrcForConnection({

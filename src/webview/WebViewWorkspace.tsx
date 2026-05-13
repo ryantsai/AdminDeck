@@ -1,4 +1,5 @@
 import { ScreenshotMenu } from "../workspace/ScreenshotMenu";
+import { documentHasWebviewBlockingOverlay } from "../workspace/nativeOverlay";
 
 import { ArrowLeft, ArrowRight, Globe2, KeyRound, RefreshCw, Save } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
@@ -141,7 +142,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
   const sessionIdRef = useRef<string>(`webview-${tab.id}`);
   const lastBoundsRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   const rafRef = useRef<number | null>(null);
-  const visibilityRef = useRef({ isActive });
+  const visibilityRef = useRef({ isActive, suppressed: false });
   const pendingCaptureNonceRef = useRef<string | null>(null);
   const faviconUpdatedRef = useRef(false);
   const credentialRef = useRef({ canFillCredential: false });
@@ -183,7 +184,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
     if (!bounds) {
       return;
     }
-    const visible = visibilityRef.current.isActive;
+    const visible = visibilityRef.current.isActive && !visibilityRef.current.suppressed;
     void invokeCommand("set_webview_visibility", {
       request: { sessionId: sessionIdRef.current, visible, ...bounds },
     }).catch((error) => {
@@ -207,7 +208,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
       if (!bounds) {
         return;
       }
-      if (!visibilityRef.current.isActive) {
+      if (!visibilityRef.current.isActive || visibilityRef.current.suppressed) {
         void invokeCommand("set_webview_visibility", {
           request: { sessionId: sessionIdRef.current, visible: false, ...bounds },
         }).catch((error) => {
@@ -317,7 +318,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
   }, [autoRefreshSeconds, webviewReady]);
 
   useEffect(() => {
-    visibilityRef.current = { isActive };
+    visibilityRef.current = { ...visibilityRef.current, isActive };
   }, [isActive]);
 
   useEffect(() => {
@@ -347,6 +348,35 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
     pushWebviewVisibility();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    const updateSuppression = () => {
+      const suppressed = documentHasWebviewBlockingOverlay(placeholderRef.current);
+      if (visibilityRef.current.suppressed === suppressed) {
+        return;
+      }
+      visibilityRef.current = { ...visibilityRef.current, suppressed };
+      pushWebviewVisibility();
+    };
+    updateSuppression();
+    const observer = new MutationObserver(updateSuppression);
+    observer.observe(document.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+    window.addEventListener("resize", updateSuppression);
+    window.addEventListener("scroll", updateSuppression, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateSuppression);
+      window.removeEventListener("scroll", updateSuppression, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isTauriRuntime()) {

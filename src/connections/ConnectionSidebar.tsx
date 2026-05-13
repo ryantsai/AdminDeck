@@ -6,7 +6,7 @@ import {
   CONNECTION_TAB_CONTEXT_MENU_EVENT,
   type ConnectionTabContextMenuDetail,
 } from "./connectionTabContextMenu";
-import { confirmTrustedSshHostKey, defaultPortForConnectionType, connectionTypeLabel, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
+import { confirmTrustedSshHostKey, defaultPortForConnectionType, connectionTypeLabel, ftpPortForProtocolSelection, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
 import { RECENT_CONNECTION_LIMIT, createStoredSecretMask, loadCollapsedFolderIds, loadRecentConnectionIds, notifyConnectionTreeInvalidated, saveCollapsedFolderIds, saveRecentConnectionIds } from "./connectionSidebarState";
 import { collectConnectionFolderIds, countConnections, countFolders, filterConnectionTree, flattenConnections, flattenFolders, upsertRootConnection, withLiveConnectionStatuses } from "./treeUtils";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, KeyRound, LayoutDashboard, PanelRight, Pin, PinOff, Play, Plus, RotateCcw, Save, Search, X } from "lucide-react";
@@ -2156,6 +2156,9 @@ function ConnectionDialog({
   const [hasStoredUrlPassword, setHasStoredUrlPassword] = useState(
     Boolean(initialConnection?.hasUrlCredential),
   );
+  const [portDraft, setPortDraft] = useState(
+    String(initialConnection?.port ?? (connectionType ? defaultPortForConnectionType(connectionType, sshSettings) : "")),
+  );
   const usesSshDefaults = connectionType === "ssh";
   const isTelnetConnection = connectionType === "telnet";
   const isSerialConnection = connectionType === "serial";
@@ -2167,6 +2170,7 @@ function ConnectionDialog({
   const localShellOptions = useMemo(() => localShellOptionsForPlatform(), [i18n.language]);
   const isEditMode = mode === "edit";
   const isUrlConnection = connectionType === "url";
+  const usesTwoColumnOptions = connectionType === "rdp" || connectionType === "vnc" || connectionType === "ftp";
 
   useEffect(() => {
     if (!isEditMode || !initialConnection || !isTauriRuntime()) {
@@ -2235,12 +2239,8 @@ function ConnectionDialog({
     const ftpTlsModeSelection = String(form.get("ftpTlsMode") ?? "explicit");
     const rawPortValue = String(form.get("port") ?? "").trim();
     const portValue =
-      connectionType === "ftp" && (!rawPortValue || rawPortValue === "21")
-        ? ftpProtocolSelection === "sftp"
-          ? "22"
-          : ftpProtocolSelection === "ftps" && ftpTlsModeSelection === "implicit"
-            ? "990"
-            : rawPortValue
+      connectionType === "ftp"
+        ? String(ftpPortForProtocolSelection(ftpProtocolSelection, rawPortValue, ftpTlsModeSelection))
         : rawPortValue;
     const password = String(form.get("password") ?? "");
     const keyPath = String(form.get("keyPath") ?? "").trim();
@@ -2355,6 +2355,12 @@ function ConnectionDialog({
     setKeyEmailDialogOpen(true);
   }
 
+  function handleFtpProtocolChange(event: FormEvent<HTMLSelectElement>) {
+    if (event.currentTarget.value === "sftp") {
+      setPortDraft("22");
+    }
+  }
+
   async function handleGenerateKeyPair(emailInput: string) {
     const email = emailInput.trim();
     if (!email) {
@@ -2379,7 +2385,10 @@ function ConnectionDialog({
 
   return (
     <div className="dialog-backdrop connection-dialog-backdrop" role="presentation">
-      <form className="connection-dialog" onSubmit={handleSubmit}>
+      <form
+        className={usesTwoColumnOptions ? "connection-dialog connection-dialog-wide" : "connection-dialog"}
+        onSubmit={handleSubmit}
+      >
         <header
           className={mode === "quick" ? "connection-dialog-header" : "connection-dialog-header compact"}
         >
@@ -2420,7 +2429,13 @@ function ConnectionDialog({
         ) : null}
 
         {connectionType ? (
-          <div className="connection-dialog-fields">
+          <div
+            className={
+              usesTwoColumnOptions
+                ? "connection-dialog-fields connection-dialog-fields-two-column"
+                : "connection-dialog-fields"
+            }
+          >
             {mode === "save" || mode === "edit" ? (
               <label>
                 <span>{t("connections.folder")}</span>
@@ -2549,9 +2564,8 @@ function ConnectionDialog({
                     <input
                       key={`port-${connectionType}`}
                       name="port"
-                      defaultValue={
-                        initialConnection?.port ?? defaultPortForConnectionType(connectionType, sshSettings)
-                      }
+                      onChange={(event) => setPortDraft(event.currentTarget.value)}
+                      value={portDraft}
                       inputMode="numeric"
                       min="1"
                       max="65535"
@@ -2698,7 +2712,7 @@ function ConnectionDialog({
               </>
             ) : null}
             {connectionType === "rdp" ? (
-              <fieldset className="connection-session-fields">
+              <fieldset className="connection-session-fields connection-specific-options">
                 <legend>{t("connections.rdpOptions")}</legend>
                 <label className="connection-session-toggle">
                   <span>{t("connections.inheritSettingsDefaults")}</span>
@@ -2744,7 +2758,7 @@ function ConnectionDialog({
               </fieldset>
             ) : null}
             {connectionType === "vnc" ? (
-              <fieldset className="connection-session-fields">
+              <fieldset className="connection-session-fields connection-specific-options">
                 <legend>{t("connections.vncOptions")}</legend>
                 <label className="connection-session-toggle">
                   <span>{t("connections.inheritSettingsDefaults")}</span>
@@ -2786,7 +2800,7 @@ function ConnectionDialog({
               </fieldset>
             ) : null}
             {isFtpConnection ? (
-              <fieldset className="connection-session-fields">
+              <fieldset className="connection-session-fields connection-specific-options">
                 <legend>{t("connections.ftpOptions")}</legend>
                 <div className="connection-option-fields">
                   <label>
@@ -2794,6 +2808,7 @@ function ConnectionDialog({
                     <select
                       name="ftpProtocol"
                       defaultValue={initialConnection?.ftpOptions?.protocol ?? "ftp"}
+                      onChange={handleFtpProtocolChange}
                     >
                       <option value="ftp">{t("connections.ftpProtocolFtp")}</option>
                       <option value="ftps">{t("connections.ftpProtocolFtps")}</option>

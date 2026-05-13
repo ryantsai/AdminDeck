@@ -66,6 +66,24 @@ export function defaultPortForConnectionType(type: ConnectionType, sshSettings: 
   return sshSettings.defaultPort;
 }
 
+export function ftpPortForProtocolSelection(
+  protocol: string,
+  currentPort: string,
+  tlsMode = "explicit",
+) {
+  const trimmedPort = currentPort.trim();
+  if (trimmedPort && trimmedPort !== "21") {
+    return Number(trimmedPort);
+  }
+  if (protocol === "sftp") {
+    return 22;
+  }
+  if (protocol === "ftps" && tlsMode === "implicit") {
+    return 990;
+  }
+  return 21;
+}
+
 export function connectionTypeLabel(type: ConnectionType) {
   switch (type) {
     case "local":

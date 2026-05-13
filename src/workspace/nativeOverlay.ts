@@ -11,16 +11,29 @@ const NATIVE_BLOCKING_OVERLAY_SELECTOR = [
   ".dw-customize",
 ].join(", ");
 
+const WEBVIEW_BLOCKING_OVERLAY_SELECTOR = [
+  ".add-connection-menu",
+  ".quick-connect-menu",
+  ".connection-dialog-backdrop",
+].join(", ");
+
 export function documentHasRdpBlockingOverlay(surface: Element | null) {
   return documentHasNativeBlockingOverlay(surface);
 }
 
-function documentHasNativeBlockingOverlay(surface: Element | null) {
+export function documentHasWebviewBlockingOverlay(surface: Element | null) {
+  return documentHasNativeBlockingOverlay(surface, WEBVIEW_BLOCKING_OVERLAY_SELECTOR);
+}
+
+function documentHasNativeBlockingOverlay(
+  surface: Element | null,
+  selector = NATIVE_BLOCKING_OVERLAY_SELECTOR,
+) {
   const surfaceRect = visibleRect(surface);
   if (!surfaceRect) {
     return false;
   }
-  return Array.from(document.querySelectorAll(NATIVE_BLOCKING_OVERLAY_SELECTOR)).some((overlay) => {
+  return Array.from(document.querySelectorAll(selector)).some((overlay) => {
     const overlayRect = visibleRect(overlay);
     return Boolean(overlayRect && rectsIntersect(surfaceRect, overlayRect));
   });
