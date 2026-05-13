@@ -48,6 +48,7 @@ Use **Connection** (not "profile") for stored openable resources.
 
 - Prefer existing repo patterns over new abstractions.
 - KKTerm is a desktop-only app. Optimize layouts for desktop windows and Tauri/WebView2 runtime behavior; do not spend implementation or QA time on mobile viewport layouts unless the user explicitly requests mobile support.
+- When designing UI, prefer concise, accurate short terms over expressive terminology and explanatory text.
 - SQLite stores non-secret durable data; OS keychain stores secrets; terminal contents are not logged by default.
 - Do not put live session state into the durable connection model. Keep UI state (tabs, selected panes) in the frontend workspace layer unless persistence is required.
 - Keep Tauri command calls behind typed wrappers in `src/lib/tauri.ts`.
