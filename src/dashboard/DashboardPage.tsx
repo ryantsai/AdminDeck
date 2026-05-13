@@ -112,6 +112,8 @@ export function DashboardPage({
         "For a user request to create a visible Dashboard widget, use dashboard_create_widget with activeView.id so the widget is validated and placed on the selected view in one step.",
         "Prefer content widgets for static notes, checklists, stats, and key/value summaries. Use script widgets only when live JavaScript behavior is required.",
         "When using a script widget, provide JavaScript source only. Do not generate a full HTML document or include <script> tags; create DOM nodes inside #root instead.",
+        "Choose preset, accentName, iconName, and grid size intentionally from the widget purpose. Default to panel for ordinary tools, tile or stat-like content for compact metrics, mono for terminal/code/system data, action for launch/action surfaces, and hero only for rare high-priority summaries.",
+        "Use calm app-style accents: blue/teal/slate/emerald for normal utility widgets, amber for warnings, red/rose only for destructive or error-oriented widgets. Keep labels concise and controls dense, aligned, and consistent with KKTerm's desktop UI.",
         "",
         JSON.stringify(dashboardSnapshot, null, 2),
       ].join("\n"),

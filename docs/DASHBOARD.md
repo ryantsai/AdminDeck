@@ -43,6 +43,28 @@ It does not own:
 
 **Icon** — a lucide icon name from a curated whitelist of ~50 entries in `palette.ts`. The whitelist bounds the visual language and keeps the bundle predictable.
 
+## AI Visual Selection Rules
+
+The AI Assistant must choose `preset`, `accent_name`, `icon_name`, and grid size as part of widget design, not as arbitrary required fields. Generated widgets should feel like built-in KKTerm surfaces: quiet, dense, desktop-oriented, and consistent with the app's typography and control spacing.
+
+Preset guidance:
+
+- `panel` — default for ordinary tools, forms, checklists, and mixed content.
+- `tile` — compact status, short summaries, and small metrics.
+- `mono` — terminal, code, logs, system information, or diagnostic readouts.
+- `action` — launchers, one-command actions, and command-like workflows.
+- `ambient` — soft informational summaries where low visual weight matters.
+- `hero` — rare high-priority summary widgets; avoid for normal utilities.
+
+Accent guidance:
+
+- `blue`, `teal`, `slate`, `emerald`, and `sky` are the normal utility palette.
+- `amber` is for warnings, pending state, and attention-needed widgets.
+- `red` and `rose` are reserved for destructive, failed, or error-oriented widgets.
+- `purple`, `pink`, and `orange` should be used sparingly when the user asks for expressive styling or the widget domain clearly fits.
+
+Script widget UI should use the provided root and compact app-style controls. Do not generate a full HTML document, global reset CSS, external fonts, large decorative headers, marketing copy, gradients, or random color systems. Prefer short labels, stable sizing, aligned inputs/buttons, and the same system font feel as the host app.
+
 ## Persistence
 
 SQLite holds three Dashboard tables, defined in `src-tauri/src/storage.rs` under `CURRENT_SCHEMA`. The schema version is bumped when these tables change; no in-place migrations are run because there are no v1 users.
@@ -91,6 +113,10 @@ Rust validation invariants:
 - Frontend renderers use the matching TypeScript validator in `src/dashboard/schema.ts` before rendering content or script widgets, so malformed stored JSON falls back to the existing invalid-body state instead of partially rendering.
 
 Validation failures return structured error text to the AI Assistant so it can self-correct. The Assistant page context tells the model to call `dashboard_create_widget` with the active view id for creation requests; after any dashboard mutating tool completes, the frontend reloads Dashboard state and the newly mounted widget frame runs the canvas fade-in animation.
+
+Dashboard mutating tools run from the Rust Assistant tool loop, outside the frontend Dashboard store. To keep the live Dashboard view in sync, every successful mutating dashboard tool emits a `dashboard-changed` event. `src/dashboard/state/invalidation.ts` listens once at the app shell and reloads `useDashboardStore`. The streaming `toolCallEnd` refresh remains a useful fallback, but the backend event is the authoritative invalidation path for out-of-band mutations.
+
+The `dashboard_create_widget` assistant tool schema is strict-compatible where possible. It uses a closed root object, bounded enums, required fields, and closed nested object shapes so capable providers produce structured widget arguments instead of free-form prose or partial JSON. Rust validation remains the final authority before anything is persisted.
 
 ## Frontend Module Map (Dashboard)
 
@@ -161,7 +187,7 @@ The catalog overlay is a separate modal with search + two source-group tabs: Bui
 
 `ScriptWidgetHost.tsx` renders an `<iframe srcdoc="...">` per script instance, with:
 
-- A `<style>` block carrying KKTerm's accent and text tokens.
+- A `<style>` block carrying compact KKTerm-like text, form-control, button, stack, row, and result defaults so simple generated DOM starts from the app's desktop UI grammar.
 - An optional `htmlShim` body markup (default: a single `<div id="root">`).
 - A small host `<script>` that loads the stored source as data. The generated source is never pasted directly into the host script text, because generated snippets commonly contain HTML/script literals such as `</script>` that would prematurely close the host script and render broken JavaScript as widget body text.
 
@@ -174,6 +200,10 @@ Declared permissions:
 - `permissions.pollSeconds` → informational; the script self-schedules. The host may enforce a minimum floor in a follow-up.
 
 The bridge exposes `KK.requestPermission(name)` and `KK.postMessage(payload)` at the iframe globals. Future Tauri command access is added by extending this bridge with explicit handlers — not by widening the iframe surface.
+
+### Finding: Broken Script HTML
+
+The original script host pasted AI-generated `source` directly inside the host `<script>` block. That made generated snippets fragile: a common string such as `` `<script>...</script>` `` or a full HTML document could close the host script early, leaving the rest of the JavaScript visible as broken widget body text. The fix is to encode source as a JavaScript string literal, escape `<`, and load it through a blob-backed script element. Runtime and unhandled promise errors render into a small `<pre>` inside the iframe instead of replacing the Dashboard surface with raw host code.
 
 ## AI Widget Reliability Direction
 
