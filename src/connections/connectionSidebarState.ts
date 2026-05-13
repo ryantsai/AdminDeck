@@ -1,4 +1,5 @@
 const RECENT_CONNECTION_STORAGE_KEY = "kkterm.recentConnectionIds";
+const COLLAPSED_FOLDER_IDS_KEY = "kkterm.collapsedFolderIds";
 
 export const RECENT_CONNECTION_LIMIT = 5;
 
@@ -31,6 +32,29 @@ export function saveRecentConnectionIds(connectionIds: string[]) {
     RECENT_CONNECTION_STORAGE_KEY,
     JSON.stringify(connectionIds.slice(0, RECENT_CONNECTION_LIMIT)),
   );
+}
+
+export function loadCollapsedFolderIds(): Set<string> {
+  if (typeof localStorage === "undefined") {
+    return new Set();
+  }
+  try {
+    const stored = JSON.parse(localStorage.getItem(COLLAPSED_FOLDER_IDS_KEY) ?? "[]");
+    return new Set(
+      Array.isArray(stored)
+        ? stored.filter((id): id is string => typeof id === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveCollapsedFolderIds(ids: Set<string>) {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  localStorage.setItem(COLLAPSED_FOLDER_IDS_KEY, JSON.stringify([...ids]));
 }
 
 export function notifyConnectionTreeInvalidated() {

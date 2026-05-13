@@ -2,7 +2,7 @@ import { ConnectionGlyph, connectionSubtitle, connectionTypeSubtitle } from "./C
 import { AddConnectionMenu, QuickConnectMenu } from "./ConnectionMenus";
 import { ImportDialog } from "./ImportDialog";
 import { confirmTrustedSshHostKey, defaultPortForConnectionType, connectionTypeLabel, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
-import { RECENT_CONNECTION_LIMIT, createStoredSecretMask, loadRecentConnectionIds, notifyConnectionTreeInvalidated, saveRecentConnectionIds } from "./connectionSidebarState";
+import { RECENT_CONNECTION_LIMIT, createStoredSecretMask, loadCollapsedFolderIds, loadRecentConnectionIds, notifyConnectionTreeInvalidated, saveCollapsedFolderIds, saveRecentConnectionIds } from "./connectionSidebarState";
 import { collectConnectionFolderIds, countConnections, countFolders, filterConnectionTree, flattenConnections, flattenFolders, upsertRootConnection, withLiveConnectionStatuses } from "./treeUtils";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, KeyRound, LayoutDashboard, PanelRight, Pin, PinOff, Play, Plus, RotateCcw, Save, Search, X } from "lucide-react";
 import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollapseTextInput, Delete as IconParkDelete, Edit as IconParkEdit, ExpandTextInput as IconParkExpandTextInput, FolderPlus as IconParkFolderPlus, Setting as IconParkSetting } from "@icon-park/react";
@@ -118,7 +118,7 @@ export function ConnectionSidebar({
   const [dropTarget, setDropTarget] = useState("");
   const [dragPreview, setDragPreview] = useState<TreeDragPreview | null>(null);
   const [draggedSourceId, setDraggedSourceId] = useState("");
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(() => new Set());
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(loadCollapsedFolderIds);
   const [pendingFolderDraft, setPendingFolderDraft] = useState<PendingFolderDraft | null>(null);
   const [treeContextMenu, setTreeContextMenu] = useState<TreeContextMenuState | null>(null);
   const [editConnection, setEditConnection] = useState<EditConnectionState | null>(null);
@@ -151,6 +151,10 @@ export function ConnectionSidebar({
       window.removeEventListener("kkterm:connection-tree-invalidated", handleTreeInvalidated);
     };
   }, []);
+
+  useEffect(() => {
+    saveCollapsedFolderIds(collapsedFolderIds);
+  }, [collapsedFolderIds]);
 
   useEffect(() => {
     if (!quickConnectMenuOpen && !addConnectionMenuOpen) {
