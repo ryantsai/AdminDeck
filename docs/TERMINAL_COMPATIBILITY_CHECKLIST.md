@@ -155,6 +155,8 @@ Run these checks after generating substantial output in at least two Panes.
 
 Simple Workspace command menus must be native Tauri context menus in the desktop runtime, not DOM flyouts that force WebView2 or terminal visibility changes. Check Quick Connect, Add Connection, right-click on empty Connection Tree space, right-click on a Connection, right-click on a pinned/connected Activity Rail Connection, right-click on a workspace Tab, and the screenshot toolbar menu on URL/RDP/VNC workspaces. Opening these menus should not blank, hide, resize, or park WebView2, terminal, SFTP, or VNC surfaces. RDP ActiveX parking is reserved for registered DOM overlays such as Region selection or dialogs that actually intersect the RDP host.
 
+Native context menu icons should appear beside command items where the menu uses app-owned lucide-style SVG strings from `src/lib/nativeMenuIcons.ts`. Those icons are rasterized to small RGBA Tauri images by `src/lib/nativeContextMenu.ts`; missing icons should be fixed through that shared adapter/model, not by replacing native menus with DOM flyouts.
+
 ## Notes for Failures
 
 For each failure, record:

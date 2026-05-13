@@ -10,6 +10,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ConnectionIcon } from "../connections/ConnectionIcon";
 import { flattenConnections } from "../connections/treeUtils";
+import { nativeMenuIcons } from "../lib/nativeMenuIcons";
 import { showNativeContextMenu, type NativeContextMenuItem } from "../lib/nativeContextMenu";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
@@ -409,6 +410,7 @@ export function ActivityRail({
       {
         kind: "item",
         label: t(menu.pinned ? "connections.unpinFromRail" : "connections.pinToRail"),
+        iconSvg: menu.pinned ? nativeMenuIcons.pinOff : nativeMenuIcons.pin,
         action: () => {
           void (menu.pinned
             ? unpinRailConnection(menu.connection)

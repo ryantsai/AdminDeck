@@ -2,12 +2,14 @@ export type NativeContextMenuItem =
   | {
       kind: "item";
       label: string;
+      iconSvg?: string;
       disabled?: boolean;
       action: () => void;
     }
   | {
       kind: "submenu";
       label: string;
+      iconSvg?: string;
       disabled?: boolean;
       items: NativeContextMenuItem[];
     }

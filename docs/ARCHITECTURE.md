@@ -118,6 +118,8 @@ RDP ActiveX is a native child HWND, not a DOM element. It can draw above React d
 
 Do not turn overlay detection back into a document-wide boolean, and do not attach it to URL/WebView2 workspaces. RDP is the only workspace family that uses the screenshot-backed parking workaround. WebView2 visibility is for URL Session lifecycle and Tab activation only; ordinary menus should rely on native menu popups or the app's normal stacking/layout. If a future WebView2 overlay bug is proven in the real Tauri runtime, document the exact failure mode and add a narrow WebView2-specific fix rather than reusing RDP parking.
 
+Native context menu icons are not SVGs passed directly to Tauri. App-owned lucide-style SVG strings live in `src/lib/nativeMenuIcons.ts`; menu builders pass them as `iconSvg`; `src/lib/nativeContextMenu.ts` rasterizes each SVG to a small RGBA Tauri `Image` with an offscreen canvas and caches the result before creating the native menu item. This keeps native menus visually recognizable without adding PNG assets or reintroducing DOM overlays.
+
 If a future design truly needs a live overlay over RDP without parking the ActiveX host, the practical options are outside normal React layering: render that overlay as a native popup/owned HWND, clip or reshape the RDP child HWND around the overlay region, or replace the ActiveX path with a renderer that draws into KKTerm's own canvas/texture stack. Native popup HWNDs match how many Win32 desktop apps keep menus above embedded controls, but they add DPI, focus, accessibility, styling, and coordinate-sync complexity. Replacing the RDP renderer would avoid the airspace issue but moves KKTerm into owning RDP protocol/rendering concerns such as authentication, clipboard, display resize, and device redirection.
 
 RDP sizing has an important diagnostic trap: gray left/right gutters or a visible resize after switching Tabs can be caused by frontend workspace layout changes, not by the RDP transport itself. In particular, global chrome such as the right AI Assistant panel must keep one workspace-wide width/collapsed state; it must not load per-Connection panel layout on Tab activation. Per-Connection assistant panel state changes the workspace width during Tab switching, which then forces the native RDP ActiveX HWND to resize and can look like an RDP display-sync bug. When investigating RDP gutters, first verify that `remote-desktop-workspace` bounds and app chrome widths stay identical before and after Tab activation.
@@ -341,7 +343,8 @@ Workspace chrome layout is global state. Connection-specific live context may ch
 - `src/settings/shared.tsx` — Shared `SettingsSummary` and `PlannedSettingsGrid` for settings pages.
 - `src/settings/aboutData.ts` — Product metadata and open-source component groups.
 - `src/lib/clipboard.ts` — shared clipboard read/write fallback helpers.
-- `src/lib/nativeContextMenu.ts` — shared Tauri native context-menu adapter for simple text command menus, with `src/lib/nativeContextMenuModel.ts` containing testable menu normalization.
+- `src/lib/nativeContextMenu.ts` — shared Tauri native context-menu adapter for simple text command menus, including SVG-to-RGBA icon rasterization, with `src/lib/nativeContextMenuModel.ts` containing testable menu normalization.
+- `src/lib/nativeMenuIcons.ts` — app-owned lucide-style SVG strings used by native context menu `iconSvg` entries.
 - `src/i18n/config.ts` — i18next instance, language detection, dynamic locale loading, `switchLanguage()`, `ensureI18nReady()`.
 - `src/i18n/useT.ts` — typed translation hook with key autocompletion.
 - `src/i18n/locales/en.json` — English source-of-truth; 12 additional locale files under the same directory.

@@ -15,6 +15,7 @@ import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPoi
 import { useTranslation } from "react-i18next";
 import i18next from "../i18n/config";
 import { ariaExpanded, dialogButtonAria } from "../lib/aria";
+import { nativeMenuIcons } from "../lib/nativeMenuIcons";
 import { showNativeContextMenu, type NativeContextMenuItem } from "../lib/nativeContextMenu";
 import { invokeCommand, isTauriRuntime, selectKeyFile } from "../lib/tauri";
 import { connectionTree } from "../app-defaults";
@@ -772,12 +773,14 @@ export function ConnectionSidebar({
       ...connectionTypes.map((connectionType) => ({
         kind: "item" as const,
         label: connectionType === "ssh" ? t("connections.ssh") : connectionTypeLabel(connectionType),
+        iconSvg: nativeMenuIconForConnectionType(connectionType),
         action: () => handleNewConnectionTypeSelected(connectionType),
       })),
       { kind: "separator" as const },
       {
         kind: "item" as const,
         label: t("connections.import.tileTitle"),
+        iconSvg: nativeMenuIcons.download,
         action: handleImportRequested,
       },
     ];
@@ -788,6 +791,7 @@ export function ConnectionSidebar({
       {
         kind: "item",
         label: t("connections.ssh"),
+        iconSvg: nativeMenuIcons.server,
         action: handleQuickSshRequested,
       },
       ...quickConnectShellOptions.map((option) =>
@@ -799,11 +803,13 @@ export function ConnectionSidebar({
                 {
                   kind: "item" as const,
                   label: t("connections.normal"),
+                  iconSvg: nativeMenuIcons.terminal,
                   action: () => handleQuickLocalShell(option),
                 },
                 {
                   kind: "item" as const,
                   label: t("connections.admin"),
+                  iconSvg: nativeMenuIcons.terminal,
                   action: () => void handleQuickAdminShell(option),
                 },
               ],
@@ -811,6 +817,7 @@ export function ConnectionSidebar({
           : {
               kind: "item" as const,
               label: option.label,
+              iconSvg: nativeMenuIcons.terminal,
               action: () => handleQuickLocalShell(option),
             },
       ),
@@ -819,6 +826,7 @@ export function ConnectionSidebar({
         ? recentConnections.map((connection) => ({
             kind: "item" as const,
             label: `${connection.name} - ${connectionSubtitle(connection)}`,
+            iconSvg: nativeMenuIconForConnectionType(connection.type),
             action: () => {
               setQuickConnectMenuOpen(false);
               handleOpenConnection(connection);
@@ -932,11 +940,13 @@ export function ConnectionSidebar({
         {
           kind: "item",
           label: t("connections.newConnection"),
+          iconSvg: nativeMenuIcons.plus,
           action: handleTreeMenuCreateConnection,
         },
         {
           kind: "item",
           label: t("connections.newFolder"),
+          iconSvg: nativeMenuIcons.folderPlus,
           action: handleTreeMenuCreateFolder,
         },
       ];
@@ -946,11 +956,13 @@ export function ConnectionSidebar({
       {
         kind: "item",
         label: t("connections.rename"),
+        iconSvg: nativeMenuIcons.pencil,
         action: () => void handleTreeMenuRename(menu),
       },
       {
         kind: "item",
         label: t("connections.delete"),
+        iconSvg: nativeMenuIcons.trash,
         action: () => handleTreeMenuDelete(menu),
       },
     ];
@@ -966,6 +978,7 @@ export function ConnectionSidebar({
       {
         kind: "item",
         label: t(isPinned ? "connections.unpinFromRail" : "connections.pinToRail"),
+        iconSvg: isPinned ? nativeMenuIcons.pinOff : nativeMenuIcons.pin,
         action: () => void handleTreeMenuToggleRailPin(menu),
       },
     );
@@ -974,25 +987,30 @@ export function ConnectionSidebar({
       items.push({
         kind: "submenu",
         label: t("connections.addTo"),
+        iconSvg: nativeMenuIcons.panelRight,
         items: [
           {
             kind: "item",
             label: t("connections.left"),
+            iconSvg: nativeMenuIcons.arrowLeft,
             action: () => handleTreeMenuAddToPane(menu, "left"),
           },
           {
             kind: "item",
             label: t("connections.right"),
+            iconSvg: nativeMenuIcons.arrowRight,
             action: () => handleTreeMenuAddToPane(menu, "right"),
           },
           {
             kind: "item",
             label: t("connections.lower"),
+            iconSvg: nativeMenuIcons.arrowDown,
             action: () => handleTreeMenuAddToPane(menu, "down"),
           },
           {
             kind: "item",
             label: t("connections.upper"),
+            iconSvg: nativeMenuIcons.arrowUp,
             action: () => handleTreeMenuAddToPane(menu, "up"),
           },
         ],
@@ -1003,15 +1021,18 @@ export function ConnectionSidebar({
       items.push({
         kind: "submenu",
         label: t("connections.layout"),
+        iconSvg: nativeMenuIcons.layoutDashboard,
         items: [
           {
             kind: "item",
             label: t("common.save"),
+            iconSvg: nativeMenuIcons.save,
             action: () => handleTreeMenuSaveLayout(menu),
           },
           {
             kind: "item",
             label: t("common.reset"),
+            iconSvg: nativeMenuIcons.rotateCcw,
             action: () => handleTreeMenuResetLayout(menu),
           },
         ],
@@ -1022,6 +1043,7 @@ export function ConnectionSidebar({
       items.push({
         kind: "item",
         label: t("connections.transferSshPublicKey"),
+        iconSvg: nativeMenuIcons.keyRound,
         action: () => handleTreeMenuTransferSshPublicKey(menu),
       });
     }
@@ -1029,6 +1051,7 @@ export function ConnectionSidebar({
     items.push({
       kind: "item",
       label: t("connections.properties"),
+      iconSvg: nativeMenuIcons.settings,
       action: () => handleTreeMenuProperties(menu),
     });
     return items;
@@ -1860,6 +1883,23 @@ function NewFolderDraftRow({
 
 function isTerminalConnectionType(type: ConnectionType) {
   return type === "local" || type === "ssh" || type === "telnet" || type === "serial";
+}
+
+function nativeMenuIconForConnectionType(type: ConnectionType) {
+  switch (type) {
+    case "local":
+    case "telnet":
+    case "serial":
+      return nativeMenuIcons.terminal;
+    case "ssh":
+    case "ftp":
+      return nativeMenuIcons.server;
+    case "url":
+      return nativeMenuIcons.panelRight;
+    case "rdp":
+    case "vnc":
+      return nativeMenuIcons.layoutDashboard;
+  }
 }
 
 function TreeContextMenu({

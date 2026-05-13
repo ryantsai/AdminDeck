@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { menuButtonAria } from "../lib/aria";
+import { nativeMenuIcons } from "../lib/nativeMenuIcons";
 import { showNativeContextMenu } from "../lib/nativeContextMenu";
 import { invokeCommand, isTauriRuntime, type CaptureScreenshotRequest } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
@@ -109,11 +110,13 @@ export function ScreenshotMenu({
         {
           kind: "item",
           label: t("workspace.copyRegion"),
+          iconSvg: nativeMenuIcons.scanLine,
           action: handleRegion,
         },
         {
           kind: "item",
           label: t("workspace.copyEntirePanel"),
+          iconSvg: nativeMenuIcons.camera,
           action: handleEntirePanel,
         },
       ],
