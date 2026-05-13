@@ -1913,6 +1913,7 @@ pub fn run() {
             dashboard_commands::dashboard_update_instance,
             dashboard_commands::dashboard_remove_instance,
             dashboard_commands::dashboard_apply_layout,
+            dashboard_commands::dashboard_create_widget,
             dashboard_commands::dashboard_create_custom_widget,
             dashboard_commands::dashboard_update_custom_widget,
             dashboard_commands::dashboard_remove_custom_widget,

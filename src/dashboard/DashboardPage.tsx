@@ -109,7 +109,7 @@ export function DashboardPage({
       sourceLabel: t("dashboard.assistantContextSource", { view: activeView.title }),
       text: [
         t("dashboard.assistantContextIntro"),
-        "For a user request to create a Dashboard widget, use dashboard_create_custom_widget first, then dashboard_add_instance with activeView.id.",
+        "For a user request to create a visible Dashboard widget, use dashboard_create_widget with activeView.id so the widget is validated and placed on the selected view in one step.",
         "Prefer content widgets for static notes, checklists, stats, and key/value summaries. Use script widgets only when live JavaScript behavior is needed.",
         "",
         JSON.stringify(dashboardSnapshot, null, 2),

@@ -1,11 +1,15 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ContentBody } from "../types";
+import { parseJsonObject, validateContentWidgetBody } from "../schema";
 
 export function ContentWidgetRenderer({ bodyJson }: { bodyJson: string }) {
   const { t } = useTranslation();
   const parsed = useMemo<ContentBody | null>(() => {
-    try { return JSON.parse(bodyJson) as ContentBody; } catch { return null; }
+    const json = parseJsonObject(bodyJson);
+    if (!json.ok) return null;
+    const body = validateContentWidgetBody(json.value);
+    return body.ok ? body.value : null;
   }, [bodyJson]);
 
   if (!parsed) return <div className="dw-content-error">{t("dashboard.invalidContentWidgetBody")}</div>;

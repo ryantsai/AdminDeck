@@ -1992,8 +1992,13 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
             json!({"type":"object","properties":{"viewId":{"type":"string"},"layout":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"gridX":{"type":"integer"},"gridY":{"type":"integer"},"gridW":{"type":"integer"},"gridH":{"type":"integer"}},"required":["id","gridX","gridY","gridW","gridH"]}}},"required":["viewId","layout"]}),
         ));
         tools.push(tool_definition(
+            "dashboard_create_widget",
+            "Create a validated AI-authored custom widget and place it on the selected Dashboard view in one step. Prefer this for user requests to create a visible widget.",
+            dashboard_create_widget_schema(),
+        ));
+        tools.push(tool_definition(
             "dashboard_create_custom_widget",
-            "Create a new AI-authored custom widget (content or script kind). bodyJson must be a JSON string matching the selected kind. For content use shape markdown, kvList, checklist, or stat. For script use source plus permissions.",
+            "Create a reusable AI-authored custom widget definition only; this does not place it on a view. bodyJson must be a JSON string matching the selected kind. Prefer dashboard_create_widget when the user expects a visible widget.",
             json!({"type":"object","properties":{"kind":{"type":"string","enum":["content","script"]},"title":{"type":"string"},"summary":{"type":"string"},"category":{"type":"string"},"bodyJson":{"type":"string"},"createdBy":{"type":"string","enum":["user","agent"]}},"required":["kind","title","summary","category","bodyJson","createdBy"]}),
         ));
         tools.push(tool_definition(
@@ -2013,6 +2018,37 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
         ));
     }
     tools
+}
+
+
+fn dashboard_create_widget_schema() -> Value {
+    json!({
+        "type":"object",
+        "properties":{
+            "viewId":{"type":"string"},
+            "kind":{"type":"string","enum":["content","script"]},
+            "title":{"type":"string","minLength":1,"maxLength":120},
+            "summary":{"type":"string","maxLength":240},
+            "category":{"type":"string","minLength":1,"maxLength":80},
+            "body":{
+                "oneOf":[
+                    {"type":"object","properties":{"shape":{"const":"markdown"},"data":{"type":"object","properties":{"source":{"type":"string","minLength":1}},"required":["source"]}},"required":["shape","data"]},
+                    {"type":"object","properties":{"shape":{"const":"kvList"},"data":{"type":"object","properties":{"rows":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"string"}},"required":["label","value"]}}},"required":["rows"]}},"required":["shape","data"]},
+                    {"type":"object","properties":{"shape":{"const":"checklist"},"data":{"type":"object","properties":{"items":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"done":{"type":"boolean"}},"required":["label"]}}},"required":["items"]}},"required":["shape","data"]},
+                    {"type":"object","properties":{"shape":{"const":"stat"},"data":{"type":"object","properties":{"value":{"type":"string","minLength":1},"unit":{"type":"string"},"delta":{"type":"string"},"caption":{"type":"string"}},"required":["value"]}},"required":["shape","data"]},
+                    {"type":"object","properties":{"source":{"type":"string","minLength":1},"permissions":{"type":"object","properties":{"network":{"type":"boolean"},"pollSeconds":{"type":"integer","minimum":1}},"required":["network"]},"htmlShim":{"type":"string"}},"required":["source","permissions"]}
+                ]
+            },
+            "preset":{"type":"string","enum":["panel","ambient","glass","tile","hero","mono","stack","action","band"]},
+            "accentName":{"type":"string","enum":["blue","indigo","teal","green","amber","red","purple","pink","slate","cyan","orange","rose","emerald","sky"]},
+            "iconName":{"type":"string","enum":["Hash","Network","Terminal","Server","Cpu","Activity","Bolt","Sun","Bell","Bot","Wrench","Folder","Clock","Doc","Cloud","Calendar","Database","Globe","Lock","Key","Mail","Mic","Monitor","Music","Package","Phone","Pin","Power","Printer","Radio","Search","Settings","Shield","ShoppingCart","Star","Tag","Tool","Trash","Truck","User","Users","Video","Volume","Watch","Wifi","Wind","Zap","Layers","List","Grid"]},
+            "gridX":{"type":"integer","minimum":0,"maximum":11},
+            "gridY":{"type":"integer","minimum":0},
+            "gridW":{"type":"integer","minimum":1,"maximum":12},
+            "gridH":{"type":"integer","minimum":1}
+        },
+        "required":["viewId","kind","title","summary","category","body","preset","accentName","iconName","gridX","gridY","gridW","gridH"]
+    })
 }
 
 fn tool_definition(
@@ -2153,6 +2189,41 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
                 ds::apply_layout(conn, &view_id, &layout)
                     .map(|_| json!({"ok": true}))
                     .map_err(|e| format!("{e:?}"))
+            }
+            "dashboard_create_widget" => {
+                let view_id = arg_string(&args, "viewId");
+                if view_id.is_empty() {
+                    return Err("dashboard_create_widget requires viewId".to_string());
+                }
+                let kind = arg_string(&args, "kind");
+                let title = arg_string(&args, "title");
+                let summary = arg_string(&args, "summary");
+                let category = arg_string(&args, "category");
+                let body = args.get("body").cloned().unwrap_or(Value::Null);
+                if body.is_null() {
+                    return Err("dashboard_create_widget requires body".to_string());
+                }
+                let body_json = serde_json::to_string(&body)
+                    .map_err(|e| format!("invalid body: {e}"))?;
+                let preset = arg_string(&args, "preset");
+                let accent_name = arg_string(&args, "accentName");
+                let icon_name = arg_string(&args, "iconName");
+                let grid_x = args.get("gridX").and_then(Value::as_i64).unwrap_or(0);
+                let grid_y = args.get("gridY").and_then(Value::as_i64).unwrap_or(0);
+                let grid_w = args.get("gridW").and_then(Value::as_i64).unwrap_or(4);
+                let grid_h = args.get("gridH").and_then(Value::as_i64).unwrap_or(3);
+                let custom_widget_id = new_dashboard_id("cw");
+                let instance_id = new_dashboard_id("inst");
+                let custom_widget = ds::create_custom_widget(conn, &custom_widget_id, &kind, &title, &summary, &category, &body_json, "agent")
+                    .map_err(|e| format!("{e:?}"))?;
+                let instance = match ds::add_instance(conn, &instance_id, &view_id, &kind, &custom_widget_id, &preset, &accent_name, &icon_name, grid_x, grid_y, grid_w, grid_h) {
+                    Ok(instance) => instance,
+                    Err(error) => {
+                        let _ = ds::remove_custom_widget(conn, &custom_widget_id, true);
+                        return Err(format!("{error:?}"));
+                    }
+                };
+                Ok(json!({ "customWidget": custom_widget, "instance": instance }))
             }
             "dashboard_create_custom_widget" => {
                 let kind = arg_string(&args, "kind");

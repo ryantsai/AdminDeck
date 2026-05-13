@@ -75,8 +75,9 @@ Each command is a thin handler over the storage layer with up-front validation:
 | `dashboard_update_instance` | Patch over presentation + layout fields. |
 | `dashboard_remove_instance` | Hard delete. |
 | `dashboard_apply_layout` | Batched layout commit used by the debounced drag/resize pipeline. |
-| `dashboard_create_custom_widget` | Validates `bodyJson` per kind. |
-| `dashboard_update_custom_widget` | |
+| `dashboard_create_widget` | AI-facing atomic helper: validates a structured `body`, creates the custom widget, and places an instance on the supplied selected view. Use this when the user expects a visible widget. |
+| `dashboard_create_custom_widget` | Definition-only command; validates `bodyJson` per kind but does not place an instance. |
+| `dashboard_update_custom_widget` | Validates patched `bodyJson` per kind. |
 | `dashboard_remove_custom_widget` | Requires `forceDeleteInstances` if instances reference the widget. |
 
 Rust validation invariants:
@@ -85,10 +86,11 @@ Rust validation invariants:
 - `accent_name` is in the palette whitelist.
 - `icon_name` is in the lucide icon whitelist.
 - Grid bounds: `w ≥ 1`, `h ≥ 1`, `x ≥ 0`, `y ≥ 0`, `x + w ≤ 12`.
-- Content shape byte caps and shape-specific schema.
-- Script source ≤ 64 KB; `pollSeconds ≥ 1`; only known `permissions` keys.
+- Content shape byte caps and shape-specific schema: non-empty markdown source, non-empty key/value rows with labels, non-empty checklist items with labels, or a non-empty stat value.
+- Script source is required and ≤ 64 KB; `pollSeconds ≥ 1`; only declared `permissions` values are accepted.
+- Frontend renderers use the matching TypeScript validator in `src/dashboard/schema.ts` before rendering content or script widgets, so malformed stored JSON falls back to the existing invalid-body state instead of partially rendering.
 
-Validation failures return `{ ok: false, reason, details }` so the AI Assistant can self-correct.
+Validation failures return structured error text to the AI Assistant so it can self-correct. The Assistant page context tells the model to call `dashboard_create_widget` with the active view id for creation requests; after any dashboard mutating tool completes, the frontend reloads Dashboard state and the newly mounted widget frame runs the canvas fade-in animation.
 
 ## Frontend Module Map (Dashboard)
 
@@ -96,6 +98,7 @@ Validation failures return `{ ok: false, reason, details }` so the AI Assistant 
 src/dashboard/
   DashboardPage.tsx              ── shell, topbar, view pills, edit-mode toggle
   motion.tsx                     ── existing centralized motion wrappers
+  schema.ts                     ── TypeScript validator for content/script custom widget bodies
   state/
     dashboardStore.ts            ── Zustand store: views, instances, customWidgets, activeViewId, editMode
     persistence.ts               ── typed Tauri command wrappers

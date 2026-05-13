@@ -178,12 +178,12 @@ pub fn validate_content_body_json(json: &str) -> Result<ContentBody, ValidationE
             }
         }
         ContentBody::KvList { data } => {
-            if data.rows.is_empty() {
+            if data.rows.is_empty() || data.rows.iter().any(|row| row.label.trim().is_empty()) {
                 return Err(ValidationError::InvalidContentData);
             }
         }
         ContentBody::Checklist { data } => {
-            if data.items.is_empty() {
+            if data.items.is_empty() || data.items.iter().any(|item| item.label.trim().is_empty()) {
                 return Err(ValidationError::InvalidContentData);
             }
         }
@@ -202,6 +202,9 @@ pub fn validate_script_body_json(json: &str) -> Result<ScriptBody, ValidationErr
     }
     let parsed: ScriptBody = serde_json::from_str(json)
         .map_err(|_| ValidationError::InvalidScriptBody)?;
+    if parsed.source.trim().is_empty() {
+        return Err(ValidationError::InvalidScriptBody);
+    }
     if parsed.source.len() > MAX_SCRIPT_SOURCE_BYTES {
         return Err(ValidationError::ScriptTooLarge);
     }
@@ -306,6 +309,15 @@ mod tests {
     }
 
     #[test]
+    fn content_kv_empty_label_rejected() {
+        let json = r#"{"shape":"kvList","data":{"rows":[{"label":"   ","value":"b"}]}}"#;
+        assert_eq!(
+            validate_content_body_json(json),
+            Err(ValidationError::InvalidContentData),
+        );
+    }
+
+    #[test]
     fn script_ok() {
         let json = r#"{"source":"console.log(1)","permissions":{"network":false}}"#;
         assert!(validate_script_body_json(json).is_ok());
@@ -317,6 +329,15 @@ mod tests {
         assert_eq!(
             validate_script_body_json(&json),
             Err(ValidationError::InvalidPollSeconds),
+        );
+    }
+
+    #[test]
+    fn script_empty_source_rejected() {
+        let json = r#"{"source":"   ","permissions":{"network":false}}"#;
+        assert_eq!(
+            validate_script_body_json(&json),
+            Err(ValidationError::InvalidScriptBody),
         );
     }
 

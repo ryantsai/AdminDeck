@@ -1,4 +1,5 @@
 use serde::Serialize;
+use serde_json::Value;
 use tauri::{AppHandle, Manager, State};
 
 use crate::dashboard_storage::{
@@ -14,6 +15,13 @@ pub enum DashboardCommandError {
     NotFound,
     InstancesExist { instance_ids: Vec<String> },
     Internal { message: String },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardCreatedWidget {
+    pub custom_widget: DashboardCustomWidget,
+    pub instance: DashboardWidgetInstance,
 }
 
 impl From<ds::DashboardStorageError> for DashboardCommandError {
@@ -127,6 +135,47 @@ pub fn dashboard_apply_layout(
     layout: Vec<LayoutEntry>,
 ) -> Result<(), DashboardCommandError> {
     storage(&app).with_connection_infallible(|conn| ds::apply_layout(conn, &view_id, &layout).map_err(Into::into))
+}
+
+
+#[tauri::command]
+pub fn dashboard_create_widget(
+    app: AppHandle,
+    view_id: String,
+    kind: String,
+    title: String,
+    summary: String,
+    category: String,
+    body: Value,
+    preset: String,
+    accent_name: String,
+    icon_name: String,
+    grid_x: i64,
+    grid_y: i64,
+    grid_w: i64,
+    grid_h: i64,
+) -> Result<DashboardCreatedWidget, DashboardCommandError> {
+    let body_json = serde_json::to_string(&body)
+        .map_err(|error| DashboardCommandError::Internal { message: error.to_string() })?;
+    let custom_widget_id = new_dashboard_id("cw");
+    let instance_id = new_dashboard_id("inst");
+    storage(&app).with_connection_infallible(|conn| {
+        let custom_widget = ds::create_custom_widget(
+            conn, &custom_widget_id, &kind, &title, &summary, &category, &body_json, "agent",
+        )?;
+        let instance = match ds::add_instance(
+            conn, &instance_id, &view_id, &kind, &custom_widget_id,
+            &preset, &accent_name, &icon_name,
+            grid_x, grid_y, grid_w, grid_h,
+        ) {
+            Ok(instance) => instance,
+            Err(error) => {
+                let _ = ds::remove_custom_widget(conn, &custom_widget_id, true);
+                return Err(error.into());
+            }
+        };
+        Ok(DashboardCreatedWidget { custom_widget, instance })
+    })
 }
 
 #[tauri::command]

@@ -1,4 +1,5 @@
 import { invokeCommand, isTauriRuntime } from "../../lib/tauri";
+import { validateCustomWidgetBodyJson } from "../schema";
 import type {
   DashboardCustomWidget, DashboardLoadState, DashboardView, DashboardWidgetInstance,
   CustomWidgetPatch, InstancePatch, LayoutEntry, ViewPatch,
@@ -172,6 +173,10 @@ export async function createCustomWidget(input: {
   category: string; bodyJson: string; createdBy: "user" | "agent";
 }): Promise<DashboardCustomWidget> {
   if (!isTauriRuntime()) {
+    const validation = validateCustomWidgetBodyJson(input.kind, input.bodyJson);
+    if (!validation.ok) {
+      throw new Error(`Invalid Dashboard custom widget body: ${validation.reason}`);
+    }
     const state = browserPreviewState();
     const widget = { id: createPreviewId("cw"), ...input };
     state.customWidgets.push(widget);
@@ -186,6 +191,12 @@ export async function updateCustomWidget(id: string, patch: CustomWidgetPatch): 
     const widget = state.customWidgets.find((item) => item.id === id);
     if (!widget) {
       throw new Error("Dashboard custom widget not found.");
+    }
+    if (patch.bodyJson !== undefined) {
+      const validation = validateCustomWidgetBodyJson(widget.kind, patch.bodyJson);
+      if (!validation.ok) {
+        throw new Error(`Invalid Dashboard custom widget body: ${validation.reason}`);
+      }
     }
     Object.assign(widget, patch);
     return { ...widget };

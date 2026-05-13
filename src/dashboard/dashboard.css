@@ -307,6 +307,25 @@ main.dashboard-page {
   display: flex;
   height: 100%;
   color: var(--text);
+  animation: dw-widget-fade-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes dw-widget-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dw-instance {
+    animation: none;
+  }
 }
 
 .dw-instance.dw-edit {

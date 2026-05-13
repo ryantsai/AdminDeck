@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ScriptBody } from "../types";
+import { parseJsonObject, validateScriptWidgetBody } from "../schema";
 import { buildSrcdoc } from "./permissions";
 
 export function ScriptWidgetHost({ bodyJson }: { bodyJson: string }) {
   const { t } = useTranslation();
   const { key: reloadKey } = useScriptReloadHandle();
   const parsed = useMemo<ScriptBody | null>(() => {
-    try { return JSON.parse(bodyJson) as ScriptBody; } catch { return null; }
+    const json = parseJsonObject(bodyJson);
+    if (!json.ok) return null;
+    const body = validateScriptWidgetBody(json.value);
+    return body.ok ? body.value : null;
   }, [bodyJson]);
   const srcdoc = useMemo(() => (parsed ? buildSrcdoc(parsed) : ""), [parsed]);
 
