@@ -5,6 +5,7 @@ export type AssistantToolCallStatus = {
   toolId: string;
   toolName: string;
   status: "running" | "completed";
+  error?: string;
   startedAt: string;
   endedAt?: string;
 };
@@ -54,6 +55,7 @@ export function applyAssistantStreamEventToMessage(
               ...tc,
               toolName: event.toolName,
               status: "completed",
+              error: event.error,
               endedAt: options.now(),
             }
           : tc,

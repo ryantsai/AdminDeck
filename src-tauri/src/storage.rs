@@ -392,7 +392,7 @@ pub struct AiAssistantToolSettings {
     app_data_file_read: bool,
     #[serde(default = "default_ai_current_time_tool_enabled")]
     current_time: bool,
-    #[serde(default)]
+    #[serde(default = "default_ai_dashboard_tool_enabled")]
     dashboard: bool,
 }
 
@@ -3424,12 +3424,16 @@ fn default_ai_assistant_tool_settings() -> AiAssistantToolSettings {
         app_data_file_search: false,
         app_data_file_read: false,
         current_time: default_ai_current_time_tool_enabled(),
-        dashboard: false,
+        dashboard: default_ai_dashboard_tool_enabled(),
     }
 }
 
 fn default_ai_current_time_tool_enabled() -> bool {
     false
+}
+
+fn default_ai_dashboard_tool_enabled() -> bool {
+    true
 }
 
 fn default_ai_provider_kind() -> String {

@@ -435,7 +435,7 @@ export type AiStreamEvent =
   | { type: "reasoningDelta"; delta: string }
   | { type: "contentDelta"; delta: string }
   | { type: "toolCallStart"; toolId: string; toolName: string }
-  | { type: "toolCallEnd"; toolId: string; toolName: string }
+  | { type: "toolCallEnd"; toolId: string; toolName: string; error?: string }
   | { type: "done"; model: string; providerKind: string }
   | { type: "error"; message: string };
 

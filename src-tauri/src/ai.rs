@@ -261,7 +261,7 @@ enum AiStreamEvent {
     ReasoningDelta { delta: String },
     ContentDelta { delta: String },
     ToolCallStart { tool_id: String, tool_name: String },
-    ToolCallEnd { tool_id: String, tool_name: String },
+    ToolCallEnd { tool_id: String, tool_name: String, error: Option<String> },
     Done { model: String, provider_kind: String },
 }
 
@@ -1292,6 +1292,7 @@ impl OpenAiCompatibleProvider {
                     tool_call.function.name,
                     result.len()
                 );
+                let tool_error = tool_result_error(&result);
                 messages.push(OpenAiCompatibleMessage {
                     role: "tool".to_string(),
                     content: OpenAiCompatibleContent::Text(result),
@@ -1304,6 +1305,7 @@ impl OpenAiCompatibleProvider {
                     &AiStreamEvent::ToolCallEnd {
                         tool_id: tool_call.id.clone(),
                         tool_name: tool_call.function.name.clone(),
+                        error: tool_error,
                     },
                 )?;
             }
@@ -1478,6 +1480,7 @@ impl OpenAiCompatibleProvider {
                     },
                 )?;
                 let result = run_ai_tool(settings.tools(), &app_data_dir, &app, tool_call).await;
+                let tool_error = tool_result_error(&result);
                 input.push(json!({
                     "type": "function_call_output",
                     "call_id": tool_call.id,
@@ -1488,6 +1491,7 @@ impl OpenAiCompatibleProvider {
                     &AiStreamEvent::ToolCallEnd {
                         tool_id: tool_call.id.clone(),
                         tool_name: tool_call.function.name.clone(),
+                        error: tool_error,
                     },
                 )?;
             }
@@ -1918,7 +1922,7 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
         ));
         tools.push(tool_definition(
             "dashboard_create_widget",
-            "Create a validated AI-authored custom widget and place it on the selected Dashboard view in one step. Prefer this for user requests to create a visible widget.",
+            "Create a validated AI-authored custom widget and place it on the selected Dashboard view in one step. Prefer this for user requests to create a visible widget. For script kind: body must be an object with source (JS string), permissions (object with network boolean), and optional htmlShim. For content kind: body must be an object with shape (markdown|kvList|checklist|stat) and data. Example script body: {\"source\":\"html`<div>Hi</div>`\",\"permissions\":{\"network\":false}}",
             dashboard_create_widget_schema(),
         ));
         tools.push(tool_definition(
@@ -2075,8 +2079,11 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
                 let icon_name = arg_string(&args, "iconName");
                 let grid_x = args.get("gridX").and_then(Value::as_i64).unwrap_or(0);
                 let grid_y = args.get("gridY").and_then(Value::as_i64).unwrap_or(0);
-                let grid_w = args.get("gridW").and_then(Value::as_i64).unwrap_or(4);
-                let grid_h = args.get("gridH").and_then(Value::as_i64).unwrap_or(3);
+                let mut grid_w = args.get("gridW").and_then(Value::as_i64).unwrap_or(4);
+                let mut grid_h = args.get("gridH").and_then(Value::as_i64).unwrap_or(3);
+                if grid_x + grid_w > 12 { grid_w = (12 - grid_x).max(1); }
+                if grid_w < 1 { grid_w = 1; }
+                if grid_h < 1 { grid_h = 1; }
                 let id = new_dashboard_id("inst");
                 ds::add_instance(conn, &id, &view_id, &kind, &source_id, &preset, &accent_name, &icon_name, grid_x, grid_y, grid_w, grid_h)
                     .map(|v| serde_json::to_value(v).unwrap_or(Value::Null))
@@ -2135,8 +2142,11 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
                 let icon_name = arg_string(&args, "iconName");
                 let grid_x = args.get("gridX").and_then(Value::as_i64).unwrap_or(0);
                 let grid_y = args.get("gridY").and_then(Value::as_i64).unwrap_or(0);
-                let grid_w = args.get("gridW").and_then(Value::as_i64).unwrap_or(4);
-                let grid_h = args.get("gridH").and_then(Value::as_i64).unwrap_or(3);
+                let mut grid_w = args.get("gridW").and_then(Value::as_i64).unwrap_or(4);
+                let mut grid_h = args.get("gridH").and_then(Value::as_i64).unwrap_or(3);
+                if grid_x + grid_w > 12 { grid_w = (12 - grid_x).max(1); }
+                if grid_w < 1 { grid_w = 1; }
+                if grid_h < 1 { grid_h = 1; }
                 let custom_widget_id = new_dashboard_id("cw");
                 let instance_id = new_dashboard_id("inst");
                 let custom_widget = ds::create_custom_widget(conn, &custom_widget_id, &kind, &title, &summary, &category, &body_json, "agent")
@@ -2347,6 +2357,18 @@ fn arg_string(args: &Value, key: &str) -> String {
         .to_string()
 }
 
+fn tool_result_error(result: &str) -> Option<String> {
+    let trimmed = result.trim();
+    if !trimmed.starts_with("{\"error\"") {
+        return None;
+    }
+    serde_json::from_str::<Value>(trimmed)
+        .ok()
+        .and_then(|v| v.get("error").and_then(Value::as_str).map(str::to_string))
+        .map(|e| e.trim().to_string())
+        .filter(|e| !e.is_empty())
+}
+
 fn is_destructive_command(command: &str) -> bool {
     contains_any(
         &command.to_ascii_lowercase(),
@@ -2462,7 +2484,7 @@ fn build_agent_messages(
         "Do not claim to have executed commands or observed live session state unless it is in the provided context.".to_string(),
         "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.".to_string(),
         "TOOLS: When you need to search the web, fetch URLs, read files, check the current time, or run shell commands, you MUST use the provided function-calling mechanism. Always make the actual function call alongside your explanation. Do not describe what you plan to do with a tool without calling it — invoke the tool in the same response.".to_string(),
-        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, usually call dashboard_create_custom_widget followed by dashboard_add_instance.".to_string(),
+        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation.".to_string(),
     ];
     if let Some(language) = normalize_output_language(output_language) {
         system_instructions.push(language);

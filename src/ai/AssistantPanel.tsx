@@ -1129,7 +1129,14 @@ export function AssistantPanel({
         }
         logAssistantStreamEvent(event);
         if (event.type === "toolCallEnd" && isDashboardMutatingTool(event.toolName)) {
-          void useDashboardStore.getState().load();
+          if (event.error) {
+            useWorkspaceStore.getState().showStatusBarNotice(
+              `${event.toolName} failed: ${event.error}`,
+              { tone: "error", durationMs: 8_000 },
+            );
+          } else {
+            void useDashboardStore.getState().load();
+          }
         }
         streamingMessageSnapshot = {
           ...streamingMessageSnapshot,
