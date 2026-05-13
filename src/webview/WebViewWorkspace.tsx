@@ -122,6 +122,8 @@ type CapturedCredentialPayload = {
 };
 
 const CREDENTIAL_TITLE_PREFIX = "__KKTERM_URL_CREDENTIAL__";
+const AUTO_REFRESH_INTERVALS_SECONDS = [0, 5, 15, 30, 60, 120] as const;
+type AutoRefreshIntervalSeconds = (typeof AUTO_REFRESH_INTERVALS_SECONDS)[number];
 
 function createCredentialCaptureNonce() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -145,6 +147,8 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
   const [fillStatus, setFillStatus] = useState("");
   const [webviewSuppressed, setWebviewSuppressed] = useState(false);
   const [addressInput, setAddressInput] = useState(tab.url ?? "");
+  const [webviewReady, setWebviewReady] = useState(false);
+  const [autoRefreshSeconds, setAutoRefreshSeconds] = useState<AutoRefreshIntervalSeconds>(0);
 
   const initialUrl = tab.url ?? "";
   const [savedCredentialUsername, setSavedCredentialUsername] = useState(tab.connection?.urlCredentialUsername ?? "");
@@ -261,6 +265,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
           return;
         }
         sessionStartedRef.current = true;
+        setWebviewReady(true);
         pushWebviewVisibility();
       })
       .catch((error) => {
@@ -280,6 +285,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
       const ownsSession = sessionStartingRef.current || sessionStartedRef.current;
       sessionStartingRef.current = false;
       sessionStartedRef.current = false;
+      setWebviewReady(false);
       if (ownsSession) {
         releaseWebviewSession(sessionId);
       }
@@ -291,6 +297,25 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime() || !webviewReady || autoRefreshSeconds === 0) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      if (!sessionStartedRef.current) {
+        return;
+      }
+      void invokeCommand("webview_reload", {
+        request: { sessionId: sessionIdRef.current },
+      }).catch((error) => {
+        setNavError(error instanceof Error ? error.message : String(error));
+      });
+    }, autoRefreshSeconds * 1000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [autoRefreshSeconds, webviewReady]);
 
   useEffect(() => {
     visibilityRef.current = { isActive, webviewSuppressed };
@@ -544,6 +569,13 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
     void fillCredential({ automatic: false, showStatus: true });
   }
 
+  function handleAutoRefreshChange(value: string) {
+    const seconds = Number(value);
+    if (AUTO_REFRESH_INTERVALS_SECONDS.includes(seconds as AutoRefreshIntervalSeconds)) {
+      setAutoRefreshSeconds(seconds as AutoRefreshIntervalSeconds);
+    }
+  }
+
   return (
     <section
       className={isActive ? "terminal-workspace webview-workspace active" : "terminal-workspace webview-workspace"}
@@ -595,23 +627,42 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
           </span>
           <div className="terminal-pane-actions">
             {fillStatus ? <span className="webview-toolbar-status">{fillStatus}</span> : null}
-            <button
-              className="terminal-pane-action"
-              onClick={handleSaveCredential}
-              title={t("webview.savePasswordTitle")}
-              type="button"
+            <select
+              aria-label={t("webview.autoRefresh")}
+              className="webview-auto-refresh-select"
+              onChange={(event) => handleAutoRefreshChange(event.currentTarget.value)}
+              title={t("webview.autoRefresh")}
+              value={autoRefreshSeconds}
             >
-              <Save size={13} />
-            </button>
-            <button
-              className="terminal-pane-action"
-              disabled={!canFillCredential}
-              onClick={handleFillCredential}
-              title={canFillCredential ? t("webview.fillSavedCredential") : t("webview.noSavedCredential")}
-              type="button"
-            >
-              <KeyRound size={13} />
-            </button>
+              {AUTO_REFRESH_INTERVALS_SECONDS.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {seconds === 0
+                    ? t("webview.autoRefreshOff")
+                    : t("webview.autoRefreshSeconds", { count: seconds })}
+                </option>
+              ))}
+            </select>
+            {tab.connection ? (
+              <>
+                <button
+                  className="terminal-pane-action"
+                  onClick={handleSaveCredential}
+                  title={t("webview.savePasswordTitle")}
+                  type="button"
+                >
+                  <Save size={13} />
+                </button>
+                <button
+                  className="terminal-pane-action"
+                  disabled={!canFillCredential}
+                  onClick={handleFillCredential}
+                  title={canFillCredential ? t("webview.fillSavedCredential") : t("webview.noSavedCredential")}
+                  type="button"
+                >
+                  <KeyRound size={13} />
+                </button>
+              </>
+            ) : null}
             <ScreenshotMenu
               buttonClassName="terminal-pane-action"
               targetLabel={t("webview.screenshotTarget", { title: tab.title })}

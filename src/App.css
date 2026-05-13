@@ -6637,6 +6637,23 @@ fieldset.connection-session-fields > legend {
   flex-shrink: 0;
 }
 
+.webview-auto-refresh-select {
+  height: 24px;
+  max-width: 128px;
+  padding: 0 22px 0 8px;
+  color: #d9e2ef;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(128, 153, 184, 0.28);
+  border-radius: 5px;
+  outline: none;
+}
+
+.webview-auto-refresh-select:focus {
+  border-color: rgba(86, 166, 255, 0.45);
+  background: rgba(255, 255, 255, 0.09);
+}
+
 .webview-pane .webview-toolbar-status {
   max-width: 220px;
   overflow: hidden;

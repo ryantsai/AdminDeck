@@ -1437,15 +1437,14 @@ main.dashboard-page {
 .dashboard-connection-widget,
 .dashboard-url-widget {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   height: 100%;
   min-height: 0;
 }
 
 .dashboard-connection-controls,
-.dashboard-url-controls,
-.dashboard-url-viewport-controls {
+.dashboard-url-controls {
   display: flex;
   align-items: end;
   gap: 8px;
@@ -1566,8 +1565,7 @@ main.dashboard-page {
   display: none;
 }
 
-.dashboard-url-controls,
-.dashboard-url-viewport-controls {
+.dashboard-url-controls {
   flex-wrap: wrap;
 }
 
@@ -1575,34 +1573,33 @@ main.dashboard-page {
   min-width: 92px;
 }
 
-.dashboard-url-controls .dw-field:not(.dashboard-url-field),
-.dashboard-url-viewport-controls .dw-field {
+.dashboard-url-controls .dw-field:not(.dashboard-url-field) {
   flex: 0 0 112px;
 }
 
-.dashboard-url-viewport-controls {
-  align-items: center;
-  padding: 8px;
+.dashboard-url-webview-shell {
+  position: relative;
+  display: flex;
+  min-height: 180px;
+  min-width: 0;
+  overflow: hidden;
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.dashboard-url-frame-shell {
+.dashboard-url-webview-shell .webview-workspace {
   position: relative;
-  min-height: 180px;
-  overflow: hidden;
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  border-radius: 9px;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
 }
 
-.dashboard-url-frame {
-  display: block;
-  min-width: 100%;
-  min-height: 100%;
-  background: #fff;
+.dashboard-url-webview-shell .terminal-pane {
   border: 0;
+  border-radius: 0;
 }
 
 [data-color-scheme="dark"] .dw-preset-glass,
