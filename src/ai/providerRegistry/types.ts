@@ -42,6 +42,7 @@ export type AiProviderDefaults = Pick<
   | "model"
   | "reasoningEffort"
   | "outputLanguage"
+  | "allowInsecureTls"
   | "cliExecutionPolicy"
   | "claudeCliPath"
   | "codexCliPath"

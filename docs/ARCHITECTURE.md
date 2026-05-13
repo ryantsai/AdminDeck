@@ -41,7 +41,7 @@ Debug-only observability should use local debug logs, console output, or the dia
 - `src/settings/GeneralSettings.tsx` — Language (i18n) selector, Auto Backup toggle and last-backup status, connected Connection rail shortcut toggle, minimize-to-tray toggle, settings backup/import actions, database folder opener.
 - `src/settings/AppearanceSettings.tsx` — App UI font family, layout reset, Color Scheme placeholder.
 - `src/settings/DashboardSettings.tsx` — Dashboard-wide preferences: confirm before removing a widget, default landing view. Per-view grid density is owned by the view row and edited from the Dashboard topbar in edit mode, not here. The destructive "Reset Dashboard" action lives in General → Settings data, not in this section.
-- `src/settings/AiSettings.tsx` — AI provider kind, dynamic provider fields, provider-specific model selector, custom model ID input, API key, output language.
+- `src/settings/AiSettings.tsx` — AI provider kind, dynamic provider fields, provider-specific model selector, custom model ID input, API key, output language, and insecure TLS provider toggle. Provider addition rules live in `docs/AI_PROVIDERS.md`.
 - `src/settings/SshSettings.tsx` — SSH defaults, SSH terminal buffer behavior, SSH port redirect visibility, SSH OSC 52 clipboard policy, and SFTP transfer defaults summary.
 - `src/settings/TerminalSettings.tsx` — Local terminal font, size, line height, scrollback, cursor, default shell, and local terminal toggles. Do not put SSH-only terminal behavior here; SSH terminal behavior belongs in `SshSettings.tsx`.
 - `src/settings/UrlSettings.tsx` — URL Connection security defaults, saved website password metadata, and URL data shard management.
@@ -333,7 +333,7 @@ Workspace chrome layout is global state. Connection-specific live context may ch
 - `src/remote-desktop/RemoteDesktopWorkspace.tsx` — RDP/VNC workspace host, RDP ActiveX visibility/bounds synchronization, RDP snapshot/parking for DOM overlays, and VNC canvas framebuffer/input handling.
 - `src/ai/AssistantPanel.tsx` — AI Assistant chat surface, markdown rendering, chat history, extension draft intent UI, terminal send handoff.
 - `src/ai/providers.ts` — frontend provider registry barrel and provider validation.
-- `src/ai/providerRegistry/` — one provider definition per file plus shared registry types. Provider model suggestions live here, not in Settings. The Settings model picker must render these suggestions as a real provider-specific select so users can see every known model; freeform model or deployment IDs belong in the separate custom model ID input.
+- `src/ai/providerRegistry/` — one provider definition per file plus shared registry types. Provider model suggestions live here, not in Settings. The Settings model picker must render these suggestions as a real provider-specific select so users can see every known model; freeform model or deployment IDs belong in the separate custom model ID input. See `docs/AI_PROVIDERS.md` before adding or changing provider structure.
 - `src/settings/SettingsPage.tsx` — Settings shell with sidebar nav and section routing.
 - `src/settings/UrlSettings.tsx` — URL Connection security defaults, saved website password metadata, and URL data shard management.
 - `src/settings/shared.tsx` — Shared `SettingsSummary` and `PlannedSettingsGrid` for settings pages.

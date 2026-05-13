@@ -376,6 +376,23 @@ export function AiSettings() {
             />
           ))}
         </div>
+        <div className="settings-toggle-list">
+          <label className="settings-toggle-row">
+            <ToggleSwitch
+              checked={draft.allowInsecureTls}
+              onChange={(checked) =>
+                setDraft((settings) => ({
+                  ...settings,
+                  allowInsecureTls: checked,
+                }))
+              }
+            />
+            <span>
+              <strong>{t("settings.aiAllowInsecureTls")}</strong>
+              <small>{t("settings.aiAllowInsecureTlsHint")}</small>
+            </span>
+          </label>
+        </div>
       </fieldset>
 
       <fieldset className="settings-subsection settings-fieldset">

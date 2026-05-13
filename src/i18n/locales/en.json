@@ -582,6 +582,8 @@
     "aiToolsTitle": "Assistant tools",
     "aiProviderConnection": "Provider connection",
     "aiProviderConnectionHint": "Endpoint, model, reasoning, and API key.",
+    "aiAllowInsecureTls": "Allow insecure TLS for AI providers",
+    "aiAllowInsecureTlsHint": "Ignore invalid or self-signed certificates for AI provider requests. Use only for trusted local or internal endpoints.",
     "aiResponseDefaults": "Response defaults",
     "aiResponseDefaultsHint": "Language preferences for Assistant replies.",
     "aiToolsDescription": "Choose the built-in tools the AI Assistant may call.",

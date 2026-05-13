@@ -101,6 +101,7 @@ export const defaultAiProviderSettings: AiProviderSettings = {
   model: "gpt-5.5",
   reasoningEffort: "medium",
   outputLanguage: "",
+  allowInsecureTls: false,
   cliExecutionPolicy: "suggestOnly",
   claudeCliPath: "",
   codexCliPath: "",

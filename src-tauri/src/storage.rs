@@ -441,6 +441,8 @@ pub struct AiProviderSettings {
     reasoning_effort: String,
     #[serde(default)]
     output_language: String,
+    #[serde(default)]
+    allow_insecure_tls: bool,
     #[serde(default = "default_ai_cli_execution_policy")]
     cli_execution_policy: String,
     #[serde(default)]
@@ -466,6 +468,10 @@ impl AiProviderSettings {
 
     pub(crate) fn reasoning_effort(&self) -> &str {
         &self.reasoning_effort
+    }
+
+    pub(crate) fn allow_insecure_tls(&self) -> bool {
+        self.allow_insecure_tls
     }
 
     pub(crate) fn tools(&self) -> &AiAssistantToolSettings {
@@ -3400,6 +3406,7 @@ fn default_ai_provider_settings() -> AiProviderSettings {
         model: default_ai_model(),
         reasoning_effort: default_ai_reasoning_effort(),
         output_language: String::new(),
+        allow_insecure_tls: false,
         cli_execution_policy: default_ai_cli_execution_policy(),
         claude_cli_path: None,
         codex_cli_path: None,
@@ -5117,6 +5124,7 @@ mod tests {
         assert_eq!(defaults.model, "gpt-5.5");
         assert_eq!(defaults.reasoning_effort, "medium");
         assert_eq!(defaults.cli_execution_policy, "suggestOnly");
+        assert!(!defaults.allow_insecure_tls);
 
         let updated = storage
             .update_ai_provider_settings(AiProviderSettings {
@@ -5126,6 +5134,7 @@ mod tests {
                 model: " openai/gpt-5.5 ".to_string(),
                 reasoning_effort: " XHIGH ".to_string(),
                 output_language: String::new(),
+                allow_insecure_tls: true,
                 cli_execution_policy: "suggest-only".to_string(),
                 claude_cli_path: Some("  C:\\Tools\\claude.exe  ".to_string()),
                 codex_cli_path: Some("  codex  ".to_string()),
@@ -5139,6 +5148,7 @@ mod tests {
         assert_eq!(updated.model, "openai/gpt-5.5");
         assert_eq!(updated.reasoning_effort, "max");
         assert_eq!(updated.cli_execution_policy, "suggestOnly");
+        assert!(updated.allow_insecure_tls);
         assert_eq!(
             updated.claude_cli_path.as_deref(),
             Some("C:\\Tools\\claude.exe")
@@ -5151,6 +5161,7 @@ mod tests {
         assert_eq!(reloaded.base_url, "https://llm-gateway.internal/v1");
         assert_eq!(reloaded.model, "openai/gpt-5.5");
         assert_eq!(reloaded.reasoning_effort, "max");
+        assert!(reloaded.allow_insecure_tls);
     }
 
     #[test]
@@ -5165,6 +5176,7 @@ mod tests {
                 model: "gpt-5.5".to_string(),
                 reasoning_effort: "medium".to_string(),
                 output_language: String::new(),
+                allow_insecure_tls: false,
                 cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
@@ -5191,6 +5203,7 @@ mod tests {
                 model: "   ".to_string(),
                 reasoning_effort: "medium".to_string(),
                 output_language: String::new(),
+                allow_insecure_tls: false,
                 cli_execution_policy: "suggestOnly".to_string(),
                 claude_cli_path: None,
                 codex_cli_path: None,
@@ -5213,6 +5226,7 @@ mod tests {
                 model: "gpt-5.5".to_string(),
                 reasoning_effort: "medium".to_string(),
                 output_language: String::new(),
+                allow_insecure_tls: false,
                 cli_execution_policy: "executeAutomatically".to_string(),
                 claude_cli_path: Some("claude".to_string()),
                 codex_cli_path: Some("codex".to_string()),

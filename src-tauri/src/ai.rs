@@ -6,6 +6,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use futures::StreamExt;
+
+mod providers;
+use providers::provider_for;
 use tauri::ipc::Channel;
 use tauri::Manager;
 
@@ -311,92 +314,6 @@ struct OpenAiCompatibleProvider {
     default_api: OpenAiApiStyle,
 }
 
-fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, String> {
-    match kind {
-        "azure-openai" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "azure-openai",
-            label: "Azure OpenAI",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::Azure,
-            auth_style: OpenAiAuthStyle::ApiKeyHeader,
-            default_api: OpenAiApiStyle::Responses,
-        }),
-        "deepseek" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "deepseek",
-            label: "DeepSeek",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::ChatCompletions,
-        }),
-        "grok" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "grok",
-            label: "Grok",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::ChatCompletions,
-        }),
-        "litellm" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "litellm",
-            label: "LiteLLM",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::Responses,
-        }),
-        "openai" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "openai",
-            label: "OpenAI",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::Responses,
-        }),
-        "openrouter" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "openrouter",
-            label: "OpenRouter",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::Responses,
-        }),
-        "ollama" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "ollama",
-            label: "Ollama",
-            requires_api_key: false,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::Responses,
-        }),
-        "nvidia" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "nvidia",
-            label: "NVIDIA",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::Responses,
-        }),
-        "openai-compatible" => Ok(OpenAiCompatibleProvider {
-            provider_kind: "openai-compatible",
-            label: "OpenAI compatible",
-            requires_api_key: true,
-            endpoint_style: OpenAiEndpointStyle::ChatCompletions,
-            auth_style: OpenAiAuthStyle::Bearer,
-            default_api: OpenAiApiStyle::ChatCompletions,
-        }),
-        "anthropic" => Err(
-            "Anthropic support needs a provider adapter; DeepSeek and OpenAI-compatible providers are wired first."
-                .to_string(),
-        ),
-        "github-copilot" => Err(
-            "GitHub Copilot support needs the Copilot SDK OAuth bridge before AI Assistant can chat."
-                .to_string(),
-        ),
-        _ => Err("AI provider is not supported by the agent runner".to_string()),
-    }
-}
-
 #[derive(Clone, Copy)]
 enum OpenAiEndpointStyle {
     ChatCompletions,
@@ -514,6 +431,14 @@ struct ToolCallAccumulator {
     id: String,
     name: String,
     arguments: String,
+}
+
+
+fn ai_http_client(allow_insecure_tls: bool) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .danger_accept_invalid_certs(allow_insecure_tls)
+        .build()
+        .map_err(|error| format!("failed to configure AI HTTP client: {error}"))
 }
 
 macro_rules! ai_debug {
@@ -907,7 +832,7 @@ impl OpenAiCompatibleProvider {
             request.messages,
             request.output_language,
         );
-        let client = reqwest::Client::new();
+        let client = ai_http_client(settings.allow_insecure_tls())?;
         let tool_definitions = if request.allow_tools {
             ai_tool_definitions(settings.tools())
         } else {
@@ -1068,7 +993,7 @@ impl OpenAiCompatibleProvider {
             request.output_language,
         );
         let mut input = responses_input_from_messages(messages, request.files);
-        let client = reqwest::Client::new();
+        let client = ai_http_client(settings.allow_insecure_tls())?;
         let tool_definitions = if request.allow_tools {
             ai_tool_definitions(settings.tools())
         } else {
@@ -1235,7 +1160,7 @@ impl OpenAiCompatibleProvider {
             request.messages,
             request.output_language,
         );
-        let client = reqwest::Client::new();
+        let client = ai_http_client(settings.allow_insecure_tls())?;
         let tool_definitions = if request.allow_tools {
             ai_tool_definitions(settings.tools())
         } else {
@@ -1463,7 +1388,7 @@ impl OpenAiCompatibleProvider {
             request.messages,
             request.output_language,
         );
-        let client = reqwest::Client::new();
+        let client = ai_http_client(settings.allow_insecure_tls())?;
         let tool_definitions = if request.allow_tools {
             ai_tool_definitions(settings.tools())
         } else {

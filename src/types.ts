@@ -380,6 +380,7 @@ export interface AiProviderSettings {
   model: string;
   reasoningEffort: AiReasoningEffort;
   outputLanguage: string;
+  allowInsecureTls: boolean;
   cliExecutionPolicy: "suggestOnly";
   claudeCliPath?: string;
   codexCliPath?: string;
