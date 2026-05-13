@@ -5768,13 +5768,22 @@ progress {
   align-items: start;
 }
 
-.connection-dialog-fields-two-column > :not(.connection-specific-options) {
+.connection-dialog-primary-fields {
+  display: contents;
+}
+
+.connection-dialog-fields-two-column > .connection-dialog-primary-fields {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
   grid-column: 1;
 }
 
 .connection-dialog-fields-two-column > .connection-specific-options {
   grid-column: 2;
-  grid-row: 1 / span 20;
+  grid-row: 1;
+  align-self: start;
 }
 
 .connection-endpoint-fields,
@@ -5884,6 +5893,46 @@ fieldset.connection-session-fields > legend {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-muted);
+}
+
+fieldset.connection-specific-options {
+  gap: 5px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+}
+
+fieldset.connection-specific-options > legend {
+  min-height: 18px;
+  margin-bottom: 2px;
+}
+
+.connection-specific-options-panel {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  padding: 10px;
+  background: var(--surface-muted);
+  border-radius: 8px;
+}
+
+.connection-specific-options-panel > .connection-session-toggle:first-child {
+  min-height: 30px;
+  padding-bottom: 8px;
+}
+
+.connection-specific-options-panel > .connection-option-fields {
+  padding: 8px 0;
+  background: transparent;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.connection-specific-options-panel > .connection-session-fields {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 
 .connection-session-toggle {
@@ -6271,8 +6320,8 @@ fieldset.connection-session-fields > legend {
   overflow-wrap: anywhere;
 }
 
-.import-dialog {
-  width: min(1100px, calc(100vw - 40px));
+.connection-dialog-backdrop .import-dialog {
+  width: min(900px, calc(100vw - 40px));
 }
 
 .import-dialog-header-text {

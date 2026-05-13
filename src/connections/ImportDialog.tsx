@@ -4,7 +4,6 @@ import {
   FileUp,
   Loader2,
   Network,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -76,7 +75,6 @@ export function ImportDialog({ tree, sshSettings, onClose, onImported }: ImportD
                   setStage("menu");
                   setError("");
                 }}
-                title={t("connections.import.back")}
                 type="button"
                 aria-label={t("connections.import.back")}
               >
@@ -84,32 +82,30 @@ export function ImportDialog({ tree, sshSettings, onClose, onImported }: ImportD
               </button>
             ) : null}
             <div>
-              <p className="panel-label">{t("connections.import.title")}</p>
-              <h2>
+              <p className="panel-label">
                 {stage === "menu"
-                  ? t("connections.import.chooseSource")
+                  ? t("connections.import.title")
                   : stage === "file"
                     ? t("connections.import.fromFileTitle")
                     : stage === "scan"
                       ? t("connections.import.scanTitle")
                       : t("connections.import.bookmarksTitle")}
-              </h2>
+              </p>
             </div>
           </div>
-          <button
-            className="icon-button"
-            type="button"
-            aria-label={t("connections.close")}
-            onClick={onClose}
-          >
-            <X size={15} />
-          </button>
         </header>
 
         {error ? <p className="form-error">{error}</p> : null}
 
         {stage === "menu" ? (
-          <ImportMenu onPick={(next) => setStage(next)} />
+          <>
+            <ImportMenu onPick={(next) => setStage(next)} />
+            <div className="dialog-actions import-menu-actions">
+              <button className="toolbar-button" onClick={onClose} type="button">
+                {t("connections.cancel")}
+              </button>
+            </div>
+          </>
         ) : null}
         {stage === "file" ? (
           <FileImportPanel
@@ -294,7 +290,13 @@ function FileImportPanel({
           tree={tree}
           warnings={preview.warnings}
         />
-      ) : null}
+      ) : (
+        <div className="dialog-actions">
+          <button className="toolbar-button" onClick={onClose} type="button">
+            {t("connections.cancel")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -2436,6 +2436,7 @@ function ConnectionDialog({
                 : "connection-dialog-fields"
             }
           >
+            <div className="connection-dialog-primary-fields">
             {mode === "save" || mode === "edit" ? (
               <label>
                 <span>{t("connections.folder")}</span>
@@ -2711,189 +2712,196 @@ function ConnectionDialog({
                 </div>
               </>
             ) : null}
+            </div>
             {connectionType === "rdp" ? (
               <fieldset className="connection-session-fields connection-specific-options">
                 <legend>{t("connections.rdpOptions")}</legend>
-                <label className="connection-session-toggle">
-                  <span>{t("connections.inheritSettingsDefaults")}</span>
-                  <input
-                    name="rdpInheritDefaults"
-                    type="checkbox"
-                    defaultChecked={initialConnection?.rdpOptions?.inheritDefaults ?? true}
-                  />
-                </label>
-                <div className="connection-option-fields">
-                  <label>
-                    <span>{t("settings.colorDepth")}</span>
-                    <select name="rdpColorDepth" defaultValue={initialConnection?.rdpOptions?.colorDepth ?? rdpSettings.colorDepth}>
-                      <option value={32}>{t("settings.rdpColorDepth32")}</option>
-                      <option value={24}>{t("settings.rdpColorDepth24")}</option>
-                      <option value={16}>{t("settings.rdpColorDepth16")}</option>
-                      <option value={15}>{t("settings.rdpColorDepth15")}</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>{t("settings.performanceFlags")}</span>
-                    <select name="rdpPerformanceProfile" defaultValue={initialConnection?.rdpOptions?.performanceProfile ?? rdpSettings.performanceProfile}>
-                      <option value="balanced">{t("settings.rdpPerformanceBalanced")}</option>
-                      <option value="quality">{t("settings.rdpPerformanceQuality")}</option>
-                      <option value="speed">{t("settings.rdpPerformanceSpeed")}</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="connection-session-fields">
+                <div className="connection-specific-options-panel">
                   <label className="connection-session-toggle">
-                    <span>{t("settings.rdpRedirectClipboard")}</span>
-                    <input name="rdpRedirectClipboard" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.redirectClipboard ?? rdpSettings.redirectClipboard} />
+                    <span>{t("connections.inheritSettingsDefaults")}</span>
+                    <input
+                      name="rdpInheritDefaults"
+                      type="checkbox"
+                      defaultChecked={initialConnection?.rdpOptions?.inheritDefaults ?? true}
+                    />
                   </label>
-                  <label className="connection-session-toggle">
-                    <span>{t("settings.rdpRedirectDrives")}</span>
-                    <input name="rdpRedirectDrives" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.redirectDrives ?? rdpSettings.redirectDrives} />
-                  </label>
-                  <label className="connection-session-toggle">
-                    <span>{t("settings.bitmapCache")}</span>
-                    <input name="rdpBitmapCache" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.bitmapCache ?? rdpSettings.bitmapCache} />
-                  </label>
+                  <div className="connection-option-fields">
+                    <label>
+                      <span>{t("settings.colorDepth")}</span>
+                      <select name="rdpColorDepth" defaultValue={initialConnection?.rdpOptions?.colorDepth ?? rdpSettings.colorDepth}>
+                        <option value={32}>{t("settings.rdpColorDepth32")}</option>
+                        <option value={24}>{t("settings.rdpColorDepth24")}</option>
+                        <option value={16}>{t("settings.rdpColorDepth16")}</option>
+                        <option value={15}>{t("settings.rdpColorDepth15")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("settings.performanceFlags")}</span>
+                      <select name="rdpPerformanceProfile" defaultValue={initialConnection?.rdpOptions?.performanceProfile ?? rdpSettings.performanceProfile}>
+                        <option value="balanced">{t("settings.rdpPerformanceBalanced")}</option>
+                        <option value="quality">{t("settings.rdpPerformanceQuality")}</option>
+                        <option value="speed">{t("settings.rdpPerformanceSpeed")}</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="connection-session-fields">
+                    <label className="connection-session-toggle">
+                      <span>{t("settings.rdpRedirectClipboard")}</span>
+                      <input name="rdpRedirectClipboard" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.redirectClipboard ?? rdpSettings.redirectClipboard} />
+                    </label>
+                    <label className="connection-session-toggle">
+                      <span>{t("settings.rdpRedirectDrives")}</span>
+                      <input name="rdpRedirectDrives" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.redirectDrives ?? rdpSettings.redirectDrives} />
+                    </label>
+                    <label className="connection-session-toggle">
+                      <span>{t("settings.bitmapCache")}</span>
+                      <input name="rdpBitmapCache" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.bitmapCache ?? rdpSettings.bitmapCache} />
+                    </label>
+                  </div>
                 </div>
               </fieldset>
             ) : null}
             {connectionType === "vnc" ? (
               <fieldset className="connection-session-fields connection-specific-options">
                 <legend>{t("connections.vncOptions")}</legend>
-                <label className="connection-session-toggle">
-                  <span>{t("connections.inheritSettingsDefaults")}</span>
-                  <input
-                    name="vncInheritDefaults"
-                    type="checkbox"
-                    defaultChecked={initialConnection?.vncOptions?.inheritDefaults ?? true}
-                  />
-                </label>
-                <div className="connection-option-fields">
-                  <label>
-                    <span>{t("settings.preferredEncoding")}</span>
-                    <select name="vncPreferredEncoding" defaultValue={initialConnection?.vncOptions?.preferredEncoding ?? vncSettings.preferredEncoding}>
-                      <option value="tight">{t("settings.vncEncodingTight")}</option>
-                      <option value="zrle">{t("settings.vncEncodingZrle")}</option>
-                      <option value="raw">{t("settings.vncEncodingRaw")}</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>{t("settings.colorLevel")}</span>
-                    <select name="vncColorLevel" defaultValue={initialConnection?.vncOptions?.colorLevel ?? vncSettings.colorLevel}>
-                      <option value="full">{t("settings.vncColorFull")}</option>
-                      <option value="256">{t("settings.vncColor256")}</option>
-                      <option value="64">{t("settings.vncColor64")}</option>
-                      <option value="8">{t("settings.vncColor8")}</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="connection-session-fields">
+                <div className="connection-specific-options-panel">
                   <label className="connection-session-toggle">
-                    <span>{t("settings.vncSharedSession")}</span>
-                    <input name="vncSharedSession" type="checkbox" defaultChecked={initialConnection?.vncOptions?.sharedSession ?? vncSettings.sharedSession} />
+                    <span>{t("connections.inheritSettingsDefaults")}</span>
+                    <input
+                      name="vncInheritDefaults"
+                      type="checkbox"
+                      defaultChecked={initialConnection?.vncOptions?.inheritDefaults ?? true}
+                    />
                   </label>
-                  <label className="connection-session-toggle">
-                    <span>{t("settings.vncViewOnly")}</span>
-                    <input name="vncViewOnly" type="checkbox" defaultChecked={initialConnection?.vncOptions?.viewOnly ?? vncSettings.viewOnly} />
-                  </label>
+                  <div className="connection-option-fields">
+                    <label>
+                      <span>{t("settings.preferredEncoding")}</span>
+                      <select name="vncPreferredEncoding" defaultValue={initialConnection?.vncOptions?.preferredEncoding ?? vncSettings.preferredEncoding}>
+                        <option value="tight">{t("settings.vncEncodingTight")}</option>
+                        <option value="zrle">{t("settings.vncEncodingZrle")}</option>
+                        <option value="raw">{t("settings.vncEncodingRaw")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("settings.colorLevel")}</span>
+                      <select name="vncColorLevel" defaultValue={initialConnection?.vncOptions?.colorLevel ?? vncSettings.colorLevel}>
+                        <option value="full">{t("settings.vncColorFull")}</option>
+                        <option value="256">{t("settings.vncColor256")}</option>
+                        <option value="64">{t("settings.vncColor64")}</option>
+                        <option value="8">{t("settings.vncColor8")}</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="connection-session-fields">
+                    <label className="connection-session-toggle">
+                      <span>{t("settings.vncSharedSession")}</span>
+                      <input name="vncSharedSession" type="checkbox" defaultChecked={initialConnection?.vncOptions?.sharedSession ?? vncSettings.sharedSession} />
+                    </label>
+                    <label className="connection-session-toggle">
+                      <span>{t("settings.vncViewOnly")}</span>
+                      <input name="vncViewOnly" type="checkbox" defaultChecked={initialConnection?.vncOptions?.viewOnly ?? vncSettings.viewOnly} />
+                    </label>
+                  </div>
                 </div>
               </fieldset>
             ) : null}
             {isFtpConnection ? (
               <fieldset className="connection-session-fields connection-specific-options">
                 <legend>{t("connections.ftpOptions")}</legend>
-                <div className="connection-option-fields">
-                  <label>
-                    <span>{t("connections.ftpProtocol")}</span>
-                    <select
-                      name="ftpProtocol"
-                      defaultValue={initialConnection?.ftpOptions?.protocol ?? "ftp"}
-                      onChange={handleFtpProtocolChange}
-                    >
-                      <option value="ftp">{t("connections.ftpProtocolFtp")}</option>
-                      <option value="ftps">{t("connections.ftpProtocolFtps")}</option>
-                      <option value="sftp">{t("connections.ftpProtocolSftp")}</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>{t("connections.ftpMode")}</span>
-                    <select
-                      name="ftpMode"
-                      defaultValue={initialConnection?.ftpOptions?.mode ?? "passive"}
-                    >
-                      <option value="passive">{t("connections.ftpModePassive")}</option>
-                      <option value="active">{t("connections.ftpModeActive")}</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>{t("connections.ftpTlsMode")}</span>
-                    <select
-                      name="ftpTlsMode"
-                      defaultValue={initialConnection?.ftpOptions?.tlsMode ?? "explicit"}
-                    >
-                      <option value="explicit">{t("connections.ftpTlsExplicit")}</option>
-                      <option value="implicit">{t("connections.ftpTlsImplicit")}</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>{t("connections.ftpTransferType")}</span>
-                    <select
-                      name="ftpTransferType"
-                      defaultValue={initialConnection?.ftpOptions?.transferType ?? "binary"}
-                    >
-                      <option value="binary">{t("connections.ftpTransferBinary")}</option>
-                      <option value="ascii">{t("connections.ftpTransferAscii")}</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>{t("connections.ftpConnectTimeoutSecs")}</span>
-                    <input
-                      name="ftpConnectTimeoutSecs"
-                      defaultValue={initialConnection?.ftpOptions?.connectTimeoutSecs ?? 30}
-                      inputMode="numeric"
-                      min="1"
-                      max="600"
-                      type="number"
-                    />
-                  </label>
-                  <label>
-                    <span>{t("connections.ftpKeepaliveSecs")}</span>
-                    <input
-                      name="ftpKeepaliveSecs"
-                      defaultValue={initialConnection?.ftpOptions?.keepaliveSecs ?? 0}
-                      inputMode="numeric"
-                      min="0"
-                      max="3600"
-                      type="number"
-                      placeholder="0"
-                    />
-                  </label>
-                </div>
-                <div className="connection-session-fields">
-                  <label className="connection-session-toggle">
-                    <span>{t("connections.ftpUtf8")}</span>
-                    <input
-                      name="ftpUtf8"
-                      type="checkbox"
-                      defaultChecked={initialConnection?.ftpOptions?.utf8 ?? true}
-                    />
-                  </label>
-                  <label className="connection-session-toggle">
-                    <span>{t("connections.ftpShowHidden")}</span>
-                    <input
-                      name="ftpShowHidden"
-                      type="checkbox"
-                      defaultChecked={initialConnection?.ftpOptions?.showHidden ?? false}
-                    />
-                  </label>
-                  <label className="connection-session-toggle">
-                    <span>{t("connections.ftpIgnoreCertErrors")}</span>
-                    <input
-                      name="ftpIgnoreCertErrors"
-                      type="checkbox"
-                      defaultChecked={initialConnection?.ftpOptions?.ignoreCertErrors ?? false}
-                    />
-                  </label>
+                <div className="connection-specific-options-panel">
+                  <div className="connection-option-fields">
+                    <label>
+                      <span>{t("connections.ftpProtocol")}</span>
+                      <select
+                        name="ftpProtocol"
+                        defaultValue={initialConnection?.ftpOptions?.protocol ?? "ftp"}
+                        onChange={handleFtpProtocolChange}
+                      >
+                        <option value="ftp">{t("connections.ftpProtocolFtp")}</option>
+                        <option value="ftps">{t("connections.ftpProtocolFtps")}</option>
+                        <option value="sftp">{t("connections.ftpProtocolSftp")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("connections.ftpMode")}</span>
+                      <select
+                        name="ftpMode"
+                        defaultValue={initialConnection?.ftpOptions?.mode ?? "passive"}
+                      >
+                        <option value="passive">{t("connections.ftpModePassive")}</option>
+                        <option value="active">{t("connections.ftpModeActive")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("connections.ftpTlsMode")}</span>
+                      <select
+                        name="ftpTlsMode"
+                        defaultValue={initialConnection?.ftpOptions?.tlsMode ?? "explicit"}
+                      >
+                        <option value="explicit">{t("connections.ftpTlsExplicit")}</option>
+                        <option value="implicit">{t("connections.ftpTlsImplicit")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("connections.ftpTransferType")}</span>
+                      <select
+                        name="ftpTransferType"
+                        defaultValue={initialConnection?.ftpOptions?.transferType ?? "binary"}
+                      >
+                        <option value="binary">{t("connections.ftpTransferBinary")}</option>
+                        <option value="ascii">{t("connections.ftpTransferAscii")}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>{t("connections.ftpConnectTimeoutSecs")}</span>
+                      <input
+                        name="ftpConnectTimeoutSecs"
+                        defaultValue={initialConnection?.ftpOptions?.connectTimeoutSecs ?? 30}
+                        inputMode="numeric"
+                        min="1"
+                        max="600"
+                        type="number"
+                      />
+                    </label>
+                    <label>
+                      <span>{t("connections.ftpKeepaliveSecs")}</span>
+                      <input
+                        name="ftpKeepaliveSecs"
+                        defaultValue={initialConnection?.ftpOptions?.keepaliveSecs ?? 0}
+                        inputMode="numeric"
+                        min="0"
+                        max="3600"
+                        type="number"
+                        placeholder="0"
+                      />
+                    </label>
+                  </div>
+                  <div className="connection-session-fields">
+                    <label className="connection-session-toggle">
+                      <span>{t("connections.ftpUtf8")}</span>
+                      <input
+                        name="ftpUtf8"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.ftpOptions?.utf8 ?? true}
+                      />
+                    </label>
+                    <label className="connection-session-toggle">
+                      <span>{t("connections.ftpShowHidden")}</span>
+                      <input
+                        name="ftpShowHidden"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.ftpOptions?.showHidden ?? false}
+                      />
+                    </label>
+                    <label className="connection-session-toggle">
+                      <span>{t("connections.ftpIgnoreCertErrors")}</span>
+                      <input
+                        name="ftpIgnoreCertErrors"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.ftpOptions?.ignoreCertErrors ?? false}
+                      />
+                    </label>
+                  </div>
                 </div>
               </fieldset>
             ) : null}
