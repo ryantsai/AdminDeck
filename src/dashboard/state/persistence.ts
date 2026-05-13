@@ -37,6 +37,8 @@ function browserPreviewState() {
           accentName: "blue",
           iconName: "Wrench",
           customTitle: null,
+          glass: false,
+          actionDirection: undefined,
           gridX: 0,
           gridY: 0,
           gridW: 4,

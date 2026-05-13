@@ -12,7 +12,7 @@ use std::{
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
-const SCHEMA_USER_VERSION: i32 = 12;
+const SCHEMA_USER_VERSION: i32 = 13;
 
 const CURRENT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS connection_folders (
@@ -181,6 +181,8 @@ CREATE TABLE IF NOT EXISTS dashboard_widget_instances (
     accent_name TEXT NOT NULL,
     icon_name TEXT NOT NULL,
     custom_title TEXT,
+    glass INTEGER NOT NULL DEFAULT 0,
+    action_direction TEXT,
     grid_x INTEGER NOT NULL,
     grid_y INTEGER NOT NULL,
     grid_w INTEGER NOT NULL,

@@ -2,7 +2,7 @@ export type WidgetKind = "builtIn" | "content" | "script";
 export type WidgetCustomKind = "content" | "script";
 
 export const WIDGET_PRESETS = [
-  "panel", "ambient", "glass", "tile", "hero", "mono", "stack", "action", "band",
+  "panel", "ambient", "tile", "hero", "mono", "action",
 ] as const;
 export type WidgetPreset = (typeof WIDGET_PRESETS)[number];
 
@@ -42,6 +42,8 @@ export interface DashboardWidgetInstance {
   accentName: AccentName;
   iconName: IconName;
   customTitle: string | null;
+  glass?: boolean;
+  actionDirection?: "vertical" | "horizontal";
   gridX: number;
   gridY: number;
   gridW: number;
@@ -70,6 +72,8 @@ export interface InstancePatch {
   accentName?: AccentName;
   iconName?: IconName;
   customTitle?: string | null;
+  glass?: boolean;
+  actionDirection?: "vertical" | "horizontal";
   gridX?: number;
   gridY?: number;
   gridW?: number;

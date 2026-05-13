@@ -8,6 +8,8 @@ export interface PresetChromeProps {
   body: ReactNode;
   controls?: ReactNode;
   editMode: boolean;
+  glass?: boolean;
+  actionDirection?: "vertical" | "horizontal";
 }
 
 function PanelChrome({ title, summary, icon, body, controls, editMode }: PresetChromeProps) {
@@ -26,22 +28,9 @@ function PanelChrome({ title, summary, icon, body, controls, editMode }: PresetC
   );
 }
 
-function AmbientChrome({ title, body, controls, editMode }: PresetChromeProps) {
+function AmbientChrome({ title, body, controls, editMode, glass }: PresetChromeProps) {
   return (
-    <div className={`dw-preset dw-preset-ambient${editMode ? " drag-handle" : ""}`}>
-      <div className="dw-ambient-label">
-        <span className="dw-dot" />
-        {title}
-        {controls}
-      </div>
-      {body}
-    </div>
-  );
-}
-
-function GlassChrome({ title, body, controls, editMode }: PresetChromeProps) {
-  return (
-    <div className={`dw-preset dw-preset-glass${editMode ? " drag-handle" : ""}`}>
+    <div className={`dw-preset dw-preset-ambient${glass ? " dw-preset-ambient--glass" : ""}${editMode ? " drag-handle" : ""}`}>
       <div className="dw-ambient-label">
         <span className="dw-dot" />
         {title}
@@ -91,20 +80,19 @@ function MonoChrome({ title, body, controls, editMode }: PresetChromeProps) {
   );
 }
 
-function StackChrome({ title, icon, body, controls, editMode }: PresetChromeProps) {
-  return (
-    <div className="dw-preset dw-preset-stack">
-      <div className={`dw-stack-head${editMode ? " drag-handle" : ""}`}>
-        <span className="dw-icon">{icon}</span>
-        <h3 className="dw-title">{title}</h3>
+function ActionChrome({ title, icon, body, controls, editMode, actionDirection }: PresetChromeProps) {
+  if (actionDirection === "horizontal") {
+    return (
+      <div className={`dw-preset dw-preset-action dw-preset-action--horizontal${editMode ? " drag-handle" : ""}`}>
+        <span className="dw-action-icon">{icon}</span>
+        <div className="dw-action-body">
+          <h3 className="dw-action-title">{title}</h3>
+          {body}
+        </div>
         {controls}
       </div>
-      <div className="dw-stack-body">{body}</div>
-    </div>
-  );
-}
-
-function ActionChrome({ title, icon, body, controls, editMode }: PresetChromeProps) {
+    );
+  }
   return (
     <div className={`dw-preset dw-preset-action${editMode ? " drag-handle" : ""}`}>
       <span className="dw-action-icon">{icon}</span>
@@ -117,27 +105,11 @@ function ActionChrome({ title, icon, body, controls, editMode }: PresetChromePro
   );
 }
 
-function BandChrome({ title, icon, body, controls, editMode }: PresetChromeProps) {
-  return (
-    <div className={`dw-preset dw-preset-band${editMode ? " drag-handle" : ""}`}>
-      <span className="dw-band-icon">{icon}</span>
-      <div className="dw-band-body">
-        <h3 className="dw-band-title">{title}</h3>
-        {body}
-      </div>
-      {controls}
-    </div>
-  );
-}
-
 export const PRESET_RENDERERS: Record<WidgetPreset, (p: PresetChromeProps) => ReactElement> = {
   panel: PanelChrome,
   ambient: AmbientChrome,
-  glass: GlassChrome,
   tile: TileChrome,
   hero: HeroChrome,
   mono: MonoChrome,
-  stack: StackChrome,
   action: ActionChrome,
-  band: BandChrome,
 };

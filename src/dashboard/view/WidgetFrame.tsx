@@ -104,6 +104,8 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
         body={<WidgetBody instance={instance} />}
         controls={controls}
         editMode={editMode}
+        glass={instance.glass}
+        actionDirection={instance.actionDirection}
       />
     </div>
   );

@@ -399,8 +399,7 @@ main.dashboard-page {
   box-shadow: var(--dashboard-shadow-card);
 }
 
-.dw-head,
-.dw-stack-head {
+.dw-head {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -419,7 +418,6 @@ main.dashboard-page {
 
 .dw-title,
 .dw-action-title,
-.dw-band-title,
 .dw-hero-title {
   margin: 0;
   overflow: hidden;
@@ -462,12 +460,6 @@ main.dashboard-page {
   color: var(--text-muted);
   font-size: 12.5px;
   line-height: 1.55;
-}
-
-.dw-stack-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
 }
 
 .dw-controls {
@@ -539,11 +531,11 @@ main.dashboard-page {
   border-radius: 50%;
 }
 
-.dw-preset-glass {
+.dw-preset-ambient--glass {
   position: relative;
   isolation: isolate;
   padding: 18px;
-  overflow: visible;
+  overflow: hidden;
   color: var(--text);
   background:
     linear-gradient(180deg, rgb(255 255 255 / 55%) 0%, rgb(255 255 255 / 18%) 38%, rgb(255 255 255 / 8%) 100%),
@@ -562,21 +554,21 @@ main.dashboard-page {
   -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
 }
 
-.dw-preset-glass::before {
+.dw-preset-ambient--glass::before {
   content: "";
   position: absolute;
-  inset: -28px;
+  inset: 0;
   z-index: -1;
   pointer-events: none;
   background:
     radial-gradient(50% 60% at 20% 25%, color-mix(in srgb, var(--w-accent) 55%, transparent) 0%, transparent 70%),
     radial-gradient(60% 60% at 85% 80%, color-mix(in srgb, var(--w-accent) 35%, transparent) 0%, transparent 70%);
-  border-radius: 40px;
+  border-radius: 22px;
   opacity: 0.85;
   filter: blur(22px);
 }
 
-.dw-preset-glass::after {
+.dw-preset-ambient--glass::after {
   content: "";
   position: absolute;
   top: 1px;
@@ -589,7 +581,7 @@ main.dashboard-page {
   border-radius: 50%;
 }
 
-.dw-preset-glass > * {
+.dw-preset-ambient--glass > * {
   position: relative;
   z-index: 1;
 }
@@ -730,13 +722,6 @@ main.dashboard-page {
   font-size: 12px;
 }
 
-.dw-preset-stack .dw-stack-head {
-  min-height: 42px;
-  padding: 10px 14px 8px;
-  background: var(--surface);
-  border-bottom: 0;
-}
-
 .dw-preset-action {
   align-items: flex-start;
   gap: 10px;
@@ -767,7 +752,7 @@ main.dashboard-page {
   line-height: 1.5;
 }
 
-.dw-preset-band {
+.dw-preset-action--horizontal {
   flex-direction: row;
   align-items: center;
   gap: 12px;
@@ -779,10 +764,7 @@ main.dashboard-page {
   box-shadow: none;
 }
 
-.dw-band-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.dw-preset-action--horizontal .dw-action-icon {
   flex: 0 0 auto;
   width: 28px;
   height: 28px;
@@ -791,11 +773,21 @@ main.dashboard-page {
   border-radius: 8px;
 }
 
-.dw-band-body {
+.dw-preset-action--horizontal .dw-action-body {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.dw-preset-action--horizontal .dw-action-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .dw-stack-fields {
@@ -1226,13 +1218,6 @@ main.dashboard-page {
   opacity: 0.7;
 }
 
-.dw-catalog-thumb[data-preset="glass"] {
-  background:
-    radial-gradient(circle at 30% 30%, var(--accent-soft), transparent 34%),
-    linear-gradient(135deg, rgb(255 255 255 / 70%), rgb(255 255 255 / 20%)),
-    var(--surface-muted);
-}
-
 .dw-catalog-thumb[data-preset="tile"] {
   background:
     linear-gradient(90deg, var(--w-accent) 0 40%, transparent 40% 100%),
@@ -1259,13 +1244,6 @@ main.dashboard-page {
     linear-gradient(90deg, transparent 0 16px, var(--w-accent-soft, var(--accent-soft)) 16px 52px, transparent 52px),
     var(--surface);
   border-style: dashed;
-}
-
-.dw-catalog-thumb[data-preset="band"] {
-  height: 46px;
-  margin-block: 17px;
-  background: var(--w-accent-soft);
-  border-color: color-mix(in srgb, var(--w-accent) 30%, transparent);
 }
 
 .dw-catalog-confirm-backdrop {
@@ -1621,9 +1599,9 @@ main.dashboard-page {
   border-radius: 0;
 }
 
-[data-color-scheme="dark"] .dw-preset-glass,
-[data-color-scheme="purple"] .dw-preset-glass,
-[data-color-scheme="blue-see"] .dw-preset-glass {
+[data-color-scheme="dark"] .dw-preset-ambient--glass,
+[data-color-scheme="purple"] .dw-preset-ambient--glass,
+[data-color-scheme="blue-see"] .dw-preset-ambient--glass {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 12%) 0%, rgb(255 255 255 / 4%) 40%, rgb(255 255 255 / 2%) 100%),
     radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--w-accent) 32%, transparent) 0%, transparent 60%),
@@ -1632,8 +1610,8 @@ main.dashboard-page {
   border-color: rgb(255 255 255 / 18%);
 }
 
-@media (prefers-color-scheme: dark) {
-  .dw-preset-glass {
+  @media (prefers-color-scheme: dark) {
+  .dw-preset-ambient--glass {
     background:
       linear-gradient(180deg, rgb(255 255 255 / 12%) 0%, rgb(255 255 255 / 4%) 40%, rgb(255 255 255 / 2%) 100%),
       radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--w-accent) 32%, transparent) 0%, transparent 60%),

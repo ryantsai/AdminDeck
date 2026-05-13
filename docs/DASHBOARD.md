@@ -37,7 +37,7 @@ It does not own:
 | `content` | Validated JSON in `dashboard_custom_widgets.body_json` | Declarative renderer in `ContentWidgetRenderer.tsx` — switches over `shape: 'markdown' \| 'kvList' \| 'checklist' \| 'stat'`. No code execution. |
 | `script` | JavaScript source string in `dashboard_custom_widgets.body_json` | Hosted inside an isolated `iframe srcdoc` via `ScriptWidgetHost.tsx`. Has `document`, `fetch`, `setInterval`, and a minimal `KK` postMessage bridge. Permissions (`network`, `pollSeconds`) declared per widget. Fault-isolation boundary — a bad script breaks one widget, not the dashboard. |
 
-**Visual Preset** — one of nine framing styles applied per widget instance: `panel`, `ambient`, `glass`, `tile`, `hero`, `mono`, `stack`, `action`, `band`. Implemented in `presetRegistry.ts` as thin CSS-driven chrome wrappers. Each preset reads `--w-accent` and `--w-accent-soft` for the widget's accent color; presets do not encode their own palette.
+**Visual Preset** — one of six framing styles applied per widget instance: `panel`, `ambient`, `tile`, `hero`, `mono`, `action`. Implemented in `presetRegistry.tsx` as thin CSS-driven chrome wrappers. Each preset reads `--w-accent` and `--w-accent-soft` for the widget's accent color; presets do not encode their own palette. Ambient supports an optional frosted-glass background toggle; Action supports a layout direction toggle (vertical/horizontal).
 
 **Accent** — a palette name (not a hex), persisted on each instance. Resolved to color values from a shared palette table at render time so future palette tweaks affect all dashboards uniformly.
 
@@ -82,7 +82,7 @@ Each command is a thin handler over the storage layer with up-front validation:
 
 Rust validation invariants:
 
-- `preset` is one of the nine known names.
+- `preset` is one of the six known names.
 - `accent_name` is in the palette whitelist.
 - `icon_name` is in the lucide icon whitelist.
 - Grid bounds: `w ≥ 1`, `h ≥ 1`, `x ≥ 0`, `y ≥ 0`, `x + w ≤ 12`.
@@ -104,7 +104,7 @@ src/dashboard/
     persistence.ts               ── typed Tauri command wrappers
   registry/
     builtInRegistry.ts           ── one row per built-in widget; the only place to add new built-ins
-    presetRegistry.ts            ── nine preset chrome components
+    presetRegistry.tsx            ── six preset chrome components
     palette.ts                   ── accent palette + ~50-icon whitelist
   view/
     DashboardCanvas.tsx          ── react-grid-layout host

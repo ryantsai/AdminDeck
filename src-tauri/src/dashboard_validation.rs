@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 pub const PRESETS: &[&str] = &[
-    "panel", "ambient", "glass", "tile", "hero",
-    "mono", "stack", "action", "band",
+    "panel", "ambient", "tile", "hero",
+    "mono", "action",
 ];
 
 pub const ACCENTS: &[&str] = &[

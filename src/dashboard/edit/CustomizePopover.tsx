@@ -53,6 +53,36 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
         </div>
       </section>
 
+      {instance.preset === "ambient" && (
+        <section>
+          <label className="dw-field">
+            <input
+              type="checkbox"
+              checked={instance.glass === true}
+              onChange={(e) => updateInstance(instance.id, { glass: e.target.checked })}
+            />
+            <span>{t("dashboard.glassBackground")}</span>
+          </label>
+        </section>
+      )}
+
+      {instance.preset === "action" && (
+        <section>
+          <h4>{t("dashboard.actionDirection")}</h4>
+          <div className="dw-preset-picker">
+            {(["vertical", "horizontal"] as const).map((d) => (
+              <button
+                key={d}
+                className={(instance.actionDirection ?? "vertical") === d ? "active" : ""}
+                onClick={() => updateInstance(instance.id, { actionDirection: d })}
+              >
+                {t(`dashboard.actionDirectionOptions.${d}`)}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section>
         <h4>{t("dashboard.accent")}</h4>
         <div className="dw-accent-picker">

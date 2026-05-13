@@ -48,13 +48,16 @@
     "preset": {
       "panel": "Panel",
       "ambient": "Ambient",
-      "glass": "Glass",
       "tile": "Tile",
       "hero": "Hero",
       "mono": "Mono",
-      "stack": "Stack",
-      "action": "Action",
-      "band": "Band"
+      "action": "Action"
+    },
+    "glassBackground": "Frosted glass background",
+    "actionDirection": "Layout direction",
+    "actionDirectionOptions": {
+      "vertical": "Vertical",
+      "horizontal": "Horizontal"
     },
     "accent": "Accent",
     "icon": "Icon",

@@ -27,6 +27,8 @@ pub struct DashboardWidgetInstance {
     pub accent_name: String,
     pub icon_name: String,
     pub custom_title: Option<String>,
+    pub glass: bool,
+    pub action_direction: Option<String>,
     pub grid_x: i64,
     pub grid_y: i64,
     pub grid_w: i64,
@@ -61,6 +63,8 @@ pub struct InstancePatch {
     #[serde(default)] pub accent_name: Option<String>,
     #[serde(default)] pub icon_name: Option<String>,
     #[serde(default)] pub custom_title: Option<Option<String>>,
+    #[serde(default)] pub glass: Option<bool>,
+    #[serde(default)] pub action_direction: Option<Option<String>>,
     #[serde(default)] pub grid_x: Option<i64>,
     #[serde(default)] pub grid_y: Option<i64>,
     #[serde(default)] pub grid_w: Option<i64>,
@@ -127,7 +131,7 @@ pub fn load_state(conn: &SqliteConnection) -> Result<DashboardLoadState, Dashboa
 
     let mut inst_stmt = conn.prepare(
         "SELECT id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-                grid_x, grid_y, grid_w, grid_h, sort_order
+                glass, action_direction, grid_x, grid_y, grid_w, grid_h, sort_order
          FROM dashboard_widget_instances
          ORDER BY view_id, sort_order"
     )?;
@@ -142,11 +146,13 @@ pub fn load_state(conn: &SqliteConnection) -> Result<DashboardLoadState, Dashboa
                 accent_name: row.get(5)?,
                 icon_name: row.get(6)?,
                 custom_title: row.get(7)?,
-                grid_x: row.get(8)?,
-                grid_y: row.get(9)?,
-                grid_w: row.get(10)?,
-                grid_h: row.get(11)?,
-                sort_order: row.get(12)?,
+                glass: row.get::<_, i64>(8)? != 0,
+                action_direction: row.get(9)?,
+                grid_x: row.get(10)?,
+                grid_y: row.get(11)?,
+                grid_w: row.get(12)?,
+                grid_h: row.get(13)?,
+                sort_order: row.get(14)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -276,8 +282,8 @@ pub fn add_instance(
     conn.execute(
         "INSERT INTO dashboard_widget_instances
             (id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-             grid_x, grid_y, grid_w, grid_h, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)",
+             glass, action_direction, grid_x, grid_y, grid_w, grid_h, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, ?, ?, ?, ?, ?)",
         params![id, view_id, kind, source_id, preset, accent_name, icon_name, x, y, w, h, next_sort],
     )?;
     Ok(DashboardWidgetInstance {
@@ -289,6 +295,8 @@ pub fn add_instance(
         accent_name: accent_name.to_string(),
         icon_name: icon_name.to_string(),
         custom_title: None,
+        glass: false,
+        action_direction: None,
         grid_x: x,
         grid_y: y,
         grid_w: w,
@@ -308,7 +316,7 @@ pub fn update_instance(
 
     let mut current: DashboardWidgetInstance = conn.query_row(
         "SELECT id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-                grid_x, grid_y, grid_w, grid_h, sort_order
+                glass, action_direction, grid_x, grid_y, grid_w, grid_h, sort_order
          FROM dashboard_widget_instances WHERE id = ?",
         params![id],
         |row| Ok(DashboardWidgetInstance {
@@ -320,11 +328,13 @@ pub fn update_instance(
             accent_name: row.get(5)?,
             icon_name: row.get(6)?,
             custom_title: row.get(7)?,
-            grid_x: row.get(8)?,
-            grid_y: row.get(9)?,
-            grid_w: row.get(10)?,
-            grid_h: row.get(11)?,
-            sort_order: row.get(12)?,
+            glass: row.get::<_, i64>(8)? != 0,
+            action_direction: row.get(9)?,
+            grid_x: row.get(10)?,
+            grid_y: row.get(11)?,
+            grid_w: row.get(12)?,
+            grid_h: row.get(13)?,
+            sort_order: row.get(14)?,
         }),
     ).map_err(|e| match e {
         rusqlite::Error::QueryReturnedNoRows => DashboardStorageError::NotFound,
@@ -335,6 +345,8 @@ pub fn update_instance(
     if let Some(a) = patch.accent_name.clone()    { current.accent_name = a; }
     if let Some(i) = patch.icon_name.clone()      { current.icon_name = i; }
     if let Some(ct) = patch.custom_title.clone()  { current.custom_title = ct; }
+    if let Some(g) = patch.glass                  { current.glass = g; }
+    if let Some(ad) = patch.action_direction.clone() { current.action_direction = ad; }
     if let Some(x) = patch.grid_x                 { current.grid_x = x; }
     if let Some(y) = patch.grid_y                 { current.grid_y = y; }
     if let Some(w) = patch.grid_w                 { current.grid_w = w; }
@@ -345,11 +357,14 @@ pub fn update_instance(
     conn.execute(
         "UPDATE dashboard_widget_instances
             SET preset = ?, accent_name = ?, icon_name = ?, custom_title = ?,
+                glass = ?, action_direction = ?,
                 grid_x = ?, grid_y = ?, grid_w = ?, grid_h = ?
             WHERE id = ?",
         params![
             current.preset, current.accent_name, current.icon_name, current.custom_title,
-            current.grid_x, current.grid_y, current.grid_w, current.grid_h, current.id,
+            current.glass as i64, current.action_direction,
+            current.grid_x, current.grid_y, current.grid_w, current.grid_h,
+            current.id,
         ],
     )?;
     Ok(current)
@@ -538,6 +553,8 @@ mod tests {
                 kind TEXT NOT NULL CHECK (kind IN ('builtIn','content','script')),
                 source_id TEXT NOT NULL, preset TEXT NOT NULL, accent_name TEXT NOT NULL,
                 icon_name TEXT NOT NULL, custom_title TEXT,
+                glass INTEGER NOT NULL DEFAULT 0,
+                action_direction TEXT,
                 grid_x INTEGER NOT NULL, grid_y INTEGER NOT NULL,
                 grid_w INTEGER NOT NULL, grid_h INTEGER NOT NULL,
                 sort_order INTEGER NOT NULL
@@ -579,6 +596,7 @@ mod tests {
         let updated = update_instance(&conn, "i1", &InstancePatch {
             preset: Some("ambient".into()),
             accent_name: None, icon_name: None, custom_title: None,
+            glass: None, action_direction: None,
             grid_x: None, grid_y: None, grid_w: None, grid_h: None,
         }).unwrap();
         assert_eq!(updated.preset, "ambient");
