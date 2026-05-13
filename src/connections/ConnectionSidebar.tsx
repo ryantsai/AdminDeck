@@ -1072,7 +1072,7 @@ export function ConnectionSidebar({
           title={t("connections.newFolder")}
           type="button"
         >
-          <FolderPlus size={13} />
+          <FolderPlus size={12} />
         </button>
         <button
           aria-label={t("connections.collapseAll")}
@@ -1436,9 +1436,9 @@ function ConnectionFolderNode({
             title={isCollapsed ? t("connections.expandFolder") : t("connections.collapseFolder")}
             type="button"
           >
-            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           </button>
-          <Folder size={15} />
+          <Folder size={13} />
           <span>{folder.name}</span>
           <small>{connectionCount + folderCount}</small>
         </div>
@@ -1448,7 +1448,7 @@ function ConnectionFolderNode({
             aria-label={`${t("connections.newSubfolderIn")} ${folder.name}`}
             onClick={() => void onCreateFolder(folder.id)}
           >
-            <FolderPlus size={13} />
+            <FolderPlus size={12} />
           </button>
         </span>
       </div>
@@ -1559,8 +1559,8 @@ function NewFolderDraftRow({
     <div className="tree-group pending-folder-group" ref={groupRef}>
       <div className="tree-folder-row pending-folder-row">
         <div className="tree-folder pending-folder">
-          <ChevronDown size={14} />
-          <Folder size={15} />
+          <ChevronDown size={12} />
+          <Folder size={13} />
           <input
             aria-label={t("connections.newFolderName")}
             className="pending-folder-input"
@@ -2891,10 +2891,9 @@ function ConnectionRow({
       onPointerDown={onPointerDragStart}
     >
       <button className="connection-open" onClick={onOpen}>
-        <ConnectionGlyph localShell={connection.localShell} size={32} type={connection.type} />
+        <ConnectionGlyph localShell={connection.localShell} size={18} type={connection.type} />
         <span className="connection-main">
           <strong>{connection.name}</strong>
-          <small>{connectionSubtitle(connection)}</small>
         </span>
       </button>
       <span className={`status-dot ${connection.status}`} />
