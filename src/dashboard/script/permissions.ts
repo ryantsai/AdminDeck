@@ -2,12 +2,13 @@ import type { ScriptBody } from "../types";
 
 export function buildCsp(perm: ScriptBody["permissions"]): string {
   const connect = perm.network ? "*" : "'none'";
+  const images = perm.network ? "http: https: data: blob:" : "data: blob:";
   return [
     "default-src 'none'",
     "style-src 'unsafe-inline'",
     "script-src 'unsafe-inline' blob:",
     `connect-src ${connect}`,
-    "img-src data: blob:",
+    `img-src ${images}`,
     "font-src data:",
   ].join("; ");
 }
@@ -94,10 +95,25 @@ export function buildSrcdoc(body: ScriptBody): string {
   <script>
     (function () {
       const KK = {
+        openExternal: function (url) { window.parent.postMessage({ kk: true, type: 'openExternalUrl', url }, "*"); },
         postMessage: function (payload) { window.parent.postMessage({ kk: true, payload }, "*"); },
         requestPermission: function () { return Promise.resolve(false); },
       };
       window.KK = KK;
+      document.addEventListener('click', function (event) {
+        const target = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+        if (!target) return;
+        const href = target.getAttribute('href') || '';
+        try {
+          const url = new URL(href);
+          if (url.protocol === 'http:' || url.protocol === 'https:') {
+            event.preventDefault();
+            KK.openExternal(url.href);
+          }
+        } catch (_err) {
+          // Relative and non-URL links stay inside the sandbox.
+        }
+      }, true);
       function showError(err) {
         const pre = document.createElement('pre');
         pre.className = 'kk-widget-error';

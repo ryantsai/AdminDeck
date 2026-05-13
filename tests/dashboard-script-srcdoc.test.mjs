@@ -31,3 +31,30 @@ test("script widget source is encoded as data before iframe execution", async ()
   assert.doesNotMatch(srcdoc, /<script>alert\(1\)<\/script><\/div>`;/);
   assert.match(srcdoc, /\\u003cscript>alert\(1\)\\u003c\/script>\\u003c\/div>`;/);
 });
+
+test("script widget CSP allows remote images only with network permission", async () => {
+  const { buildCsp } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/permissions.ts", import.meta.url),
+  );
+
+  assert.match(buildCsp({ network: true }), /img-src http: https: data: blob:/);
+  assert.match(buildCsp({ network: true }), /connect-src \*/);
+  assert.match(buildCsp({ network: false }), /img-src data: blob:/);
+  assert.match(buildCsp({ network: false }), /connect-src 'none'/);
+});
+
+test("script widget host intercepts external links for parent opener bridge", async () => {
+  const { buildSrcdoc } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/permissions.ts", import.meta.url),
+  );
+  const srcdoc = buildSrcdoc({
+    source: "document.getElementById('root').innerHTML = '<a href=\"https://example.com\">Example</a>';",
+    permissions: { network: false },
+  });
+
+  assert.match(srcdoc, /openExternal: function \(url\)/);
+  assert.match(srcdoc, /closest\('a\[href\]'\)/);
+  assert.match(srcdoc, /type: 'openExternalUrl'/);
+  assert.match(srcdoc, /url\.protocol === 'http:'/);
+  assert.match(srcdoc, /url\.protocol === 'https:'/);
+});

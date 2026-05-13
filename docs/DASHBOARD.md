@@ -65,6 +65,8 @@ Accent guidance:
 
 Script widget UI should use the provided root and compact app-style controls. Do not generate a full HTML document, global reset CSS, external fonts, large decorative headers, marketing copy, gradients, or random color systems. Prefer short labels, stable sizing, aligned inputs/buttons, and the same system font feel as the host app.
 
+If a script widget displays remote images, the assistant must set `permissions.network: true`; otherwise KKTerm's CSP blocks those image requests. Plain `<img src="https://...">` loads do not normally require CORS unless widget code tries to read the image data through canvas/fetch or the remote site blocks hotlinking. Fetching images with `fetch()` is subject to normal browser CORS and may fail even when CSP allows network access.
+
 ## Persistence
 
 SQLite holds three Dashboard tables, defined in `src-tauri/src/storage.rs` under `CURRENT_SCHEMA`. The schema version is bumped when these tables change; no in-place migrations are run because there are no v1 users.
@@ -196,10 +198,13 @@ The iframe is a **fault-isolation** boundary, not a security boundary. KKTerm is
 Declared permissions:
 
 - `permissions.network: false` → CSP blocks `connect-src`; `fetch`, XHR, and WebSocket all fail.
-- `permissions.network: true` → `connect-src *` permitted.
+- `permissions.network: false` → external images are blocked; only `data:` and `blob:` images may load.
+- `permissions.network: true` → `connect-src *` is permitted and `http:` / `https:` images may load.
 - `permissions.pollSeconds` → informational; the script self-schedules. The host may enforce a minimum floor in a follow-up.
 
-The bridge exposes `KK.requestPermission(name)` and `KK.postMessage(payload)` at the iframe globals. Future Tauri command access is added by extending this bridge with explicit handlers — not by widening the iframe surface.
+External website links must leave the widget iframe. The host script intercepts absolute `http:` / `https:` anchor clicks and sends an `openExternalUrl` bridge message to the parent, where `ScriptWidgetHost.tsx` validates the URL and calls Tauri's opener plugin. Script widgets may also call `KK.openExternal(url)` directly. This avoids navigating third-party sites inside a sandboxed `srcdoc` iframe with an opaque origin, which can produce site errors such as unknown/null origin headers.
+
+The bridge exposes `KK.openExternal(url)`, `KK.requestPermission(name)`, and `KK.postMessage(payload)` at the iframe globals. Future Tauri command access is added by extending this bridge with explicit handlers — not by widening the iframe surface.
 
 ### Finding: Broken Script HTML
 

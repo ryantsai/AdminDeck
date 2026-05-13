@@ -114,6 +114,7 @@ export function DashboardPage({
         "When using a script widget, provide JavaScript source only. Do not generate a full HTML document or include <script> tags; create DOM nodes inside #root instead.",
         "Choose preset, accentName, iconName, and grid size intentionally from the widget purpose. Default to panel for ordinary tools, tile or stat-like content for compact metrics, mono for terminal/code/system data, action for launch/action surfaces, and hero only for rare high-priority summaries.",
         "Use calm app-style accents: blue/teal/slate/emerald for normal utility widgets, amber for warnings, red/rose only for destructive or error-oriented widgets. Keep labels concise and controls dense, aligned, and consistent with KKTerm's desktop UI.",
+        "For script widgets that display remote images or fetch remote data, set permissions.network to true. Use normal http/https anchors or KK.openExternal(url) for external website links; links open in the user's external browser, not inside the widget iframe.",
         "",
         JSON.stringify(dashboardSnapshot, null, 2),
       ].join("\n"),
