@@ -1017,18 +1017,8 @@ button {
   display: flex;
   gap: 10px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   min-width: 0;
-}
-
-.app-launcher-widget-toolbar > span {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .app-launcher-add {

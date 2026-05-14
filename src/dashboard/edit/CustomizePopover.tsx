@@ -138,7 +138,7 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
       </section>
 
       <section>
-        <h4>{t("dashboard.title")}</h4>
+        <h4>{t("dashboard.titleLabel")}</h4>
         <input
           defaultValue={instance.customTitle ?? ""}
           placeholder={t("dashboard.titlePlaceholder")}

@@ -382,7 +382,6 @@ export function AppLauncherWidget() {
   return (
     <div className="dashboard-widget-body app-launcher-widget">
       <div className="app-launcher-widget-toolbar">
-        <span>{t("appLauncher.entriesLabel")}</span>
         <button
           className="secondary-button app-launcher-add"
           onClick={(event) => openAddMenuFromElement(event.currentTarget)}

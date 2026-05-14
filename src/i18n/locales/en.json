@@ -63,6 +63,7 @@
     },
     "accent": "Accent",
     "icon": "Icon",
+    "titleLabel": "Title",
     "titlePlaceholder": "Custom title…",
     "advanced": "Advanced",
     "advancedNothing": "No advanced settings for built-in widgets.",

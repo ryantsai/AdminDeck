@@ -411,6 +411,7 @@ main.dashboard-page {
 
 .dw-title-group {
   display: grid;
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   gap: 2px;
@@ -429,13 +430,21 @@ main.dashboard-page {
   letter-spacing: 0;
 }
 
-.dw-subtitle {
-  overflow: hidden;
-  color: var(--text-faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.dw-subtitle-tip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  margin-top: 4px;
+  max-width: 240px;
+  padding: 6px 8px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
   font-size: 11px;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .dw-icon {
@@ -1325,16 +1334,8 @@ main.dashboard-page {
 .app-launcher-widget-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
-}
-
-.app-launcher-widget-toolbar > span {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .app-launcher-tile-grid {
