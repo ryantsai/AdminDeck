@@ -1575,6 +1575,14 @@ type CommandMap = {
     args: undefined;
     result: null;
   };
+  dashboard_import_background_image: {
+    args: { sourcePath: string };
+    result: string;
+  };
+  dashboard_load_background_image: {
+    args: { file: string };
+    result: { dataUrl: string };
+  };
 };
 
 export function invokeCommand<Name extends keyof CommandMap>(

@@ -31,7 +31,7 @@ function browserPreviewState() {
   if (!previewState) {
     const viewId = createPreviewId("view");
     previewState = {
-      views: [{ id: viewId, title: "Default", sortOrder: 0, gridDensity: "default" }],
+      views: [{ id: viewId, title: "Default", sortOrder: 0, gridDensity: "default", background: null }],
       instances: [
         {
           id: createPreviewId("inst"),
@@ -73,6 +73,7 @@ export async function createView(title: string, gridDensity?: GridDensity): Prom
       title,
       sortOrder: state.views.length,
       gridDensity: gridDensity ?? "default",
+      background: null,
     };
     state.views.push(view);
     return { ...view };
@@ -263,4 +264,21 @@ export async function resetDashboard(): Promise<void> {
     return;
   }
   await invokeCommand("dashboard_reset");
+}
+
+export async function importBackgroundImage(sourcePath: string): Promise<string> {
+  if (!isTauriRuntime()) {
+    // Browser preview cannot copy files — echo a deterministic fake filename.
+    return `preview-bg-${sourcePath.replace(/[^a-z0-9]/gi, "").slice(-12)}.png`;
+  }
+  return invokeCommand("dashboard_import_background_image", { sourcePath });
+}
+
+export async function loadBackgroundImage(file: string): Promise<string> {
+  if (!isTauriRuntime()) {
+    // Browser preview: no managed folder. Return a tiny transparent PNG.
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  }
+  const result = await invokeCommand("dashboard_load_background_image", { file });
+  return result.dataUrl;
 }
