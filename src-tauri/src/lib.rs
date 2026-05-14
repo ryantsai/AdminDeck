@@ -981,13 +981,17 @@ fn parse_widget_secret_owner_id(owner_id: &str) -> Option<(String, String)> {
 #[tauri::command]
 async fn start_terminal_session(
     app: tauri::AppHandle,
-    sessions: tauri::State<'_, sessions::SessionManager>,
-    secrets: tauri::State<'_, secrets::Secrets>,
-    performance: tauri::State<'_, performance::PerformanceMonitor>,
     request: sessions::StartTerminalSessionRequest,
 ) -> Result<sessions::TerminalSessionStarted, String> {
-    let started = sessions.start_terminal_session(app, &secrets, request)?;
+    let startup_app = app.clone();
+    let started = run_blocking_command("terminal session startup", move || {
+        let sessions = startup_app.state::<sessions::SessionManager>();
+        let secrets = startup_app.state::<secrets::Secrets>();
+        sessions.start_terminal_session(startup_app.clone(), &secrets, request)
+    })
+    .await?;
     if let Some(terminal_ready_ms) = started.terminal_ready_ms() {
+        let performance = app.state::<performance::PerformanceMonitor>();
         performance.record_ssh_terminal_ready(terminal_ready_ms);
     }
     Ok(started)

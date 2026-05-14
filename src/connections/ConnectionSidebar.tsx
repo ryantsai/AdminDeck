@@ -238,12 +238,8 @@ export function ConnectionSidebar({
     }
   }
 
-  async function handleConnectionSaved(connection: Connection, folderId?: string) {
-    if (folderId) {
-      await reloadConnectionGroups();
-    } else {
-      setTree((currentTree) => upsertRootConnection(currentTree, connection));
-    }
+  async function handleConnectionSaved() {
+    await reloadConnectionGroups();
     notifyConnectionTreeInvalidated();
     setFormMode(null);
     setNewConnectionType(null);
@@ -489,16 +485,7 @@ export function ConnectionSidebar({
           await storeUrlPassword(connection.id, urlPassword);
           await upsertUrlCredential(connection.id, urlCredentialUsername);
         }
-        await handleConnectionSaved(
-          {
-            ...connection,
-            hasPassword: Boolean(password),
-            urlCredentialUsername:
-              connection.type === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
-            hasUrlCredential: connection.type === "url" && Boolean(urlCredentialUsername && urlPassword),
-          },
-          connectionRequest.folderId,
-        );
+        await handleConnectionSaved();
         showConnectionSuccessStatus(t("connections.createConnectionComplete", { name: connection.name }));
       } catch (error) {
         setFormError(error instanceof Error ? error.message : String(error));
