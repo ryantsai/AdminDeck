@@ -1790,6 +1790,35 @@ impl Storage {
         get_connection_by_id(&connection, &connection_id).map(Some)
     }
 
+    pub fn update_connection_icon_data_url(
+        &self,
+        connection_id: String,
+        icon_data_url: Option<String>,
+    ) -> Result<Option<SavedConnection>, String> {
+        let connection_id = required_field("connection id", connection_id)?;
+        let icon_data_url = normalize_connection_icon_data_url(icon_data_url)?;
+        let connection = self.lock()?;
+        let current_icon_data_url = connection
+            .query_row(
+                "SELECT icon_data_url FROM connections WHERE id = ?1",
+                params![&connection_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?
+            .ok_or_else(|| "connection was not found".to_string())?;
+        if current_icon_data_url == icon_data_url {
+            return Ok(None);
+        }
+        connection
+            .execute(
+                "UPDATE connections SET icon_data_url = ?1 WHERE id = ?2",
+                params![icon_data_url, &connection_id],
+            )
+            .map_err(to_storage_error)?;
+        get_connection_by_id(&connection, &connection_id).map(Some)
+    }
+
     pub fn upsert_url_credential(
         &self,
         request: UpsertUrlCredentialRequest,
@@ -4374,6 +4403,40 @@ mod tests {
             .expect("URL connection exists");
         assert!(reloaded.has_url_credential);
         assert_eq!(reloaded.url_credential_username.as_deref(), Some("admin"));
+    }
+
+    #[test]
+    fn connection_icon_data_url_updates_for_any_connection_type() {
+        let storage = Storage::open(temp_db_path("connection-icon-data-url")).expect("storage opens");
+        let created = create_test_ssh_connection(&storage, "Bastion", "bastion.internal", None);
+        let icon_data_url = " data:image/png;base64,customicon ".to_string();
+
+        let updated = storage
+            .update_connection_icon_data_url(created.id.clone(), Some(icon_data_url))
+            .expect("connection icon is updated")
+            .expect("changed icon returns the updated connection");
+
+        assert_eq!(
+            updated.icon_data_url.as_deref(),
+            Some("data:image/png;base64,customicon")
+        );
+
+        let tree = storage.list_connection_tree().expect("connection tree loads");
+        let reloaded = tree
+            .connections
+            .iter()
+            .find(|connection| connection.id == created.id)
+            .expect("connection exists");
+        assert_eq!(
+            reloaded.icon_data_url.as_deref(),
+            Some("data:image/png;base64,customicon")
+        );
+
+        let cleared = storage
+            .update_connection_icon_data_url(created.id.clone(), None)
+            .expect("connection icon is cleared")
+            .expect("cleared icon returns the updated connection");
+        assert!(cleared.icon_data_url.is_none());
     }
 
     #[test]

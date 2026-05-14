@@ -306,6 +306,15 @@ fn update_connection(
 }
 
 #[tauri::command]
+fn update_connection_icon_data_url(
+    storage: tauri::State<'_, storage::Storage>,
+    connection_id: String,
+    icon_data_url: Option<String>,
+) -> Result<Option<storage::SavedConnection>, String> {
+    storage.update_connection_icon_data_url(connection_id, icon_data_url)
+}
+
+#[tauri::command]
 fn delete_connection(
     storage: tauri::State<'_, storage::Storage>,
     connection_id: String,
@@ -1862,6 +1871,7 @@ pub fn run() {
             delete_connection_folder,
             rename_connection,
             update_connection,
+            update_connection_icon_data_url,
             delete_connection,
             duplicate_connection,
             move_connection_folder,

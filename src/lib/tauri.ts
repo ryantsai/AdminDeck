@@ -685,6 +685,10 @@ type CommandMap = {
     args: { request: UpdateConnectionRequest };
     result: Connection;
   };
+  update_connection_icon_data_url: {
+    args: { connectionId: string; iconDataUrl?: string | null };
+    result: Connection | null;
+  };
   delete_connection: {
     args: { connectionId: string };
     result: null;

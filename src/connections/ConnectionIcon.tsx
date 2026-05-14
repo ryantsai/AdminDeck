@@ -9,7 +9,7 @@ import urlIcon from "../assets/connection-icons/url.png";
 import vncIcon from "../assets/connection-icons/vnc.png";
 import wslIcon from "../assets/connection-icons/wsl.png";
 
-const CONNECTION_ICON_SRC: Record<ConnectionType, string> = {
+export const CONNECTION_ICON_SRC: Record<ConnectionType, string> = {
   local: terminalIcon,
   ssh: sshIcon,
   telnet: telnetIcon,
@@ -20,6 +20,17 @@ const CONNECTION_ICON_SRC: Record<ConnectionType, string> = {
   ftp: ftpIcon,
 };
 
+export const PREDEFINED_CONNECTION_ICON_TYPES: ConnectionType[] = [
+  "local",
+  "ssh",
+  "telnet",
+  "serial",
+  "url",
+  "rdp",
+  "vnc",
+  "ftp",
+];
+
 export function connectionIconSrcForConnection({
   iconDataUrl,
   localShell,
@@ -29,7 +40,7 @@ export function connectionIconSrcForConnection({
   localShell?: string;
   type: ConnectionType;
 }) {
-  return type === "url" && iconDataUrl
+  return iconDataUrl
     ? iconDataUrl
     : type === "local" && localShell === "wsl.exe"
       ? wslIcon

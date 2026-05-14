@@ -471,7 +471,7 @@ export function WebViewWorkspace({ isActive, tab }: { isActive: boolean; tab: Wo
   }
 
   function maybeUpdateConnectionIcon(pageUrl: string) {
-    if (!tab.connection || tab.connection.type !== "url" || faviconUpdatedRef.current) {
+    if (!tab.connection || tab.connection.type !== "url" || tab.connection.iconDataUrl || faviconUpdatedRef.current) {
       return;
     }
     faviconUpdatedRef.current = true;

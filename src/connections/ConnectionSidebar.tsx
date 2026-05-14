@@ -1,4 +1,5 @@
 import { ConnectionGlyph, connectionSubtitle, connectionTypeSubtitle } from "./ConnectionGlyph";
+import { ConnectionIconPicker } from "./ConnectionIconPicker";
 import { connectionIconSrcForConnection } from "./ConnectionIcon";
 import { AddConnectionMenu, QuickConnectMenu } from "./ConnectionMenus";
 import { ImportDialog } from "./ImportDialog";
@@ -95,6 +96,7 @@ type TransferSshPublicKeyDialogState = {
 };
 
 type ConnectionDialogRequest = CreateConnectionRequest & {
+  iconDataUrl?: string | null;
   password?: string;
   urlCredentialUsername?: string;
   urlPassword?: string;
@@ -473,12 +475,13 @@ export function ConnectionSidebar({
 
   async function handleConnectionSubmit(request: ConnectionDialogRequest) {
     setFormError("");
-    const { password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
+    const { iconDataUrl, password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
     if (formMode === "save") {
       try {
-        const connection = await invokeCommand("create_connection", {
+        let connection = await invokeCommand("create_connection", {
           request: connectionRequest,
         });
+        connection = await saveConnectionIconDataUrl(connection, iconDataUrl);
         if (password) {
           await storeConnectionPassword(connection.id, password);
         }
@@ -527,6 +530,7 @@ export function ConnectionSidebar({
       urlCredentialUsername:
         connectionRequest.type === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
       hasUrlCredential: connectionRequest.type === "url" && Boolean(urlCredentialUsername && urlPassword),
+      iconDataUrl,
       status: "idle",
     };
 
@@ -549,7 +553,7 @@ export function ConnectionSidebar({
     }
 
     setFormError("");
-    const { password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
+    const { iconDataUrl, password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
     const updateRequest: UpdateConnectionRequest = {
       ...connectionRequest,
       id: editConnection.connection.id,
@@ -557,9 +561,10 @@ export function ConnectionSidebar({
     };
 
     try {
-      const connection = await invokeCommand("update_connection", {
+      let connection = await invokeCommand("update_connection", {
         request: updateRequest,
       });
+      connection = await saveConnectionIconDataUrl(connection, iconDataUrl);
       if (password) {
         await storeConnectionPassword(connection.id, password);
       }
@@ -652,6 +657,21 @@ export function ConnectionSidebar({
       setTreeError(error instanceof Error ? error.message : String(error));
       return false;
     }
+  }
+
+  async function saveConnectionIconDataUrl(
+    connection: Connection,
+    iconDataUrl: string | null | undefined,
+  ) {
+    const normalizedIconDataUrl = iconDataUrl ?? null;
+    if ((connection.iconDataUrl ?? null) === normalizedIconDataUrl) {
+      return connection;
+    }
+    const updated = await invokeCommand("update_connection_icon_data_url", {
+      connectionId: connection.id,
+      iconDataUrl: normalizedIconDataUrl,
+    });
+    return updated ?? { ...connection, iconDataUrl: normalizedIconDataUrl };
   }
 
   async function handleDeleteFolder(folder: ConnectionFolder) {
@@ -2300,6 +2320,7 @@ function ConnectionDialog({
   const [portDraft, setPortDraft] = useState(
     String(initialConnection?.port ?? (connectionType ? defaultPortForConnectionType(connectionType, sshSettings) : "")),
   );
+  const [iconDataUrl, setIconDataUrl] = useState<string | null>(initialConnection?.iconDataUrl ?? null);
   const usesSshDefaults = connectionType === "ssh";
   const isTelnetConnection = connectionType === "telnet";
   const isSerialConnection = connectionType === "serial";
@@ -2308,6 +2329,15 @@ function ConnectionDialog({
     ? isRemoteDesktopConnectionType(connectionType)
     : false;
   const folderOptions = useMemo(() => flattenFolders(tree.folders), [tree.folders]);
+  const reusableIconDataUrls = useMemo(() => {
+    const urls = flattenConnections(tree)
+      .map((connection) => connection.iconDataUrl)
+      .filter((url): url is string => Boolean(url));
+    if (initialConnection?.iconDataUrl) {
+      urls.unshift(initialConnection.iconDataUrl);
+    }
+    return Array.from(new Set(urls));
+  }, [initialConnection?.iconDataUrl, tree]);
   const localShellOptions = useMemo(() => localShellOptionsForPlatform(), [i18n.language]);
   const isEditMode = mode === "edit";
   const isUrlConnection = connectionType === "url";
@@ -2480,6 +2510,7 @@ function ConnectionDialog({
           ? String(form.get("urlCredentialUsername") ?? "").trim() || undefined
           : undefined,
       urlPassword: connectionType === "url" ? String(form.get("urlPassword") ?? "") || undefined : undefined,
+      iconDataUrl: mode === "quick" ? undefined : iconDataUrl,
     });
   }
 
@@ -2552,12 +2583,22 @@ function ConnectionDialog({
 
         {connectionType ? (
           <div className="connection-type-summary">
-            <ConnectionGlyph
-              iconDataUrl={initialConnection?.iconDataUrl}
-              localShell={initialConnection?.localShell}
-              size={20}
-              type={connectionType}
-            />
+            {mode === "quick" ? (
+              <ConnectionGlyph
+                iconDataUrl={initialConnection?.iconDataUrl}
+                localShell={initialConnection?.localShell}
+                size={20}
+                type={connectionType}
+              />
+            ) : (
+              <ConnectionIconPicker
+                customIconDataUrls={reusableIconDataUrls}
+                iconDataUrl={iconDataUrl}
+                localShell={initialConnection?.localShell}
+                onChange={setIconDataUrl}
+                type={connectionType}
+              />
+            )}
             <span>
               <strong>{connectionTypeLabel(connectionType)}</strong>
               <small>
