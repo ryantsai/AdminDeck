@@ -62,6 +62,12 @@ struct CustomFontData {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct DashboardBackgroundImageData {
+    data_url: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StoredCredentialSummary {
     id: String,
     kind: String,
@@ -149,6 +155,80 @@ async fn load_custom_font_data(path: String) -> Result<CustomFontData, String> {
         .map_err(|error| format!("failed to load custom font: {error}"))?
 }
 
+#[tauri::command]
+async fn dashboard_import_background_image(source_path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || dashboard_import_background_image_sync(source_path))
+        .await
+        .map_err(|error| format!("failed to import background image: {error}"))?
+}
+
+fn dashboard_import_background_image_sync(source_path: String) -> Result<String, String> {
+    use std::hash::{Hash, Hasher};
+
+    let source = PathBuf::from(&source_path);
+    let extension = background_image_extension(&source)
+        .ok_or_else(|| "background image must be .png, .jpg, .jpeg, .webp, .gif, or .bmp".to_string())?;
+
+    let bytes = fs::read(&source)
+        .map_err(|error| format!("failed to read background image {source_path}: {error}"))?;
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    let file_name = format!("bg-{:016x}.{extension}", hasher.finish());
+
+    let folder = backgrounds_folder()?;
+    fs::create_dir_all(&folder)
+        .map_err(|error| format!("failed to create backgrounds folder {}: {error}", folder.display()))?;
+    let destination = folder.join(&file_name);
+    if !destination.exists() {
+        fs::write(&destination, &bytes)
+            .map_err(|error| format!("failed to write background image {}: {error}", destination.display()))?;
+    }
+    Ok(file_name)
+}
+
+#[tauri::command]
+async fn dashboard_load_background_image(file: String) -> Result<DashboardBackgroundImageData, String> {
+    tauri::async_runtime::spawn_blocking(move || dashboard_load_background_image_sync(file))
+        .await
+        .map_err(|error| format!("failed to load background image: {error}"))?
+}
+
+fn dashboard_load_background_image_sync(file: String) -> Result<DashboardBackgroundImageData, String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+    if file.is_empty() || file.contains('/') || file.contains('\\') || file.contains("..") {
+        return Err("invalid background image file name".to_string());
+    }
+
+    let folder = backgrounds_folder()?;
+    fs::create_dir_all(&folder)
+        .map_err(|error| format!("failed to create backgrounds folder {}: {error}", folder.display()))?;
+    let folder = folder
+        .canonicalize()
+        .map_err(|error| format!("failed to resolve backgrounds folder: {error}"))?;
+
+    let path = folder.join(&file);
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|error| format!("failed to resolve background image path: {error}"))?;
+    if !canonical_path.starts_with(&folder) {
+        return Err("background image path must stay inside the backgrounds folder".to_string());
+    }
+
+    let extension = background_image_extension(&canonical_path)
+        .ok_or_else(|| "background image must be .png, .jpg, .jpeg, .webp, .gif, or .bmp".to_string())?;
+    let bytes = fs::read(&canonical_path)
+        .map_err(|error| format!("failed to read background image {}: {error}", canonical_path.display()))?;
+
+    let data_url = format!(
+        "data:{};base64,{}",
+        background_image_mime(&extension),
+        STANDARD.encode(bytes),
+    );
+    Ok(DashboardBackgroundImageData { data_url })
+}
+
 fn list_custom_fonts_sync() -> Result<Vec<CustomFontEntry>, String> {
     let folder = custom_fonts_folder()?;
     fs::create_dir_all(&folder).map_err(|error| {
@@ -221,6 +301,15 @@ fn custom_fonts_folder() -> Result<PathBuf, String> {
     Ok(exe_folder.join("fonts"))
 }
 
+pub(crate) fn backgrounds_folder() -> Result<PathBuf, String> {
+    let exe_path = std::env::current_exe()
+        .map_err(|error| format!("failed to resolve app executable path: {error}"))?;
+    let exe_folder = exe_path
+        .parent()
+        .ok_or_else(|| "failed to resolve app executable folder".to_string())?;
+    Ok(exe_folder.join("backgrounds"))
+}
+
 fn custom_font_entry(path: PathBuf) -> Option<CustomFontEntry> {
     if !path.is_file() {
         return None;
@@ -250,6 +339,30 @@ fn custom_font_entry(path: PathBuf) -> Option<CustomFontEntry> {
 
 fn is_supported_font_extension(extension: &str) -> bool {
     matches!(extension, "ttf" | "otf" | "woff" | "woff2")
+}
+
+/// Returns the lowercased extension if `path` is a supported background image.
+fn background_image_extension(path: &std::path::Path) -> Option<String> {
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.to_lowercase())?;
+    if matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp") {
+        Some(extension)
+    } else {
+        None
+    }
+}
+
+fn background_image_mime(extension: &str) -> &'static str {
+    match extension {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "bmp" => "image/bmp",
+        _ => "application/octet-stream",
+    }
 }
 
 #[tauri::command]
@@ -2096,7 +2209,9 @@ pub fn run() {
             dashboard_commands::dashboard_create_custom_widget,
             dashboard_commands::dashboard_update_custom_widget,
             dashboard_commands::dashboard_remove_custom_widget,
-            dashboard_commands::dashboard_reset
+            dashboard_commands::dashboard_reset,
+            dashboard_import_background_image,
+            dashboard_load_background_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running KKTerm");
