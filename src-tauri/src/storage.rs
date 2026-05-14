@@ -159,7 +159,8 @@ CREATE TABLE IF NOT EXISTS dashboard_views (
     title TEXT NOT NULL,
     sort_order INTEGER NOT NULL,
     grid_density TEXT NOT NULL DEFAULT 'default'
-        CHECK (grid_density IN ('compact', 'default', 'roomy'))
+        CHECK (grid_density IN ('compact', 'default', 'roomy')),
+    background_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dashboard_custom_widgets (
@@ -1525,6 +1526,7 @@ impl Storage {
         ensure_column(&connection, "url_credentials", "field_values", "TEXT")?;
         ensure_column(&connection, "dashboard_custom_widgets", "settings_schema_json", "TEXT NOT NULL DEFAULT '{\"fields\":[]}'")?;
         ensure_column(&connection, "dashboard_widget_instances", "settings_values_json", "TEXT NOT NULL DEFAULT '{}'")?;
+        ensure_column(&connection, "dashboard_views", "background_json", "TEXT")?;
         connection
             .execute_batch(&format!("PRAGMA user_version = {SCHEMA_USER_VERSION}"))
             .map_err(to_storage_error)?;
