@@ -1975,8 +1975,8 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
         ));
         tools.push(tool_definition(
             "dashboard_update_custom_widget",
-            "Update an existing custom widget's title, summary, category, or body JSON.",
-            json!({"type":"object","properties":{"id":{"type":"string"},"patch":{"type":"object","properties":{"title":{"type":"string"},"summary":{"type":"string"},"category":{"type":"string"},"bodyJson":{"type":"string"}}}},"required":["id","patch"]}),
+            "Update an existing custom widget's title, summary, category, or body. Prefer patch.body with the same structured body shape used by dashboard_create_widget so KKTerm serializes valid JSON for you. Use legacy patch.bodyJson only when you intentionally need to submit a pre-serialized JSON string.",
+            dashboard_update_custom_widget_schema(),
         ));
         tools.push(tool_definition(
             "dashboard_remove_custom_widget",
@@ -2019,15 +2019,7 @@ fn dashboard_create_widget_schema() -> Value {
             "summary":{"type":"string","maxLength":240},
             "category":{"type":"string","minLength":1,"maxLength":80},
             "settingsSchema":{"type":["object","null"],"properties":{"fields":{"type":"array","items":dashboard_widget_settings_field_schema()}},"required":["fields"],"additionalProperties":false},
-            "body":{
-                "anyOf":[
-                    {"type":"object","properties":{"shape":{"type":"string","enum":["markdown"]},"data":{"type":"object","properties":{"source":{"type":"string","minLength":1}},"required":["source"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
-                    {"type":"object","properties":{"shape":{"type":"string","enum":["kvList"]},"data":{"type":"object","properties":{"rows":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"string"}},"required":["label","value"],"additionalProperties":false}}},"required":["rows"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
-                    {"type":"object","properties":{"shape":{"type":"string","enum":["checklist"]},"data":{"type":"object","properties":{"items":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"done":{"type":"boolean"}},"required":["label","done"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
-                    {"type":"object","properties":{"shape":{"type":"string","enum":["stat"]},"data":{"type":"object","properties":{"value":{"type":"string","minLength":1},"unit":{"type":["string","null"]},"delta":{"type":["string","null"]},"caption":{"type":["string","null"]}},"required":["value","unit","delta","caption"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
-                    {"type":"object","properties":{"source":{"type":"string","minLength":1},"permissions":{"type":"object","properties":{"network":{"type":"boolean"},"pollSeconds":{"type":["integer","null"],"minimum":1}},"required":["network","pollSeconds"],"additionalProperties":false},"htmlShim":{"type":["string","null"]}},"required":["source","permissions","htmlShim"],"additionalProperties":false}
-                ]
-            },
+            "body": dashboard_widget_body_schema(),
             "preset":{"type":"string","enum":["panel","ambient","tile","hero","mono","action"]},
             "accentName":{"type":"string","enum":["blue","indigo","teal","green","amber","red","purple","pink","slate","cyan","orange","rose","emerald","sky"]},
             "iconName":{"type":"string","enum":["Hash","Network","Terminal","Server","Cpu","Activity","Bolt","Sun","Bell","Bot","Wrench","Folder","Clock","Doc","Cloud","Calendar","Database","Globe","Lock","Key","Mail","Mic","Monitor","Music","Package","Phone","Pin","Power","Printer","Radio","Search","Settings","Shield","ShoppingCart","Star","Tag","Tool","Trash","Truck","User","Users","Video","Volume","Watch","Wifi","Wind","Zap","Layers","List","Grid"]},
@@ -2038,6 +2030,41 @@ fn dashboard_create_widget_schema() -> Value {
         },
         "required":["viewId","kind","title","summary","category","settingsSchema","body","preset","accentName","iconName","gridX","gridY","gridW","gridH"],
         "additionalProperties":false
+    })
+}
+
+fn dashboard_update_custom_widget_schema() -> Value {
+    json!({
+        "type":"object",
+        "properties":{
+            "id":{"type":"string"},
+            "patch":{
+                "type":"object",
+                "properties":{
+                    "title":{"type":"string"},
+                    "summary":{"type":"string"},
+                    "category":{"type":"string"},
+                    "body": dashboard_widget_body_schema(),
+                    "bodyJson":{"type":"string"},
+                    "settingsSchemaJson":{"type":"string"}
+                },
+                "additionalProperties":false
+            }
+        },
+        "required":["id","patch"],
+        "additionalProperties":false
+    })
+}
+
+fn dashboard_widget_body_schema() -> Value {
+    json!({
+        "anyOf":[
+            {"type":"object","properties":{"shape":{"type":"string","enum":["markdown"]},"data":{"type":"object","properties":{"source":{"type":"string","minLength":1}},"required":["source"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["kvList"]},"data":{"type":"object","properties":{"rows":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"string"}},"required":["label","value"],"additionalProperties":false}}},"required":["rows"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["checklist"]},"data":{"type":"object","properties":{"items":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"done":{"type":"boolean"}},"required":["label","done"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["stat"]},"data":{"type":"object","properties":{"value":{"type":"string","minLength":1},"unit":{"type":["string","null"]},"delta":{"type":["string","null"]},"caption":{"type":["string","null"]}},"required":["value","unit","delta","caption"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"source":{"type":"string","minLength":1},"permissions":{"type":"object","properties":{"network":{"type":"boolean"},"pollSeconds":{"type":["integer","null"],"minimum":1}},"required":["network","pollSeconds"],"additionalProperties":false},"htmlShim":{"type":["string","null"]}},"required":["source","permissions","htmlShim"],"additionalProperties":false}
+        ]
     })
 }
 
@@ -2341,7 +2368,7 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
                     return Err("dashboard_update_custom_widget requires id".to_string());
                 }
                 let patch: ds::CustomWidgetPatch = serde_json::from_value(
-                    args.get("patch").cloned().unwrap_or(Value::Null)
+                    normalize_dashboard_custom_widget_patch(args.get("patch").cloned().unwrap_or(Value::Null))?
                 ).map_err(|e| format!("invalid patch: {e}"))?;
                 ds::update_custom_widget(conn, &id, &patch)
                     .map(|v| serde_json::to_value(v).unwrap_or(Value::Null))
@@ -2372,6 +2399,22 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
         Ok(v) => serde_json::to_string(&v).unwrap_or_else(|_| "{}".to_string()),
         Err(e) => format!("{{\"error\":\"{}\"}}", e.replace('"', "\\\"")),
     }
+}
+
+fn normalize_dashboard_custom_widget_patch(mut patch: Value) -> Result<Value, String> {
+    let Some(object) = patch.as_object_mut() else {
+        return Ok(patch);
+    };
+    if object.get("bodyJson").is_none() {
+        if let Some(body) = object.remove("body") {
+            let body_json = serde_json::to_string(&body)
+                .map_err(|error| format!("invalid patch.body: {error}"))?;
+            object.insert("bodyJson".to_string(), Value::String(body_json));
+        }
+    } else {
+        object.remove("body");
+    }
+    Ok(patch)
 }
 
 fn is_dashboard_mutating_tool(name: &str) -> bool {
@@ -2759,7 +2802,7 @@ fn build_agent_messages(
         "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.".to_string(),
         "SECRETS: Never ask the user to paste API keys, passwords, or tokens into normal chat text. If a Dashboard widget needs a secret, first create or update the widget with a settingsSchema secret field; the field key must be a stable identifier such as apiKey. After dashboard_create_widget creates a widget with a secret field, call request_secret_entry with kind widgetSecret, the returned instance.id as instanceId, and the exact fieldKey. Use request_secret_entry for AI provider API keys too. The secret value is captured by KKTerm locally and is not visible to you. Do not include or request the plaintext secret.".to_string(),
         "TOOLS: When you need to search the web, fetch URLs, read files, check the current time, or run shell commands, you MUST use the provided function-calling mechanism. Always make the actual function call alongside your explanation. Do not describe what you plan to do with a tool without calling it — invoke the tool in the same response.".to_string(),
-        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style; do not pick decorative colors at random. Be boundary-aware: size simple timers/counters at least 4x3, forms or images at least 5x4, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read/write non-secret values through KK.getSettings(), KK.setSetting(), and KK.setSettings(). Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret with no defaultValue; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret, and scripts read it with await KK.getSecret('fieldKey') only when needed. After creating a widget with a secret field, call request_secret_entry using the returned widget instance id and the exact secret field key instead of asking the user to paste the secret in chat. When a widget embeds remote images, fetches remote data, or loads external libraries such as Three.js from a CDN, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
+        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, repair, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. When the user reports an error in an existing AI-authored widget, use dashboard_load_state to read the current Dashboard custom widget source, then call dashboard_update_custom_widget with the matching custom widget id. Prefer patch.body for widget source edits; patch.body is structured JSON and avoids escaping mistakes. Do not ask the user to paste widget source that KKTerm can read through dashboard_load_state. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style; do not pick decorative colors at random. Be boundary-aware: size simple timers/counters at least 4x3, forms or images at least 5x4, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read non-secret values with KK.getSettings() and save via KK.setSetting(key, value). Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret with no defaultValue; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret, and scripts read it with await KK.getSecret('fieldKey') only when needed. After creating a widget with a secret field, call request_secret_entry using the returned widget instance id and the exact secret field key instead of asking the user to paste the secret in chat. When a widget embeds remote images, fetches remote data, or loads external libraries such as Three.js from a CDN, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
     ];
     if let Some(language) = normalize_output_language(output_language) {
         system_instructions.push(language);
@@ -3756,6 +3799,58 @@ mod tests {
             .and_then(Value::as_array)
             .expect("secret branch lists required properties")
             .contains(&json!("defaultValue")));
+    }
+
+    #[test]
+    fn dashboard_update_custom_widget_tool_accepts_structured_body_patch() {
+        let settings: AiAssistantToolSettings = serde_json::from_value(json!({
+            "dashboard": true
+        }))
+        .expect("tool settings deserialize");
+
+        let tools = ai_tool_definitions(&settings);
+        let tool = tools
+            .iter()
+            .find(|tool| tool.function.name == "dashboard_update_custom_widget")
+            .expect("dashboard update custom widget tool exists");
+
+        assert!(tool
+            .function
+            .description
+            .contains("Prefer patch.body"));
+        assert!(tool
+            .function
+            .parameters
+            .pointer("/properties/patch/properties/body/anyOf")
+            .is_some());
+        assert!(tool
+            .function
+            .parameters
+            .pointer("/properties/patch/properties/bodyJson")
+            .is_some());
+    }
+
+    #[test]
+    fn agent_messages_tell_assistant_to_edit_existing_dashboard_widget_source() {
+        let messages = build_agent_messages(
+            "Fix the widget below.".to_string(),
+            "Dashboard - Default".to_string(),
+            None,
+            "medium".to_string(),
+            None,
+            None,
+            None,
+            true,
+            None,
+            vec![],
+            vec![],
+            None,
+        );
+
+        let system_content = text_content(&messages[0]);
+        assert!(system_content.contains("use dashboard_load_state"));
+        assert!(system_content.contains("patch.body"));
+        assert!(system_content.contains("Do not ask the user to paste widget source"));
     }
 
     #[test]

@@ -66,6 +66,10 @@ export function DashboardPage({
     () => (activeView ? instances.filter((i) => i.viewId === activeView.id) : []),
     [activeView, instances],
   );
+  const activeCustomSourceIds = useMemo(
+    () => new Set(viewInstances.filter((instance) => instance.kind !== "builtIn").map((instance) => instance.sourceId)),
+    [viewInstances],
+  );
   const densitySettings = DENSITY_SETTINGS[activeView?.gridDensity ?? "default"];
   const canvasGridStyle = {
     "--dw-row-height": `${densitySettings.rowHeight}px`,
@@ -100,6 +104,8 @@ export function DashboardPage({
         kind: widget.kind,
         title: widget.title,
         category: widget.category,
+        summary: widget.summary,
+        activeOnView: activeCustomSourceIds.has(widget.id),
       })),
     };
     onAssistantContextChange({
@@ -110,6 +116,7 @@ export function DashboardPage({
       text: [
         t("dashboard.assistantContextIntro"),
         "For a user request to create a visible Dashboard widget, use dashboard_create_widget with activeView.id so the widget is validated and placed on the selected view in one step.",
+        "For a user request to fix or edit an existing AI-authored widget, use dashboard_load_state to read the current customWidgets[].bodyJson and instances[].sourceId, then call dashboard_update_custom_widget. Prefer patch.body over patch.bodyJson so you can submit structured content/script bodies without manual JSON escaping.",
         "Prefer content widgets for static notes, checklists, stats, and key/value summaries. Use script widgets only when live JavaScript behavior is required.",
         "When using a script widget, provide JavaScript source only. Do not generate a full HTML document or include <script> tags; create DOM nodes inside #root instead.",
         "Choose preset, accentName, iconName, and grid size intentionally from the widget purpose. Default to panel for ordinary tools, tile or stat-like content for compact metrics, mono for terminal/code/system data, action for launch/action surfaces, and hero only for rare high-priority summaries.",
@@ -123,7 +130,7 @@ export function DashboardPage({
         JSON.stringify(dashboardSnapshot, null, 2),
       ].join("\n"),
     });
-  }, [activeView, viewInstances, customWidgets, onAssistantContextChange, t]);
+  }, [activeView, viewInstances, activeCustomSourceIds, customWidgets, onAssistantContextChange, t]);
 
   if (!ready || !activeView) return <div className="dashboard-loading">{t("common.loading")}</div>;
 
