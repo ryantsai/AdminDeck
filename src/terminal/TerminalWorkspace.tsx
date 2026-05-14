@@ -1226,6 +1226,10 @@ function TerminalPaneView({
 
         const terminalStartAt = performance.now();
         const terminalDimensions = terminal.dimensions;
+        const shell =
+          connection.type === "local"
+            ? connection.localShell ?? terminalSettings.defaultShell
+            : undefined;
         const result = await invokeCommand("start_terminal_session", {
           request: {
             sessionId: requestedSessionId,
@@ -1238,10 +1242,7 @@ function TerminalPaneView({
             proxyJump: connection.proxyJump,
             authMethod: connection.authMethod,
             secretOwnerId: connection.id,
-            shell:
-              connection.type === "local"
-                ? connection.localShell ?? terminalSettings.defaultShell
-                : undefined,
+            shell,
             serialLine: connection.type === "serial" ? connection.serialLine ?? connection.host : undefined,
             serialSpeed: connection.type === "serial" ? connection.serialSpeed ?? 9600 : undefined,
             initialDirectory:

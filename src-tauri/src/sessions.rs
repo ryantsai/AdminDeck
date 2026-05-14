@@ -1,4 +1,6 @@
 use crate::{secrets, serial, ssh, telnet};
+#[cfg(target_os = "windows")]
+use crate::windows_local_pty;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -184,6 +186,10 @@ pub struct TerminalSessionStarted {
 }
 
 impl TerminalSessionStarted {
+    pub fn session_id(&self) -> &str {
+        &self.session_id
+    }
+
     pub fn terminal_ready_ms(&self) -> Option<u128> {
         self.terminal_ready_ms
     }
@@ -232,6 +238,10 @@ impl SessionManager {
             .session_id
             .clone()
             .unwrap_or_else(|| make_session_id(&request.title));
+        let is_local_start = request
+            .connection_type
+            .trim()
+            .eq_ignore_ascii_case("local");
         let password = connection_password_for(secrets, &request);
         if request
             .connection_type
@@ -351,6 +361,59 @@ impl SessionManager {
                 }
                 Err(error) => return Err(error),
             }
+        }
+
+        #[cfg(target_os = "windows")]
+        if is_local_start {
+            let command = command_for(&request)?;
+            let local_pty = windows_local_pty::spawn_local_shell(pty_size_for(&request), command)
+                .map_err(|error| format!("failed to start Windows local shell: {error}"))?;
+            let session = TerminalSession {
+                transport: TerminalTransport::Pty {
+                    master: local_pty.master,
+                    writer: local_pty.writer,
+                    child: local_pty.child,
+                },
+            };
+            self.sessions
+                .lock()
+                .map_err(|_| "terminal session lock is poisoned".to_string())?
+                .insert(session_id.clone(), session);
+
+            let output_session_id = session_id.clone();
+            thread::spawn(move || {
+                let mut reader = local_pty.reader;
+                let mut buffer = [0_u8; 8192];
+                loop {
+                    match reader.read(&mut buffer) {
+                        Ok(0) => break,
+                        Ok(count) => {
+                            let data = String::from_utf8_lossy(&buffer[..count]).to_string();
+                            let _ = app.emit(
+                                "terminal-output",
+                                TerminalOutput {
+                                    session_id: output_session_id.clone(),
+                                    data,
+                                },
+                            );
+                        }
+                        Err(error) => {
+                            let _ = app.emit(
+                                "terminal-output",
+                                TerminalOutput {
+                                    session_id: output_session_id.clone(),
+                                    data: format!("\r\n[session read error: {error}]\r\n"),
+                                },
+                            );
+                            break;
+                        }
+                    }
+                }
+            });
+            return Ok(TerminalSessionStarted {
+                session_id,
+                terminal_ready_ms: None,
+            });
         }
 
         let pty_system = native_pty_system();
@@ -1436,7 +1499,12 @@ fn command_for(request: &StartTerminalSessionRequest) -> Result<CommandBuilder, 
                         std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
                     }
                 });
-            let mut command = CommandBuilder::new(program);
+            let is_cmd = is_windows_cmd_shell(&program);
+            let mut command = CommandBuilder::new(resolved_local_shell_program(program));
+            if is_cmd {
+                command.arg("/D");
+            }
+            sanitize_windows_local_environment(&mut command);
             set_terminal_environment(&mut command);
             if let Some(directory) = initial_directory_for(request) {
                 command.cwd(OsString::from(directory));
@@ -1505,6 +1573,85 @@ fn set_terminal_environment(command: &mut CommandBuilder) {
     command.env("COLORTERM", "truecolor");
 }
 
+fn sanitize_windows_local_environment(command: &mut CommandBuilder) -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        const WINDOWS_LOCAL_ENV_ALLOWLIST: &[&str] = &[
+            "ALLUSERSPROFILE",
+            "APPDATA",
+            "CommonProgramFiles",
+            "CommonProgramFiles(x86)",
+            "ComSpec",
+            "HOMEDRIVE",
+            "HOMEPATH",
+            "LOCALAPPDATA",
+            "NUMBER_OF_PROCESSORS",
+            "OS",
+            "PATH",
+            "PATHEXT",
+            "PROCESSOR_ARCHITECTURE",
+            "PROCESSOR_IDENTIFIER",
+            "PROCESSOR_LEVEL",
+            "PROCESSOR_REVISION",
+            "ProgramData",
+            "ProgramFiles",
+            "ProgramFiles(x86)",
+            "PSModulePath",
+            "PUBLIC",
+            "SystemDrive",
+            "SystemRoot",
+            "TEMP",
+            "TMP",
+            "USERDOMAIN",
+            "USERNAME",
+            "USERPROFILE",
+            "windir",
+        ];
+
+        command.env_clear();
+        let mut retained = Vec::new();
+        for key in WINDOWS_LOCAL_ENV_ALLOWLIST {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(*key, value);
+                retained.push((*key).to_string());
+            }
+        }
+        return retained;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = command;
+        Vec::new()
+    }
+}
+
+fn resolved_local_shell_program(program: String) -> String {
+    if is_windows_cmd_shell(&program) {
+        windows_cmd_program()
+    } else {
+        program
+    }
+}
+
+fn is_windows_cmd_shell(program: &str) -> bool {
+    let trimmed = program.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let normalized = trimmed.replace('/', "\\").to_ascii_lowercase();
+    normalized == "cmd" || normalized == "cmd.exe" || normalized.ends_with("\\cmd.exe")
+}
+
+fn windows_cmd_program() -> String {
+    std::env::var("ComSpec")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "cmd.exe".to_string())
+}
+
 fn initial_directory_for(request: &StartTerminalSessionRequest) -> Option<String> {
     request
         .initial_directory
@@ -1553,6 +1700,32 @@ fn make_session_id(title: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn local_request() -> StartTerminalSessionRequest {
+        StartTerminalSessionRequest {
+            session_id: None,
+            title: "Local shell".to_string(),
+            connection_type: "local".to_string(),
+            host: "localhost".to_string(),
+            user: String::new(),
+            port: None,
+            key_path: None,
+            proxy_jump: None,
+            auth_method: None,
+            secret_owner_id: None,
+            shell: None,
+            serial_line: None,
+            serial_speed: None,
+            initial_directory: None,
+            cols: None,
+            pixel_height: None,
+            pixel_width: None,
+            rows: None,
+            use_tmux: None,
+            tmux_session_id: None,
+            ssh_buffer_lines: None,
+        }
+    }
 
     #[test]
     fn ssh_auth_method_prefers_explicit_agent_and_key_file() {
@@ -1657,6 +1830,30 @@ mod tests {
                 .and_then(|value| value.to_str()),
             Some("truecolor")
         );
+    }
+
+    #[test]
+    fn recognizes_cmd_shell_names_and_paths() {
+        assert!(is_windows_cmd_shell("cmd"));
+        assert!(is_windows_cmd_shell("cmd.exe"));
+        assert!(is_windows_cmd_shell("C:/Windows/System32/cmd.exe"));
+        assert!(is_windows_cmd_shell("C:\\Windows\\System32\\cmd.exe"));
+        assert!(!is_windows_cmd_shell("powershell.exe"));
+    }
+
+    #[test]
+    fn local_cmd_sessions_disable_command_processor_autorun() {
+        let mut request = local_request();
+        request.shell = Some("cmd.exe".to_string());
+
+        let command = command_for(&request).expect("local cmd command should build");
+        let argv = command
+            .get_argv()
+            .iter()
+            .map(|value| value.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(argv, vec![windows_cmd_program(), "/D".to_string()]);
     }
 
     #[test]

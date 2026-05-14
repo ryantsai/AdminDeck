@@ -26,6 +26,8 @@ mod telnet;
 mod vnc;
 mod webview;
 mod wiki;
+#[cfg(target_os = "windows")]
+mod windows_local_pty;
 mod window_state;
 
 use serde::{Deserialize, Serialize};
@@ -989,7 +991,8 @@ async fn start_terminal_session(
         let secrets = startup_app.state::<secrets::Secrets>();
         sessions.start_terminal_session(startup_app.clone(), &secrets, request)
     })
-    .await?;
+    .await;
+    let started = started?;
     if let Some(terminal_ready_ms) = started.terminal_ready_ms() {
         let performance = app.state::<performance::PerformanceMonitor>();
         performance.record_ssh_terminal_ready(terminal_ready_ms);

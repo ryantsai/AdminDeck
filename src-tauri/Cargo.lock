@@ -2795,13 +2795,16 @@ dependencies = [
 
 [[package]]
 name = "kkterm"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
+ "anyhow",
  "async-native-tls",
  "base64 0.22.1",
+ "filedescriptor",
  "futures",
  "image",
  "keyring-core",
+ "lazy_static",
  "portable-pty",
  "rand 0.8.6",
  "reqwest 0.12.28",
@@ -2811,6 +2814,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial2",
+ "shared_library",
  "suppaftp",
  "tauri",
  "tauri-build",
@@ -2825,6 +2829,7 @@ dependencies = [
  "url",
  "vnc-rs",
  "webview2-com",
+ "winapi",
  "windows 0.61.3",
  "windows-native-keyring-store",
  "windows-sys 0.59.0",
