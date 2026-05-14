@@ -24,7 +24,9 @@ Windows is the first acceptance platform. macOS and Linux should remain first-cl
 
 Owns Tauri setup, window lifecycle, command registration, menus, native dialogs, logging setup, and platform-specific capabilities.
 
-The main app window close path must remain native and unhooked. Do not listen for or intercept Tauri close events such as `CloseRequested`, `onCloseRequested`, `tauri://close-requested`, or `prevent_close`, and do not add app-owned close confirmation flows on the title-bar close button. Those hooks have repeatedly broken the Windows native close button under Tauri v2. Window and layout state should be persisted during ordinary resize/move/settings flows, not during app close.
+The main app window close path stays native and free of frontend hooks. Do not add `onCloseRequested`, `tauri://close-requested`, JS-side close listeners, or app-owned close-confirmation flows on the title-bar close button — those have repeatedly broken the Windows native close button under Tauri v2. Window and layout state should be persisted during ordinary resize/move/settings flows, not during app close.
+
+The single sanctioned exception is the minimize-to-tray diversion in `app_tray.rs`: a native, synchronous Rust-side `WindowEvent::CloseRequested` arm inside the existing `on_window_event` handler. It calls `api.prevent_close()` and hides the window **only when minimize-to-tray is enabled**; when disabled the close request is untouched and quits natively. The handler does no async work, and the tray "Exit" item (`app.exit(0)`) bypasses `CloseRequested` so a guaranteed quit path always exists.
 
 Automatic database backups follow the same rule: they run during startup or explicit Settings actions, never during app-window close. Backup files are KKTerm settings ZIPs with the same structure as manual exports, so Import Settings can restore them directly.
 

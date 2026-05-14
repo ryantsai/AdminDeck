@@ -213,3 +213,23 @@ pub fn hide_minimized_window_if_enabled<R: tauri::Runtime>(window: &tauri::Windo
 
     let _ = window.hide();
 }
+
+/// Diverts the native title-bar close button to a hide-to-tray when minimize-to-tray is enabled.
+/// When disabled, the close request is left untouched so the window quits natively. The tray
+/// "Exit" item calls `app.exit(0)`, which never routes through `CloseRequested`, so quitting
+/// always remains possible.
+pub fn hide_window_on_close_if_enabled<R: tauri::Runtime>(
+    window: &tauri::Window<R>,
+    api: &tauri::CloseRequestApi,
+) {
+    let Some(tray_state) = window.try_state::<TrayState>() else {
+        return;
+    };
+
+    if !tray_state.minimize_to_tray() {
+        return;
+    }
+
+    api.prevent_close();
+    let _ = window.hide();
+}

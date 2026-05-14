@@ -1865,6 +1865,10 @@ pub fn run() {
                 return;
             }
 
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                app_tray::hide_window_on_close_if_enabled(window, api);
+            }
+
             if let Some(window_tracker) = window.try_state::<window_state::MainWindowState>() {
                 match event {
                     tauri::WindowEvent::Resized(size) => {
