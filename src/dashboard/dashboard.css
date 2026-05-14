@@ -242,6 +242,7 @@ main.dashboard-page {
 
 .dw-canvas-scroll {
   box-sizing: border-box;
+  position: relative;
   --dw-grid-dot: rgb(23 32 43 / 14%);
   --dw-grid-dot-soft: rgb(23 32 43 / 5%);
   --dw-grid-column-width: calc((100% - (var(--dw-grid-gap-x, 16px) * 13)) / 12);
@@ -253,7 +254,12 @@ main.dashboard-page {
   overflow-y: auto;
 }
 
-.dw-canvas-scroll.is-editing {
+.dw-canvas-scroll.is-editing .dw-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   background-image:
     radial-gradient(circle, var(--dw-grid-dot) 1px, transparent 1.4px),
     radial-gradient(circle, var(--dw-grid-dot-soft) 1px, transparent 1.4px);
@@ -266,6 +272,28 @@ main.dashboard-page {
 
 .dw-canvas {
   min-height: 100%;
+}
+
+.dw-canvas-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.dw-canvas-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--dw-bg-dim-color, transparent);
+}
+
+.dw-canvas-scroll > .dw-canvas {
+  position: relative;
+  z-index: 1;
 }
 
 .react-grid-layout.dw-canvas {
