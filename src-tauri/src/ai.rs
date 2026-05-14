@@ -859,6 +859,7 @@ impl OpenAiCompatibleProvider {
                     stream: false,
                     tools: tool_definitions.clone(),
                     tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
+                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
                 })
                 .send()
                 .await
@@ -936,6 +937,7 @@ impl OpenAiCompatibleProvider {
                     stream: false,
                     tools: vec![],
                     tool_choice: None,
+                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
                 })
                 .send()
                 .await
@@ -1194,6 +1196,7 @@ impl OpenAiCompatibleProvider {
                     stream: true,
                     tools: tool_definitions.clone(),
                     tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
+                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
                 })
                 .send()
                 .await
@@ -1330,6 +1333,7 @@ impl OpenAiCompatibleProvider {
                     stream: true,
                     tools: vec![],
                     tool_choice: None,
+                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
                 })
                 .send()
                 .await
@@ -1561,6 +1565,15 @@ struct OpenAiCompatibleChatRequest {
     tools: Vec<OpenAiToolDefinition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thinking: Option<DeepSeekThinking>,
+}
+
+#[derive(Serialize)]
+struct DeepSeekThinking {
+    #[serde(rename = "type")]
+    thinking_type: &'static str,
+    reasoning_effort: &'static str,
 }
 
 #[derive(Serialize)]
@@ -1678,6 +1691,21 @@ fn require_streamed_assistant_content(
     } else {
         Ok(())
     }
+}
+
+fn deepseek_thinking(provider_kind: &str, reasoning_effort: &str) -> Option<DeepSeekThinking> {
+    if provider_kind != "deepseek" {
+        return None;
+    }
+    let reasoning_effort = match reasoning_effort.trim().to_ascii_lowercase().as_str() {
+        "max" | "maximum" | "xhigh" | "x-high" | "x_high" => "max",
+        "high" | "low" | "medium" => "high",
+        _ => return None,
+    };
+    Some(DeepSeekThinking {
+        thinking_type: "enabled",
+        reasoning_effort,
+    })
 }
 
 fn responses_tool_definitions(tools: &[OpenAiToolDefinition]) -> Vec<Value> {
@@ -1932,7 +1960,7 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
         ));
         tools.push(tool_definition(
             "dashboard_create_widget",
-            "Create a validated AI-authored custom widget and place it on the selected Dashboard view in one step. Prefer this for user requests to create a visible widget. Prefer content widgets for static markdown, key/value summaries, checklists, and stats. Use script widgets only when the user explicitly needs live JavaScript behavior. For script widgets that display remote images or fetch remote data, set permissions.network to true; otherwise keep it false. External website links must be normal http/https anchors or call KK.openExternal(url), and KKTerm will open them in the user's external browser. Choose preset, accentName, iconName, and grid size deliberately from the widget purpose: panel for standard tools, tile/stat for compact metrics, mono for terminal/code/system data, action for launch/action surfaces, hero only for rare high-priority summaries. Size widgets generously enough to avoid inner scrollbars: simple timers/counters need at least 4x3, forms or images need 5x4 or larger, lists need height for expected rows. Prefer calm app-like accents such as blue, teal, slate, emerald, amber for warnings, and red/rose only for destructive or error-oriented widgets. Never set text and background to the same or low-contrast colors; use host CSS variables and compact app-style controls. If the widget needs user-configurable/persistent per-instance options, provide settingsSchema.fields with text, number, boolean, select, or secret fields. Use secret fields for passwords, API keys, tokens, and similar values; SQLite stores only secret references and scripts must call await KK.getSecret('fieldKey') to read the OS-keychain value at runtime. Do not generate full HTML documents; script source should create or update DOM nodes inside the provided root.",
+            "Create a validated AI-authored custom widget and place it on the selected Dashboard view in one step. Prefer this for user requests to create a visible widget. Prefer content widgets for static markdown, key/value summaries, checklists, and stats. Use script widgets only when the user explicitly needs live JavaScript behavior. For script widgets that display remote images, fetch remote data, or load external libraries such as Three.js from a CDN, set permissions.network to true; otherwise keep it false. External website links must be normal http/https anchors or call KK.openExternal(url), and KKTerm will open them in the user's external browser. Choose preset, accentName, iconName, and grid size deliberately from the widget purpose: panel for standard tools, tile/stat for compact metrics, mono for terminal/code/system data, action for launch/action surfaces, hero only for rare high-priority summaries. Size widgets generously enough to avoid inner scrollbars: simple timers/counters need at least 4x3, forms or images need 5x4 or larger, lists need height for expected rows. Prefer calm app-like accents such as blue, teal, slate, emerald, amber for warnings, and red/rose only for destructive or error-oriented widgets. Never set text and background to the same or low-contrast colors; use host CSS variables and compact app-style controls. If the widget needs user-configurable/persistent per-instance options, provide settingsSchema.fields with text, number, boolean, select, or secret fields. Use secret fields for passwords, API keys, tokens, and similar values; SQLite stores only secret references and scripts must call await KK.getSecret('fieldKey') to read the OS-keychain value at runtime. Do not generate full HTML documents; script source should create or update DOM nodes inside the provided root.",
             dashboard_create_widget_schema(),
         ).strict());
         tools.push(tool_definition(
@@ -2527,7 +2555,7 @@ fn build_agent_messages(
         "Do not claim to have executed commands or observed live session state unless it is in the provided context.".to_string(),
         "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.".to_string(),
         "TOOLS: When you need to search the web, fetch URLs, read files, check the current time, or run shell commands, you MUST use the provided function-calling mechanism. Always make the actual function call alongside your explanation. Do not describe what you plan to do with a tool without calling it — invoke the tool in the same response.".to_string(),
-        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style; do not pick decorative colors at random. Be boundary-aware: size simple timers/counters at least 4x3, forms or images at least 5x4, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read/write non-secret values through KK.getSettings(), KK.setSetting(), and KK.setSettings(). Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret, and scripts read it with await KK.getSecret('fieldKey') only when needed. When a widget embeds remote images or fetches remote data, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
+        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style; do not pick decorative colors at random. Be boundary-aware: size simple timers/counters at least 4x3, forms or images at least 5x4, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read/write non-secret values through KK.getSettings(), KK.setSetting(), and KK.setSettings(). Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret, and scripts read it with await KK.getSecret('fieldKey') only when needed. When a widget embeds remote images, fetches remote data, or loads external libraries such as Three.js from a CDN, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
     ];
     if let Some(language) = normalize_output_language(output_language) {
         system_instructions.push(language);
@@ -3408,6 +3436,51 @@ mod tests {
         assert_eq!(tool_json["tool_call_id"], "call_time");
         assert_eq!(tool_json["content"], "2026-05-12T23:00:00+08:00");
         assert!(tool_json.get("reasoning_content").is_none());
+    }
+
+    #[test]
+    fn deepseek_chat_request_serializes_thinking_effort() {
+        let request = OpenAiCompatibleChatRequest {
+            model: "deepseek-v4-flash".to_string(),
+            messages: vec![OpenAiCompatibleMessage {
+                role: "user".to_string(),
+                content: OpenAiCompatibleContent::Text("Hello".to_string()),
+                reasoning_content: None,
+                tool_call_id: None,
+                tool_calls: None,
+            }],
+            stream: true,
+            tools: vec![],
+            tool_choice: None,
+            thinking: deepseek_thinking("deepseek", "max"),
+        };
+
+        let json = serde_json::to_value(&request).expect("request serializes");
+
+        assert_eq!(json["thinking"]["type"], "enabled");
+        assert_eq!(json["thinking"]["reasoning_effort"], "max");
+    }
+
+    #[test]
+    fn non_deepseek_chat_request_omits_thinking_effort() {
+        let request = OpenAiCompatibleChatRequest {
+            model: "gpt-5.5".to_string(),
+            messages: vec![OpenAiCompatibleMessage {
+                role: "user".to_string(),
+                content: OpenAiCompatibleContent::Text("Hello".to_string()),
+                reasoning_content: None,
+                tool_call_id: None,
+                tool_calls: None,
+            }],
+            stream: true,
+            tools: vec![],
+            tool_choice: None,
+            thinking: deepseek_thinking("openai", "max"),
+        };
+
+        let json = serde_json::to_value(&request).expect("request serializes");
+
+        assert!(json.get("thinking").is_none());
     }
 
     #[test]
