@@ -111,6 +111,8 @@ export const defaultAiProviderSettings: AiProviderSettings = {
   claudeCliPath: "",
   codexCliPath: "",
   tools: defaultAiAssistantToolSettings,
+  searchProvider: "scraper",
+  searxngUrl: "",
 };
 
 export type AiSuggestion = {

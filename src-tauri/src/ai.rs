@@ -1,4 +1,5 @@
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -2396,7 +2397,7 @@ async fn run_ai_tool(
     match call.function.name.as_str() {
         "request_secret_entry" => request_secret_entry_tool(args, stream_channel),
         "current_time" if tool_settings.current_time() => current_time_tool(),
-        "web_search" if tool_settings.web_search() => web_search_tool(args).await,
+        "web_search" if tool_settings.web_search() => web_search_tool(settings, args).await,
         "web_fetch" if tool_settings.web_fetch() => web_fetch_tool(args).await,
         "app_data_file_search" if tool_settings.app_data_file_search() => {
             app_data_file_search_tool(app_data_dir, args)
@@ -2861,18 +2862,33 @@ fn current_time_tool() -> String {
         })
 }
 
-async fn web_search_tool(args: Value) -> String {
+async fn web_search_tool(settings: &AiProviderSettings, args: Value) -> String {
     let query = arg_string(&args, "query");
     if query.is_empty() {
         return "web_search requires query.".to_string();
     }
-    let url = format!("https://duckduckgo.com/html/?q={}", url_encode(&query));
-    match reqwest::get(url).await {
-        Ok(response) => match response.text().await {
-            Ok(text) => strip_html(&text).chars().take(4000).collect(),
-            Err(error) => format!("Failed to read search response: {error}"),
+    let provider = settings.search_provider();
+    let allow_insecure = settings.allow_insecure_tls();
+
+    match provider {
+        "scraper" | "" => web_search_scraper(&query, allow_insecure).await,
+        "brave" => match settings.search_provider_api_key() {
+            Some(key) => web_search_brave(&query, key, allow_insecure).await,
+            None => "Brave Search API key is not configured.".to_string(),
         },
-        Err(error) => format!("Web search failed: {error}"),
+        "tavily" => match settings.search_provider_api_key() {
+            Some(key) => web_search_tavily(&query, key, allow_insecure).await,
+            None => "Tavily Search API key is not configured.".to_string(),
+        },
+        "searxng" => {
+            let instance_url = settings.searxng_url();
+            if instance_url.is_empty() {
+                "SearXNG instance URL is not configured.".to_string()
+            } else {
+                web_search_searxng(&query, instance_url, allow_insecure).await
+            }
+        }
+        _ => "Unknown search provider configured.".to_string(),
     }
 }
 
@@ -2881,11 +2897,27 @@ async fn web_fetch_tool(args: Value) -> String {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return "web_fetch only accepts http:// or https:// URLs.".to_string();
     }
-    match reqwest::get(url).await {
-        Ok(response) => match response.text().await {
-            Ok(text) => strip_html(&text).chars().take(8000).collect(),
-            Err(error) => format!("Failed to read page: {error}"),
-        },
+    let client = match reqwest::Client::builder().build() {
+        Ok(client) => client,
+        Err(error) => return format!("Failed to create HTTP client: {error}"),
+    };
+    match client.get(&url).send().await {
+        Ok(response) => {
+            let content_type = response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            if !content_type.contains("text/html") && !content_type.contains("text/plain") {
+                return format!(
+                    "Cannot fetch content type: {content_type}. Only text/html and text/plain are supported."
+                );
+            }
+            match response.text().await {
+                Ok(html) => extract_readable_text(&html),
+                Err(error) => format!("Failed to read page: {error}"),
+            }
+        }
         Err(error) => format!("Fetch failed: {error}"),
     }
 }
@@ -3070,6 +3102,318 @@ fn url_encode(value: &str) -> String {
             _ => format!("%{byte:02X}"),
         })
         .collect()
+}
+
+fn clean_text(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut prev_was_whitespace = true;
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            if !prev_was_whitespace {
+                result.push(' ');
+            }
+            prev_was_whitespace = true;
+        } else {
+            result.push(ch);
+            prev_was_whitespace = false;
+        }
+    }
+    result.trim().to_string()
+}
+
+fn extract_readable_text(html: &str) -> String {
+    let document = Html::parse_document(html);
+
+    for selector_str in [
+        "article",
+        "main",
+        "[role=\"main\"]",
+        ".post-content",
+        ".article-content",
+        ".entry-content",
+        "#content",
+    ] {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            let combined: String = document
+                .select(&selector)
+                .flat_map(|el| el.text())
+                .collect::<Vec<_>>()
+                .join(" ");
+            let cleaned = clean_text(&combined);
+            if cleaned.len() > 200 {
+                return cleaned.chars().take(8000).collect();
+            }
+        }
+    }
+
+    if let Ok(selector) = Selector::parse("body") {
+        if let Some(body) = document.select(&selector).next() {
+            let combined: String =
+                body.text().collect::<Vec<_>>().join(" ");
+            return clean_text(&combined).chars().take(8000).collect();
+        }
+    }
+
+    clean_text(&strip_html(html)).chars().take(8000).collect()
+}
+
+fn build_web_client(allow_insecure_tls: bool) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .danger_accept_invalid_certs(allow_insecure_tls)
+        .build()
+        .map_err(|e| format!("failed to create HTTP client: {e}"))
+}
+
+async fn web_search_scraper(query: &str, allow_insecure_tls: bool) -> String {
+    let client = match build_web_client(allow_insecure_tls) {
+        Ok(c) => c,
+        Err(e) => return e,
+    };
+
+    let json_url = format!(
+        "https://api.duckduckgo.com/?q={}&format=json&no_html=1&skip_disambig=1",
+        url_encode(query)
+    );
+
+    match client.get(&json_url).send().await {
+        Ok(response) => match response.json::<DdgInstantAnswer>().await {
+            Ok(answer) => {
+                let mut result = String::new();
+                if !answer.abstract_text.is_empty() {
+                    result.push_str("Instant answer: ");
+                    result.push_str(&answer.abstract_text);
+                    if !answer.abstract_url.is_empty() {
+                        result.push_str(&format!("\nSource: {}", answer.abstract_url));
+                    }
+                }
+                let mut has_related = false;
+                for topic in &answer.related_topics {
+                    if let Some(text) = &topic.text {
+                        if !has_related {
+                            if !result.is_empty() {
+                                result.push_str("\n\n");
+                            }
+                            result.push_str("Related topics:\n");
+                            has_related = true;
+                        }
+                        result.push_str(&format!("- {}\n", text));
+                    }
+                }
+                if !result.is_empty() {
+                    return result.chars().take(4000).collect();
+                }
+            }
+            Err(_) => {}
+        },
+        Err(_) => {}
+    }
+
+    let html_url = format!(
+        "https://html.duckduckgo.com/html/?q={}",
+        url_encode(query)
+    );
+    match client.get(&html_url).send().await {
+        Ok(response) => match response.text().await {
+            Ok(html) => {
+                let document = Html::parse_document(&html);
+                let mut result = String::new();
+                if let Ok(sel) = Selector::parse(".result__body") {
+                    for (i, el) in document.select(&sel).enumerate() {
+                        if i >= 6 {
+                            break;
+                        }
+                        let snippet: String =
+                            el.text().collect::<Vec<_>>().join(" ");
+                        let cleaned = clean_text(&snippet);
+                        if !cleaned.is_empty() {
+                            result.push_str(&cleaned);
+                            result.push('\n');
+                        }
+                    }
+                }
+                if result.is_empty() {
+                    clean_text(&strip_html(&html))
+                        .chars()
+                        .take(4000)
+                        .collect()
+                } else {
+                    result.chars().take(4000).collect()
+                }
+            }
+            Err(error) => format!("Web search failed: {error}"),
+        },
+        Err(error) => format!("Web search failed: {error}"),
+    }
+}
+
+async fn web_search_brave(query: &str, api_key: &str, allow_insecure_tls: bool) -> String {
+    let client = match build_web_client(allow_insecure_tls) {
+        Ok(c) => c,
+        Err(e) => return e,
+    };
+    let url = format!(
+        "https://api.search.brave.com/res/v1/web/search?q={}&count=5",
+        url_encode(query)
+    );
+    match client
+        .get(&url)
+        .header("Accept", "application/json")
+        .header("Accept-Encoding", "gzip")
+        .header("X-Subscription-Token", api_key)
+        .send()
+        .await
+    {
+        Ok(response) => match response.json::<BraveSearchResponse>().await {
+            Ok(data) => {
+                if let Some(web) = data.web {
+                    let mut result = String::new();
+                    for (i, r) in web.results.iter().enumerate() {
+                        result.push_str(&format!("{}. {}\n", i + 1, r.title));
+                        result.push_str(&format!("   {}\n", r.url));
+                        result.push_str(&format!("   {}\n", r.description));
+                    }
+                    result.chars().take(4000).collect()
+                } else {
+                    "Brave Search returned no web results.".to_string()
+                }
+            }
+            Err(error) => format!("Failed to parse Brave Search response: {error}"),
+        },
+        Err(error) => format!("Brave Search request failed: {error}"),
+    }
+}
+
+async fn web_search_tavily(query: &str, api_key: &str, allow_insecure_tls: bool) -> String {
+    let client = match build_web_client(allow_insecure_tls) {
+        Ok(c) => c,
+        Err(e) => return e,
+    };
+    let body = serde_json::json!({
+        "api_key": api_key,
+        "query": query,
+        "search_depth": "basic",
+        "include_answer": true,
+        "max_results": 5,
+    });
+    match client
+        .post("https://api.tavily.com/search")
+        .json(&body)
+        .send()
+        .await
+    {
+        Ok(response) => match response.json::<TavilySearchResponse>().await {
+            Ok(data) => {
+                let mut result = String::new();
+                if let Some(answer) = &data.answer {
+                    if !answer.is_empty() {
+                        result.push_str("Answer: ");
+                        result.push_str(answer);
+                        result.push_str("\n\n");
+                    }
+                }
+                for (i, r) in data.results.iter().enumerate() {
+                    result.push_str(&format!("{}. {}\n", i + 1, r.title));
+                    result.push_str(&format!("   {}\n", r.url));
+                    result.push_str(&format!("   {}\n", r.content));
+                }
+                result.chars().take(4000).collect()
+            }
+            Err(error) => format!("Failed to parse Tavily response: {error}"),
+        },
+        Err(error) => format!("Tavily request failed: {error}"),
+    }
+}
+
+async fn web_search_searxng(
+    query: &str,
+    instance_url: &str,
+    allow_insecure_tls: bool,
+) -> String {
+    let client = match build_web_client(allow_insecure_tls) {
+        Ok(c) => c,
+        Err(e) => return e,
+    };
+    let base = instance_url.trim_end_matches('/');
+    let url = format!("{}/search?q={}&format=json", base, url_encode(query));
+    match client.get(&url).send().await {
+        Ok(response) => match response.json::<SearxngSearchResponse>().await {
+            Ok(data) => {
+                let mut result = String::new();
+                for (i, r) in data.results.iter().enumerate().take(6) {
+                    result.push_str(&format!("{}. {}\n", i + 1, r.title));
+                    result.push_str(&format!("   {}\n", r.url));
+                    if let Some(content) = &r.content {
+                        result.push_str(&format!("   {}\n", content));
+                    }
+                }
+                if result.is_empty() {
+                    "SearXNG returned no results.".to_string()
+                } else {
+                    result.chars().take(4000).collect()
+                }
+            }
+            Err(error) => format!("Failed to parse SearXNG response: {error}"),
+        },
+        Err(error) => format!("SearXNG request failed: {error}"),
+    }
+}
+
+#[derive(Deserialize)]
+struct DdgInstantAnswer {
+    #[serde(rename = "AbstractText")]
+    abstract_text: String,
+    #[serde(rename = "AbstractURL")]
+    abstract_url: String,
+    #[serde(rename = "RelatedTopics")]
+    related_topics: Vec<DdgRelatedTopic>,
+}
+
+#[derive(Deserialize)]
+struct DdgRelatedTopic {
+    #[serde(rename = "Text")]
+    text: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct BraveSearchResponse {
+    web: Option<BraveWeb>,
+}
+
+#[derive(Deserialize)]
+struct BraveWeb {
+    results: Vec<BraveResult>,
+}
+
+#[derive(Deserialize)]
+struct BraveResult {
+    title: String,
+    url: String,
+    description: String,
+}
+
+#[derive(Deserialize)]
+struct TavilySearchResponse {
+    answer: Option<String>,
+    results: Vec<TavilyResult>,
+}
+
+#[derive(Deserialize)]
+struct TavilyResult {
+    title: String,
+    url: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct SearxngSearchResponse {
+    results: Vec<SearxngResult>,
+}
+
+#[derive(Deserialize)]
+struct SearxngResult {
+    title: String,
+    url: String,
+    content: Option<String>,
 }
 
 #[derive(Deserialize)]

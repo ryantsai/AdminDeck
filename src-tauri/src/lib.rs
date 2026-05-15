@@ -848,10 +848,11 @@ async fn run_ai_agent(
     secrets: tauri::State<'_, secrets::Secrets>,
     request: ai::AgentRunRequest,
 ) -> Result<ai::AgentRunResponse, String> {
-    let settings = storage.ai_provider_settings()?;
+    let mut settings = storage.ai_provider_settings()?;
     let api_key = secrets
         .read_ai_api_key("openai-compatible-provider".to_string())
         .map_err(|error| format!("failed to read AI API key: {error}"))?;
+    inject_search_api_key(&secrets, &mut settings)?;
     ai::run_agent(app, settings, api_key, request).await
 }
 
@@ -863,11 +864,29 @@ async fn run_ai_agent_streaming(
     channel: tauri::ipc::Channel<serde_json::Value>,
     request: ai::AgentRunRequest,
 ) -> Result<ai::AgentRunResponse, String> {
-    let settings = storage.ai_provider_settings()?;
+    let mut settings = storage.ai_provider_settings()?;
     let api_key = secrets
         .read_ai_api_key("openai-compatible-provider".to_string())
         .map_err(|error| format!("failed to read AI API key: {error}"))?;
+    inject_search_api_key(&secrets, &mut settings)?;
     ai::run_agent_streaming(app, settings, api_key, request, channel).await
+}
+
+fn inject_search_api_key(
+    secrets: &secrets::Secrets,
+    settings: &mut storage::AiProviderSettings,
+) -> Result<(), String> {
+    let key = match settings.search_provider() {
+        "brave" => secrets
+            .read_brave_search_api_key("brave-search".to_string())
+            .map_err(|e| format!("failed to read Brave Search API key: {e}"))?,
+        "tavily" => secrets
+            .read_tavily_search_api_key("tavily-search".to_string())
+            .map_err(|e| format!("failed to read Tavily Search API key: {e}"))?,
+        _ => None,
+    };
+    settings.set_search_provider_api_key(key);
+    Ok(())
 }
 
 #[tauri::command]

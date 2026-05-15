@@ -18,6 +18,7 @@ import type {
   AiProviderKind,
   AiProviderSettings as AiProviderSettingsType,
   AiReasoningEffort,
+  SearchProvider,
 } from "../types";
 import { SettingsSectionHeader, SettingsSummary } from "./shared";
 import { ToggleSwitch } from "./ToggleSwitch";
@@ -217,12 +218,111 @@ const AI_ASSISTANT_TOOL_IDS: AiAssistantToolId[] = [
   "sessions",
 ];
 
-function AiAssistantToolsControl({
+const SEARCH_PROVIDER_OPTIONS: { value: SearchProvider; labelKey: string }[] = [
+  { value: "scraper", labelKey: "settings.searchProviderScraper" },
+  { value: "brave", labelKey: "settings.searchProviderBrave" },
+  { value: "tavily", labelKey: "settings.searchProviderTavily" },
+  { value: "searxng", labelKey: "settings.searchProviderSearxng" },
+];
+
+const BRAVE_SEARCH_OWNER_ID = "brave-search";
+const TAVILY_SEARCH_OWNER_ID = "tavily-search";
+
+function SearchProviderControl({
   draft,
+  searchApiKeyDraft,
+  searchApiKeyStoredMask,
+  hasSearchApiKey,
   onDraftChange,
+  onSearchApiKeyDraftChange,
 }: {
   draft: AiProviderSettingsType;
+  searchApiKeyDraft: string;
+  searchApiKeyStoredMask: string;
+  hasSearchApiKey: boolean;
   onDraftChange: (patch: Partial<AiProviderSettingsType>) => void;
+  onSearchApiKeyDraftChange: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [isSearchApiKeyFocused, setIsSearchApiKeyFocused] = useState(false);
+  const shouldShowStoredApiKeyMask =
+    hasSearchApiKey && !isSearchApiKeyFocused && searchApiKeyDraft.length === 0;
+
+  return (
+    <div className="search-provider-subsection">
+      <label>
+        <span>{t("settings.searchProvider")}</span>
+        <select
+          onChange={(event) =>
+            onDraftChange({
+              searchProvider: event.currentTarget.value as SearchProvider,
+            })
+          }
+          value={draft.searchProvider}
+        >
+          {SEARCH_PROVIDER_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {t(option.labelKey)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {draft.searchProvider === "brave" ? (
+        <label>
+          <span>{t("settings.braveSearchApiKey")}</span>
+          <input
+            autoComplete="off"
+            onBlur={() => setIsSearchApiKeyFocused(false)}
+            onChange={(event) => onSearchApiKeyDraftChange(event.currentTarget.value)}
+            onFocus={() => setIsSearchApiKeyFocused(true)}
+            placeholder={t("settings.braveSearchApiKey")}
+            type="password"
+            value={shouldShowStoredApiKeyMask ? searchApiKeyStoredMask : searchApiKeyDraft}
+          />
+        </label>
+      ) : draft.searchProvider === "tavily" ? (
+        <label>
+          <span>{t("settings.tavilySearchApiKey")}</span>
+          <input
+            autoComplete="off"
+            onBlur={() => setIsSearchApiKeyFocused(false)}
+            onChange={(event) => onSearchApiKeyDraftChange(event.currentTarget.value)}
+            onFocus={() => setIsSearchApiKeyFocused(true)}
+            placeholder={t("settings.tavilySearchApiKey")}
+            type="password"
+            value={shouldShowStoredApiKeyMask ? searchApiKeyStoredMask : searchApiKeyDraft}
+          />
+        </label>
+      ) : draft.searchProvider === "searxng" ? (
+        <label>
+          <span>{t("settings.searxngUrl")}</span>
+          <input
+            onChange={(event) =>
+              onDraftChange({ searxngUrl: event.currentTarget.value })
+            }
+            placeholder="https://searxng.example.com"
+            value={draft.searxngUrl}
+          />
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
+function AiAssistantToolsControl({
+  draft,
+  searchApiKeyDraft,
+  searchApiKeyStoredMask,
+  hasSearchApiKey,
+  onDraftChange,
+  onSearchApiKeyDraftChange,
+}: {
+  draft: AiProviderSettingsType;
+  searchApiKeyDraft: string;
+  searchApiKeyStoredMask: string;
+  hasSearchApiKey: boolean;
+  onDraftChange: (patch: Partial<AiProviderSettingsType>) => void;
+  onSearchApiKeyDraftChange: (value: string) => void;
 }) {
   const { t } = useTranslation();
 
@@ -232,23 +332,35 @@ function AiAssistantToolsControl({
       <p className="settings-help-text">{t("settings.aiToolsDescription")}</p>
       <div className="settings-toggle-list">
         {AI_ASSISTANT_TOOL_IDS.map((toolId) => (
-          <label className="settings-toggle-row" key={toolId}>
-            <ToggleSwitch
-              checked={Boolean(draft.tools?.[toolId])}
-              onChange={(checked) =>
-                onDraftChange({
-                  tools: {
-                    ...draft.tools,
-                    [toolId]: checked,
-                  },
-                })
-              }
-            />
-            <span>
-              <strong>{t(`settings.aiTools.${toolId}.label`)}</strong>
-              <small>{t(`settings.aiTools.${toolId}.description`)}</small>
-            </span>
-          </label>
+          <div key={toolId}>
+            <label className="settings-toggle-row">
+              <ToggleSwitch
+                checked={Boolean(draft.tools?.[toolId])}
+                onChange={(checked) =>
+                  onDraftChange({
+                    tools: {
+                      ...draft.tools,
+                      [toolId]: checked,
+                    },
+                  })
+                }
+              />
+              <span>
+                <strong>{t(`settings.aiTools.${toolId}.label`)}</strong>
+                <small>{t(`settings.aiTools.${toolId}.description`)}</small>
+              </span>
+            </label>
+            {toolId === "webSearch" && draft.tools?.webSearch ? (
+              <SearchProviderControl
+                draft={draft}
+                hasSearchApiKey={hasSearchApiKey}
+                onDraftChange={onDraftChange}
+                onSearchApiKeyDraftChange={onSearchApiKeyDraftChange}
+                searchApiKeyDraft={searchApiKeyDraft}
+                searchApiKeyStoredMask={searchApiKeyStoredMask}
+              />
+            ) : null}
+          </div>
         ))}
       </div>
       <p className="settings-help-text">{t("settings.aiToolsSafety")}</p>
@@ -266,13 +378,47 @@ export function AiSettings() {
   const [draft, setDraft] = useState(aiProviderSettings);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyStoredMask, setApiKeyStoredMask] = useState(createStoredApiKeyMask);
+  const [searchApiKeyDraft, setSearchApiKeyDraft] = useState("");
+  const [searchApiKeyStoredMask, setSearchApiKeyStoredMask] = useState(createStoredApiKeyMask);
+  const [hasSearchApiKey, setHasSearchApiKey] = useState(false);
   const hasChanges =
-    JSON.stringify(draft) !== JSON.stringify(aiProviderSettings) || apiKeyDraft.trim().length > 0;
+    JSON.stringify(draft) !== JSON.stringify(aiProviderSettings) ||
+    apiKeyDraft.trim().length > 0 ||
+    searchApiKeyDraft.trim().length > 0;
   const aiProviderDefinition = getAiProviderDefinition(draft.providerKind);
 
   useEffect(() => {
     setDraft(aiProviderSettings);
   }, [aiProviderSettings]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let disposed = false;
+    const ownerId =
+      draft.searchProvider === "brave"
+        ? BRAVE_SEARCH_OWNER_ID
+        : draft.searchProvider === "tavily"
+          ? TAVILY_SEARCH_OWNER_ID
+          : null;
+    if (!ownerId) {
+      setHasSearchApiKey(false);
+      return;
+    }
+    void invokeCommand("secret_exists", {
+      request: {
+        kind:
+          draft.searchProvider === "brave"
+            ? ("braveSearchApiKey" as const)
+            : ("tavilySearchApiKey" as const),
+        ownerId,
+      },
+    }).then((presence) => {
+      if (!disposed) setHasSearchApiKey(presence.exists);
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [draft.searchProvider]);
 
   async function handleSave() {
     try {
@@ -291,6 +437,23 @@ export function AiSettings() {
         setAiProviderHasApiKey(true);
         setApiKeyDraft("");
         setApiKeyStoredMask(createStoredApiKeyMask());
+      }
+
+      if (searchApiKeyDraft.trim()) {
+        const isBrave = nextSettings.searchProvider === "brave";
+        const isTavily = nextSettings.searchProvider === "tavily";
+        if ((isBrave || isTavily) && isTauriRuntime()) {
+          await invokeCommand("store_secret", {
+            request: {
+              kind: isBrave ? ("braveSearchApiKey" as const) : ("tavilySearchApiKey" as const),
+              ownerId: isBrave ? BRAVE_SEARCH_OWNER_ID : TAVILY_SEARCH_OWNER_ID,
+              secret: searchApiKeyDraft.trim(),
+            },
+          });
+          setHasSearchApiKey(true);
+          setSearchApiKeyDraft("");
+          setSearchApiKeyStoredMask(createStoredApiKeyMask());
+        }
       }
 
       const saved = isTauriRuntime()
@@ -417,12 +580,16 @@ export function AiSettings() {
 
       <AiAssistantToolsControl
         draft={draft}
+        hasSearchApiKey={hasSearchApiKey}
         onDraftChange={(patch) =>
           setDraft((settings) => ({
             ...settings,
             ...patch,
           }))
         }
+        onSearchApiKeyDraftChange={setSearchApiKeyDraft}
+        searchApiKeyDraft={searchApiKeyDraft}
+        searchApiKeyStoredMask={searchApiKeyStoredMask}
       />
 
       <div className="settings-summary-grid compact">

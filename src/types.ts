@@ -383,6 +383,8 @@ export type AiAssistantToolId =
 
 export type AiAssistantToolSettings = Record<AiAssistantToolId, boolean>;
 
+export type SearchProvider = "scraper" | "brave" | "tavily" | "searxng";
+
 export interface AiProviderSettings {
   providerKind: AiProviderKind;
   baseUrl: string;
@@ -395,6 +397,8 @@ export interface AiProviderSettings {
   claudeCliPath?: string;
   codexCliPath?: string;
   tools: AiAssistantToolSettings;
+  searchProvider: SearchProvider;
+  searxngUrl: string;
 }
 
 export interface WorkspaceTab {
@@ -484,6 +488,8 @@ export type SecretKind =
   | "connectionPassphrase"
   | "urlPassword"
   | "aiApiKey"
+  | "braveSearchApiKey"
+  | "tavilySearchApiKey"
   | "widgetSecret";
 
 export interface KeychainStatus {

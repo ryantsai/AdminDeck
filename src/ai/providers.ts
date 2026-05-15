@@ -1,6 +1,6 @@
 import i18next from "../i18n/config";
 import { AI_PROVIDER_DEFINITIONS } from "./providerRegistry";
-import type { AiAssistantToolSettings, AiProviderKind, AiProviderSettings, AiReasoningEffort } from "../types";
+import type { AiAssistantToolSettings, AiProviderKind, AiProviderSettings, AiReasoningEffort, SearchProvider } from "../types";
 export { AI_PROVIDER_DEFINITIONS, modelSupportsImageInput } from "./providerRegistry";
 export type {
   AiModelOption,
@@ -42,6 +42,8 @@ export function providerDefaultsFor(kind: AiProviderKind): AiProviderSettings {
     claudeCliPath: "",
     codexCliPath: "",
     tools: DEFAULT_AI_ASSISTANT_TOOLS,
+    searchProvider: "scraper",
+    searxngUrl: "",
   };
 }
 
@@ -74,7 +76,22 @@ export function normalizeAiProviderDraft(draft: AiProviderSettings): AiProviderS
     claudeCliPath: draft.claudeCliPath?.trim() ?? "",
     codexCliPath: draft.codexCliPath?.trim() ?? "",
     tools: { ...DEFAULT_AI_ASSISTANT_TOOLS, ...(draft.tools ?? {}) },
+    searchProvider: normalizeSearchProvider(draft.searchProvider),
+    searxngUrl: draft.searxngUrl?.trim() ?? "",
   };
+}
+
+function normalizeSearchProvider(value: string | undefined): SearchProvider {
+  switch (value) {
+    case "brave":
+      return "brave";
+    case "tavily":
+      return "tavily";
+    case "searxng":
+      return "searxng";
+    default:
+      return "scraper";
+  }
 }
 
 export function providerNeedsApiKey(settings: AiProviderSettings) {

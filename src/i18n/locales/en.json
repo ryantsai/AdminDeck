@@ -729,6 +729,14 @@
         "description": "Read visible session context and interact with active terminal, remote desktop, and file browser Sessions."
       }
     },
+    "searchProvider": "Search provider",
+    "searchProviderScraper": "Built-in (DuckDuckGo)",
+    "searchProviderBrave": "Brave Search",
+    "searchProviderTavily": "Tavily",
+    "searchProviderSearxng": "SearXNG",
+    "braveSearchApiKey": "Brave Search API key",
+    "tavilySearchApiKey": "Tavily API key",
+    "searxngUrl": "SearXNG instance URL",
     "connectedConnectionsRail": "Show connected Connections",
     "connectedConnectionsRailHint": "Adds connected Connection icons to the Activity Rail.",
     "connectedConnectionsRailSaved": "Show Connection in Left Rail setting saved."

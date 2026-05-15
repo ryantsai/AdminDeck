@@ -61,6 +61,20 @@ impl SecretReferenceRequest {
             owner_id,
         }
     }
+
+    pub(crate) fn brave_search_api_key(owner_id: String) -> Self {
+        Self {
+            kind: SecretKind::BraveSearchApiKey,
+            owner_id,
+        }
+    }
+
+    pub(crate) fn tavily_search_api_key(owner_id: String) -> Self {
+        Self {
+            kind: SecretKind::TavilySearchApiKey,
+            owner_id,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -82,6 +96,8 @@ enum SecretKind {
     ConnectionPassphrase,
     UrlPassword,
     AiApiKey,
+    BraveSearchApiKey,
+    TavilySearchApiKey,
     WidgetSecret,
 }
 
@@ -187,6 +203,20 @@ impl Secrets {
         })
     }
 
+    pub(crate) fn read_brave_search_api_key(
+        &self,
+        owner_id: String,
+    ) -> Result<Option<String>, String> {
+        self.read_secret(SecretReferenceRequest::brave_search_api_key(owner_id))
+    }
+
+    pub(crate) fn read_tavily_search_api_key(
+        &self,
+        owner_id: String,
+    ) -> Result<Option<String>, String> {
+        self.read_secret(SecretReferenceRequest::tavily_search_api_key(owner_id))
+    }
+
     pub(crate) fn read_widget_secret(&self, owner_id: String) -> Result<Option<String>, String> {
         self.read_secret(SecretReferenceRequest::widget_secret(owner_id))
     }
@@ -252,6 +282,8 @@ impl SecretKind {
             Self::ConnectionPassphrase => "connection-passphrase",
             Self::UrlPassword => "url-password",
             Self::AiApiKey => "ai-api-key",
+            Self::BraveSearchApiKey => "brave-search-api-key",
+            Self::TavilySearchApiKey => "tavily-search-api-key",
             Self::WidgetSecret => "widget-secret",
         }
     }

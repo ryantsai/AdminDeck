@@ -481,6 +481,12 @@ pub struct AiProviderSettings {
     codex_cli_path: Option<String>,
     #[serde(default = "default_ai_assistant_tool_settings")]
     tools: AiAssistantToolSettings,
+    #[serde(default = "default_search_provider")]
+    search_provider: String,
+    #[serde(default)]
+    searxng_url: String,
+    #[serde(skip)]
+    search_provider_api_key: Option<String>,
 }
 
 impl AiProviderSettings {
@@ -510,6 +516,22 @@ impl AiProviderSettings {
 
     pub(crate) fn tool_permission_mode(&self) -> &str {
         &self.tool_permission_mode
+    }
+
+    pub(crate) fn search_provider(&self) -> &str {
+        &self.search_provider
+    }
+
+    pub(crate) fn searxng_url(&self) -> &str {
+        &self.searxng_url
+    }
+
+    pub(crate) fn search_provider_api_key(&self) -> Option<&str> {
+        self.search_provider_api_key.as_deref()
+    }
+
+    pub(crate) fn set_search_provider_api_key(&mut self, key: Option<String>) {
+        self.search_provider_api_key = key;
     }
 }
 
@@ -3784,6 +3806,9 @@ fn default_ai_provider_settings() -> AiProviderSettings {
         claude_cli_path: None,
         codex_cli_path: None,
         tools: default_ai_assistant_tool_settings(),
+        search_provider: default_search_provider(),
+        searxng_url: String::new(),
+        search_provider_api_key: None,
     }
 }
 
@@ -3815,6 +3840,10 @@ fn default_ai_connections_tool_enabled() -> bool {
 
 fn default_ai_sessions_tool_enabled() -> bool {
     true
+}
+
+fn default_search_provider() -> String {
+    "scraper".to_string()
 }
 
 fn default_ai_provider_kind() -> String {
@@ -4098,6 +4127,34 @@ fn validate_ai_provider_settings(
 
     if settings.model.chars().any(char::is_whitespace) {
         return Err("AI model cannot contain whitespace".to_string());
+    }
+
+    settings.search_provider = match settings
+        .search_provider
+        .trim()
+        .to_lowercase()
+        .replace(['-', '_', ' '], "")
+        .as_str()
+    {
+        "" | "scraper" => "scraper".to_string(),
+        "brave" => "brave".to_string(),
+        "tavily" => "tavily".to_string(),
+        "searxng" => "searxng".to_string(),
+        _ => return Err("Search provider must be scraper, brave, tavily, or searxng".to_string()),
+    };
+
+    settings.searxng_url = settings.searxng_url.trim().to_string();
+    if !settings.searxng_url.is_empty() {
+        if !(settings.searxng_url.starts_with("https://")
+            || settings.searxng_url.starts_with("http://"))
+        {
+            return Err(
+                "SearXNG instance URL must start with https:// or http://".to_string(),
+            );
+        }
+        if settings.searxng_url.chars().any(char::is_whitespace) {
+            return Err("SearXNG instance URL cannot contain whitespace".to_string());
+        }
     }
 
     Ok(settings)
@@ -5778,6 +5835,9 @@ mod tests {
                 claude_cli_path: Some("  C:\\Tools\\claude.exe  ".to_string()),
                 codex_cli_path: Some("  codex  ".to_string()),
                 tools: default_ai_assistant_tool_settings(),
+                search_provider: default_search_provider(),
+                searxng_url: String::new(),
+                search_provider_api_key: None,
             })
             .expect("AI provider settings update");
 
@@ -5824,6 +5884,9 @@ mod tests {
                 claude_cli_path: None,
                 codex_cli_path: None,
                 tools: default_ai_assistant_tool_settings(),
+                search_provider: default_search_provider(),
+                searxng_url: String::new(),
+                search_provider_api_key: None,
             })
             .expect_err("unknown tool permission mode is rejected");
 
@@ -5851,6 +5914,9 @@ mod tests {
                 claude_cli_path: None,
                 codex_cli_path: None,
                 tools: default_ai_assistant_tool_settings(),
+                search_provider: default_search_provider(),
+                searxng_url: String::new(),
+                search_provider_api_key: None,
             })
             .expect_err("scheme-less endpoint is rejected");
 
@@ -5879,6 +5945,9 @@ mod tests {
                 claude_cli_path: None,
                 codex_cli_path: None,
                 tools: default_ai_assistant_tool_settings(),
+                search_provider: default_search_provider(),
+                searxng_url: String::new(),
+                search_provider_api_key: None,
             })
             .expect_err("blank model is rejected");
 
@@ -5903,6 +5972,9 @@ mod tests {
                 claude_cli_path: Some("claude".to_string()),
                 codex_cli_path: Some("codex".to_string()),
                 tools: default_ai_assistant_tool_settings(),
+                search_provider: default_search_provider(),
+                searxng_url: String::new(),
+                search_provider_api_key: None,
             })
             .expect_err("auto-execution policy is rejected");
 
