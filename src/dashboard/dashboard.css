@@ -243,44 +243,37 @@ main.dashboard-page {
 .dw-canvas-scroll {
   box-sizing: border-box;
   position: relative;
+  --dw-canvas-padding-x: 20px;
+  --dw-canvas-padding-top: 18px;
+  --dw-canvas-padding-bottom: 60px;
   --dw-grid-dot: rgb(23 32 43 / 14%);
   --dw-grid-dot-soft: rgb(23 32 43 / 5%);
   --dw-grid-column-width: calc((100% - (var(--dw-grid-gap-x, 16px) * 13)) / 12);
   --dw-grid-step-x: calc(var(--dw-grid-column-width) + var(--dw-grid-gap-x, 16px));
   --dw-grid-step-y: calc(var(--dw-row-height, 68px) + var(--dw-grid-gap-y, 16px));
   min-height: 0;
-  padding: 18px 20px 60px;
+  padding: var(--dw-canvas-padding-top) var(--dw-canvas-padding-x) var(--dw-canvas-padding-bottom);
   overflow-x: hidden;
   overflow-y: auto;
-}
-
-/* Edit-mode grid lines: a pseudo-element on the canvas that layers above any custom background but below widgets. inset:0 maps to the canvas's bounds; no background-origin needed. */
-.dw-canvas-scroll.is-editing .dw-canvas::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0; /* deliberate: keep grid lines below positioned widgets */
-  pointer-events: none;
-  background-image:
-    radial-gradient(circle, var(--dw-grid-dot) 1px, transparent 1.4px),
-    radial-gradient(circle, var(--dw-grid-dot-soft) 1px, transparent 1.4px);
-  background-size:
-    var(--dw-grid-step-x) var(--dw-grid-step-y),
-    16px 16px;
-  background-origin: content-box;
-  background-position: 0 0;
 }
 
 .dw-canvas {
   min-height: 100%;
 }
 
-/* Custom per-view background layer: sits behind the widget grid (z-index 0 vs the grid's z-index 1). The renderer sets background/background-image and --dw-bg-dim-color inline. */
-.dw-canvas-bg {
+/* Custom per-view background layer: expands across the scroll padding so no page background shows around the canvas. */
+.dw-canvas-bg,
+.dw-canvas-blueprint {
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  top: calc(-1 * var(--dw-canvas-padding-top, 18px));
+  right: calc(-1 * var(--dw-canvas-padding-x, 20px));
+  bottom: calc(-1 * var(--dw-canvas-padding-bottom, 60px));
+  left: calc(-1 * var(--dw-canvas-padding-x, 20px));
   pointer-events: none;
+}
+
+.dw-canvas-bg {
+  z-index: 0;
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -293,6 +286,17 @@ main.dashboard-page {
   background: var(--dw-bg-dim-color, transparent);
 }
 
+.dw-canvas-blueprint {
+  z-index: 1;
+  background-image:
+    radial-gradient(circle, var(--dw-grid-dot) 1px, transparent 1.4px),
+    radial-gradient(circle, var(--dw-grid-dot-soft) 1px, transparent 1.4px);
+  background-size:
+    var(--dw-grid-step-x) var(--dw-grid-step-y),
+    16px 16px;
+  background-position: var(--dw-canvas-padding-x, 20px) var(--dw-canvas-padding-top, 18px), 0 0;
+}
+
 .dw-canvas-host {
   position: relative;
   z-index: 0;
@@ -301,7 +305,7 @@ main.dashboard-page {
 
 .dw-canvas-host > .dw-canvas {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .react-grid-layout.dw-canvas {

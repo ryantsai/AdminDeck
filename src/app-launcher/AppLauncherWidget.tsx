@@ -11,7 +11,14 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { DragEvent, FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
+import type {
+  DragEvent,
+  FormEvent,
+  KeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -34,8 +41,6 @@ import {
   reorderAppLauncherEntries,
   serializeAppLauncherSettings,
 } from "./storage";
-
-const APP_LAUNCHER_REORDER_MIME = "application/x-kkterm-app-launcher-entry";
 
 type ReorderPlacement = "before" | "after";
 
@@ -66,6 +71,14 @@ type ReorderTarget = {
   placement: ReorderPlacement;
 };
 
+type PointerReorderState = {
+  entryId: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  active: boolean;
+};
+
 export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInstance }) {
   const { t } = useTranslation();
   const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
@@ -82,6 +95,7 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
   const [draggedEntryId, setDraggedEntryId] = useState<string | null>(null);
   const [reorderTarget, setReorderTarget] = useState<ReorderTarget | null>(null);
   const draggedEntryIdRef = useRef<string | null>(null);
+  const pointerReorderRef = useRef<PointerReorderState | null>(null);
   const suppressNextLaunchRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -487,52 +501,69 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
     }
   }
 
-  function handleEntryDragStart(event: DragEvent<HTMLDivElement>, entryId: string) {
-    if (!editMode) {
-      event.preventDefault();
+  function handleEntryPointerDown(event: ReactPointerEvent<HTMLDivElement>, entryId: string) {
+    if (!editMode || event.button !== 0 || (event.target as HTMLElement).closest(".app-launcher-tile-remove")) {
       return;
     }
-    suppressNextLaunchRef.current = true;
-    draggedEntryIdRef.current = entryId;
-    setDraggedEntryId(entryId);
-    setReorderTarget({ id: entryId, placement: "before" });
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData(APP_LAUNCHER_REORDER_MIME, entryId);
+    pointerReorderRef.current = {
+      entryId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function handleEntryDragOver(event: DragEvent<HTMLDivElement>, targetId: string) {
-    const activeDraggedId = draggedEntryIdRef.current;
-    if (!editMode || !activeDraggedId || activeDraggedId === targetId) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    event.dataTransfer.dropEffect = "move";
-    setReorderTarget({ id: targetId, placement: reorderPlacementFromEvent(event) });
-  }
-
-  function handleEntryDrop(event: DragEvent<HTMLDivElement>, targetId: string) {
-    const draggedId = event.dataTransfer.getData(APP_LAUNCHER_REORDER_MIME) || draggedEntryIdRef.current;
-    if (!editMode || !draggedId) {
+  function handleEntryPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const pointerState = pointerReorderRef.current;
+    if (!editMode || !pointerState || pointerState.pointerId !== event.pointerId) {
       return;
     }
     event.preventDefault();
-    event.stopPropagation();
-    draggedEntryIdRef.current = null;
-    setDraggedEntryId(null);
-    const placement =
-      reorderTarget?.id === targetId ? reorderTarget.placement : reorderPlacementFromEvent(event);
-    setReorderTarget(null);
-    void saveReorderedEntry(draggedId, targetId, placement);
+    const moved = Math.abs(event.clientX - pointerState.startX) + Math.abs(event.clientY - pointerState.startY);
+    if (!pointerState.active && moved < 4) {
+      return;
+    }
+    if (!pointerState.active) {
+      pointerState.active = true;
+      suppressNextLaunchRef.current = true;
+      draggedEntryIdRef.current = pointerState.entryId;
+      setDraggedEntryId(pointerState.entryId);
+    }
+
+    const targetTile = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>(".app-launcher-tile[data-app-launcher-entry-id]");
+    const targetId = targetTile?.dataset.appLauncherEntryId;
+    if (!targetTile || !targetId || targetId === pointerState.entryId) {
+      setReorderTarget(null);
+      return;
+    }
+    setReorderTarget({ id: targetId, placement: reorderPlacementFromPoint(event.clientX, targetTile) });
   }
 
-  function handleEntryDragEnd() {
+  function finishPointerReorder(event: ReactPointerEvent<HTMLDivElement>) {
+    const pointerState = pointerReorderRef.current;
+    if (!pointerState || pointerState.pointerId !== event.pointerId) {
+      return;
+    }
+    pointerReorderRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const target = reorderTarget;
+    setReorderTarget(null);
     draggedEntryIdRef.current = null;
     setDraggedEntryId(null);
-    setReorderTarget(null);
     window.setTimeout(() => {
       suppressNextLaunchRef.current = false;
     }, 0);
+    if (!editMode || !pointerState.active || !target || target.id === pointerState.entryId) {
+      return;
+    }
+    event.preventDefault();
+    void saveReorderedEntry(pointerState.entryId, target.id, target.placement);
   }
 
   function handleBrowserDragOver(event: DragEvent<HTMLDivElement>) {
@@ -610,12 +641,12 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
                   ? reorderTarget.placement
                   : null
               }
-              onDragEnd={handleEntryDragEnd}
-              onDragOverEntry={handleEntryDragOver}
-              onDragStart={handleEntryDragStart}
-              onDropEntry={handleEntryDrop}
               onLaunch={launch}
               onMenu={(nextMenu) => setMenuState(nextMenu)}
+              onPointerCancelEntry={finishPointerReorder}
+              onPointerDownEntry={handleEntryPointerDown}
+              onPointerMoveEntry={handleEntryPointerMove}
+              onPointerUpEntry={finishPointerReorder}
               onRemove={removeEntry}
               prepared={preparedById[entry.id]}
             />
@@ -665,9 +696,9 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
   );
 }
 
-function reorderPlacementFromEvent(event: DragEvent<HTMLElement>): ReorderPlacement {
-  const bounds = event.currentTarget.getBoundingClientRect();
-  return event.clientX >= bounds.left + bounds.width / 2 ? "after" : "before";
+function reorderPlacementFromPoint(clientX: number, target: HTMLElement): ReorderPlacement {
+  const bounds = target.getBoundingClientRect();
+  return clientX >= bounds.left + bounds.width / 2 ? "after" : "before";
 }
 
 function isPointInsideBounds(x: number, y: number, bounds: DOMRect) {
@@ -679,12 +710,12 @@ function AppLauncherTile({
   editMode,
   isDragging,
   reorderPlacement,
-  onDragEnd,
-  onDragOverEntry,
-  onDragStart,
-  onDropEntry,
   onLaunch,
   onMenu,
+  onPointerCancelEntry,
+  onPointerDownEntry,
+  onPointerMoveEntry,
+  onPointerUpEntry,
   onRemove,
   prepared,
 }: {
@@ -693,12 +724,12 @@ function AppLauncherTile({
   isDragging: boolean;
   reorderPlacement: ReorderPlacement | null;
   prepared?: PreparedAppLauncherEntry;
-  onDragEnd: () => void;
-  onDragOverEntry: (event: DragEvent<HTMLDivElement>, entryId: string) => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>, entryId: string) => void;
-  onDropEntry: (event: DragEvent<HTMLDivElement>, entryId: string) => void;
   onLaunch: (entry: AppLauncherEntry, mode: AppLauncherLaunchMode) => Promise<void>;
   onMenu: (state: MenuState) => void;
+  onPointerCancelEntry: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerDownEntry: (event: ReactPointerEvent<HTMLDivElement>, entryId: string) => void;
+  onPointerMoveEntry: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUpEntry: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onRemove: (entry: AppLauncherEntry) => Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -722,18 +753,20 @@ function AppLauncherTile({
 
   return (
     <div
+      aria-label={editMode ? entry.name : undefined}
       className={`app-launcher-tile ${missing ? "missing" : ""}${isDragging ? " is-reordering" : ""}${reorderPlacement ? ` is-reorder-${reorderPlacement}` : ""}`}
-      draggable={editMode}
+      data-app-launcher-entry-id={entry.id}
+      draggable={false}
       onContextMenu={(event) => {
         event.preventDefault();
         if (!editMode) {
           onMenu({ entry, prepared, x: event.clientX, y: event.clientY });
         }
       }}
-      onDragEnd={onDragEnd}
-      onDragOver={(event) => onDragOverEntry(event, entry.id)}
-      onDragStart={(event) => onDragStart(event, entry.id)}
-      onDrop={(event) => onDropEntry(event, entry.id)}
+      onPointerCancel={onPointerCancelEntry}
+      onPointerDown={(event) => onPointerDownEntry(event, entry.id)}
+      onPointerMove={onPointerMoveEntry}
+      onPointerUp={onPointerUpEntry}
     >
       {editMode ? (
         <button
@@ -749,23 +782,43 @@ function AppLauncherTile({
           <X size={12} />
         </button>
       ) : null}
-      <button
-        className="app-launcher-tile-launch"
-        aria-label={t("appLauncher.launchApp", { name: entry.name })}
-        onClick={() => void onLaunch(entry, "normal")}
-        onKeyDown={handleKeyDown}
-        type="button"
-      >
-        <span className="app-launcher-tile-icon" aria-hidden="true">
-          {iconDataUrl ? (
-            <img alt="" src={iconDataUrl} />
-          ) : (
-            <AppWindow size={20} />
-          )}
-        </span>
-        <span className="app-launcher-tile-label">{entry.name}</span>
-      </button>
+      {editMode ? (
+        <div className="app-launcher-tile-launch" aria-hidden="true">
+          <AppLauncherTileContent entryName={entry.name} iconDataUrl={iconDataUrl} />
+        </div>
+      ) : (
+        <button
+          className="app-launcher-tile-launch"
+          aria-label={t("appLauncher.launchApp", { name: entry.name })}
+          onClick={() => void onLaunch(entry, "normal")}
+          onKeyDown={handleKeyDown}
+          type="button"
+        >
+          <AppLauncherTileContent entryName={entry.name} iconDataUrl={iconDataUrl} />
+        </button>
+      )}
     </div>
+  );
+}
+
+function AppLauncherTileContent({
+  entryName,
+  iconDataUrl,
+}: {
+  entryName: string;
+  iconDataUrl: string | null | undefined;
+}) {
+  return (
+    <>
+      <span className="app-launcher-tile-icon" aria-hidden="true">
+        {iconDataUrl ? (
+          <img alt="" draggable={false} src={iconDataUrl} />
+        ) : (
+          <AppWindow size={20} />
+        )}
+      </span>
+      <span className="app-launcher-tile-label">{entryName}</span>
+    </>
   );
 }
 

@@ -32,3 +32,4 @@ dist-ssr
 *.sw?
 /node_modules
 /.playwright-mcp
+/tmp
