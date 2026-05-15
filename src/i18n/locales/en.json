@@ -1273,6 +1273,7 @@
     "more": "More",
     "errorPrefix": "AI Assistant error",
     "providerError": "AI provider settings error",
+    "copilotSdkOAuthRequired": "GitHub Copilot support needs the Copilot SDK OAuth bridge before AI Assistant can chat.",
     "chargingBeacon": "Charging the answer beacon",
     "preparingResponse": "Preparing response...",
     "extensionDraftPrompt": "Create an KKTerm extension draft for: ",

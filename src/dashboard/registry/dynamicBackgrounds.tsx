@@ -651,7 +651,7 @@ export function isDynamicBackgroundId(value: string): value is DynamicBackground
 }
 
 export function getDashboardDynamicBackgroundHostClassName() {
-  return "dw-dynamic-bg-layer";
+  return "dw-canvas-bg dw-dynamic-bg-layer";
 }
 
 export function DashboardDynamicBackground({ id }: { id: string }) {

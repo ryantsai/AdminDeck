@@ -6533,11 +6533,24 @@ fieldset.connection-specific-options > legend {
 }
 
 .connection-dialog input:disabled,
-.connection-dialog select:disabled {
+.connection-dialog select:disabled,
+.connection-dialog .connection-session-toggle input[type="checkbox"]:disabled {
   color: var(--text-faint);
   cursor: default;
   background: var(--surface-muted);
   opacity: 0.72;
+}
+
+.connection-dialog .connection-session-toggle input[type="checkbox"]:disabled::after {
+  background: var(--text-faint);
+}
+
+.settings-inline-warning {
+  margin: 0 18px 10px;
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 :root:not([data-color-scheme]) .settings-section input:not([readonly]):not(:disabled),

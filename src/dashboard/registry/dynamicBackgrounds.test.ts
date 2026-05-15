@@ -29,6 +29,6 @@ if (isDynamicBackgroundId("none")) {
   throw new Error("Theme default should not be stored as a dynamic Dashboard background.");
 }
 
-if (getDashboardDynamicBackgroundHostClassName() !== "dw-dynamic-bg-layer") {
-  throw new Error("Dynamic Dashboard backgrounds should use the stable canvas-level layer class.");
+if (getDashboardDynamicBackgroundHostClassName() !== "dw-canvas-bg dw-dynamic-bg-layer") {
+  throw new Error("Dynamic Dashboard backgrounds should use the stable scroll-level background placement class.");
 }

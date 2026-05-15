@@ -6,6 +6,11 @@ export const HOSTED_PROVIDER_SETTINGS_FIELDS: AiProviderSettingsField[] = [
   "apiKey",
 ];
 
+export const HOSTED_PROVIDER_WITHOUT_KEY_SETTINGS_FIELDS: AiProviderSettingsField[] = [
+  "model",
+  "reasoningEffort",
+];
+
 export const CONFIGURABLE_ENDPOINT_SETTINGS_FIELDS: AiProviderSettingsField[] = [
   "baseUrl",
   "model",

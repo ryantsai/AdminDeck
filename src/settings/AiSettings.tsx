@@ -519,6 +519,11 @@ export function AiSettings() {
         <div>
           <p className="field-hint">{t("settings.aiProviderConnectionHint")}</p>
         </div>
+        {aiProviderDefinition.chatDisabledReasonKey ? (
+          <p className="settings-inline-warning">
+            {t(aiProviderDefinition.chatDisabledReasonKey)}
+          </p>
+        ) : null}
         <div className="form-grid ai-provider-selector-grid">
           <label>
             <span>{t("settings.provider")}</span>

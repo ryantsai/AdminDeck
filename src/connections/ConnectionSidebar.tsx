@@ -861,6 +861,10 @@ export function ConnectionSidebar({
           ? {
               kind: "submenu" as const,
               label: option.label,
+              iconSrc: connectionIconSrcForConnection({
+                localShell: option.value,
+                type: "local",
+              }),
               items: [
                 {
                   kind: "item" as const,
@@ -2351,6 +2355,12 @@ function ConnectionDialog({
     String(initialConnection?.port ?? (connectionType ? defaultPortForConnectionType(connectionType, sshSettings) : "")),
   );
   const [iconDataUrl, setIconDataUrl] = useState<string | null>(initialConnection?.iconDataUrl ?? null);
+  const [rdpInheritsSettingsDefaults, setRdpInheritsSettingsDefaults] = useState(
+    initialConnection?.rdpOptions?.inheritDefaults ?? true,
+  );
+  const [vncInheritsSettingsDefaults, setVncInheritsSettingsDefaults] = useState(
+    initialConnection?.vncOptions?.inheritDefaults ?? true,
+  );
   const usesSshDefaults = connectionType === "ssh";
   const isTelnetConnection = connectionType === "telnet";
   const isSerialConnection = connectionType === "serial";
@@ -2491,12 +2501,22 @@ function ConnectionDialog({
         connectionType === "rdp"
           ? {
               inheritDefaults: inheritRdpDefaults,
-              colorDepth: Number(String(form.get("rdpColorDepth") ?? rdpSettings.colorDepth)) as RdpSettings["colorDepth"],
-              redirectClipboard: form.get("rdpRedirectClipboard") === "on",
-              redirectDrives: form.get("rdpRedirectDrives") === "on",
-              bitmapCache: form.get("rdpBitmapCache") === "on",
+              colorDepth: inheritRdpDefaults
+                ? rdpSettings.colorDepth
+                : Number(String(form.get("rdpColorDepth") ?? rdpSettings.colorDepth)) as RdpSettings["colorDepth"],
+              redirectClipboard: inheritRdpDefaults
+                ? rdpSettings.redirectClipboard
+                : form.get("rdpRedirectClipboard") === "on",
+              redirectDrives: inheritRdpDefaults
+                ? rdpSettings.redirectDrives
+                : form.get("rdpRedirectDrives") === "on",
+              bitmapCache: inheritRdpDefaults
+                ? rdpSettings.bitmapCache
+                : form.get("rdpBitmapCache") === "on",
               performanceProfile: String(
-                form.get("rdpPerformanceProfile") ?? rdpSettings.performanceProfile,
+                inheritRdpDefaults
+                  ? rdpSettings.performanceProfile
+                  : form.get("rdpPerformanceProfile") ?? rdpSettings.performanceProfile,
               ) as RdpSettings["performanceProfile"],
             }
           : undefined,
@@ -2504,11 +2524,19 @@ function ConnectionDialog({
         connectionType === "vnc"
           ? {
               inheritDefaults: inheritVncDefaults,
-              sharedSession: form.get("vncSharedSession") === "on",
-              viewOnly: form.get("vncViewOnly") === "on",
-              colorLevel: String(form.get("vncColorLevel") ?? vncSettings.colorLevel) as VncSettings["colorLevel"],
+              sharedSession: inheritVncDefaults
+                ? vncSettings.sharedSession
+                : form.get("vncSharedSession") === "on",
+              viewOnly: inheritVncDefaults
+                ? vncSettings.viewOnly
+                : form.get("vncViewOnly") === "on",
+              colorLevel: String(
+                inheritVncDefaults ? vncSettings.colorLevel : form.get("vncColorLevel") ?? vncSettings.colorLevel,
+              ) as VncSettings["colorLevel"],
               preferredEncoding: String(
-                form.get("vncPreferredEncoding") ?? vncSettings.preferredEncoding,
+                inheritVncDefaults
+                  ? vncSettings.preferredEncoding
+                  : form.get("vncPreferredEncoding") ?? vncSettings.preferredEncoding,
               ) as VncSettings["preferredEncoding"],
             }
           : undefined,
@@ -2974,13 +3002,18 @@ function ConnectionDialog({
                     <input
                       name="rdpInheritDefaults"
                       type="checkbox"
-                      defaultChecked={initialConnection?.rdpOptions?.inheritDefaults ?? true}
+                      checked={rdpInheritsSettingsDefaults}
+                      onChange={(event) => setRdpInheritsSettingsDefaults(event.currentTarget.checked)}
                     />
                   </label>
                   <div className="connection-option-fields">
                     <label>
                       <span>{t("settings.colorDepth")}</span>
-                      <select name="rdpColorDepth" defaultValue={initialConnection?.rdpOptions?.colorDepth ?? rdpSettings.colorDepth}>
+                      <select
+                        disabled={rdpInheritsSettingsDefaults}
+                        name="rdpColorDepth"
+                        defaultValue={initialConnection?.rdpOptions?.colorDepth ?? rdpSettings.colorDepth}
+                      >
                         <option value={32}>{t("settings.rdpColorDepth32")}</option>
                         <option value={24}>{t("settings.rdpColorDepth24")}</option>
                         <option value={16}>{t("settings.rdpColorDepth16")}</option>
@@ -2989,7 +3022,11 @@ function ConnectionDialog({
                     </label>
                     <label>
                       <span>{t("settings.performanceFlags")}</span>
-                      <select name="rdpPerformanceProfile" defaultValue={initialConnection?.rdpOptions?.performanceProfile ?? rdpSettings.performanceProfile}>
+                      <select
+                        disabled={rdpInheritsSettingsDefaults}
+                        name="rdpPerformanceProfile"
+                        defaultValue={initialConnection?.rdpOptions?.performanceProfile ?? rdpSettings.performanceProfile}
+                      >
                         <option value="balanced">{t("settings.rdpPerformanceBalanced")}</option>
                         <option value="quality">{t("settings.rdpPerformanceQuality")}</option>
                         <option value="speed">{t("settings.rdpPerformanceSpeed")}</option>
@@ -2999,15 +3036,30 @@ function ConnectionDialog({
                   <div className="connection-session-fields">
                     <label className="connection-session-toggle">
                       <span>{t("settings.rdpRedirectClipboard")}</span>
-                      <input name="rdpRedirectClipboard" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.redirectClipboard ?? rdpSettings.redirectClipboard} />
+                      <input
+                        disabled={rdpInheritsSettingsDefaults}
+                        name="rdpRedirectClipboard"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.rdpOptions?.redirectClipboard ?? rdpSettings.redirectClipboard}
+                      />
                     </label>
                     <label className="connection-session-toggle">
                       <span>{t("settings.rdpRedirectDrives")}</span>
-                      <input name="rdpRedirectDrives" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.redirectDrives ?? rdpSettings.redirectDrives} />
+                      <input
+                        disabled={rdpInheritsSettingsDefaults}
+                        name="rdpRedirectDrives"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.rdpOptions?.redirectDrives ?? rdpSettings.redirectDrives}
+                      />
                     </label>
                     <label className="connection-session-toggle">
                       <span>{t("settings.bitmapCache")}</span>
-                      <input name="rdpBitmapCache" type="checkbox" defaultChecked={initialConnection?.rdpOptions?.bitmapCache ?? rdpSettings.bitmapCache} />
+                      <input
+                        disabled={rdpInheritsSettingsDefaults}
+                        name="rdpBitmapCache"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.rdpOptions?.bitmapCache ?? rdpSettings.bitmapCache}
+                      />
                     </label>
                   </div>
                 </div>
@@ -3022,13 +3074,18 @@ function ConnectionDialog({
                     <input
                       name="vncInheritDefaults"
                       type="checkbox"
-                      defaultChecked={initialConnection?.vncOptions?.inheritDefaults ?? true}
+                      checked={vncInheritsSettingsDefaults}
+                      onChange={(event) => setVncInheritsSettingsDefaults(event.currentTarget.checked)}
                     />
                   </label>
                   <div className="connection-option-fields">
                     <label>
                       <span>{t("settings.preferredEncoding")}</span>
-                      <select name="vncPreferredEncoding" defaultValue={initialConnection?.vncOptions?.preferredEncoding ?? vncSettings.preferredEncoding}>
+                      <select
+                        disabled={vncInheritsSettingsDefaults}
+                        name="vncPreferredEncoding"
+                        defaultValue={initialConnection?.vncOptions?.preferredEncoding ?? vncSettings.preferredEncoding}
+                      >
                         <option value="tight">{t("settings.vncEncodingTight")}</option>
                         <option value="zrle">{t("settings.vncEncodingZrle")}</option>
                         <option value="raw">{t("settings.vncEncodingRaw")}</option>
@@ -3036,7 +3093,11 @@ function ConnectionDialog({
                     </label>
                     <label>
                       <span>{t("settings.colorLevel")}</span>
-                      <select name="vncColorLevel" defaultValue={initialConnection?.vncOptions?.colorLevel ?? vncSettings.colorLevel}>
+                      <select
+                        disabled={vncInheritsSettingsDefaults}
+                        name="vncColorLevel"
+                        defaultValue={initialConnection?.vncOptions?.colorLevel ?? vncSettings.colorLevel}
+                      >
                         <option value="full">{t("settings.vncColorFull")}</option>
                         <option value="256">{t("settings.vncColor256")}</option>
                         <option value="64">{t("settings.vncColor64")}</option>
@@ -3047,11 +3108,21 @@ function ConnectionDialog({
                   <div className="connection-session-fields">
                     <label className="connection-session-toggle">
                       <span>{t("settings.vncSharedSession")}</span>
-                      <input name="vncSharedSession" type="checkbox" defaultChecked={initialConnection?.vncOptions?.sharedSession ?? vncSettings.sharedSession} />
+                      <input
+                        disabled={vncInheritsSettingsDefaults}
+                        name="vncSharedSession"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.vncOptions?.sharedSession ?? vncSettings.sharedSession}
+                      />
                     </label>
                     <label className="connection-session-toggle">
                       <span>{t("settings.vncViewOnly")}</span>
-                      <input name="vncViewOnly" type="checkbox" defaultChecked={initialConnection?.vncOptions?.viewOnly ?? vncSettings.viewOnly} />
+                      <input
+                        disabled={vncInheritsSettingsDefaults}
+                        name="vncViewOnly"
+                        type="checkbox"
+                        defaultChecked={initialConnection?.vncOptions?.viewOnly ?? vncSettings.viewOnly}
+                      />
                     </label>
                   </div>
                 </div>

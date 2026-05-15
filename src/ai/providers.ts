@@ -104,6 +104,9 @@ export function validateAiProviderForChat(
 ): AiProviderSettings {
   const normalized = normalizeAiProviderDraft(settings);
   const definition = getAiProviderDefinition(normalized.providerKind);
+  if (definition.chatDisabledReasonKey) {
+    throw new Error(i18next.t(definition.chatDisabledReasonKey));
+  }
   if (definition.requiresApiKey && !hasApiKey) {
     throw new Error(i18next.t("ai.apiKeyRequired", { provider: definition.label }));
   }

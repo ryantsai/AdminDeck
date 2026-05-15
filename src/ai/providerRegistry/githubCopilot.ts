@@ -1,4 +1,4 @@
-import { HOSTED_PROVIDER_SETTINGS_FIELDS, STANDARD_REASONING_EFFORTS } from "./shared";
+import { HOSTED_PROVIDER_WITHOUT_KEY_SETTINGS_FIELDS, STANDARD_REASONING_EFFORTS } from "./shared";
 import type { AiProviderDefinition } from "./types";
 
 export const githubCopilotProvider: AiProviderDefinition = {
@@ -8,11 +8,10 @@ export const githubCopilotProvider: AiProviderDefinition = {
   defaultModel: "gpt-5.4",
   defaultReasoningEffort: "medium",
   reasoningEfforts: [...STANDARD_REASONING_EFFORTS],
-  requiresApiKey: true,
+  requiresApiKey: false,
   allowsCustomBaseUrl: false,
   allowsCustomModel: true,
-  apiKeyLabel: "GitHub OAuth token",
-  apiKeyUrl: "https://github.com/settings/tokens",
+  apiKeyLabel: "GitHub Copilot OAuth",
   modelOptions: [
     { id: "gpt-5.5", label: "GPT-5.5", supportsImageInput: true },
     { id: "gpt-5.4", label: "GPT-5.4", supportsImageInput: true },
@@ -24,6 +23,7 @@ export const githubCopilotProvider: AiProviderDefinition = {
     { id: "claude-sonnet-4.6", label: "Claude Sonnet 4.6", supportsImageInput: true },
     { id: "claude-haiku-4.5", label: "Claude Haiku 4.5", supportsImageInput: true },
   ],
-  settingsFields: HOSTED_PROVIDER_SETTINGS_FIELDS,
+  settingsFields: HOSTED_PROVIDER_WITHOUT_KEY_SETTINGS_FIELDS,
   capabilities: ["chat", "imageInput", "streaming", "toolCalling", "sdkOAuth"],
+  chatDisabledReasonKey: "ai.copilotSdkOAuthRequired",
 };
