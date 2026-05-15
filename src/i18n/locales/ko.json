@@ -1,4 +1,4 @@
-{
+﻿{
     "ai": {
         "addContext": "컨텍스트 추가",
         "addFiles": "파일/사진 추가",
@@ -1037,7 +1037,6 @@
     },
     "settings": {
         "accent": "강조",
-        "activeEndpoint": "활성 엔드포인트",
         "activeUiFont": "현재 UI 글꼴",
         "aiAllowInsecureTls": "AI 제공자에 안전하지 않은 TLS 허용",
         "aiAllowInsecureTlsHint": "AI 제공자 요청에 대해 유효하지 않거나 자체 서명된 인증서를 무시합니다. 신뢰할 수 있는 로컬 또는 내부 엔드포인트에만 사용하세요.",
@@ -1110,7 +1109,6 @@
         "bar": "막대",
         "bitmapCache": "비트맵 캐시",
         "block": "블록",
-        "capabilities": "기능",
         "capabilityLocalRuntime": "로컬",
         "capabilityMcpReady": "MCP 지원",
         "capabilityOpenAiCompatible": "OpenAI 호환",
@@ -1264,7 +1262,6 @@
         "rdpResolutionHint": "DesktopWidth, DesktopHeight, SmartSizing 및 디스플레이 동기화에 매핑됩니다.",
         "rdpResolutionValue": "워크스페이스 영역에 맞춤",
         "rdpSettingsSaved": "RDP 기본값이 저장되었습니다.",
-        "reasoning": "추론",
         "reasoningEffort": "추론 노력",
         "remoteResize": "원격 크기 조정",
         "repository": "저장소",

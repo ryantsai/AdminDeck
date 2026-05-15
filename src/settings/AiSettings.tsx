@@ -11,7 +11,7 @@ import {
 } from "../ai/providers";
 import { SUPPORTED_LANGUAGES } from "../i18n/config";
 import { aiProviderSecretOwnerId } from "../lib/settings";
-import { invokeCommand, isTauriRuntime } from "../lib/tauri";
+import { invokeCommand, isTauriRuntime, openExternalUrl } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import type {
   AiAssistantToolId,
@@ -20,7 +20,7 @@ import type {
   AiReasoningEffort,
   SearchProvider,
 } from "../types";
-import { SettingsSectionHeader, SettingsSummary } from "./shared";
+import { SettingsSectionHeader } from "./shared";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { shouldShowStoredAiProviderKeyMask } from "./aiProviderKeyField";
 import i18next from "../i18n/config";
@@ -30,30 +30,6 @@ function createStoredApiKeyMask() {
   return "*".repeat(maskLength);
 }
 
-function formatProviderHost(baseUrl: string) {
-  try {
-    return new URL(baseUrl).host || i18next.t("settings.openAiCompatibleEndpoint");
-  } catch {
-    return i18next.t("settings.openAiCompatibleEndpoint");
-  }
-}
-
-function formatAiProviderCapability(capability: string) {
-  switch (capability) {
-    case "toolCalling":
-      return i18next.t("settings.capabilityToolCalling");
-    case "mcpReady":
-      return i18next.t("settings.capabilityMcpReady");
-    case "localRuntime":
-      return i18next.t("settings.capabilityLocalRuntime");
-    case "openAiCompatible":
-      return i18next.t("settings.capabilityOpenAiCompatible");
-    case "sdkOAuth":
-      return i18next.t("settings.capabilitySdkOAuth");
-    default:
-      return capability;
-  }
-}
 
 function formatReasoningEffort(effort: AiReasoningEffort) {
   switch (effort) {
@@ -165,7 +141,18 @@ function AiProviderSettingsFieldControl({
     case "apiKey":
       return (
         <label>
-          <span>{definition.apiKeyLabel}</span>
+          <span>
+            {definition.apiKeyLabel}
+            {definition.apiKeyUrl ? (
+              <button
+                className="settings-api-key-link"
+                onClick={() => void openExternalUrl(definition.apiKeyUrl!)}
+                type="button"
+              >
+                {t("settings.howToGetApiKey")}
+              </button>
+            ) : null}
+          </span>
           <input
             autoComplete="off"
             disabled={!definition.requiresApiKey}
@@ -621,19 +608,6 @@ export function AiSettings() {
         searchApiKeyStoredMask={searchApiKeyStoredMask}
       />
 
-      <div className="settings-summary-grid compact">
-        <SettingsSummary label={t("settings.activeEndpoint")} value={formatProviderHost(draft.baseUrl)} />
-        <SettingsSummary
-          label={t("settings.capabilities")}
-          value={aiProviderDefinition.capabilities
-            .map(formatAiProviderCapability)
-            .join(", ")}
-        />
-        <SettingsSummary
-          label={t("settings.reasoning")}
-          value={formatReasoningEffort(draft.reasoningEffort)}
-        />
-      </div>
     </section>
   );
 }

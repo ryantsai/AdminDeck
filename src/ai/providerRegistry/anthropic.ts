@@ -12,6 +12,7 @@ export const anthropicProvider: AiProviderDefinition = {
   allowsCustomBaseUrl: false,
   allowsCustomModel: true,
   apiKeyLabel: "Anthropic API key",
+  apiKeyUrl: "https://console.anthropic.com/settings/keys",
   modelOptions: [
     { id: "claude-opus-4-7", label: "Claude Opus 4.7", note: "Most capable", supportsImageInput: true },
     { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", note: "Balanced", supportsImageInput: true },

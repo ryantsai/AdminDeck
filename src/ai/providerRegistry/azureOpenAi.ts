@@ -12,6 +12,7 @@ export const azureOpenAiProvider: AiProviderDefinition = {
   allowsCustomBaseUrl: true,
   allowsCustomModel: true,
   apiKeyLabel: "Azure OpenAI key",
+  apiKeyUrl: "https://portal.azure.com/",
   modelOptions: [
     { id: "gpt-5.5", label: "GPT-5.5", note: "Newest Azure model", supportsImageInput: true },
     { id: "gpt-5.5-2026-04-23", label: "GPT-5.5 snapshot", supportsImageInput: true },

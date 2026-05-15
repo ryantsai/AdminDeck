@@ -1,4 +1,4 @@
-{
+﻿{
     "ai": {
         "addContext": "Tambah konteks",
         "addFiles": "Tambah File/Foto",
@@ -1037,7 +1037,6 @@
     },
     "settings": {
         "accent": "Aksen",
-        "activeEndpoint": "Endpoint aktif",
         "activeUiFont": "Font UI aktif",
         "aiAllowInsecureTls": "Izinkan TLS tidak aman untuk penyedia AI",
         "aiAllowInsecureTlsHint": "Abaikan sertifikat tidak valid atau ditandatangani sendiri untuk permintaan penyedia AI. Hanya gunakan untuk titik akhir lokal atau internal tepercaya.",
@@ -1110,7 +1109,6 @@
         "bar": "Batang",
         "bitmapCache": "Cache bitmap",
         "block": "Blok",
-        "capabilities": "Kemampuan",
         "capabilityLocalRuntime": "lokal",
         "capabilityMcpReady": "siap MCP",
         "capabilityOpenAiCompatible": "kompatibel OpenAI",
@@ -1264,7 +1262,6 @@
         "rdpResolutionHint": "Dipetakan ke DesktopWidth, DesktopHeight, SmartSizing, dan sinkronisasi tampilan.",
         "rdpResolutionValue": "Sesuaikan batas ruang kerja",
         "rdpSettingsSaved": "Default RDP disimpan.",
-        "reasoning": "Penalaran",
         "reasoningEffort": "Upaya penalaran",
         "remoteResize": "Ubah ukuran jarak jauh",
         "repository": "Repositori",

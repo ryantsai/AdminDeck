@@ -1,4 +1,4 @@
-{
+﻿{
     "ai": {
         "addContext": "เพิ่มบริบท",
         "addFiles": "เพิ่มไฟล์/รูปภาพ",
@@ -1037,7 +1037,6 @@
     },
     "settings": {
         "accent": "สีเน้น",
-        "activeEndpoint": "จุดสิ้นสุดที่ใช้งานอยู่",
         "activeUiFont": "แบบอักษร UI ปัจจุบัน",
         "aiAllowInsecureTls": "อนุญาต TLS ที่ไม่ปลอดภัยสำหรับผู้ให้บริการ AI",
         "aiAllowInsecureTlsHint": "ละเว้นใบรับรองที่ไม่ถูกต้องหรือลงนามเองสำหรับคำขอผู้ให้บริการ AI ใช้เฉพาะกับปลายทางภายในหรือภายในที่เชื่อถือได้",
@@ -1110,7 +1109,6 @@
         "bar": "แถบ",
         "bitmapCache": "แคชบิตแมป",
         "block": "บล็อก",
-        "capabilities": "ความสามารถ",
         "capabilityLocalRuntime": "ภายในเครื่อง",
         "capabilityMcpReady": "พร้อม MCP",
         "capabilityOpenAiCompatible": "เข้ากันได้กับ OpenAI",
@@ -1264,7 +1262,6 @@
         "rdpResolutionHint": "ผูกกับ DesktopWidth, DesktopHeight, SmartSizing และการซิงค์จอภาพ",
         "rdpResolutionValue": "พอดีกับขอบเขตพื้นที่ทำงาน",
         "rdpSettingsSaved": "บันทึกค่าเริ่มต้น RDP แล้ว",
-        "reasoning": "การให้เหตุผล",
         "reasoningEffort": "ความพยายามในการให้เหตุผล",
         "remoteResize": "ปรับขนาดระยะไกล",
         "repository": "ที่เก็บ",

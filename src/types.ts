@@ -359,6 +359,7 @@ export type AiProviderKind =
   | "anthropic"
   | "openrouter"
   | "deepseek"
+  | "gemini"
   | "grok"
   | "azure-openai"
   | "litellm"

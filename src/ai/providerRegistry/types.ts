@@ -30,6 +30,7 @@ export type AiProviderDefinition = {
   allowsCustomBaseUrl: boolean;
   allowsCustomModel: boolean;
   apiKeyLabel: string;
+  apiKeyUrl?: string;
   modelOptions: AiModelOption[];
   settingsFields: AiProviderSettingsField[];
   capabilities: AiProviderCapability[];
