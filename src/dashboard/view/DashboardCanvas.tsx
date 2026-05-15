@@ -45,6 +45,17 @@ function dimColor(dim: number): string | undefined {
     : `rgba(255, 255, 255, ${alpha})`;
 }
 
+function muteBackgroundVideo(video: HTMLVideoElement | null) {
+  if (!video) return;
+  video.defaultMuted = true;
+  video.muted = true;
+  video.volume = 0;
+}
+
+function keepBackgroundVideoMuted(event: { currentTarget: HTMLVideoElement }) {
+  muteBackgroundVideo(event.currentTarget);
+}
+
 export interface DashboardCanvasProps {
   view: DashboardView;
   instances: DashboardWidgetInstance[];
@@ -124,8 +135,12 @@ export function DashboardCanvas({ view, instances, onCustomize, onOpenBackground
           <video
             aria-hidden="true"
             autoPlay
+            ref={muteBackgroundVideo}
             loop
             muted
+            onLoadedMetadata={keepBackgroundVideoMuted}
+            onPlay={keepBackgroundVideoMuted}
+            onVolumeChange={keepBackgroundVideoMuted}
             playsInline
             src={dataUrl}
             style={videoFitStyle(background.fit)}

@@ -219,15 +219,9 @@ fn dashboard_load_background_image_sync(file: String) -> Result<DashboardBackgro
 
     let extension = background_media_extension(&canonical_path)
         .ok_or_else(|| background_media_extension_error().to_string())?;
-    if background_media_is_video(&extension) {
-        return Ok(DashboardBackgroundImageData {
-            data_url: None,
-            path: Some(canonical_path.to_string_lossy().into_owned()),
-        });
-    }
 
     let bytes = fs::read(&canonical_path)
-        .map_err(|error| format!("failed to read background image {}: {error}", canonical_path.display()))?;
+        .map_err(|error| format!("failed to read background media {}: {error}", canonical_path.display()))?;
 
     let data_url = format!(
         "data:{};base64,{}",
@@ -418,10 +412,6 @@ fn background_media_mime(extension: &str) -> &'static str {
         "ogv" => "video/ogg",
         _ => "application/octet-stream",
     }
-}
-
-fn background_media_is_video(extension: &str) -> bool {
-    matches!(extension, "mp4" | "webm" | "mov" | "m4v" | "ogv")
 }
 
 fn background_media_extension_error() -> &'static str {
@@ -2298,4 +2288,37 @@ pub fn run() {
 
 fn setup_error(message: String) -> Box<dyn std::error::Error> {
     Box::new(std::io::Error::new(std::io::ErrorKind::Other, message))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn write_test_background_file(extension: &str, bytes: &[u8]) -> String {
+        let folder = backgrounds_folder().expect("backgrounds folder");
+        fs::create_dir_all(&folder).expect("create backgrounds folder");
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let file = format!("bg-test-{}-{nonce}.{extension}", std::process::id());
+        fs::write(folder.join(&file), bytes).expect("write background test media");
+        file
+    }
+
+    #[test]
+    fn dashboard_load_background_video_returns_data_url() {
+        let file = write_test_background_file("mp4", b"test-video-bytes");
+        let result = dashboard_load_background_image_sync(file.clone()).expect("load background video");
+
+        assert_eq!(result.path, None);
+        assert_eq!(
+            result.data_url,
+            Some("data:video/mp4;base64,dGVzdC12aWRlby1ieXRlcw==".to_string())
+        );
+
+        let _ = fs::remove_file(backgrounds_folder().expect("backgrounds folder").join(file));
+    }
 }
