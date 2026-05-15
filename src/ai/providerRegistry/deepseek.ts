@@ -12,6 +12,7 @@ export const deepSeekProvider: AiProviderDefinition = {
   allowsCustomBaseUrl: false,
   allowsCustomModel: true,
   apiKeyLabel: "DeepSeek API key",
+  apiKeyUrl: "https://platform.deepseek.com/api_keys",
   modelOptions: [
     { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", note: "Fast current model", supportsImageInput: false },
     { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", note: "Most capable", supportsImageInput: false },

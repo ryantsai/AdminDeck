@@ -1,6 +1,7 @@
 // Provider adapters live in one file per provider; Rust still requires this explicit module registry.
 mod azure_openai;
 mod deepseek;
+mod gemini;
 mod grok;
 mod litellm;
 mod nvidia;
@@ -15,6 +16,7 @@ pub(super) fn provider_for(kind: &str) -> Result<OpenAiCompatibleProvider, Strin
     match kind {
         "azure-openai" => Ok(azure_openai::provider()),
         "deepseek" => Ok(deepseek::provider()),
+        "gemini" => Ok(gemini::provider()),
         "grok" => Ok(grok::provider()),
         "litellm" => Ok(litellm::provider()),
         "openai" => Ok(openai::provider()),
