@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useTranslation } from "react-i18next";
 import type { AssistantPageContext } from "../ai/AssistantPanel";
 import { useWorkspaceStore } from "../store";
+import { BackgroundPopover } from "./edit/BackgroundPopover";
 import { CatalogOverlay } from "./edit/CatalogOverlay";
 import { CustomizePopover } from "./edit/CustomizePopover";
 import "./dashboard.css";
@@ -34,6 +35,7 @@ export function DashboardPage({
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [customize, setCustomize] = useState<{ instance: DashboardWidgetInstance; rect: DOMRect } | null>(null);
   const [editingViewId, setEditingViewId] = useState<string | null>(null);
+  const [backgroundOpen, setBackgroundOpen] = useState(false);
   const appliedLandingPref = useRef(false);
 
   useEffect(() => {
@@ -216,6 +218,7 @@ export function DashboardPage({
           view={activeView}
           instances={viewInstances}
           onCustomize={(instance, anchor) => setCustomize({ instance, rect: anchor.getBoundingClientRect() })}
+          onOpenBackground={() => setBackgroundOpen(true)}
         />
       </div>
 
@@ -228,6 +231,9 @@ export function DashboardPage({
           anchorRect={customize.rect}
           onClose={() => setCustomize(null)}
         />
+      )}
+      {backgroundOpen && (
+        <BackgroundPopover view={activeView} onClose={() => setBackgroundOpen(false)} />
       )}
     </main>
   );

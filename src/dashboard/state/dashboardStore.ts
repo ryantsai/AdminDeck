@@ -4,7 +4,7 @@ import { useWorkspaceStore } from "../../store";
 import type {
   DashboardCustomWidget, DashboardView, DashboardWidgetInstance,
   GridDensity, InstancePatch, LayoutEntry, WidgetCustomKind,
-  WidgetKind, WidgetPreset, AccentName, IconName, CustomWidgetPatch,
+  WidgetKind, WidgetPreset, AccentName, IconName, CustomWidgetPatch, DashboardBackground,
 } from "../types";
 
 interface DashboardStoreState {
@@ -22,6 +22,9 @@ interface DashboardStoreState {
   createView: (title: string) => Promise<DashboardView | null>;
   renameView: (id: string, title: string) => Promise<void>;
   setViewDensity: (id: string, density: GridDensity) => Promise<void>;
+  setViewBackground: (id: string, background: DashboardBackground | null) => Promise<void>;
+  backgroundImages: Record<string, string>;
+  loadBackgroundImage: (file: string) => Promise<void>;
   removeView: (id: string) => Promise<void>;
   addInstance: (input: {
     viewId: string; kind: WidgetKind; sourceId: string;
@@ -66,6 +69,7 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
   activeViewId: null,
   editMode: false,
   lastError: null,
+  backgroundImages: {},
 
   load: async () => {
     set({ loading: true });
@@ -112,6 +116,23 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
       const updated = await persistence.updateView(id, { gridDensity: density });
       set((s) => ({ views: s.views.map((v) => (v.id === id ? updated : v)) }));
     } catch (e) { set({ lastError: String(e) }); }
+  },
+
+  setViewBackground: async (id, background) => {
+    try {
+      const updated = await persistence.updateView(id, { background });
+      set((s) => ({ views: s.views.map((v) => (v.id === id ? updated : v)) }));
+    } catch (e) { set({ lastError: String(e) }); }
+  },
+
+  loadBackgroundImage: async (file) => {
+    if (!file || get().backgroundImages[file]) return;
+    try {
+      const dataUrl = await persistence.loadBackgroundImage(file);
+      set((s) => ({ backgroundImages: { ...s.backgroundImages, [file]: dataUrl } }));
+    } catch (e) {
+      set({ lastError: String(e) });
+    }
   },
 
   removeView: async (id) => {

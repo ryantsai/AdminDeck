@@ -242,6 +242,7 @@ main.dashboard-page {
 
 .dw-canvas-scroll {
   box-sizing: border-box;
+  position: relative;
   --dw-grid-dot: rgb(23 32 43 / 14%);
   --dw-grid-dot-soft: rgb(23 32 43 / 5%);
   --dw-grid-column-width: calc((100% - (var(--dw-grid-gap-x, 16px) * 13)) / 12);
@@ -253,7 +254,13 @@ main.dashboard-page {
   overflow-y: auto;
 }
 
-.dw-canvas-scroll.is-editing {
+/* Edit-mode grid lines: a pseudo-element on the canvas that layers above any custom background but below widgets. inset:0 maps to the canvas's bounds; no background-origin needed. */
+.dw-canvas-scroll.is-editing .dw-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0; /* deliberate: keep grid lines below positioned widgets */
+  pointer-events: none;
   background-image:
     radial-gradient(circle, var(--dw-grid-dot) 1px, transparent 1.4px),
     radial-gradient(circle, var(--dw-grid-dot-soft) 1px, transparent 1.4px);
@@ -266,6 +273,35 @@ main.dashboard-page {
 
 .dw-canvas {
   min-height: 100%;
+}
+
+/* Custom per-view background layer: sits behind the widget grid (z-index 0 vs the grid's z-index 1). The renderer sets background/background-image and --dw-bg-dim-color inline. */
+.dw-canvas-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.dw-canvas-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--dw-bg-dim-color, transparent);
+}
+
+.dw-canvas-host {
+  position: relative;
+  z-index: 0;
+  min-height: 100%;
+}
+
+.dw-canvas-host > .dw-canvas {
+  position: relative;
+  z-index: 1;
 }
 
 .react-grid-layout.dw-canvas {
@@ -1809,4 +1845,87 @@ main.dashboard-page {
       rgb(20 24 36 / 45%);
     border-color: rgb(255 255 255 / 18%);
   }
+}
+
+.dw-bg-popover {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  width: 320px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--dashboard-radius-lg);
+  box-shadow: var(--dashboard-shadow-ambient);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.dw-bg-popover-head {
+  font-weight: 650;
+}
+
+.dw-bg-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface-muted);
+  border-radius: 8px;
+}
+
+.dw-bg-seg button {
+  flex: 1;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, var(--text));
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dw-bg-seg button.active {
+  background: var(--surface);
+  box-shadow: var(--dashboard-shadow-card);
+  font-weight: 600;
+}
+
+.dw-bg-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.dw-bg-preset-grid button {
+  aspect-ratio: 1.4;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dw-bg-preset-grid button.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dw-bg-image {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dw-bg-image-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dw-bg-popover input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
 }

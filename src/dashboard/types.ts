@@ -26,11 +26,19 @@ export type IconName = (typeof ICON_NAMES)[number];
 export const GRID_DENSITIES = ["compact", "default", "roomy"] as const;
 export type GridDensity = (typeof GRID_DENSITIES)[number];
 
+export const BACKGROUND_FITS = ["fill", "fit", "stretch", "tile", "center"] as const;
+export type BackgroundFit = (typeof BACKGROUND_FITS)[number];
+
+export type DashboardBackground =
+  | { kind: "preset"; preset: string }
+  | { kind: "image"; file: string; fit: BackgroundFit; dim: number };
+
 export interface DashboardView {
   id: string;
   title: string;
   sortOrder: number;
   gridDensity: GridDensity;
+  background: DashboardBackground | null;
 }
 
 export interface DashboardWidgetInstance {
@@ -87,6 +95,7 @@ export interface ViewPatch {
   title?: string;
   gridDensity?: GridDensity;
   sortOrder?: number;
+  background?: DashboardBackground | null;
 }
 
 export interface CustomWidgetPatch {

@@ -22,6 +22,13 @@ pub const ICONS: &[&str] = &[
     "Zap", "Layers", "List", "Grid",
 ];
 
+pub const BACKGROUND_PRESET_IDS: &[&str] = &[
+    "mist", "sand", "sage", "sky", "blush", "lavender", "slate", "graphite",
+    "g-dawn", "g-fog", "g-meadow", "g-dusk", "g-linen", "g-horizon", "g-petal", "g-twilight",
+];
+
+pub const BACKGROUND_FITS: &[&str] = &["fill", "fit", "stretch", "tile", "center"];
+
 pub const GRID_COLUMNS: i64 = 12;
 pub const MAX_SCRIPT_SOURCE_BYTES: usize = 64 * 1024;
 pub const MAX_CONTENT_BODY_BYTES: usize = 32 * 1024;
@@ -51,6 +58,7 @@ pub enum ValidationError {
     InvalidGridDensity,
     InvalidSettingsSchema,
     InvalidSettingsValues,
+    InvalidBackground,
 }
 
 pub fn validate_preset(value: &str) -> Result<(), ValidationError> {
@@ -104,6 +112,31 @@ pub fn validate_title(value: &str) -> Result<(), ValidationError> {
     } else {
         Ok(())
     }
+}
+
+pub fn validate_background_preset(preset: &str) -> Result<(), ValidationError> {
+    if BACKGROUND_PRESET_IDS.contains(&preset) {
+        Ok(())
+    } else {
+        Err(ValidationError::InvalidBackground)
+    }
+}
+
+pub fn validate_background_image(file: &str, fit: &str, dim: i64) -> Result<(), ValidationError> {
+    let file_ok = !file.is_empty()
+        && !file.contains('/')
+        && !file.contains('\\')
+        && !file.contains("..");
+    if !file_ok {
+        return Err(ValidationError::InvalidBackground);
+    }
+    if !BACKGROUND_FITS.contains(&fit) {
+        return Err(ValidationError::InvalidBackground);
+    }
+    if !(-100..=100).contains(&dim) {
+        return Err(ValidationError::InvalidBackground);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -558,6 +591,67 @@ mod tests {
         assert_eq!(
             validate_settings_values_json("[]"),
             Err(ValidationError::InvalidSettingsValues),
+        );
+    }
+
+    #[test]
+    fn background_preset_known() {
+        assert!(validate_background_preset("mist").is_ok());
+        assert!(validate_background_preset("g-twilight").is_ok());
+    }
+
+    #[test]
+    fn background_preset_unknown() {
+        assert_eq!(
+            validate_background_preset("neon-explosion"),
+            Err(ValidationError::InvalidBackground),
+        );
+    }
+
+    #[test]
+    fn background_image_ok() {
+        assert!(validate_background_image("bg-abc123.jpg", "fill", 0).is_ok());
+        assert!(validate_background_image("bg-abc123.jpg", "center", -100).is_ok());
+        assert!(validate_background_image("bg-abc123.jpg", "tile", 100).is_ok());
+    }
+
+    #[test]
+    fn background_image_rejects_path_separators() {
+        assert_eq!(
+            validate_background_image("../secret.jpg", "fill", 0),
+            Err(ValidationError::InvalidBackground),
+        );
+        assert_eq!(
+            validate_background_image("sub/dir.jpg", "fill", 0),
+            Err(ValidationError::InvalidBackground),
+        );
+        assert_eq!(
+            validate_background_image("a\\b.jpg", "fill", 0),
+            Err(ValidationError::InvalidBackground),
+        );
+        assert_eq!(
+            validate_background_image("", "fill", 0),
+            Err(ValidationError::InvalidBackground),
+        );
+    }
+
+    #[test]
+    fn background_image_rejects_bad_fit() {
+        assert_eq!(
+            validate_background_image("bg.jpg", "zoom", 0),
+            Err(ValidationError::InvalidBackground),
+        );
+    }
+
+    #[test]
+    fn background_image_rejects_dim_out_of_range() {
+        assert_eq!(
+            validate_background_image("bg.jpg", "fill", 101),
+            Err(ValidationError::InvalidBackground),
+        );
+        assert_eq!(
+            validate_background_image("bg.jpg", "fill", -101),
+            Err(ValidationError::InvalidBackground),
         );
     }
 

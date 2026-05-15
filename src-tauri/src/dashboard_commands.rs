@@ -69,7 +69,13 @@ pub fn dashboard_update_view(
     id: String,
     patch: ViewPatch,
 ) -> Result<DashboardView, DashboardCommandError> {
-    storage(&app).with_connection_infallible(|conn| ds::update_view(conn, &id, &patch).map_err(Into::into))
+    let result = storage(&app).with_connection_infallible(
+        |conn| -> Result<DashboardView, DashboardCommandError> {
+            ds::update_view(conn, &id, &patch).map_err(Into::into)
+        },
+    )?;
+    crate::prune_unreferenced_backgrounds(&app);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -77,7 +83,13 @@ pub fn dashboard_remove_view(
     app: AppHandle,
     id: String,
 ) -> Result<(), DashboardCommandError> {
-    storage(&app).with_connection_infallible(|conn| ds::remove_view(conn, &id).map_err(Into::into))
+    storage(&app).with_connection_infallible(
+        |conn| -> Result<(), DashboardCommandError> {
+            ds::remove_view(conn, &id).map_err(Into::into)
+        },
+    )?;
+    crate::prune_unreferenced_backgrounds(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -246,5 +258,11 @@ pub fn dashboard_remove_custom_widget(
 
 #[tauri::command]
 pub fn dashboard_reset(app: AppHandle) -> Result<(), DashboardCommandError> {
-    storage(&app).with_connection_infallible(|conn| ds::reset_dashboard(conn).map_err(Into::into))
+    storage(&app).with_connection_infallible(
+        |conn| -> Result<(), DashboardCommandError> {
+            ds::reset_dashboard(conn).map_err(Into::into)
+        },
+    )?;
+    crate::prune_unreferenced_backgrounds(&app);
+    Ok(())
 }
