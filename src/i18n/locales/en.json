@@ -66,7 +66,10 @@
     "titleLabel": "Title",
     "titlePlaceholder": "Custom title…",
     "advanced": "Advanced",
-    "advancedNothing": "No advanced settings for built-in widgets.",
+    "customize": {
+      "sectionCommon": "Common",
+      "sectionWidget": "Widget"
+    },
     "changeBackground": "Change Background…",
     "backgroundModeDefault": "Theme Default",
     "backgroundModePreset": "Color & Gradient",
