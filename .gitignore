@@ -1,6 +1,7 @@
 /.agents
 /.claude
 /.superpowers
+/docs/superpowers
 /skills-lock.json
 
 # Logs
