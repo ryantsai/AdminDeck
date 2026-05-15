@@ -26,6 +26,7 @@ pub struct DashboardView {
 pub enum DashboardBackground {
     Preset { preset: String },
     Image { file: String, fit: String, dim: i64 },
+    Video { file: String, fit: String, dim: i64 },
 }
 
 impl DashboardBackground {
@@ -36,6 +37,9 @@ impl DashboardBackground {
             }
             DashboardBackground::Image { file, fit, dim } => {
                 crate::dashboard_validation::validate_background_image(file, fit, *dim)
+            }
+            DashboardBackground::Video { file, fit, dim } => {
+                crate::dashboard_validation::validate_background_video(file, fit, *dim)
             }
         }
     }
@@ -313,10 +317,12 @@ pub fn referenced_background_image_files(
     let mut files = HashSet::new();
     for json in rows {
         let json = json?;
-        if let Ok(DashboardBackground::Image { file, .. }) =
-            serde_json::from_str::<DashboardBackground>(&json)
-        {
-            files.insert(file);
+        match serde_json::from_str::<DashboardBackground>(&json) {
+            Ok(DashboardBackground::Image { file, .. })
+            | Ok(DashboardBackground::Video { file, .. }) => {
+                files.insert(file);
+            }
+            _ => {}
         }
     }
     Ok(files)
@@ -966,11 +972,12 @@ mod tests {
     }
 
     #[test]
-    fn referenced_background_image_files_collects_image_files_only() {
+    fn referenced_background_image_files_collects_media_files_only() {
         let conn = open_test_db();
         create_view(&conn, "v1", "First", None).unwrap();
         create_view(&conn, "v2", "Second", None).unwrap();
         create_view(&conn, "v3", "Third", None).unwrap();
+        create_view(&conn, "v4", "Fourth", None).unwrap();
         update_view(&conn, "v1", &ViewPatch {
             title: None, grid_density: None, sort_order: None,
             background: Some(Some(DashboardBackground::Image {
@@ -981,10 +988,17 @@ mod tests {
             title: None, grid_density: None, sort_order: None,
             background: Some(Some(DashboardBackground::Preset { preset: "mist".into() })),
         }).unwrap();
+        update_view(&conn, "v4", &ViewPatch {
+            title: None, grid_density: None, sort_order: None,
+            background: Some(Some(DashboardBackground::Video {
+                file: "bg-bbb.mp4".into(), fit: "fill".into(), dim: 0,
+            })),
+        }).unwrap();
         // v3 left as theme default (NULL).
         let files = referenced_background_image_files(&conn).unwrap();
-        assert_eq!(files.len(), 1);
+        assert_eq!(files.len(), 2);
         assert!(files.contains("bg-aaa.jpg"));
+        assert!(files.contains("bg-bbb.mp4"));
     }
 
     #[test]

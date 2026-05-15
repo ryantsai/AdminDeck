@@ -7,11 +7,21 @@ import { importBackgroundImage } from "../state/persistence";
 import { useDashboardStore } from "../state/dashboardStore";
 import { BACKGROUND_FITS, type BackgroundFit, type DashboardBackground, type DashboardView } from "../types";
 
-type Mode = "default" | "preset" | "image";
+type Mode = "default" | "preset" | "media";
 
 function modeOf(background: DashboardBackground | null): Mode {
   if (!background) return "default";
-  return background.kind === "preset" ? "preset" : "image";
+  return background.kind === "preset" ? "preset" : "media";
+}
+
+function isMediaBackground(
+  background: DashboardBackground | null,
+): background is Extract<DashboardBackground, { kind: "image" | "video" }> {
+  return background?.kind === "image" || background?.kind === "video";
+}
+
+function mediaKindForFile(file: string): "image" | "video" {
+  return /\.(mp4|webm|mov|m4v|ogv)$/i.test(file) ? "video" : "image";
 }
 
 export interface BackgroundPopoverProps {
@@ -39,7 +49,7 @@ export function BackgroundPopover({ view, onClose }: BackgroundPopoverProps) {
   }, [onClose]);
 
   const background = view.background;
-  const imageBackground = background?.kind === "image" ? background : null;
+  const mediaBackground = isMediaBackground(background) ? background : null;
 
   function applyDefault() {
     setMode("default");
@@ -51,14 +61,14 @@ export function BackgroundPopover({ view, onClose }: BackgroundPopoverProps) {
     void setViewBackground(view.id, { kind: "preset", preset: presetId });
   }
 
-  type ImageBackground = Extract<DashboardBackground, { kind: "image" }>;
-  function applyImagePatch(patch: Partial<Omit<ImageBackground, "kind">>) {
-    const base: ImageBackground = imageBackground ?? { kind: "image", file: "", fit: "fill", dim: 0 };
+  type MediaBackground = Extract<DashboardBackground, { kind: "image" | "video" }>;
+  function applyMediaPatch(patch: Partial<Omit<MediaBackground, "kind">>) {
+    const base: MediaBackground = mediaBackground ?? { kind: "image", file: "", fit: "fill", dim: 0 };
     if (!base.file && !patch.file) return;
-    void setViewBackground(view.id, { ...base, ...patch, kind: "image" });
+    void setViewBackground(view.id, { ...base, ...patch });
   }
 
-  async function chooseImage() {
+  async function chooseMedia() {
     setImportError("");
     try {
       let sourcePath: string | null = null;
@@ -66,22 +76,22 @@ export function BackgroundPopover({ view, onClose }: BackgroundPopoverProps) {
         const selected = await openDialog({
           directory: false,
           multiple: false,
-          title: t("dashboard.backgroundChooseImage"),
+          title: t("dashboard.backgroundChooseMedia"),
           filters: [{
-            name: t("dashboard.backgroundImageFilter"),
-            extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"],
+            name: t("dashboard.backgroundMediaFilter"),
+            extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "mp4", "webm", "mov", "m4v", "ogv"],
           }],
         });
         sourcePath = typeof selected === "string" ? selected : null;
       } else {
-        sourcePath = "preview-image.png";
+        sourcePath = "preview-media.png";
       }
       if (!sourcePath) return;
       const file = await importBackgroundImage(sourcePath);
       await loadBackgroundImage(file);
-      setMode("image");
-      const base = imageBackground ?? { fit: "fill" as BackgroundFit, dim: 0 };
-      void setViewBackground(view.id, { kind: "image", file, fit: base.fit, dim: base.dim });
+      setMode("media");
+      const base = mediaBackground ?? { fit: "fill" as BackgroundFit, dim: 0 };
+      void setViewBackground(view.id, { kind: mediaKindForFile(file), file, fit: base.fit, dim: base.dim });
     } catch (error) {
       setImportError(error instanceof Error ? error.message : String(error));
     }
@@ -102,8 +112,8 @@ export function BackgroundPopover({ view, onClose }: BackgroundPopoverProps) {
         <button className={mode === "preset" ? "active" : ""} onClick={() => setMode("preset")}>
           {t("dashboard.backgroundModePreset")}
         </button>
-        <button className={mode === "image" ? "active" : ""} onClick={() => setMode("image")}>
-          {t("dashboard.backgroundModeImage")}
+        <button className={mode === "media" ? "active" : ""} onClick={() => setMode("media")}>
+          {t("dashboard.backgroundModeMedia")}
         </button>
       </div>
 
@@ -126,26 +136,26 @@ export function BackgroundPopover({ view, onClose }: BackgroundPopoverProps) {
         </div>
       )}
 
-      {mode === "image" && (
+      {mode === "media" && (
         <div className="dw-bg-image">
           <div className="dw-bg-image-actions">
-            <button className="dw-secondary-button" onClick={() => { void chooseImage(); }}>
-              {t("dashboard.backgroundChooseImage")}
+            <button className="dw-secondary-button" onClick={() => { void chooseMedia(); }}>
+              {t("dashboard.backgroundChooseMedia")}
             </button>
-            {imageBackground && (
+            {mediaBackground && (
               <button className="dw-secondary-button" onClick={removeImage}>
                 {t("dashboard.backgroundRemoveImage")}
               </button>
             )}
           </div>
           {importError && <small className="dw-muted">{importError}</small>}
-          {imageBackground && (
+          {mediaBackground && (
             <>
               <label className="dw-field">
                 <span>{t("dashboard.backgroundFitLabel")}</span>
                 <select
-                  value={imageBackground.fit}
-                  onChange={(e) => applyImagePatch({ fit: e.target.value as BackgroundFit })}
+                  value={mediaBackground.fit}
+                  onChange={(e) => applyMediaPatch({ fit: e.target.value as BackgroundFit })}
                 >
                   {BACKGROUND_FITS.map((fit) => (
                     <option key={fit} value={fit}>{t(`dashboard.backgroundFit.${fit}`)}</option>
@@ -159,14 +169,14 @@ export function BackgroundPopover({ view, onClose }: BackgroundPopoverProps) {
                   min={-100}
                   max={100}
                   step={1}
-                  value={imageBackground.dim}
-                  onChange={(e) => applyImagePatch({ dim: Number(e.target.value) })}
+                  value={mediaBackground.dim}
+                  onChange={(e) => applyMediaPatch({ dim: Number(e.target.value) })}
                 />
-                <small className="dw-muted">{imageBackground.dim}</small>
+                <small className="dw-muted">{mediaBackground.dim}</small>
               </label>
             </>
           )}
-          {!imageBackground && <p className="dw-muted">{t("dashboard.backgroundImageHint")}</p>}
+          {!mediaBackground && <p className="dw-muted">{t("dashboard.backgroundMediaHint")}</p>}
         </div>
       )}
     </div>

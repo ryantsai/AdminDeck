@@ -1,3 +1,4 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { invokeCommand, isTauriRuntime } from "../../lib/tauri";
 import {
   parseWidgetSettingsValuesJson,
@@ -268,8 +269,9 @@ export async function resetDashboard(): Promise<void> {
 
 export async function importBackgroundImage(sourcePath: string): Promise<string> {
   if (!isTauriRuntime()) {
-    // Browser preview cannot copy files — echo a deterministic fake filename.
-    return `preview-bg-${sourcePath.replace(/[^a-z0-9]/gi, "").slice(-12)}.png`;
+    // Browser preview cannot copy files - echo a deterministic fake filename.
+    const extension = sourcePath.split(".").pop()?.toLowerCase() ?? "png";
+    return `preview-bg-${sourcePath.replace(/[^a-z0-9]/gi, "").slice(-12)}.${extension}`;
   }
   return invokeCommand("dashboard_import_background_image", { sourcePath });
 }
@@ -280,5 +282,8 @@ export async function loadBackgroundImage(file: string): Promise<string> {
     return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
   }
   const result = await invokeCommand("dashboard_load_background_image", { file });
-  return result.dataUrl;
+  if (result.path) {
+    return convertFileSrc(result.path);
+  }
+  return result.dataUrl ?? "";
 }

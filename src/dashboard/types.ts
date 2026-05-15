@@ -31,7 +31,8 @@ export type BackgroundFit = (typeof BACKGROUND_FITS)[number];
 
 export type DashboardBackground =
   | { kind: "preset"; preset: string }
-  | { kind: "image"; file: string; fit: BackgroundFit; dim: number };
+  | { kind: "image"; file: string; fit: BackgroundFit; dim: number }
+  | { kind: "video"; file: string; fit: BackgroundFit; dim: number };
 
 export interface DashboardView {
   id: string;

@@ -286,6 +286,16 @@ main.dashboard-page {
   background: var(--dw-bg-dim-color, transparent);
 }
 
+.dw-canvas-bg-video {
+  overflow: hidden;
+}
+
+.dw-canvas-bg-video video {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .dw-canvas-blueprint {
   z-index: 1;
   background-image:

@@ -63,7 +63,8 @@ struct CustomFontData {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DashboardBackgroundImageData {
-    data_url: String,
+    data_url: Option<String>,
+    path: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -166,8 +167,8 @@ fn dashboard_import_background_image_sync(source_path: String) -> Result<String,
     use std::hash::{Hash, Hasher};
 
     let source = PathBuf::from(&source_path);
-    let extension = background_image_extension(&source)
-        .ok_or_else(|| "background image must be .png, .jpg, .jpeg, .webp, .gif, or .bmp".to_string())?;
+    let extension = background_media_extension(&source)
+        .ok_or_else(|| background_media_extension_error().to_string())?;
 
     let bytes = fs::read(&source)
         .map_err(|error| format!("failed to read background image {source_path}: {error}"))?;
@@ -216,17 +217,24 @@ fn dashboard_load_background_image_sync(file: String) -> Result<DashboardBackgro
         return Err("background image path must stay inside the backgrounds folder".to_string());
     }
 
-    let extension = background_image_extension(&canonical_path)
-        .ok_or_else(|| "background image must be .png, .jpg, .jpeg, .webp, .gif, or .bmp".to_string())?;
+    let extension = background_media_extension(&canonical_path)
+        .ok_or_else(|| background_media_extension_error().to_string())?;
+    if background_media_is_video(&extension) {
+        return Ok(DashboardBackgroundImageData {
+            data_url: None,
+            path: Some(canonical_path.to_string_lossy().into_owned()),
+        });
+    }
+
     let bytes = fs::read(&canonical_path)
         .map_err(|error| format!("failed to read background image {}: {error}", canonical_path.display()))?;
 
     let data_url = format!(
         "data:{};base64,{}",
-        background_image_mime(&extension),
+        background_media_mime(&extension),
         STANDARD.encode(bytes),
     );
-    Ok(DashboardBackgroundImageData { data_url })
+    Ok(DashboardBackgroundImageData { data_url: Some(data_url), path: None })
 }
 
 fn list_custom_fonts_sync() -> Result<Vec<CustomFontEntry>, String> {
@@ -310,7 +318,7 @@ pub(crate) fn backgrounds_folder() -> Result<PathBuf, String> {
     Ok(exe_folder.join("backgrounds"))
 }
 
-/// Best-effort: delete background image files no view references anymore.
+/// Best-effort: delete background media files no view references anymore.
 /// Never returns an error — cleanup failures must not break view mutations.
 pub(crate) fn prune_unreferenced_backgrounds(app: &tauri::AppHandle) {
     let storage = app.state::<storage::Storage>();
@@ -381,28 +389,43 @@ fn is_supported_font_extension(extension: &str) -> bool {
     matches!(extension, "ttf" | "otf" | "woff" | "woff2")
 }
 
-/// Returns the lowercased extension if `path` is a supported background image.
-fn background_image_extension(path: &std::path::Path) -> Option<String> {
+/// Returns the lowercased extension if `path` is a supported background media file.
+fn background_media_extension(path: &std::path::Path) -> Option<String> {
     let extension = path
         .extension()
         .and_then(|extension| extension.to_str())
         .map(|extension| extension.to_lowercase())?;
-    if matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp") {
+    if matches!(
+        extension.as_str(),
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "mp4" | "webm" | "mov" | "m4v" | "ogv",
+    ) {
         Some(extension)
     } else {
         None
     }
 }
 
-fn background_image_mime(extension: &str) -> &'static str {
+fn background_media_mime(extension: &str) -> &'static str {
     match extension {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "webp" => "image/webp",
         "gif" => "image/gif",
         "bmp" => "image/bmp",
+        "mp4" | "m4v" => "video/mp4",
+        "webm" => "video/webm",
+        "mov" => "video/quicktime",
+        "ogv" => "video/ogg",
         _ => "application/octet-stream",
     }
+}
+
+fn background_media_is_video(extension: &str) -> bool {
+    matches!(extension, "mp4" | "webm" | "mov" | "m4v" | "ogv")
+}
+
+fn background_media_extension_error() -> &'static str {
+    "background file must be .png, .jpg, .jpeg, .webp, .gif, .bmp, .mp4, .webm, .mov, .m4v, or .ogv"
 }
 
 #[tauri::command]

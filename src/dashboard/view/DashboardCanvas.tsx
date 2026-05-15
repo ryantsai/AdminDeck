@@ -27,6 +27,16 @@ function backgroundFitStyle(fit: BackgroundFit): CSSProperties {
   }
 }
 
+function videoFitStyle(fit: BackgroundFit): CSSProperties {
+  switch (fit) {
+    case "fill":    return { objectFit: "cover", objectPosition: "center" };
+    case "fit":     return { objectFit: "contain", objectPosition: "center" };
+    case "stretch": return { objectFit: "fill" };
+    case "tile":    return { objectFit: "none", objectPosition: "center" };
+    case "center":  return { objectFit: "none", objectPosition: "center" };
+  }
+}
+
 function dimColor(dim: number): string | undefined {
   if (dim === 0) return undefined;
   const alpha = Math.min(Math.abs(dim), 100) / 100;
@@ -50,11 +60,11 @@ export function DashboardCanvas({ view, instances, onCustomize, onOpenBackground
   const loadBackgroundImage = useDashboardStore((s) => s.loadBackgroundImage);
 
   const background = view.background;
-  const imageFile = background?.kind === "image" ? background.file : null;
+  const mediaFile = background?.kind === "image" || background?.kind === "video" ? background.file : null;
 
   useEffect(() => {
-    if (imageFile) void loadBackgroundImage(imageFile);
-  }, [imageFile, loadBackgroundImage]);
+    if (mediaFile) void loadBackgroundImage(mediaFile);
+  }, [mediaFile, loadBackgroundImage]);
 
   const settings = DENSITY_SETTINGS[view.gridDensity];
   const layout: Layout = useMemo(
@@ -100,6 +110,28 @@ export function DashboardCanvas({ view, instances, onCustomize, onOpenBackground
         (style as Record<string, string>)["--dw-bg-dim-color"] = dim;
       }
       backgroundLayer = <div className="dw-canvas-bg" style={style} />;
+    }
+  } else if (background?.kind === "video") {
+    const dataUrl = backgroundImages[background.file];
+    if (dataUrl) {
+      const style: CSSProperties = {};
+      const dim = dimColor(background.dim);
+      if (dim) {
+        (style as Record<string, string>)["--dw-bg-dim-color"] = dim;
+      }
+      backgroundLayer = (
+        <div className="dw-canvas-bg dw-canvas-bg-video" style={style}>
+          <video
+            aria-hidden="true"
+            autoPlay
+            loop
+            muted
+            playsInline
+            src={dataUrl}
+            style={videoFitStyle(background.fit)}
+          />
+        </div>
+      );
     }
   }
 

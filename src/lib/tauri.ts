@@ -1581,7 +1581,7 @@ type CommandMap = {
   };
   dashboard_load_background_image: {
     args: { file: string };
-    result: { dataUrl: string };
+    result: { dataUrl?: string; path?: string };
   };
 };
 

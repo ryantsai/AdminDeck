@@ -123,6 +123,19 @@ pub fn validate_background_preset(preset: &str) -> Result<(), ValidationError> {
 }
 
 pub fn validate_background_image(file: &str, fit: &str, dim: i64) -> Result<(), ValidationError> {
+    validate_background_media(file, fit, dim, &["png", "jpg", "jpeg", "webp", "gif", "bmp"])
+}
+
+pub fn validate_background_video(file: &str, fit: &str, dim: i64) -> Result<(), ValidationError> {
+    validate_background_media(file, fit, dim, &["mp4", "webm", "mov", "m4v", "ogv"])
+}
+
+fn validate_background_media(
+    file: &str,
+    fit: &str,
+    dim: i64,
+    extensions: &[&str],
+) -> Result<(), ValidationError> {
     let file_ok = !file.is_empty()
         && !file.contains('/')
         && !file.contains('\\')
@@ -134,6 +147,13 @@ pub fn validate_background_image(file: &str, fit: &str, dim: i64) -> Result<(), 
         return Err(ValidationError::InvalidBackground);
     }
     if !(-100..=100).contains(&dim) {
+        return Err(ValidationError::InvalidBackground);
+    }
+    let extension = file
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_lowercase())
+        .ok_or(ValidationError::InvalidBackground)?;
+    if !extensions.contains(&extension.as_str()) {
         return Err(ValidationError::InvalidBackground);
     }
     Ok(())
@@ -616,6 +636,13 @@ mod tests {
     }
 
     #[test]
+    fn background_video_ok() {
+        assert!(validate_background_video("bg-abc123.mp4", "fill", 0).is_ok());
+        assert!(validate_background_video("bg-abc123.webm", "fit", -20).is_ok());
+        assert!(validate_background_video("bg-abc123.mov", "stretch", 30).is_ok());
+    }
+
+    #[test]
     fn background_image_rejects_path_separators() {
         assert_eq!(
             validate_background_image("../secret.jpg", "fill", 0),
@@ -639,6 +666,18 @@ mod tests {
     fn background_image_rejects_bad_fit() {
         assert_eq!(
             validate_background_image("bg.jpg", "zoom", 0),
+            Err(ValidationError::InvalidBackground),
+        );
+    }
+
+    #[test]
+    fn background_media_rejects_wrong_kind_extension() {
+        assert_eq!(
+            validate_background_image("bg.mp4", "fill", 0),
+            Err(ValidationError::InvalidBackground),
+        );
+        assert_eq!(
+            validate_background_video("bg.jpg", "fill", 0),
             Err(ValidationError::InvalidBackground),
         );
     }
