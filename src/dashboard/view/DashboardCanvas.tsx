@@ -119,7 +119,7 @@ export function DashboardCanvas({ view, instances, onCustomize, onOpenBackground
         preventCollision={false}
         draggableHandle=".drag-handle"
         draggableCancel=".dw-controls, .dw-ctrl, button, input, textarea, select, a, [role='button']"
-        resizeHandles={editMode ? ["n", "e", "s", "w"] : []}
+        resizeHandles={editMode ? ["n", "e", "s", "w", "nw", "ne", "sw", "se"] : []}
         onLayoutChange={onLayoutChange}
       >
         {instances.map((i) => (

@@ -408,6 +408,40 @@ main.dashboard-page {
   bottom: -5px !important;
 }
 
+.react-grid-item > .react-resizable-handle.react-resizable-handle-nw,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-ne,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-sw,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-nw {
+  top: -6px !important;
+  left: -6px !important;
+  cursor: nwse-resize;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-ne {
+  top: -6px !important;
+  right: -6px !important;
+  cursor: nesw-resize;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-sw {
+  bottom: -6px !important;
+  left: -6px !important;
+  cursor: nesw-resize;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+  right: -6px !important;
+  bottom: -6px !important;
+  cursor: nwse-resize;
+}
+
 .dw-preset {
   display: flex;
   flex-direction: column;
