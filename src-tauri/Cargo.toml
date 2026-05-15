@@ -1,6 +1,6 @@
 [package]
 name = "kkterm"
-version = "0.1.6"
+version = "0.1.7"
 description = "Fast local-first administration workspace for terminals, SSH, SFTP, and approval-based command assistance."
 authors = ["Ryan Tsai"]
 license = "MIT"
@@ -59,6 +59,7 @@ tauri-plugin-single-instance = "2"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-updater = "2.10.1"
+
 
 
 
