@@ -46,9 +46,7 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
     () => (customSource ? parseSettingsSchema(customSource.settingsSchemaJson) : null),
     [customSource],
   );
-  const hasWidgetSettings = Boolean(
-    customSource && settingsSchema && settingsSchema.fields.length > 0,
-  );
+  const hasWidgetSettings = Boolean(customSource);
   const hasAdvanced = instance.kind !== "builtIn";
 
   const sections = useMemo(() => {
@@ -125,7 +123,7 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
       </nav>
       <div className="dw-customize-pane">
         {section === "common" ? <CommonSection instance={instance} /> : null}
-        {section === "widget" && settingsSchema ? (
+        {section === "widget" ? (
           <WidgetSection schema={settingsSchema} instance={instance} />
         ) : null}
         {section === "advanced" ? <AdvancedSection instance={instance} /> : null}
@@ -243,28 +241,41 @@ function WidgetSection({
   schema,
   instance,
 }: {
-  schema: WidgetSettingsSchema;
+  schema: WidgetSettingsSchema | null;
   instance: DashboardWidgetInstance;
 }) {
   const { t } = useTranslation();
   const updateInstance = useDashboardStore((s) => s.updateInstance);
   const settingsValues = useMemo(
-    () => parseSettingsValues(schema, instance.settingsValuesJson),
+    () => (schema ? parseSettingsValues(schema, instance.settingsValuesJson) : {}),
     [schema, instance.settingsValuesJson],
   );
+
+  if (!schema) {
+    return (
+      <section>
+        <h4>{t("dashboard.widgetSettings")}</h4>
+        <p className="dw-muted">{t("dashboard.widgetSettingsInvalid")}</p>
+      </section>
+    );
+  }
 
   return (
     <section>
       <h4>{t("dashboard.widgetSettings")}</h4>
-      <WidgetSettingsFields
-        schema={schema}
-        values={settingsValues}
-        instanceId={instance.id}
-        onChange={(key, value) => {
-          const next = { ...settingsValues, [key]: value };
-          void updateInstance(instance.id, { settingsValuesJson: JSON.stringify(next) });
-        }}
-      />
+      {schema.fields.length > 0 ? (
+        <WidgetSettingsFields
+          schema={schema}
+          values={settingsValues}
+          instanceId={instance.id}
+          onChange={(key, value) => {
+            const next = { ...settingsValues, [key]: value };
+            void updateInstance(instance.id, { settingsValuesJson: JSON.stringify(next) });
+          }}
+        />
+      ) : (
+        <p className="dw-muted">{t("dashboard.widgetSettingsEmpty")}</p>
+      )}
     </section>
   );
 }
