@@ -573,8 +573,8 @@ main.dashboard-page {
 
 .dw-controls {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 10px;
+  right: 10px;
   z-index: 2;
   display: inline-flex;
   gap: 2px;
