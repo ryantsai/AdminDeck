@@ -260,6 +260,18 @@ A purple widget stays purple regardless of the active color scheme. A change of 
 
 Secret widget settings are also visible from Settings → Credentials. That unified credentials page lists widget secret references alongside Connection passwords, website credentials, and AI provider keys. Deleting a widget secret there removes the OS-keychain value and clears the widget instance `secretRef`.
 
+### Per-View Backgrounds
+
+Each Dashboard View carries an optional background, stored as a nullable `background_json` column on `dashboard_views` (`NULL` = theme default). Right-clicking empty canvas space opens a native context menu with "Change Background…", which opens the app-owned `BackgroundPopover`. Three modes:
+
+- **Theme Default** — `NULL`; the canvas uses the active color scheme's `--app-bg`.
+- **Color & Gradient** — `{ kind: "preset", preset }` referencing one of the 16 fixed entries in `src/dashboard/registry/backgroundPresets.ts` (whitelisted in Rust as `BACKGROUND_PRESET_IDS`).
+- **Image** — `{ kind: "image", file, fit, dim }`. The image file is copied into a `backgrounds/` folder next to the executable (mirroring custom fonts) and referenced by filename. `fit` is one of fill/fit/stretch/tile/center; `dim` is a signed −100..100 value (negative darkens, positive lightens). Unreferenced image files are swept after view-mutating commands by `prune_unreferenced_backgrounds`.
+
+The background renders on a dedicated `.dw-canvas-bg` layer behind the widget grid; it is canvas-only and does not affect the topbar or widget chrome. A missing image file or unparseable `background_json` falls back to theme default rather than erroring.
+
+Background image files are **not** included in the settings export ZIP — an imported database may reference a missing image, which is handled by the theme-default fallback.
+
 ## Settings → Dashboard
 
 A `dashboard-settings` section under Settings holds cross-widget app preferences:
