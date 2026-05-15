@@ -5,7 +5,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use futures::StreamExt;
+use tokio::sync::oneshot;
+use tokio::time::timeout;
 
 mod providers;
 use providers::provider_for;
@@ -15,6 +20,98 @@ use tauri::{Emitter, Manager};
 use crate::dashboard_ids::new_dashboard_id;
 use crate::dashboard_storage as ds;
 use crate::storage::{AiAssistantToolSettings, AiProviderSettings, Storage};
+
+static LIVE_TOOL_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+pub struct AssistantLiveToolBridge {
+    pending: Mutex<HashMap<String, oneshot::Sender<String>>>,
+}
+
+impl AssistantLiveToolBridge {
+    pub fn new() -> Self {
+        Self {
+            pending: Mutex::new(HashMap::new()),
+        }
+    }
+
+    async fn request(
+        &self,
+        app: &tauri::AppHandle,
+        tool_name: &str,
+        args: Value,
+    ) -> String {
+        let request_id = new_live_tool_request_id();
+        let (tx, rx) = oneshot::channel();
+        match self.pending.lock() {
+            Ok(mut pending) => {
+                pending.insert(request_id.clone(), tx);
+            }
+            Err(_) => {
+                return json!({"ok": false, "error": "live tool bridge is unavailable"})
+                    .to_string();
+            }
+        }
+
+        let payload = json!({
+            "requestId": request_id,
+            "toolName": tool_name,
+            "args": args,
+        });
+        if let Err(error) = app.emit("assistant-live-tool-request", payload) {
+            let _ = self.take_pending(&request_id);
+            return json!({"ok": false, "error": format!("failed to dispatch live tool request: {error}")})
+                .to_string();
+        }
+
+        match timeout(Duration::from_secs(15), rx).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => json!({"ok": false, "error": "live tool response channel closed"}).to_string(),
+            Err(_) => {
+                let _ = self.take_pending(&request_id);
+                json!({"ok": false, "error": "live tool timed out waiting for the frontend"}).to_string()
+            }
+        }
+    }
+
+    fn complete(&self, request_id: &str, result: String) -> Result<(), String> {
+        let sender = self
+            .take_pending(request_id)
+            .ok_or_else(|| "live tool request is no longer pending".to_string())?;
+        sender
+            .send(result)
+            .map_err(|_| "live tool receiver is no longer available".to_string())
+    }
+
+    fn take_pending(&self, request_id: &str) -> Option<oneshot::Sender<String>> {
+        self.pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| pending.remove(request_id))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantLiveToolCompletion {
+    request_id: String,
+    result: String,
+}
+
+pub fn complete_live_tool_request(
+    bridge: &AssistantLiveToolBridge,
+    completion: AssistantLiveToolCompletion,
+) -> Result<(), String> {
+    bridge.complete(&completion.request_id, completion.result)
+}
+
+fn new_live_tool_request_id() -> String {
+    let seq = LIVE_TOOL_REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    format!("live-tool-{millis}-{seq}")
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2016,6 +2113,63 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
             json!({"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}),
         ));
     }
+    if settings.sessions() {
+        tools.push(tool_definition(
+            "session_state",
+            "Read the currently open KKTerm Tabs and active live Session targets, including pane ids the assistant can use with other session_* tools.",
+            json!({"type":"object","properties":{}}),
+        ));
+        tools.push(tool_definition(
+            "session_terminal_read_buffer",
+            "Read visible terminal buffer text from an open terminal Pane. Use session_state first to discover paneId. Defaults to the active terminal Pane.",
+            json!({"type":"object","properties":{"paneId":{"type":["string","null"]},"maxChars":{"type":["integer","null"],"minimum":1,"maximum":50000}},"required":["paneId","maxChars"]}),
+        ));
+        tools.push(tool_definition(
+            "session_terminal_send_text",
+            "Send text to an open terminal Pane. Use this for user-approved commands. Set pressEnter true to submit.",
+            json!({"type":"object","properties":{"paneId":{"type":["string","null"]},"text":{"type":"string"},"pressEnter":{"type":"boolean"}},"required":["paneId","text","pressEnter"]}),
+        ));
+        tools.push(tool_definition(
+            "session_remote_desktop_screenshot",
+            "Capture the active RDP/VNC remote desktop surface as a transient PNG data URL for visual inspection.",
+            json!({"type":"object","properties":{"paneId":{"type":["string","null"]}},"required":["paneId"]}),
+        ));
+        tools.push(tool_definition(
+            "session_remote_desktop_send_text",
+            "Send text to an active remote desktop Session. RDP uses native text injection; VNC sends keyboard events when supported.",
+            json!({"type":"object","properties":{"paneId":{"type":["string","null"]},"text":{"type":"string"},"pressEnter":{"type":"boolean"}},"required":["paneId","text","pressEnter"]}),
+        ));
+        tools.push(tool_definition(
+            "session_remote_desktop_keypress",
+            "Send a named key press to an active RDP/VNC remote desktop Session.",
+            json!({"type":"object","properties":{"paneId":{"type":["string","null"]},"key":{"type":"string","enum":["enter","tab","escape","backspace","delete","arrowUp","arrowDown","arrowLeft","arrowRight","home","end","pageUp","pageDown","space","ctrlAltDelete"]}},"required":["paneId","key"]}),
+        ));
+        tools.push(tool_definition(
+            "session_remote_desktop_mouse_click",
+            "Send a mouse click to an active RDP/VNC remote desktop Session using remote surface coordinates.",
+            json!({"type":"object","properties":{"paneId":{"type":["string","null"]},"x":{"type":"integer","minimum":0},"y":{"type":"integer","minimum":0},"button":{"type":"string","enum":["left","right","middle"]}},"required":["paneId","x","y","button"]}),
+        ));
+        tools.push(tool_definition(
+            "session_file_browser_list",
+            "List files in an active SFTP/FTP file browser Session. Defaults to its current remote path.",
+            json!({"type":"object","properties":{"tabId":{"type":["string","null"]},"path":{"type":["string","null"]}},"required":["tabId","path"]}),
+        ));
+        tools.push(tool_definition(
+            "session_file_browser_create_folder",
+            "Create a folder in an active SFTP/FTP file browser Session.",
+            json!({"type":"object","properties":{"tabId":{"type":["string","null"]},"parentPath":{"type":"string"},"name":{"type":"string"}},"required":["tabId","parentPath","name"]}),
+        ));
+        tools.push(tool_definition(
+            "session_file_browser_rename",
+            "Rename a path in an active SFTP/FTP file browser Session.",
+            json!({"type":"object","properties":{"tabId":{"type":["string","null"]},"path":{"type":"string"},"newName":{"type":"string"}},"required":["tabId","path","newName"]}),
+        ));
+        tools.push(tool_definition(
+            "session_file_browser_delete",
+            "Delete a path in an active SFTP/FTP file browser Session.",
+            json!({"type":"object","properties":{"tabId":{"type":["string","null"]},"path":{"type":"string"}},"required":["tabId","path"]}),
+        ));
+    }
     tools
 }
 
@@ -2257,6 +2411,9 @@ async fn run_ai_tool(
         name if tool_settings.connections() && name.starts_with("connection_") => {
             connection_tool(app, name, args)
         }
+        name if tool_settings.sessions() && name.starts_with("session_") => {
+            live_session_tool(app, name, args).await
+        }
         _ => "Tool is disabled in AI Assistant settings.".to_string(),
     }
 }
@@ -2268,6 +2425,16 @@ fn tool_requires_allow_all(tool_name: &str) -> bool {
             tool_name,
             "connection_create" | "connection_update" | "connection_delete"
                 | "connection_open"
+        )
+        || matches!(
+            tool_name,
+            "session_terminal_send_text"
+                | "session_remote_desktop_send_text"
+                | "session_remote_desktop_keypress"
+                | "session_remote_desktop_mouse_click"
+                | "session_file_browser_create_folder"
+                | "session_file_browser_rename"
+                | "session_file_browser_delete"
         )
 }
 
@@ -2333,6 +2500,13 @@ fn connection_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
             value.to_string()
         }
         Err(error) => json!({ "ok": false, "error": error }).to_string(),
+    }
+}
+
+async fn live_session_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
+    match app.try_state::<AssistantLiveToolBridge>() {
+        Some(bridge) => bridge.request(app, name, args).await,
+        None => json!({"ok": false, "error": "live session tools are unavailable"}).to_string(),
     }
 }
 
@@ -2953,6 +3127,7 @@ fn build_agent_messages(
         "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.".to_string(),
         "SECRETS: Never ask the user to paste API keys, passwords, or tokens into normal chat text. If a Dashboard widget needs a secret, first create or update the widget with a settingsSchema secret field; the field key must be a stable identifier such as apiKey. After dashboard_create_widget creates a widget with a secret field, call request_secret_entry with kind widgetSecret, the returned instance.id as instanceId, and the exact fieldKey. Use request_secret_entry for AI provider API keys too. The secret value is captured by KKTerm locally and is not visible to you. Do not include or request the plaintext secret.".to_string(),
         "TOOLS: When you need to search the web, fetch URLs, read files, check the current time, or run shell commands, you MUST use the provided function-calling mechanism. Always make the actual function call alongside your explanation. Do not describe what you plan to do with a tool without calling it — invoke the tool in the same response.".to_string(),
+        "SESSION TOOLS: Use session_state to discover active Tabs, pane ids, remote desktop targets, and SFTP/FTP browser Sessions before using session_* interaction tools. Terminal, remote desktop, and file browser tools operate on live Sessions, not saved Connections. Prefer read tools before mutating tools. For RDP/VNC, use send_text for text, keypress for named keys, and mouse_click for remote surface coordinates. In Prompt permission mode, mutating tools return permissionRequired; explain that the user must switch AI Assistant tool permissions to Allow All if they want automatic execution.".to_string(),
         "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, repair, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. When the user reports an error in an existing AI-authored widget, use dashboard_load_state to read the current Dashboard custom widget source, then call dashboard_update_custom_widget with the matching custom widget id. Prefer patch.body for widget source edits; patch.body is structured JSON and avoids escaping mistakes. Do not ask the user to paste widget source that KKTerm can read through dashboard_load_state. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style; do not pick decorative colors at random. Be boundary-aware: size simple timers/counters at least 4x3, forms or images at least 5x4, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read non-secret values with KK.getSettings() and save via KK.setSetting(key, value). Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret with no defaultValue; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret, and scripts read it with await KK.getSecret('fieldKey') only when needed. After creating a widget with a secret field, call request_secret_entry using the returned widget instance id and the exact secret field key instead of asking the user to paste the secret in chat. When a widget embeds remote images, fetches remote data, or loads external libraries such as Three.js from a CDN, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
     ];
     if let Some(language) = normalize_output_language(output_language) {
@@ -4105,8 +4280,17 @@ mod tests {
         assert!(tool_requires_allow_all("connection_open"));
         assert!(tool_requires_allow_all("connection_update"));
         assert!(tool_requires_allow_all("connection_delete"));
+        assert!(tool_requires_allow_all("session_terminal_send_text"));
+        assert!(tool_requires_allow_all("session_remote_desktop_send_text"));
+        assert!(tool_requires_allow_all("session_remote_desktop_keypress"));
+        assert!(tool_requires_allow_all("session_remote_desktop_mouse_click"));
+        assert!(tool_requires_allow_all("session_file_browser_delete"));
         assert!(!tool_requires_allow_all("dashboard_load_state"));
         assert!(!tool_requires_allow_all("connection_list"));
+        assert!(!tool_requires_allow_all("session_state"));
+        assert!(!tool_requires_allow_all("session_terminal_read_buffer"));
+        assert!(!tool_requires_allow_all("session_remote_desktop_screenshot"));
+        assert!(!tool_requires_allow_all("session_file_browser_list"));
         assert!(!tool_requires_allow_all("current_time"));
 
         let result = tool_permission_required_result("dashboard_reset");
@@ -4119,7 +4303,8 @@ mod tests {
     #[test]
     fn tool_definitions_include_connection_management_tools() {
         let settings: AiAssistantToolSettings = serde_json::from_value(json!({
-            "connections": true
+            "connections": true,
+            "sessions": true
         }))
         .expect("tool settings deserialize");
 
@@ -4131,6 +4316,17 @@ mod tests {
         assert!(names.contains(&"connection_open"));
         assert!(names.contains(&"connection_update"));
         assert!(names.contains(&"connection_delete"));
+        assert!(names.contains(&"session_state"));
+        assert!(names.contains(&"session_terminal_read_buffer"));
+        assert!(names.contains(&"session_terminal_send_text"));
+        assert!(names.contains(&"session_remote_desktop_screenshot"));
+        assert!(names.contains(&"session_remote_desktop_send_text"));
+        assert!(names.contains(&"session_remote_desktop_keypress"));
+        assert!(names.contains(&"session_remote_desktop_mouse_click"));
+        assert!(names.contains(&"session_file_browser_list"));
+        assert!(names.contains(&"session_file_browser_create_folder"));
+        assert!(names.contains(&"session_file_browser_rename"));
+        assert!(names.contains(&"session_file_browser_delete"));
     }
 
     #[test]

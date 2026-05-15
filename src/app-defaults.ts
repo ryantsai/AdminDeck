@@ -95,6 +95,7 @@ export const defaultAiAssistantToolSettings = {
   currentTime: false,
   dashboard: false,
   connections: true,
+  sessions: true,
 };
 
 export const defaultAiProviderSettings: AiProviderSettings = {

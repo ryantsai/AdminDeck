@@ -2,11 +2,11 @@
 
 ## Current Progress
 
-The detailed status for each milestone lives in the checkboxes below. Quick snapshot as of May 12, 2026:
+The detailed status for each milestone lives in the checkboxes below. Quick snapshot as of May 15, 2026:
 
 - **Milestones A–F** are in or past usable shape: session spine, native SSH/SFTP, AI command-assist with approval and CLI adapters, performance instrumentation behind a renderer-neutral interface, and unsigned NSIS installer with smoke test.
-- **Milestone G (v0.2)** is in progress: screenshot capture into AI Assistant context, review-only Assistant extension draft mode, accepted extension platform ADR (`docs/ADR/0005-extension-platform-architecture.md`), and the Dashboard redesign (`docs/DASHBOARD.md`) shipped. RDP ActiveX Connections work end-to-end with geometry-scoped snapshot/parking for intersecting DOM overlays, and VNC `vnc-rs` Connections work end-to-end through the canvas renderer. SSH config import, diagnostics, release signing, and updater UI still need user-facing entry points.
-- **Latest validation (May 7, 2026)**: `npm run check`, `npm run build`, `cargo check`, and `cargo test` (103 passed) all clean. `npm run build` still reports Vite's existing chunk-size warning. Previous May 2, 2026 packaging validation passed for `npm run package:installer` and `npm run smoke:installer`.
+- **Milestone G (v0.2)** is in progress: screenshot capture into AI Assistant context, review-only Assistant extension draft mode, accepted extension platform ADR (`docs/ADR/0005-extension-platform-architecture.md`), Dashboard redesign (`docs/DASHBOARD.md`), saved Connection assistant tools, and live Session assistant interaction tools shipped. RDP ActiveX Connections work end-to-end with geometry-scoped snapshot/parking for intersecting DOM overlays, and VNC `vnc-rs` Connections work end-to-end through the canvas renderer. SSH config import, diagnostics, release signing, and updater UI still need user-facing entry points.
+- **Latest validation (May 15, 2026)**: `npm run check`, `npm run build`, `cargo check --manifest-path src-tauri/Cargo.toml`, and `cargo test --manifest-path src-tauri/Cargo.toml` (215 passed, 1 ignored) all clean. `npm run build` still reports Vite's existing chunk-size warning. Previous May 2, 2026 packaging validation passed for `npm run package:installer` and `npm run smoke:installer`.
 
 For the operational measurement records (machine specs, numbers vs. budgets) see `docs/PERFORMANCE.md`. For packaging/release artifacts see `docs/RELEASE.md`.
 
@@ -121,6 +121,9 @@ For the operational measurement records (machine specs, numbers vs. budgets) see
 - [x] Add partial-area screenshot capture from a terminal Pane, SFTP view, URL view, RDP view, VNC shell, or other workspace surface.
 - [x] Send captured screenshots to the AI Assistant for analysis with explicit user action.
 - [x] Add review-only AI Assistant extension draft mode.
+- [x] Add AI Assistant tool permission mode with Prompt as the default and Allow All as an explicit automatic-execution setting.
+- [x] Add AI Assistant tools for saved Connection list/create/open/update/delete operations.
+- [x] Add AI Assistant live Session tools for terminal buffer reads, terminal input, RDP/VNC screenshots, RDP/VNC text/key/mouse input, and SFTP/FTP browser list/create-folder/rename/delete actions.
 - [ ] Implement AI Assistant composer context attachments for files/photos, screenshots, and terminal buffer snippets from the `+` menu.
 - [ ] Support asking the AI Assistant to create installable extensions against the approved extension platform architecture.
 - [ ] Keep extension-generation flows approval-based before installing or running generated code.
@@ -185,8 +188,8 @@ For the operational measurement records (machine specs, numbers vs. budgets) see
 
 ### AI Assistant Tool Calling and Context
 
-- [ ] Add AI Assistant tool calling support for local tools (rg, curl, filesystem search) and web search.
-- [ ] Allow AI Assistant to read the current active Connection text buffer.
+- [x] Add AI Assistant tool calling support for local tools (rg, curl, filesystem search), web fetch/search, Dashboard, Connections, and live Sessions.
+- [x] Allow AI Assistant to read the current active terminal Session text buffer.
 - [ ] Allow AI Assistant to reference previous session text buffers via RAG/agentic search.
 - [ ] Add voice input for AI Assistant with local model support.
 - [ ] Add MCP (Model Context Protocol) server support so the AI Assistant and external agents can automate KKTerm workflows through the MCP protocol.

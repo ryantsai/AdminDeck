@@ -35,7 +35,7 @@ mod platform {
                 },
                 WindowsAndMessaging::{
                     CreateWindowExW, DestroyWindow, GetWindowRect, SetForegroundWindow,
-                    SetWindowPos, ShowWindow, HMENU, SWP_NOACTIVATE, SWP_NOZORDER,
+                    SendMessageW, SetWindowPos, ShowWindow, HMENU, SWP_NOACTIVATE, SWP_NOZORDER,
                     SW_SHOWNOACTIVATE, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_EX_NOACTIVATE,
                     WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
                 },
@@ -56,10 +56,29 @@ mod platform {
     const VK_ALT_KEY: usize = 0x12;
     const VK_END_KEY: usize = 0x23;
     const VK_RETURN_KEY: usize = 0x0D;
+    const VK_ESCAPE_KEY: usize = 0x1B;
+    const VK_BACKSPACE_KEY: usize = 0x08;
     const VK_DELETE_KEY: usize = 0x2E;
     const VK_TAB_KEY: usize = 0x09;
     const VK_SHIFT_KEY: usize = 0x10;
     const VK_V_KEY: usize = 0x56;
+    const VK_SPACE_KEY: usize = 0x20;
+    const VK_HOME_KEY: usize = 0x24;
+    const VK_LEFT_KEY: usize = 0x25;
+    const VK_UP_KEY: usize = 0x26;
+    const VK_RIGHT_KEY: usize = 0x27;
+    const VK_DOWN_KEY: usize = 0x28;
+    const VK_PAGE_UP_KEY: usize = 0x21;
+    const VK_PAGE_DOWN_KEY: usize = 0x22;
+    const WM_LBUTTONDOWN_MSG: u32 = 0x0201;
+    const WM_LBUTTONUP_MSG: u32 = 0x0202;
+    const WM_RBUTTONDOWN_MSG: u32 = 0x0204;
+    const WM_RBUTTONUP_MSG: u32 = 0x0205;
+    const WM_MBUTTONDOWN_MSG: u32 = 0x0207;
+    const WM_MBUTTONUP_MSG: u32 = 0x0208;
+    const MK_LBUTTON_WPARAM: usize = 0x0001;
+    const MK_RBUTTON_WPARAM: usize = 0x0002;
+    const MK_MBUTTON_WPARAM: usize = 0x0010;
     const RDP_TEXT_MODE_CLIPBOARD: &str = "clipboard";
     const RDP_TEXT_MODE_SEND_KEYS: &str = "sendKeys";
     const RDP_TEXT_LIMIT: usize = 64 * 1024;
@@ -253,6 +272,22 @@ mod platform {
         text: String,
         mode: Option<String>,
         press_enter: Option<bool>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SendRdpKeyPressRequest {
+        session_id: String,
+        key: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SendRdpMouseClickRequest {
+        session_id: String,
+        x: u16,
+        y: u16,
+        button: String,
     }
 
     #[derive(Serialize)]
@@ -558,6 +593,69 @@ mod platform {
                         }
                     },
                 }
+            })
+        }
+
+        pub fn send_key_press(
+            &self,
+            app: AppHandle,
+            request: SendRdpKeyPressRequest,
+        ) -> Result<(), String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread("send_rdp_key_press", app, move |_app| {
+                let sessions = lock_sessions(&sessions)?;
+                let session = sessions
+                    .get(&request.session_id)
+                    .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
+                let connection_state =
+                    get_property_i32(&session.dispatch, "Connected").unwrap_or(0);
+                if !is_rdp_connected_state(connection_state) {
+                    return Err(
+                        "RDP session is not connected; cannot send key press to remote desktop"
+                            .to_string(),
+                    );
+                }
+                focus_rdp_control(session.hwnd);
+                if normalize_remote_key_name(&request.key) == "ctrlaltdelete" {
+                    return send_ctrl_alt_end_to_rdp(&session.dispatch)
+                        .or_else(|_| invoke_method(&session.dispatch, "SendCtrlAltDel"));
+                }
+                let vk = rdp_virtual_key_for_name(&request.key)?;
+                send_key_chord(&session.dispatch, &[KeyEvent::press(vk)])
+            })
+        }
+
+        pub fn send_mouse_click(
+            &self,
+            app: AppHandle,
+            request: SendRdpMouseClickRequest,
+        ) -> Result<(), String> {
+            let sessions = Arc::clone(&self.sessions);
+            run_on_main_thread("send_rdp_mouse_click", app, move |_app| {
+                let sessions = lock_sessions(&sessions)?;
+                let session = sessions
+                    .get(&request.session_id)
+                    .ok_or_else(|| format!("RDP session '{}' was not found", request.session_id))?;
+                let connection_state =
+                    get_property_i32(&session.dispatch, "Connected").unwrap_or(0);
+                if !is_rdp_connected_state(connection_state) {
+                    return Err(
+                        "RDP session is not connected; cannot send mouse click to remote desktop"
+                            .to_string(),
+                    );
+                }
+                let (down_message, up_message, button_mask) =
+                    rdp_mouse_messages_for_button(&request.button)?;
+                focus_rdp_control(session.hwnd);
+                send_rdp_mouse_click_messages(
+                    session.hwnd,
+                    request.x,
+                    request.y,
+                    down_message,
+                    up_message,
+                    button_mask,
+                );
+                Ok(())
             })
         }
     }
@@ -1186,6 +1284,58 @@ mod platform {
         )
     }
 
+    fn normalize_remote_key_name(value: &str) -> String {
+        value
+            .chars()
+            .filter(|ch| ch.is_ascii_alphanumeric())
+            .flat_map(|ch| ch.to_lowercase())
+            .collect()
+    }
+
+    fn rdp_virtual_key_for_name(value: &str) -> Result<usize, String> {
+        match normalize_remote_key_name(value).as_str() {
+            "enter" | "return" => Ok(VK_RETURN_KEY),
+            "tab" => Ok(VK_TAB_KEY),
+            "escape" | "esc" => Ok(VK_ESCAPE_KEY),
+            "backspace" => Ok(VK_BACKSPACE_KEY),
+            "delete" | "del" => Ok(VK_DELETE_KEY),
+            "arrowup" | "up" => Ok(VK_UP_KEY),
+            "arrowdown" | "down" => Ok(VK_DOWN_KEY),
+            "arrowleft" | "left" => Ok(VK_LEFT_KEY),
+            "arrowright" | "right" => Ok(VK_RIGHT_KEY),
+            "home" => Ok(VK_HOME_KEY),
+            "end" => Ok(VK_END_KEY),
+            "pageup" | "pgup" => Ok(VK_PAGE_UP_KEY),
+            "pagedown" | "pgdn" => Ok(VK_PAGE_DOWN_KEY),
+            "space" => Ok(VK_SPACE_KEY),
+            _ => Err(format!("unsupported RDP key press: {value}")),
+        }
+    }
+
+    fn rdp_mouse_messages_for_button(value: &str) -> Result<(u32, u32, usize), String> {
+        match normalize_remote_key_name(value).as_str() {
+            "left" => Ok((WM_LBUTTONDOWN_MSG, WM_LBUTTONUP_MSG, MK_LBUTTON_WPARAM)),
+            "right" => Ok((WM_RBUTTONDOWN_MSG, WM_RBUTTONUP_MSG, MK_RBUTTON_WPARAM)),
+            "middle" => Ok((WM_MBUTTONDOWN_MSG, WM_MBUTTONUP_MSG, MK_MBUTTON_WPARAM)),
+            _ => Err(format!("unsupported RDP mouse button: {value}")),
+        }
+    }
+
+    fn send_rdp_mouse_click_messages(
+        hwnd: HWND,
+        x: u16,
+        y: u16,
+        down_message: u32,
+        up_message: u32,
+        button_mask: usize,
+    ) {
+        let lparam = LPARAM((((y as u32) << 16) | x as u32) as isize);
+        unsafe {
+            let _ = SendMessageW(hwnd, down_message, Some(WPARAM(button_mask)), Some(lparam));
+            let _ = SendMessageW(hwnd, up_message, Some(WPARAM(0)), Some(lparam));
+        }
+    }
+
     fn send_key_chord(dispatch: &IDispatch, key_events: &[KeyEvent]) -> Result<(), String> {
         let mut expanded = Vec::with_capacity(key_events.len() * 2);
         for event in key_events {
@@ -1259,7 +1409,18 @@ mod platform {
     }
 
     fn is_extended_key(vk: usize) -> bool {
-        matches!(vk, VK_END_KEY | VK_DELETE_KEY)
+        matches!(
+            vk,
+            VK_END_KEY
+                | VK_DELETE_KEY
+                | VK_HOME_KEY
+                | VK_LEFT_KEY
+                | VK_UP_KEY
+                | VK_RIGHT_KEY
+                | VK_DOWN_KEY
+                | VK_PAGE_UP_KEY
+                | VK_PAGE_DOWN_KEY
+        )
     }
 
     fn invoke_method_with_i32_args(
@@ -1864,6 +2025,22 @@ mod platform {
         pub press_enter: Option<bool>,
     }
 
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SendRdpKeyPressRequest {
+        pub session_id: String,
+        pub key: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SendRdpMouseClickRequest {
+        pub session_id: String,
+        pub x: u16,
+        pub y: u16,
+        pub button: String,
+    }
+
     #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct RdpTextSent {
@@ -1955,6 +2132,28 @@ mod platform {
         ) -> Result<RdpTextSent, String> {
             Err(
                 "RDP text injection requires Windows and the Microsoft RDP ActiveX control"
+                    .to_string(),
+            )
+        }
+
+        pub fn send_key_press(
+            &self,
+            _app: AppHandle,
+            _request: SendRdpKeyPressRequest,
+        ) -> Result<(), String> {
+            Err(
+                "RDP key injection requires Windows and the Microsoft RDP ActiveX control"
+                    .to_string(),
+            )
+        }
+
+        pub fn send_mouse_click(
+            &self,
+            _app: AppHandle,
+            _request: SendRdpMouseClickRequest,
+        ) -> Result<(), String> {
+            Err(
+                "RDP mouse injection requires Windows and the Microsoft RDP ActiveX control"
                     .to_string(),
             )
         }

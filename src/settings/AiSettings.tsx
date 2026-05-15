@@ -214,6 +214,7 @@ const AI_ASSISTANT_TOOL_IDS: AiAssistantToolId[] = [
   "shellCommand",
   "dashboard",
   "connections",
+  "sessions",
 ];
 
 function AiAssistantToolsControl({

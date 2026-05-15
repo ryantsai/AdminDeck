@@ -55,6 +55,11 @@ import {
   fileBrowserCommandsFor,
   type FileBrowserCommands,
 } from "../lib/fileBrowserCommands";
+import {
+  registerFileBrowserController,
+  unregisterFileBrowserController,
+  type FileBrowserController,
+} from "../workspace/paneRegistry";
 import { useWorkspaceStore } from "../store";
 import type { FileEntry, SftpSettings, WorkspaceTab } from "../types";
 
@@ -881,6 +886,61 @@ export function SftpWorkspace({
     TRANSFER_HISTORY_STATES.includes(transfer.state),
   ).length;
   const toolbarTitle = tab.toolbarTitle ?? (connection ? connectionToolbarTitle(connection) : tab.title);
+
+  useEffect(() => {
+    if (!commands || !isTauriRuntime()) {
+      return;
+    }
+    const controller: FileBrowserController = {
+      kind: tab.kind === "ftp" ? "ftp" : "sftp",
+      list: async (path) => {
+        const sessionId = sessionIdRef.current;
+        if (!sessionId) {
+          throw new Error(t("sftp.sessionUnavailable"));
+        }
+        return commands.listDirectory({ sessionId, path: path?.trim() || remotePath });
+      },
+      createFolder: async (parentPath, name) => {
+        const sessionId = sessionIdRef.current;
+        if (!sessionId) {
+          throw new Error(t("sftp.sessionUnavailable"));
+        }
+        const result = await commands.createFolder({ sessionId, parentPath, name });
+        await refreshRemoteDirectory();
+        return result ?? { ok: true };
+      },
+      rename: async (path, newName) => {
+        const sessionId = sessionIdRef.current;
+        if (!sessionId) {
+          throw new Error(t("sftp.sessionUnavailable"));
+        }
+        const result = await commands.renamePath({ sessionId, path, newName });
+        await refreshRemoteDirectory();
+        return result ?? { ok: true };
+      },
+      deletePath: async (path) => {
+        const sessionId = sessionIdRef.current;
+        if (!sessionId) {
+          throw new Error(t("sftp.sessionUnavailable"));
+        }
+        const result = await commands.deletePath({ sessionId, path });
+        await refreshRemoteDirectory();
+        return result ?? { ok: true };
+      },
+      snapshot: () => ({
+        kind: tab.kind === "ftp" ? "ftp" : "sftp",
+        tabId: tab.id,
+        connectionId: connection?.id,
+        connectionName: connection?.name,
+        remotePath,
+        remoteFiles,
+        selectedRemoteNames,
+        status,
+      }),
+    };
+    registerFileBrowserController(tab.id, controller);
+    return () => unregisterFileBrowserController(tab.id, controller);
+  }, [commands, connection?.id, connection?.name, remoteFiles, remotePath, selectedRemoteNames, status, t, tab.id, tab.kind]);
 
   return (
     <section

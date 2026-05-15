@@ -98,6 +98,22 @@ keychain under the shared AI API key owner. When adding settings:
 The insecure TLS setting is intentionally a provider setting, not a global HTTP
 setting. It is off by default and is applied only to AI provider HTTP clients.
 
+Assistant tool settings are also persisted as non-secret AI provider settings.
+`toolPermissionMode` controls whether mutating assistant tools are blocked in
+Prompt mode or allowed to execute automatically in Allow All mode. `assistantTools`
+controls individual tool families such as web search, shell, Dashboard,
+Connections, and Live Sessions. These settings do not grant access to secrets;
+Connection passwords, website passwords, SSH passphrases, and AI API keys remain
+keychain-owned and are not exposed to tool results.
+
+When changing assistant tools, update both OpenAI-compatible runtime paths in
+`src-tauri/src/ai.rs`: Chat Completions-style providers and Responses-style
+providers both receive the registered JSON schemas. Mutating tools must be added
+to the permission gate so Prompt mode returns a structured `permissionRequired`
+result instead of executing. Live Session tools should route through the frontend
+bridge because their targets are mounted workspace surfaces, not durable backend
+Connection records.
+
 ## Localization checklist
 
 For every new user-visible Settings string:

@@ -666,6 +666,10 @@
       "connections": {
         "label": "Connections",
         "description": "List, create, edit, and delete saved Connections."
+      },
+      "sessions": {
+        "label": "Live Sessions",
+        "description": "Read visible session context and interact with active terminal, remote desktop, and file browser Sessions."
       }
     },
     "connectedConnectionsRail": "Show connected Connections",
@@ -1246,6 +1250,7 @@
     "toolSecretRequest": "Requesting secret entry\u2026",
     "toolDashboard": "Updating Dashboard...",
     "toolConnections": "Managing Connections...",
+    "toolSessions": "Working with Sessions...",
     "toolWebSearchDone": "Searched the web",
     "toolWebFetchDone": "Fetched web page",
     "toolShellCommandDone": "Ran command",
@@ -1255,6 +1260,7 @@
     "toolSecretRequestDone": "Requested secret entry",
     "toolDashboardDone": "Updated Dashboard",
     "toolConnectionsDone": "Managed Connections",
+    "toolSessionsDone": "Worked with Sessions",
     "waitingPhrases": [
       "Compiling the tsundere kernel",
       "Defragmenting the chakra network",

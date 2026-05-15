@@ -22,9 +22,12 @@ Storage decisions:
 
 AI decisions:
 
-- AI command assist is approval-based.
-- Commands proposed by AI require explicit user approval before execution.
+- AI command assist and app tool use are permission-bounded.
+- Prompt mode is the default for AI Assistant tool permissions. Mutating tools return a permission-required result instead of executing automatically.
+- Allow All mode is an explicit user setting that lets enabled assistant tools execute without per-operation prompting.
+- Commands proposed by AI require explicit user approval before execution unless the user has explicitly enabled an automatic tool path for that class of operation.
 - Destructive or credential-touching commands should receive extra confirmation where detectable.
+- Assistant tools must preserve domain boundaries: saved Connection tools operate on durable SQLite Connection data, while live Session tools operate only on currently open runtime surfaces such as terminal Panes, RDP/VNC Sessions, and SFTP/FTP browser Sessions.
 - OpenAI-compatible API keys are bring-your-own and stored in keychain.
 - Claude Code CLI and Codex CLI integrations should be constrained to suggest-only/ask-before-execute where possible.
 

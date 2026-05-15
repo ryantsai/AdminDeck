@@ -660,6 +660,14 @@ fn plan_command_proposal(
 }
 
 #[tauri::command]
+fn complete_assistant_live_tool_request(
+    bridge: tauri::State<'_, ai::AssistantLiveToolBridge>,
+    completion: ai::AssistantLiveToolCompletion,
+) -> Result<(), String> {
+    ai::complete_live_tool_request(&bridge, completion)
+}
+
+#[tauri::command]
 async fn run_ai_agent(
     app: tauri::AppHandle,
     storage: tauri::State<'_, storage::Storage>,
@@ -1609,6 +1617,24 @@ fn send_rdp_text(
 }
 
 #[tauri::command]
+fn send_rdp_key_press(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::SendRdpKeyPressRequest,
+) -> Result<(), String> {
+    rdp_sessions.send_key_press(app, request)
+}
+
+#[tauri::command]
+fn send_rdp_mouse_click(
+    app: tauri::AppHandle,
+    rdp_sessions: tauri::State<'_, rdp::RdpSessionManager>,
+    request: rdp::SendRdpMouseClickRequest,
+) -> Result<(), String> {
+    rdp_sessions.send_mouse_click(app, request)
+}
+
+#[tauri::command]
 async fn start_vnc_session(
     app: tauri::AppHandle,
     mut request: vnc::StartVncSessionRequest,
@@ -1851,6 +1877,7 @@ pub fn run() {
             app.manage(performance::PerformanceMonitor::new());
             app.manage(power::DontSleepManager::new());
             app.manage(secrets::Secrets::new());
+            app.manage(ai::AssistantLiveToolBridge::new());
             app.manage(sessions::SessionManager::new());
             app.manage(sftp::SftpSessionManager::new());
             app.manage(ftp::FtpSessionManager::new());
@@ -1947,6 +1974,7 @@ pub fn run() {
             get_ai_provider_settings,
             update_ai_provider_settings,
             plan_command_proposal,
+            complete_assistant_live_tool_request,
             run_ai_agent,
             run_ai_agent_streaming,
             keychain_status,
@@ -2033,6 +2061,8 @@ pub fn run() {
             get_rdp_session_status,
             send_rdp_ctrl_alt_delete,
             send_rdp_text,
+            send_rdp_key_press,
+            send_rdp_mouse_click,
             start_vnc_session,
             send_vnc_pointer_event,
             send_vnc_key_event,

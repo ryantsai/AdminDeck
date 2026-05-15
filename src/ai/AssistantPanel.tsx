@@ -49,11 +49,18 @@ import {
 } from "./streamMessage";
 import { useWorkspaceStore } from "../store";
 import { useDashboardStore } from "../dashboard/state/dashboardStore";
-import { getPaneRenderer, sendTextToRdpPane, writeInputToPane } from "../workspace/paneRegistry";
+import {
+  getFileBrowserController,
+  getPaneRenderer,
+  getRemoteDesktopController,
+  sendTextToRdpPane,
+  writeInputToPane,
+} from "../workspace/paneRegistry";
 import i18next from "../i18n/config";
 import { prepareAssistantTerminalInput } from "./terminalCommandSend";
 import { marked, type Tokens } from "marked";
 import { Channel } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { AI_PROVIDER_SECRET_OWNER_ID } from "../lib/settings";
 import {
   parseAssistantSecretRequests,
@@ -126,6 +133,12 @@ type ScreenshotRegionState = {
   pointerId?: number;
   start?: { x: number; y: number };
   current?: { x: number; y: number };
+};
+
+type AssistantLiveToolRequest = {
+  requestId: string;
+  toolName: string;
+  args?: Record<string, unknown>;
 };
 
 export interface AssistantPageContext {
@@ -726,6 +739,31 @@ export function AssistantPanel({
   }, [currentModelSupportsImageInput]);
 
   useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<AssistantLiveToolRequest>("assistant-live-tool-request", (event) => {
+      if (disposed) {
+        return;
+      }
+      void completeAssistantLiveTool(event.payload);
+    }).then((dispose) => {
+      if (disposed) {
+        dispose();
+        return;
+      }
+      unlisten = dispose;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (!addContextMenuOpen) {
       return;
     }
@@ -905,6 +943,245 @@ export function AssistantPanel({
       setAiProviderSettings(previousSettings);
       setChatError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  async function completeAssistantLiveTool(request: AssistantLiveToolRequest) {
+    let result: unknown;
+    try {
+      result = await runAssistantLiveTool(request.toolName, request.args ?? {});
+    } catch (error) {
+      result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    try {
+      await invokeCommand("complete_assistant_live_tool_request", {
+        completion: {
+          requestId: request.requestId,
+          result: JSON.stringify(result),
+        },
+      });
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function runAssistantLiveTool(toolName: string, args: Record<string, unknown>) {
+    switch (toolName) {
+      case "session_state":
+        return assistantSessionState();
+      case "session_terminal_read_buffer":
+        return assistantTerminalReadBuffer(args);
+      case "session_terminal_send_text":
+        return assistantTerminalSendText(args);
+      case "session_remote_desktop_screenshot":
+        return assistantRemoteDesktopScreenshot(args);
+      case "session_remote_desktop_send_text":
+        return assistantRemoteDesktopSendText(args);
+      case "session_remote_desktop_keypress":
+        return assistantRemoteDesktopKeyPress(args);
+      case "session_remote_desktop_mouse_click":
+        return assistantRemoteDesktopMouseClick(args);
+      case "session_file_browser_list":
+        return assistantFileBrowserList(args);
+      case "session_file_browser_create_folder":
+        return assistantFileBrowserCreateFolder(args);
+      case "session_file_browser_rename":
+        return assistantFileBrowserRename(args);
+      case "session_file_browser_delete":
+        return assistantFileBrowserDelete(args);
+      default:
+        return { ok: false, error: `Unknown live Session tool: ${toolName}` };
+    }
+  }
+
+  function assistantSessionState() {
+    const state = useWorkspaceStore.getState();
+    return {
+      ok: true,
+      activeTabId: state.activeTabId,
+      tabs: state.tabs.map((tab) => ({
+        id: tab.id,
+        title: tab.title,
+        kind: tab.kind,
+        active: tab.id === state.activeTabId,
+        focusedPaneId: tab.focusedPaneId,
+        connection: tab.connection
+          ? {
+              id: tab.connection.id,
+              name: tab.connection.name,
+              type: tab.connection.type,
+              host: tab.connection.host,
+              user: tab.connection.user,
+            }
+          : null,
+        panes: tab.panes.map((pane) => ({
+          id: pane.id,
+          kind: pane.kind ?? "terminal",
+          title: pane.title,
+          hasTerminalBuffer: Boolean(getPaneRenderer(pane.id)),
+          hasRemoteDesktopController: Boolean(getRemoteDesktopController(pane.id)),
+        })),
+        fileBrowser: tab.kind === "sftp" || tab.kind === "ftp"
+          ? getFileBrowserController(tab.id)?.snapshot() ?? null
+          : null,
+      })),
+    };
+  }
+
+  function activeTerminalPaneIdForLiveTool(paneId: unknown) {
+    if (typeof paneId === "string" && paneId.trim()) {
+      return paneId.trim();
+    }
+    const state = useWorkspaceStore.getState();
+    const tab = state.tabs.find((entry) => entry.id === state.activeTabId);
+    if (!tab || tab.kind !== "terminal") {
+      return "";
+    }
+    return tab.focusedPaneId ?? tab.panes[0]?.id ?? "";
+  }
+
+  function activeRemoteDesktopPaneIdForLiveTool(paneId: unknown) {
+    if (typeof paneId === "string" && paneId.trim()) {
+      return paneId.trim();
+    }
+    const state = useWorkspaceStore.getState();
+    const tab = state.tabs.find((entry) => entry.id === state.activeTabId);
+    if (!tab || tab.kind !== "remoteDesktop") {
+      return "";
+    }
+    return tab.focusedPaneId ?? tab.panes[0]?.id ?? "";
+  }
+
+  function activeFileBrowserTabIdForLiveTool(tabId: unknown) {
+    if (typeof tabId === "string" && tabId.trim()) {
+      return tabId.trim();
+    }
+    const state = useWorkspaceStore.getState();
+    const tab = state.tabs.find((entry) => entry.id === state.activeTabId);
+    if (!tab || (tab.kind !== "sftp" && tab.kind !== "ftp")) {
+      return "";
+    }
+    return tab.id;
+  }
+
+  function assistantTerminalReadBuffer(args: Record<string, unknown>) {
+    const paneId = activeTerminalPaneIdForLiveTool(args.paneId);
+    const renderer = paneId ? getPaneRenderer(paneId) : undefined;
+    if (!paneId || !renderer) {
+      return { ok: false, error: "No active terminal Pane is available." };
+    }
+    const maxChars =
+      typeof args.maxChars === "number" && Number.isFinite(args.maxChars)
+        ? Math.max(1, Math.min(50_000, Math.trunc(args.maxChars)))
+        : 20_000;
+    const text = renderer.getBufferText();
+    return {
+      ok: true,
+      paneId,
+      text: text.length > maxChars ? text.slice(text.length - maxChars) : text,
+      truncated: text.length > maxChars,
+    };
+  }
+
+  function assistantTerminalSendText(args: Record<string, unknown>) {
+    const paneId = activeTerminalPaneIdForLiveTool(args.paneId);
+    const text = typeof args.text === "string" ? args.text : "";
+    if (!paneId || !text) {
+      return { ok: false, error: "Terminal paneId and text are required." };
+    }
+    const data = args.pressEnter === false ? text : prepareAssistantTerminalInput(text);
+    const sent = writeInputToPane(paneId, data);
+    return sent ? { ok: true, paneId } : { ok: false, error: "Terminal Pane is not writable." };
+  }
+
+  async function assistantRemoteDesktopScreenshot(args: Record<string, unknown>) {
+    const paneId = activeRemoteDesktopPaneIdForLiveTool(args.paneId);
+    const controller = paneId ? getRemoteDesktopController(paneId) : undefined;
+    if (!paneId || !controller) {
+      return { ok: false, error: "No active remote desktop Session is available." };
+    }
+    const screenshot = await controller.captureScreenshot();
+    return { ok: true, paneId, screenshot };
+  }
+
+  async function assistantRemoteDesktopSendText(args: Record<string, unknown>) {
+    const paneId = activeRemoteDesktopPaneIdForLiveTool(args.paneId);
+    const controller = paneId ? getRemoteDesktopController(paneId) : undefined;
+    const text = typeof args.text === "string" ? args.text : "";
+    if (!paneId || !controller || !text) {
+      return { ok: false, error: "Remote desktop paneId and text are required." };
+    }
+    await controller.sendText(text, args.pressEnter !== false);
+    return { ok: true, paneId, kind: controller.kind };
+  }
+
+  async function assistantRemoteDesktopKeyPress(args: Record<string, unknown>) {
+    const paneId = activeRemoteDesktopPaneIdForLiveTool(args.paneId);
+    const controller = paneId ? getRemoteDesktopController(paneId) : undefined;
+    const key = typeof args.key === "string" ? args.key : "";
+    if (!paneId || !controller || !key) {
+      return { ok: false, error: "Remote desktop paneId and key are required." };
+    }
+    await controller.keyPress(key);
+    return { ok: true, paneId, kind: controller.kind, key };
+  }
+
+  async function assistantRemoteDesktopMouseClick(args: Record<string, unknown>) {
+    const paneId = activeRemoteDesktopPaneIdForLiveTool(args.paneId);
+    const controller = paneId ? getRemoteDesktopController(paneId) : undefined;
+    if (!paneId || !controller?.mouseClick) {
+      return { ok: false, error: "No active remote desktop Session is available for mouse input." };
+    }
+    const x = typeof args.x === "number" ? Math.max(0, Math.trunc(args.x)) : 0;
+    const y = typeof args.y === "number" ? Math.max(0, Math.trunc(args.y)) : 0;
+    const button = args.button === "right" || args.button === "middle" ? args.button : "left";
+    await controller.mouseClick(x, y, button);
+    return { ok: true, paneId, x, y, button };
+  }
+
+  async function assistantFileBrowserList(args: Record<string, unknown>) {
+    const tabId = activeFileBrowserTabIdForLiveTool(args.tabId);
+    const controller = tabId ? getFileBrowserController(tabId) : undefined;
+    if (!tabId || !controller) {
+      return { ok: false, error: "No active SFTP/FTP file browser Session is available." };
+    }
+    const path = typeof args.path === "string" ? args.path : null;
+    const listing = await controller.list(path);
+    return { ok: true, tabId, kind: controller.kind, listing };
+  }
+
+  async function assistantFileBrowserCreateFolder(args: Record<string, unknown>) {
+    const tabId = activeFileBrowserTabIdForLiveTool(args.tabId);
+    const controller = tabId ? getFileBrowserController(tabId) : undefined;
+    const parentPath = typeof args.parentPath === "string" ? args.parentPath : "";
+    const name = typeof args.name === "string" ? args.name : "";
+    if (!tabId || !controller || !parentPath || !name) {
+      return { ok: false, error: "File browser tabId, parentPath, and name are required." };
+    }
+    const result = await controller.createFolder(parentPath, name);
+    return { ok: true, tabId, kind: controller.kind, result };
+  }
+
+  async function assistantFileBrowserRename(args: Record<string, unknown>) {
+    const tabId = activeFileBrowserTabIdForLiveTool(args.tabId);
+    const controller = tabId ? getFileBrowserController(tabId) : undefined;
+    const path = typeof args.path === "string" ? args.path : "";
+    const newName = typeof args.newName === "string" ? args.newName : "";
+    if (!tabId || !controller || !path || !newName) {
+      return { ok: false, error: "File browser tabId, path, and newName are required." };
+    }
+    const result = await controller.rename(path, newName);
+    return { ok: true, tabId, kind: controller.kind, result };
+  }
+
+  async function assistantFileBrowserDelete(args: Record<string, unknown>) {
+    const tabId = activeFileBrowserTabIdForLiveTool(args.tabId);
+    const controller = tabId ? getFileBrowserController(tabId) : undefined;
+    const path = typeof args.path === "string" ? args.path : "";
+    if (!tabId || !controller || !path) {
+      return { ok: false, error: "File browser tabId and path are required." };
+    }
+    const result = await controller.deletePath(path);
+    return { ok: true, tabId, kind: controller.kind, result };
   }
 
   async function handleToolPermissionModeChange(toolPermissionMode: AiToolPermissionMode) {
@@ -2358,6 +2635,17 @@ function toolCallLabel(
     connection_open: t("ai.toolConnections"),
     connection_update: t("ai.toolConnections"),
     connection_delete: t("ai.toolConnections"),
+    session_state: t("ai.toolSessions"),
+    session_terminal_read_buffer: t("ai.toolSessions"),
+    session_terminal_send_text: t("ai.toolSessions"),
+    session_remote_desktop_screenshot: t("ai.toolSessions"),
+    session_remote_desktop_send_text: t("ai.toolSessions"),
+    session_remote_desktop_keypress: t("ai.toolSessions"),
+    session_remote_desktop_mouse_click: t("ai.toolSessions"),
+    session_file_browser_list: t("ai.toolSessions"),
+    session_file_browser_create_folder: t("ai.toolSessions"),
+    session_file_browser_rename: t("ai.toolSessions"),
+    session_file_browser_delete: t("ai.toolSessions"),
   };
   const completedLabels: Record<string, string> = {
     web_search: t("ai.toolWebSearchDone"),
@@ -2387,6 +2675,17 @@ function toolCallLabel(
     connection_open: t("ai.toolConnectionsDone"),
     connection_update: t("ai.toolConnectionsDone"),
     connection_delete: t("ai.toolConnectionsDone"),
+    session_state: t("ai.toolSessionsDone"),
+    session_terminal_read_buffer: t("ai.toolSessionsDone"),
+    session_terminal_send_text: t("ai.toolSessionsDone"),
+    session_remote_desktop_screenshot: t("ai.toolSessionsDone"),
+    session_remote_desktop_send_text: t("ai.toolSessionsDone"),
+    session_remote_desktop_keypress: t("ai.toolSessionsDone"),
+    session_remote_desktop_mouse_click: t("ai.toolSessionsDone"),
+    session_file_browser_list: t("ai.toolSessionsDone"),
+    session_file_browser_create_folder: t("ai.toolSessionsDone"),
+    session_file_browser_rename: t("ai.toolSessionsDone"),
+    session_file_browser_delete: t("ai.toolSessionsDone"),
   };
   const labels = status === "running" ? runningLabels : completedLabels;
   return labels[toolName] ?? toolName;

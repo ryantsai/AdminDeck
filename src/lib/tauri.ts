@@ -619,6 +619,18 @@ export interface SendRdpTextRequest {
   pressEnter?: boolean;
 }
 
+export interface SendRdpKeyPressRequest {
+  sessionId: string;
+  key: string;
+}
+
+export interface SendRdpMouseClickRequest {
+  sessionId: string;
+  x: number;
+  y: number;
+  button: "left" | "right" | "middle";
+}
+
 export interface RdpTextSent {
   sessionId: string;
   mode: RdpTextMode;
@@ -908,6 +920,10 @@ type CommandMap = {
       };
     };
     result: CommandProposalPlan;
+  };
+  complete_assistant_live_tool_request: {
+    args: { completion: { requestId: string; result: string } };
+    result: null;
   };
   run_ai_agent: {
     args: { request: AgentRunRequest };
@@ -1402,6 +1418,14 @@ type CommandMap = {
   send_rdp_text: {
     args: { request: SendRdpTextRequest };
     result: RdpTextSent;
+  };
+  send_rdp_key_press: {
+    args: { request: SendRdpKeyPressRequest };
+    result: null;
+  };
+  send_rdp_mouse_click: {
+    args: { request: SendRdpMouseClickRequest };
+    result: null;
   };
   start_vnc_session: {
     args: { request: StartVncSessionRequest };

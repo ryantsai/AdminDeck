@@ -20,7 +20,13 @@ import type {
   VncSettings,
   WorkspaceTab,
 } from "../types";
-import { registerRdpTextSender, unregisterRdpTextSender } from "../workspace/paneRegistry";
+import {
+  registerRdpTextSender,
+  registerRemoteDesktopController,
+  unregisterRdpTextSender,
+  unregisterRemoteDesktopController,
+  type RemoteDesktopController,
+} from "../workspace/paneRegistry";
 
 type VncSessionEvent =
   | { kind: "connected"; sessionId: string; name: string }
@@ -257,6 +263,151 @@ export function RemoteDesktopWorkspace({
       );
     }
   };
+
+  const captureRemoteDesktopScreenshot = async () => {
+    if (!isTauriRuntime()) {
+      throw new Error(t("workspace.screenshotsRequireRuntime"));
+    }
+    const target = hostRef.current;
+    if (!target) {
+      throw new Error("Remote desktop host is not mounted.");
+    }
+    const bounds = target.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      throw new Error("Remote desktop host is not visible.");
+    }
+    return invokeCommand("capture_screenshot_for_assistant", {
+      request: {
+        x: Math.max(0, Math.round(bounds.left)),
+        y: Math.max(0, Math.round(bounds.top)),
+        width: Math.max(1, Math.round(bounds.width)),
+        height: Math.max(1, Math.round(bounds.height)),
+      },
+    });
+  };
+
+  const sendVncText = async (text: string, pressEnter: boolean) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !sessionStartedRef.current) {
+      throw new Error("VNC Session is not connected.");
+    }
+    for (const char of text) {
+      const key = char === "\n" || char === "\r" ? 0xff0d : char.codePointAt(0);
+      if (!key) {
+        continue;
+      }
+      await invokeCommand("send_vnc_key_event", {
+        request: { sessionId, key, down: true },
+      });
+      await invokeCommand("send_vnc_key_event", {
+        request: { sessionId, key, down: false },
+      });
+    }
+    if (pressEnter && !text.endsWith("\n") && !text.endsWith("\r")) {
+      await invokeCommand("send_vnc_key_event", {
+        request: { sessionId, key: 0xff0d, down: true },
+      });
+      await invokeCommand("send_vnc_key_event", {
+        request: { sessionId, key: 0xff0d, down: false },
+      });
+    }
+  };
+
+  const sendVncMouseClick = async (
+    x: number,
+    y: number,
+    button: "left" | "right" | "middle",
+  ) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !sessionStartedRef.current) {
+      throw new Error("VNC Session is not connected.");
+    }
+    const buttonIndex = button === "right" ? 2 : button === "middle" ? 1 : 0;
+    const buttonMask = pointerButtonMask(buttonIndex);
+    await invokeCommand("send_vnc_pointer_event", {
+      request: { sessionId, x, y, buttonMask },
+    });
+    await invokeCommand("send_vnc_pointer_event", {
+      request: { sessionId, x, y, buttonMask: 0 },
+    });
+  };
+
+  const sendVncKeyPress = async (keyName: string) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !sessionStartedRef.current) {
+      throw new Error("VNC Session is not connected.");
+    }
+    if (normalizeRemoteDesktopKeyName(keyName) === "ctrlaltdelete") {
+      await invokeCommand("send_vnc_ctrl_alt_delete", {
+        request: { sessionId },
+      });
+      return;
+    }
+    const key = vncKeysymForName(keyName);
+    await invokeCommand("send_vnc_key_event", {
+      request: { sessionId, key, down: true },
+    });
+    await invokeCommand("send_vnc_key_event", {
+      request: { sessionId, key, down: false },
+    });
+  };
+
+  useEffect(() => {
+    const paneId = tab.panes[0]?.id;
+    if (!paneId || !connection || !isTauriRuntime()) {
+      return;
+    }
+    const controller: RemoteDesktopController = {
+      kind: connection.type === "vnc" ? "vnc" : "rdp",
+      captureScreenshot: captureRemoteDesktopScreenshot,
+      sendText: async (text, pressEnter) => {
+        if (connection.type === "vnc") {
+          await sendVncText(text, pressEnter);
+          return;
+        }
+        const sessionId = sessionIdRef.current;
+        if (!sessionId || !sessionStartedRef.current) {
+          throw new Error("RDP Session is not connected.");
+        }
+        await invokeCommand("send_rdp_text", {
+          request: { sessionId, text, pressEnter },
+        });
+      },
+      keyPress: async (key) => {
+        if (connection.type === "vnc") {
+          await sendVncKeyPress(key);
+          return;
+        }
+        const sessionId = sessionIdRef.current;
+        if (!sessionId || !sessionStartedRef.current) {
+          throw new Error("RDP Session is not connected.");
+        }
+        await invokeCommand("send_rdp_key_press", {
+          request: { sessionId, key },
+        });
+      },
+      mouseClick:
+        connection.type === "vnc"
+          ? (x, y, button) => sendVncMouseClick(x, y, button)
+          : async (x, y, button) => {
+              const sessionId = sessionIdRef.current;
+              if (!sessionId || !sessionStartedRef.current) {
+                throw new Error("RDP Session is not connected.");
+              }
+              await invokeCommand("send_rdp_mouse_click", {
+                request: {
+                  sessionId,
+                  x: Math.max(0, Math.min(65535, Math.trunc(x))),
+                  y: Math.max(0, Math.min(65535, Math.trunc(y))),
+                  button,
+                },
+              });
+            },
+    };
+    registerRemoteDesktopController(paneId, controller);
+    return () => unregisterRemoteDesktopController(paneId, controller);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection?.type, tab.panes[0]?.id]);
 
   const triggerPreCapture = () => {
     if (!canStartRdp || !isActive || !rdpVisibleRef.current) {
@@ -1308,4 +1459,45 @@ function vncKeysymForEvent(event: ReactKeyboardEvent<HTMLCanvasElement>) {
     Meta: 0xffe7,
   };
   return specialKeys[event.key] ?? 0;
+}
+
+function normalizeRemoteDesktopKeyName(value: string) {
+  return value
+    .split("")
+    .filter((char) => /[a-zA-Z0-9]/.test(char))
+    .join("")
+    .toLowerCase();
+}
+
+function vncKeysymForName(value: string) {
+  const keysyms: Record<string, number> = {
+    enter: 0xff0d,
+    return: 0xff0d,
+    tab: 0xff09,
+    escape: 0xff1b,
+    esc: 0xff1b,
+    backspace: 0xff08,
+    delete: 0xffff,
+    del: 0xffff,
+    arrowleft: 0xff51,
+    left: 0xff51,
+    arrowup: 0xff52,
+    up: 0xff52,
+    arrowright: 0xff53,
+    right: 0xff53,
+    arrowdown: 0xff54,
+    down: 0xff54,
+    home: 0xff50,
+    pageup: 0xff55,
+    pgup: 0xff55,
+    pagedown: 0xff56,
+    pgdn: 0xff56,
+    end: 0xff57,
+    space: 0x20,
+  };
+  const key = keysyms[normalizeRemoteDesktopKeyName(value)];
+  if (!key) {
+    throw new Error(`Unsupported VNC key press: ${value}`);
+  }
+  return key;
 }

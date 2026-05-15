@@ -402,6 +402,8 @@ pub struct AiAssistantToolSettings {
     dashboard: bool,
     #[serde(default = "default_ai_connections_tool_enabled")]
     connections: bool,
+    #[serde(default = "default_ai_sessions_tool_enabled")]
+    sessions: bool,
 }
 
 impl AiAssistantToolSettings {
@@ -429,6 +431,9 @@ impl AiAssistantToolSettings {
     pub(crate) fn connections(&self) -> bool {
         self.connections
     }
+    pub(crate) fn sessions(&self) -> bool {
+        self.sessions
+    }
     pub(crate) fn any_enabled(&self) -> bool {
         self.web_search
             || self.web_fetch
@@ -438,6 +443,7 @@ impl AiAssistantToolSettings {
             || self.current_time
             || self.dashboard
             || self.connections
+            || self.sessions
     }
 }
 
@@ -3774,6 +3780,7 @@ fn default_ai_assistant_tool_settings() -> AiAssistantToolSettings {
         current_time: default_ai_current_time_tool_enabled(),
         dashboard: default_ai_dashboard_tool_enabled(),
         connections: default_ai_connections_tool_enabled(),
+        sessions: default_ai_sessions_tool_enabled(),
     }
 }
 
@@ -3786,6 +3793,10 @@ fn default_ai_dashboard_tool_enabled() -> bool {
 }
 
 fn default_ai_connections_tool_enabled() -> bool {
+    true
+}
+
+fn default_ai_sessions_tool_enabled() -> bool {
     true
 }
 

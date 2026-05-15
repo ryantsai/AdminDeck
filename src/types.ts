@@ -377,7 +377,8 @@ export type AiAssistantToolId =
   | "appDataFileRead"
   | "currentTime"
   | "dashboard"
-  | "connections";
+  | "connections"
+  | "sessions";
 
 export type AiAssistantToolSettings = Record<AiAssistantToolId, boolean>;
 

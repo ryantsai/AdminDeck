@@ -10,9 +10,9 @@ KKTerm is intended to be a fast, professional desktop workspace for personal/loc
 
 KKTerm v0.1 will be a Windows-first desktop app built with a Rust/Tauri core and a React/TypeScript interface. It organizes functionality into built-in modules accessible from a left-side activity rail: **Workspace** (remote connection manager with VSCode-style tabs, split terminal panes, local terminal sessions, SSH sessions with optional tmux resume, SFTP dual-pane file management, RDP, VNC, and URL connections), **Dashboard** (dynamic widget playground with prebuilt tools, reports, and an App Launcher widget for quick-launch apps/files), and **File Explorer** (lightning-fast alternative local file browser).
 
-Under the hood it provides explicit screenshot capture to clipboard for workspace surfaces, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-based AI command assistance.
+Under the hood it provides explicit screenshot capture to clipboard or AI context for workspace surfaces, backend SSH config import support, local SQLite connection storage, OS keychain secret storage, and approval-bounded AI assistance that can use typed app tools for Dashboard work, saved Connection management, and active Session interaction.
 
-The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. Mobile, RDP, VNC, team vaults, and sync are explicitly later-stage work.
+The product will be light chrome with dark terminal panes by default, optimized for dense professional workflows and fast launch. macOS and Linux will follow using the same architecture. RDP, VNC, and URL surfaces are v0.2 expansion work; mobile, team vaults, and sync remain later-stage scope.
 
 ## User Stories
 
@@ -64,8 +64,8 @@ The product will be light chrome with dark terminal panes by default, optimized 
 43. As a user, I want no telemetry by default, so that my terminal and host data remain private.
 44. As a user, I want local logs and a diagnostics bundle command, so that I can debug issues without automatic data upload.
 45. As a user, I want AI command assistance to draft commands, so that I can move faster without surrendering control.
-46. As a user, I want explicit approval before AI-generated commands run, so that destructive or sensitive actions are not executed silently.
-47. As a user, I want AI help scoped to the active local or SSH session, so that context stays clear.
+46. As a user, I want AI tool execution to default to Prompt mode, so that mutating operations do not run silently unless I explicitly choose Allow All.
+47. As a user, I want AI help scoped to the active local or SSH Session, so that context stays clear.
 48. As a user, I want OpenAI-compatible API configuration, so that I can use my own endpoint, key, and model.
 49. As a user, I want Claude Code CLI and Codex CLI paths configurable, so that local agent tools can be used from KKTerm.
 50. As a user, I want Claude Code CLI and Codex CLI integrations restricted to suggest/ask-before-execute where possible, so that they respect the product trust model.
@@ -77,6 +77,8 @@ The product will be light chrome with dark terminal panes by default, optimized 
 56. As a Windows user of the installed app, I want update installation to require my confirmation, so that KKTerm does not silently replace itself while I am using administrative tools.
 57. As a privacy-conscious user, I want update checks to be clearly described as contacting GitHub Releases/update metadata only when the update mechanism is enabled, so that the local-first trust model remains understandable.
 58. As a power user, I want the AI Assistant to draft KKTerm extensions with manifests, permissions, and source files, so that I can explore workflow automation without generated code being installed or run automatically.
+59. As an operator, I want the AI Assistant to list, add, edit, open, and delete saved Connections through typed tools, so that routine Connection maintenance can be done conversationally while preserving saved-data boundaries.
+60. As an operator, I want the AI Assistant to inspect and interact with active Sessions through typed tools, so that it can read terminal buffers, send terminal text, inspect RDP/VNC screenshots, send remote desktop text/keys/mouse clicks, and perform SFTP/FTP file-browser actions when permitted.
 
 ## Implementation Decisions
 
@@ -86,7 +88,7 @@ High-level product decisions that are not duplicated elsewhere:
 - v0.1 protocols: local terminal, SSH terminal, SFTP launched from SSH. v0.2 protocols in progress: URL (WebView2), RDP (ActiveX), VNC (`vnc-rs`).
 - License: MIT. Dependencies should be MIT/Apache-2.0/BSD/MPL-style; avoid GPL in the core runtime.
 - Privacy: no telemetry or automatic crash upload in v0.1. Update checks (v0.2) are described separately from telemetry.
-- AI model: approval-based command assist only; CLI agent integrations are suggest-only/ask-before-execute.
+- AI model: typed assistant tool calling with permission boundaries. Prompt is the default mode for mutating tools; Allow All is an explicit user setting for automatic execution of enabled tools. CLI agent integrations remain suggest-only/ask-before-execute where possible.
 
 The full stack, module map, storage/secrets boundaries, command-runtime rules, RDP overlay model, Settings layout, and Activity Rail layout live in `docs/ARCHITECTURE.md`. Standalone decision records (SSH transport, security/privacy, extension platform, etc.) live in `docs/ADR/`. Performance budgets and the measurement runbook live in `docs/PERFORMANCE.md`. Distribution, packaging scripts, and the v0.2 updater scope live in `docs/RELEASE.md`.
 
@@ -111,7 +113,7 @@ The full stack, module map, storage/secrets boundaries, command-runtime rules, R
 - Silent install, rollback/downgrade, preview-channel, managed-server, or cross-platform auto-update behavior.
 - Dynamic inventory from cloud APIs, Terraform, CMDB, or other external sources beyond the supported file imports (CSV/TSV, RDCMan `.rdg`, MobaXterm `.mxtsessions`, PuTTY `.reg`) and the bundled light TCP port scan.
 - Folder sync, diff/compare, transfer resume, archive/extract, and remote file editing in SFTP.
-- Fully autonomous AI agent execution.
+- Unattended fully autonomous AI agent operation.
 - Editable keybinding UI.
 
 ## Further Notes
