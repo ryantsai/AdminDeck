@@ -27,6 +27,11 @@ Test: would a senior engineer say this is overcomplicated? If yes, simplify.
 Touch only what you must. Clean up only your own mess.
 Don't "improve" adjacent code, comments, or formatting.
 Don't refactor what isn't broken. Match existing style.
+`cargo fmt` is optional in this repo. If formatting is useful, run it only on the
+smallest practical Rust scope you intentionally touched, such as a single file
+or package/module. Do not run broad `cargo fmt` over the whole workspace unless
+the user explicitly asks for global formatting; it can rewrite unrelated Rust
+sources and create noisy file-format churn.
 
 ## Rule 4 — Goal-Driven Execution
 

@@ -11,8 +11,7 @@ import {
 import { confirmTrustedSshHostKey, defaultPortForConnectionType, connectionTypeLabel, ftpPortForProtocolSelection, isRemoteDesktopConnectionType, localShellOptionsForPlatform, uniqueRuntimeId, type LocalShellOption } from "./utils";
 import { RECENT_CONNECTION_LIMIT, createStoredSecretMask, loadCollapsedFolderIds, loadRecentConnectionIds, notifyConnectionTreeInvalidated, saveCollapsedFolderIds, saveRecentConnectionIds } from "./connectionSidebarState";
 import { collectConnectionFolderIds, countConnections, countFolders, filterConnectionTree, flattenConnections, flattenFolders, upsertRootConnection, withLiveConnectionStatuses } from "./treeUtils";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, KeyRound, LayoutDashboard, PanelRight, Pin, PinOff, Play, Plus, RotateCcw, Save, Search, X } from "lucide-react";
-import { AddComputer as IconParkAddComputer, CollapseTextInput as IconParkCollapseTextInput, Delete as IconParkDelete, Edit as IconParkEdit, ExpandTextInput as IconParkExpandTextInput, FolderPlus as IconParkFolderPlus, Setting as IconParkSetting } from "@icon-park/react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronRight, Folder, FolderPlus, KeyRound, LayoutDashboard, Maximize2, Minimize2, PanelRight, Pencil, Pin, PinOff, Play, Plus, RotateCcw, Save, Search, Settings, SquarePlus, Trash2, X } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -1543,7 +1542,7 @@ export function ConnectionSidebar({
           title={t("connections.collapseAll")}
           type="button"
         >
-          <IconParkCollapseTextInput size={13} />
+          <Minimize2 size={13} />
         </button>
         <button
           aria-label={t("connections.expandAll")}
@@ -1552,7 +1551,7 @@ export function ConnectionSidebar({
           title={t("connections.expandAll")}
           type="button"
         >
-          <IconParkExpandTextInput size={13} />
+          <Maximize2 size={13} />
         </button>
       </div>
       {treeError ? <p className="form-error tree-error">{treeError}</p> : null}
@@ -2163,11 +2162,11 @@ function TreeContextMenu({
       {menu.kind === "tree" ? (
         <>
           <button onClick={onCreateConnection} role="menuitem" type="button">
-            <IconParkAddComputer className="menu-item-icon" size={15} />
+            <SquarePlus className="menu-item-icon" size={15} />
             <span>{t("connections.newConnection")}</span>
           </button>
           <button onClick={onCreateFolder} role="menuitem" type="button">
-            <IconParkFolderPlus className="menu-item-icon" size={15} />
+            <FolderPlus className="menu-item-icon" size={15} />
             <span>{t("connections.newFolder")}</span>
           </button>
         </>
@@ -2175,11 +2174,11 @@ function TreeContextMenu({
       {menu.kind !== "tree" ? (
         <>
           <button onClick={onRename} role="menuitem" type="button">
-            <IconParkEdit className="menu-item-icon" size={15} />
+            <Pencil className="menu-item-icon" size={15} />
             <span>{t("connections.rename")}</span>
           </button>
           <button onClick={onDelete} role="menuitem" type="button">
-            <IconParkDelete className="menu-item-icon" size={15} />
+            <Trash2 className="menu-item-icon" size={15} />
             <span>{t("connections.delete")}</span>
           </button>
         </>
@@ -2247,7 +2246,7 @@ function TreeContextMenu({
             </button>
           ) : null}
           <button onClick={onProperties} role="menuitem" type="button">
-            <IconParkSetting className="menu-item-icon" size={15} />
+            <Settings className="menu-item-icon" size={15} />
             <span>{t("connections.properties")}</span>
           </button>
         </>

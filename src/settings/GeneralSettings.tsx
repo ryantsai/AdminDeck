@@ -35,7 +35,10 @@ import {
 } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import { useDashboardStore } from "../dashboard/state/dashboardStore";
-import { AI_PROVIDER_SECRET_OWNER_ID } from "../lib/settings";
+import {
+  AI_PROVIDER_SECRET_OWNER_ID,
+  allAiProviderSecretOwnerIds,
+} from "../lib/settings";
 import { SettingsSectionHeader } from "./shared";
 import { ToggleSwitch } from "./ToggleSwitch";
 
@@ -201,12 +204,18 @@ export function GeneralSettings() {
             request: defaultDashboardSettings,
           }),
         ]);
-        await invokeCommand("delete_secret", {
-          request: {
-            kind: "aiApiKey",
-            ownerId: AI_PROVIDER_SECRET_OWNER_ID,
-          },
-        });
+        await Promise.all(
+          Array.from(
+            new Set([AI_PROVIDER_SECRET_OWNER_ID, ...allAiProviderSecretOwnerIds()]),
+          ).map((ownerId) =>
+            invokeCommand("delete_secret", {
+              request: {
+                kind: "aiApiKey",
+                ownerId,
+              },
+            }),
+          ),
+        );
         setGeneralSettings(general);
         setTerminalSettings(terminal);
         setAppearanceSettings(appearance);

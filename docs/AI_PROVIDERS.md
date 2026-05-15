@@ -85,7 +85,7 @@ outside those names must go through i18n.
 ## Persisted settings and secrets
 
 Provider metadata stored in SQLite is non-secret. API keys remain in the OS
-keychain under the shared AI API key owner. When adding settings:
+keychain under provider-specific AI API key owners. When adding settings:
 
 1. Extend `AiProviderSettings` in both `src-tauri/src/storage.rs` and
    `src/types.ts`.

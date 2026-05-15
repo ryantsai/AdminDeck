@@ -20,7 +20,9 @@ use tauri::{Emitter, Manager};
 
 use crate::dashboard_ids::new_dashboard_id;
 use crate::dashboard_storage as ds;
-use crate::storage::{AiAssistantToolSettings, AiProviderSettings, Storage};
+use crate::storage::{
+    ai_provider_secret_owner_id, AiAssistantToolSettings, AiProviderSettings, Storage,
+};
 
 static LIVE_TOOL_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -2395,7 +2397,9 @@ async fn run_ai_tool(
         return tool_permission_required_result(&call.function.name);
     }
     match call.function.name.as_str() {
-        "request_secret_entry" => request_secret_entry_tool(args, stream_channel),
+        "request_secret_entry" => {
+            request_secret_entry_tool(args, settings.provider_kind(), stream_channel)
+        }
         "current_time" if tool_settings.current_time() => current_time_tool(),
         "web_search" if tool_settings.web_search() => web_search_tool(settings, args).await,
         "web_fetch" if tool_settings.web_fetch() => web_fetch_tool(args).await,
@@ -2747,10 +2751,12 @@ fn is_dashboard_mutating_tool(name: &str) -> bool {
     name.starts_with("dashboard_") && name != "dashboard_load_state"
 }
 
-const AI_PROVIDER_SECRET_OWNER_ID: &str = "openai-compatible-provider";
-
-fn request_secret_entry_tool(args: Value, stream_channel: Option<&Channel<Value>>) -> String {
-    match build_secret_entry_request(&args) {
+fn request_secret_entry_tool(
+    args: Value,
+    provider_kind: &str,
+    stream_channel: Option<&Channel<Value>>,
+) -> String {
+    match build_secret_entry_request(&args, provider_kind) {
         Ok(request) => {
             if let Some(channel) = stream_channel {
                 if let Err(error) = emit_stream(
@@ -2783,13 +2789,16 @@ struct SecretEntryRequest {
     markdown: String,
 }
 
-fn build_secret_entry_request(args: &Value) -> Result<SecretEntryRequest, String> {
+fn build_secret_entry_request(
+    args: &Value,
+    provider_kind: &str,
+) -> Result<SecretEntryRequest, String> {
     let kind = arg_string(args, "kind");
     let label = bounded_required_arg(args, "label", 80)?;
     let description = bounded_optional_arg(args, "description", 240);
     let placeholder = bounded_optional_arg(args, "placeholder", 120);
     let owner_id = match kind.as_str() {
-        "aiApiKey" => AI_PROVIDER_SECRET_OWNER_ID.to_string(),
+        "aiApiKey" => ai_provider_secret_owner_id(provider_kind),
         "widgetSecret" => {
             let instance_id = bounded_required_arg(args, "instanceId", 80)?;
             let field_key = bounded_required_arg(args, "fieldKey", 64)?;
@@ -4552,13 +4561,29 @@ mod tests {
             "label": "API key",
             "description": "Used to fetch population data",
             "placeholder": null
-        }), None);
+        }), "openrouter", None);
         let value: Value = serde_json::from_str(&result).expect("tool result is JSON");
 
         assert_eq!(value["ok"], true);
         assert_eq!(value["ownerId"], "dashboard-widget-secret:inst-123:apiKey");
         assert!(value["secretRequestMarkdown"].as_str().unwrap().contains("```kkterm-secret-request"));
         assert!(!result.contains("secret\":\""));
+    }
+
+    #[test]
+    fn request_secret_entry_tool_uses_active_ai_provider_owner() {
+        let result = request_secret_entry_tool(json!({
+            "kind": "aiApiKey",
+            "label": "OpenRouter API key"
+        }), "openrouter", None);
+        let value: Value = serde_json::from_str(&result).expect("tool result is JSON");
+
+        assert_eq!(value["ok"], true);
+        assert_eq!(value["ownerId"], "ai-provider:openrouter");
+        assert!(value["secretRequestMarkdown"]
+            .as_str()
+            .unwrap()
+            .contains("\"ownerId\":\"ai-provider:openrouter\""));
     }
 
     #[test]

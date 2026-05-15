@@ -8856,6 +8856,23 @@ fieldset.connection-specific-options > legend {
   margin-top: 0;
 }
 
+.settings-api-key-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+  padding: 0;
+  text-decoration: underline;
+  vertical-align: baseline;
+}
+
+.settings-api-key-link:hover {
+  opacity: 0.8;
+}
+
 .settings-data-actions {
   grid-template-columns: repeat(auto-fit, minmax(170px, max-content));
   gap: 10px;

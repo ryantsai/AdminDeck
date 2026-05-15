@@ -1,6 +1,10 @@
 import { KeyRound, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  AI_PROVIDER_SECRET_OWNER_ID,
+  aiProviderSecretOwnerId,
+} from "../lib/settings";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import type { StoredCredentialKind, StoredCredentialSummary } from "../types";
@@ -43,6 +47,7 @@ function credentialDescriptionKey(credential: StoredCredentialSummary) {
 export function CredentialsSettings() {
   const { t } = useTranslation();
   const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
+  const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
   const [credentials, setCredentials] = useState<StoredCredentialSummary[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<StoredCredentialSummary | null>(null);
@@ -85,7 +90,21 @@ export function CredentialsSettings() {
         },
       });
       if (credential.kind === "aiApiKey") {
-        setAiProviderHasApiKey(false);
+        const [providerPresence, legacyPresence] = await Promise.all([
+          invokeCommand("secret_exists", {
+            request: {
+              kind: "aiApiKey",
+              ownerId: aiProviderSecretOwnerId(aiProviderSettings.providerKind),
+            },
+          }),
+          invokeCommand("secret_exists", {
+            request: {
+              kind: "aiApiKey",
+              ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+            },
+          }),
+        ]);
+        setAiProviderHasApiKey(providerPresence.exists || legacyPresence.exists);
       }
       if (credential.kind === "urlPassword" || credential.kind === "connectionPassword") {
         window.dispatchEvent(new CustomEvent("kkterm:connection-tree-invalidated"));
@@ -183,7 +202,11 @@ function CredentialRow({
     <div className="settings-list-row">
       <div className="settings-credential-summary">
         <strong>{credential.label}</strong>
-        <span>{t(credentialDescriptionKey(credential))}</span>
+        <span>
+          {credential.detail
+            ? `${credential.detail} - ${t(credentialDescriptionKey(credential))}`
+            : t(credentialDescriptionKey(credential))}
+        </span>
       </div>
       <button
         aria-label={t("settings.deleteCredential")}

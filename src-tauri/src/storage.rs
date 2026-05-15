@@ -773,6 +773,26 @@ pub struct StoredCredentialCandidate {
     pub(crate) metadata_source: String,
 }
 
+pub(crate) const LEGACY_AI_PROVIDER_SECRET_OWNER_ID: &str = "openai-compatible-provider";
+
+const AI_PROVIDER_CREDENTIALS: &[(&str, &str, &str)] = &[
+    ("openai", "OpenAI", "OpenAI API key"),
+    ("anthropic", "Anthropic", "Anthropic API key"),
+    ("openrouter", "OpenRouter", "OpenRouter API key"),
+    ("deepseek", "DeepSeek", "DeepSeek API key"),
+    ("grok", "xAI Grok", "xAI API key"),
+    ("azure-openai", "Azure OpenAI", "Azure OpenAI API key"),
+    ("litellm", "LiteLLM", "LiteLLM key"),
+    ("github-copilot", "GitHub Copilot", "GitHub OAuth token"),
+    ("ollama", "Ollama", "Ollama API key"),
+    ("nvidia", "NVIDIA", "NVIDIA API key"),
+    ("openai-compatible", "OpenAI-compatible", "API key"),
+];
+
+pub(crate) fn ai_provider_secret_owner_id(provider_kind: &str) -> String {
+    format!("ai-provider:{}", provider_kind.trim().to_lowercase())
+}
+
 #[derive(Clone)]
 pub(crate) struct UrlCredentialFill {
     pub(crate) username: String,
@@ -2665,13 +2685,27 @@ fn list_stored_credential_candidates(
         credentials.push(credential);
     }
 
+    for (provider_kind, provider_label, key_label) in AI_PROVIDER_CREDENTIALS {
+        let owner_id = ai_provider_secret_owner_id(provider_kind);
+        credentials.push(StoredCredentialCandidate {
+            id: format!("ai-api-key:{owner_id}"),
+            kind: "aiApiKey".to_string(),
+            secret_kind: "aiApiKey".to_string(),
+            owner_id,
+            label: (*key_label).to_string(),
+            detail: Some((*provider_label).to_string()),
+            username: None,
+            updated_at: None,
+            metadata_source: "settings".to_string(),
+        });
+    }
     credentials.push(StoredCredentialCandidate {
-        id: "ai-api-key:openai-compatible-provider".to_string(),
+        id: format!("ai-api-key:{LEGACY_AI_PROVIDER_SECRET_OWNER_ID}"),
         kind: "aiApiKey".to_string(),
         secret_kind: "aiApiKey".to_string(),
-        owner_id: "openai-compatible-provider".to_string(),
-        label: "AI Assistant API key".to_string(),
-        detail: Some("OpenAI-compatible provider".to_string()),
+        owner_id: LEGACY_AI_PROVIDER_SECRET_OWNER_ID.to_string(),
+        label: "Legacy AI Assistant API key".to_string(),
+        detail: Some("Shared AI provider key".to_string()),
         username: None,
         updated_at: None,
         metadata_source: "settings".to_string(),
@@ -5863,6 +5897,28 @@ mod tests {
         assert_eq!(reloaded.reasoning_effort, "max");
         assert_eq!(reloaded.tool_permission_mode, "allowAll");
         assert!(reloaded.allow_insecure_tls);
+    }
+
+    #[test]
+    fn stored_credential_candidates_include_one_ai_key_owner_per_provider() {
+        let storage =
+            Storage::open(temp_db_path("ai-provider-credential-candidates")).expect("storage opens");
+
+        let candidates = storage
+            .list_stored_credential_candidates()
+            .expect("credential candidates load");
+        let ai_candidates = candidates
+            .iter()
+            .filter(|candidate| candidate.kind == "aiApiKey")
+            .collect::<Vec<_>>();
+
+        assert!(ai_candidates
+            .iter()
+            .any(|candidate| candidate.owner_id == "ai-provider:openai"));
+        assert!(ai_candidates
+            .iter()
+            .any(|candidate| candidate.owner_id == "ai-provider:openrouter"));
+        assert!(ai_candidates.len() > 1);
     }
 
     #[test]

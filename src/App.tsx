@@ -22,7 +22,6 @@ import { SettingsPage } from "./settings/SettingsPage";
 import { useWorkspaceStore } from "./store";
 import { StatusBar } from "./workspace/StatusBar";
 import { TabStrip, WorkspaceCanvas } from "./workspace/WorkspaceCanvas";
-import "@icon-park/react/styles/index.css";
 import "@xterm/xterm/css/xterm.css";
 import "./App.css";
 

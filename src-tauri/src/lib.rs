@@ -854,9 +854,7 @@ async fn run_ai_agent(
     request: ai::AgentRunRequest,
 ) -> Result<ai::AgentRunResponse, String> {
     let mut settings = storage.ai_provider_settings()?;
-    let api_key = secrets
-        .read_ai_api_key("openai-compatible-provider".to_string())
-        .map_err(|error| format!("failed to read AI API key: {error}"))?;
+    let api_key = read_ai_provider_api_key(&secrets, settings.provider_kind())?;
     inject_search_api_key(&secrets, &mut settings)?;
     ai::run_agent(app, settings, api_key, request).await
 }
@@ -870,11 +868,25 @@ async fn run_ai_agent_streaming(
     request: ai::AgentRunRequest,
 ) -> Result<ai::AgentRunResponse, String> {
     let mut settings = storage.ai_provider_settings()?;
-    let api_key = secrets
-        .read_ai_api_key("openai-compatible-provider".to_string())
-        .map_err(|error| format!("failed to read AI API key: {error}"))?;
+    let api_key = read_ai_provider_api_key(&secrets, settings.provider_kind())?;
     inject_search_api_key(&secrets, &mut settings)?;
     ai::run_agent_streaming(app, settings, api_key, request, channel).await
+}
+
+fn read_ai_provider_api_key(
+    secrets: &secrets::Secrets,
+    provider_kind: &str,
+) -> Result<Option<String>, String> {
+    let owner_id = storage::ai_provider_secret_owner_id(provider_kind);
+    let provider_key = secrets
+        .read_ai_api_key(owner_id)
+        .map_err(|error| format!("failed to read AI API key: {error}"))?;
+    if provider_key.is_some() {
+        return Ok(provider_key);
+    }
+    secrets
+        .read_ai_api_key(storage::LEGACY_AI_PROVIDER_SECRET_OWNER_ID.to_string())
+        .map_err(|error| format!("failed to read AI API key: {error}"))
 }
 
 fn inject_search_api_key(

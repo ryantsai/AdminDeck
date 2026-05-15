@@ -1,14 +1,24 @@
 import { useEffect } from "react";
 import { useState } from "react";
 
+import { AI_PROVIDER_DEFINITIONS } from "../ai/providers";
 import { useWorkspaceStore } from "../store";
+import type { AiProviderKind } from "../types";
 import { listCustomFontOptions, normalizeAvailableAppearance } from "./customFonts";
 import { invokeCommand, isTauriRuntime } from "./tauri";
 
-// Stable keychain owner id for the OpenAI-compatible AI API key. Lives in the
-// settings module so both bootstrap and the Settings UI can reference one
-// canonical name without an App.tsx -> SettingsPage import cycle.
+// Legacy shared keychain owner used before AI provider keys became per-provider.
 export const AI_PROVIDER_SECRET_OWNER_ID = "openai-compatible-provider";
+
+export function aiProviderSecretOwnerId(providerKind: AiProviderKind | string) {
+  return `ai-provider:${providerKind.trim().toLowerCase()}`;
+}
+
+export function allAiProviderSecretOwnerIds() {
+  return AI_PROVIDER_DEFINITIONS.map((definition) =>
+    aiProviderSecretOwnerId(definition.kind),
+  );
+}
 
 // Loads persisted settings from the Tauri backend into the workspace store.
 // Combines the previously separate per-key effects into one parallel load so
@@ -114,17 +124,25 @@ export function useBootstrapSettings() {
     void invokeCommand("get_ai_provider_settings")
       .then((settings) => {
         if (!disposed) setAiProviderSettings(settings);
+        return Promise.all([
+          invokeCommand("secret_exists", {
+            request: {
+              kind: "aiApiKey",
+              ownerId: aiProviderSecretOwnerId(settings.providerKind),
+            },
+          }),
+          invokeCommand("secret_exists", {
+            request: {
+              kind: "aiApiKey",
+              ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+            },
+          }),
+        ]);
       })
-      .catch(swallow);
-
-    void invokeCommand("secret_exists", {
-      request: {
-        kind: "aiApiKey",
-        ownerId: AI_PROVIDER_SECRET_OWNER_ID,
-      },
-    })
-      .then((presence) => {
-        if (!disposed) setAiProviderHasApiKey(presence.exists);
+      .then(([providerPresence, legacyPresence]) => {
+        if (!disposed) {
+          setAiProviderHasApiKey(providerPresence.exists || legacyPresence.exists);
+        }
       })
       .catch(swallow);
 

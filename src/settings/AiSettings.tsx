@@ -10,8 +10,8 @@ import {
   type AiProviderSettingsField,
 } from "../ai/providers";
 import { SUPPORTED_LANGUAGES } from "../i18n/config";
-import { AI_PROVIDER_SECRET_OWNER_ID } from "../lib/settings";
-import { invokeCommand, isTauriRuntime } from "../lib/tauri";
+import { aiProviderSecretOwnerId } from "../lib/settings";
+import { invokeCommand, isTauriRuntime, openExternalUrl } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import type {
   AiAssistantToolId,
@@ -20,8 +20,9 @@ import type {
   AiReasoningEffort,
   SearchProvider,
 } from "../types";
-import { SettingsSectionHeader, SettingsSummary } from "./shared";
+import { SettingsSectionHeader } from "./shared";
 import { ToggleSwitch } from "./ToggleSwitch";
+import { shouldShowStoredAiProviderKeyMask } from "./aiProviderKeyField";
 import i18next from "../i18n/config";
 
 function createStoredApiKeyMask() {
@@ -29,30 +30,6 @@ function createStoredApiKeyMask() {
   return "*".repeat(maskLength);
 }
 
-function formatProviderHost(baseUrl: string) {
-  try {
-    return new URL(baseUrl).host || i18next.t("settings.openAiCompatibleEndpoint");
-  } catch {
-    return i18next.t("settings.openAiCompatibleEndpoint");
-  }
-}
-
-function formatAiProviderCapability(capability: string) {
-  switch (capability) {
-    case "toolCalling":
-      return i18next.t("settings.capabilityToolCalling");
-    case "mcpReady":
-      return i18next.t("settings.capabilityMcpReady");
-    case "localRuntime":
-      return i18next.t("settings.capabilityLocalRuntime");
-    case "openAiCompatible":
-      return i18next.t("settings.capabilityOpenAiCompatible");
-    case "sdkOAuth":
-      return i18next.t("settings.capabilitySdkOAuth");
-    default:
-      return capability;
-  }
-}
 
 function formatReasoningEffort(effort: AiReasoningEffort) {
   switch (effort) {
@@ -93,7 +70,12 @@ function AiProviderSettingsFieldControl({
   const { t } = useTranslation();
   const [isApiKeyInputFocused, setIsApiKeyInputFocused] = useState(false);
   const shouldShowStoredApiKeyMask =
-    field === "apiKey" && hasApiKey && !isApiKeyInputFocused && apiKeyDraft.length === 0;
+    field === "apiKey" &&
+    shouldShowStoredAiProviderKeyMask({
+      apiKeyDraft,
+      hasProviderApiKey: hasApiKey,
+      isInputFocused: isApiKeyInputFocused,
+    });
 
   switch (field) {
     case "baseUrl":
@@ -159,7 +141,18 @@ function AiProviderSettingsFieldControl({
     case "apiKey":
       return (
         <label>
-          <span>{definition.apiKeyLabel}</span>
+          <span>
+            {definition.apiKeyLabel}
+            {definition.apiKeyUrl ? (
+              <button
+                className="settings-api-key-link"
+                onClick={() => void openExternalUrl(definition.apiKeyUrl!)}
+                type="button"
+              >
+                {t("settings.howToGetApiKey")}
+              </button>
+            ) : null}
+          </span>
           <input
             autoComplete="off"
             disabled={!definition.requiresApiKey}
@@ -371,13 +364,13 @@ function AiAssistantToolsControl({
 export function AiSettings() {
   const { t } = useTranslation();
   const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
-  const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
   const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
   const setAiProviderHasApiKey = useWorkspaceStore((state) => state.setAiProviderHasApiKey);
   const showStatusBarNotice = useWorkspaceStore((state) => state.showStatusBarNotice);
   const [draft, setDraft] = useState(aiProviderSettings);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyStoredMask, setApiKeyStoredMask] = useState(createStoredApiKeyMask);
+  const [selectedProviderHasApiKey, setSelectedProviderHasApiKey] = useState(false);
   const [searchApiKeyDraft, setSearchApiKeyDraft] = useState("");
   const [searchApiKeyStoredMask, setSearchApiKeyStoredMask] = useState(createStoredApiKeyMask);
   const [hasSearchApiKey, setHasSearchApiKey] = useState(false);
@@ -390,6 +383,27 @@ export function AiSettings() {
   useEffect(() => {
     setDraft(aiProviderSettings);
   }, [aiProviderSettings]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let disposed = false;
+    setApiKeyDraft("");
+    void invokeCommand("secret_exists", {
+      request: {
+        kind: "aiApiKey",
+        ownerId: aiProviderSecretOwnerId(draft.providerKind),
+      },
+    })
+      .then((presence) => {
+        if (!disposed) setSelectedProviderHasApiKey(presence.exists);
+      })
+      .catch(() => {
+        if (!disposed) setSelectedProviderHasApiKey(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [draft.providerKind]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -429,12 +443,13 @@ export function AiSettings() {
           await invokeCommand("store_secret", {
             request: {
               kind: "aiApiKey",
-              ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+              ownerId: aiProviderSecretOwnerId(nextSettings.providerKind),
               secret: apiKeyDraft.trim(),
             },
           });
         }
         setAiProviderHasApiKey(true);
+        setSelectedProviderHasApiKey(true);
         setApiKeyDraft("");
         setApiKeyStoredMask(createStoredApiKeyMask());
       }
@@ -477,6 +492,7 @@ export function AiSettings() {
       reasoningEffort: defaults.reasoningEffort,
     }));
     setApiKeyDraft("");
+    setSelectedProviderHasApiKey(false);
   }
 
   return (
@@ -529,7 +545,7 @@ export function AiSettings() {
               definition={aiProviderDefinition}
               draft={draft}
               field={field}
-              hasApiKey={aiProviderHasApiKey}
+              hasApiKey={selectedProviderHasApiKey}
               key={field}
               onApiKeyDraftChange={setApiKeyDraft}
               onDraftChange={(patch) =>
@@ -592,19 +608,6 @@ export function AiSettings() {
         searchApiKeyStoredMask={searchApiKeyStoredMask}
       />
 
-      <div className="settings-summary-grid compact">
-        <SettingsSummary label={t("settings.activeEndpoint")} value={formatProviderHost(draft.baseUrl)} />
-        <SettingsSummary
-          label={t("settings.capabilities")}
-          value={aiProviderDefinition.capabilities
-            .map(formatAiProviderCapability)
-            .join(", ")}
-        />
-        <SettingsSummary
-          label={t("settings.reasoning")}
-          value={formatReasoningEffort(draft.reasoningEffort)}
-        />
-      </div>
     </section>
   );
 }

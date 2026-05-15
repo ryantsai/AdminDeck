@@ -1,5 +1,18 @@
 import { groupCredentialsForSettings } from "./credentialGroups.ts";
+import { aiProviderSecretOwnerId } from "../lib/settings.ts";
 import type { StoredCredentialSummary } from "../types";
+
+if (aiProviderSecretOwnerId("openai") !== "ai-provider:openai") {
+  throw new Error("OpenAI should use its own AI provider key owner.");
+}
+
+if (aiProviderSecretOwnerId("openrouter") !== "ai-provider:openrouter") {
+  throw new Error("OpenRouter should use its own AI provider key owner.");
+}
+
+if (aiProviderSecretOwnerId("openai") === aiProviderSecretOwnerId("openrouter")) {
+  throw new Error("AI provider keys must not share one keychain owner.");
+}
 
 const rows: StoredCredentialSummary[] = [
   {

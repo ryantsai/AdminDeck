@@ -1,4 +1,4 @@
-{
+﻿{
     "ai": {
         "addContext": "Agregar contexto",
         "addFiles": "Agregar archivos/fotos",
@@ -1057,7 +1057,6 @@
     },
     "settings": {
         "accent": "Acento",
-        "activeEndpoint": "Endpoint activo",
         "activeUiFont": "Fuente de interfaz activa",
         "aiAllowInsecureTls": "Permitir TLS inseguro para proveedores de IA",
         "aiAllowInsecureTlsHint": "Ignorar certificados inválidos o autofirmados para solicitudes de proveedores de IA. Usar solo para puntos finales locales o internos de confianza.",
@@ -1290,7 +1289,6 @@
         "rdpResolutionHint": "Se asigna a DesktopWidth, DesktopHeight, SmartSizing y sincronización de pantalla.",
         "rdpResolutionValue": "Ajustar a los límites del espacio de trabajo",
         "rdpSettingsSaved": "Valores predeterminados de RDP guardados.",
-        "reasoning": "Razonamiento",
         "reasoningEffort": "Esfuerzo de razonamiento",
         "remoteResize": "Redimensionamiento remoto",
         "repository": "Repositorio",

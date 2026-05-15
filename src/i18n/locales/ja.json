@@ -1,4 +1,4 @@
-{
+﻿{
     "ai": {
         "addContext": "コンテキストを追加",
         "addFiles": "ファイル/写真を追加",
@@ -1058,7 +1058,6 @@
     },
     "settings": {
         "accent": "アクセント",
-        "activeEndpoint": "有効なエンドポイント",
         "activeUiFont": "現在のUIフォント",
         "aiAllowInsecureTls": "AIプロバイダーに安全でないTLSを許可",
         "aiAllowInsecureTlsHint": "AIプロバイダーリクエストに対して無効または自己署名証明書を無視します。信頼できるローカルまたは内部エンドポイントにのみ使用してください。",
@@ -1139,7 +1138,6 @@
         "bar": "バー",
         "bitmapCache": "ビットマップキャッシュ",
         "block": "ブロック",
-        "capabilities": "機能",
         "capabilityLocalRuntime": "ローカル",
         "capabilityMcpReady": "MCP対応",
         "capabilityOpenAiCompatible": "OpenAI互換",
@@ -1298,7 +1296,6 @@
         "rdpResolutionHint": "DesktopWidth、DesktopHeight、SmartSizing、およびディスプレイ同期に対応します。",
         "rdpResolutionValue": "ワークスペース領域に合わせる",
         "rdpSettingsSaved": "RDP デフォルトを保存しました。",
-        "reasoning": "推論",
         "reasoningEffort": "推論の強度",
         "remoteResize": "リモートリサイズ",
         "repository": "リポジトリ",

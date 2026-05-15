@@ -64,7 +64,7 @@ import { prepareAssistantTerminalInput } from "./terminalCommandSend";
 import { marked, type Tokens } from "marked";
 import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AI_PROVIDER_SECRET_OWNER_ID } from "../lib/settings";
+import { aiProviderSecretOwnerId } from "../lib/settings";
 import {
   parseAssistantSecretRequests,
   secretRequestStorageNotice,
@@ -600,14 +600,18 @@ function normalizeDateString(value: unknown) {
 
 const ASSISTANT_CHAT_HISTORY_KEY = "kkterm.aiAssistant.chatHistory.v1";
 
-function createAiProviderSecretRequestMarkdown(label: string, provider: string) {
+function createAiProviderSecretRequestMarkdown(
+  label: string,
+  provider: string,
+  providerKind: string,
+) {
   return [
     i18next.t("ai.secretCardAiProviderMessage", { provider }),
     "",
     "```kkterm-secret-request",
     JSON.stringify({
       kind: "aiApiKey",
-      ownerId: AI_PROVIDER_SECRET_OWNER_ID,
+      ownerId: aiProviderSecretOwnerId(providerKind),
       label,
       description: i18next.t("ai.secretCardAiProviderDescription", { provider }),
     }),
@@ -1458,6 +1462,7 @@ export function AssistantPanel({
           ? createAiProviderSecretRequestMarkdown(
               providerDefinition.apiKeyLabel,
               providerDefinition.label,
+              aiProviderSettings.providerKind,
             )
           : `${t("ai.providerError")}: ${providerErrorMessage}`,
         requestIntent,
