@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import type { WidgetPreset } from "../types";
 
 export interface PresetChromeProps {
   title: string;
-  summary?: string;
   icon: ReactNode;
   body: ReactNode;
   controls?: ReactNode;
@@ -13,50 +11,12 @@ export interface PresetChromeProps {
   actionDirection?: "vertical" | "horizontal";
 }
 
-function PanelTitle({ title, summary }: { title: string; summary?: string }) {
-  const [showTip, setShowTip] = useState(false);
-  const timer = useRef<number | null>(null);
-
-  function clearTimer() {
-    if (timer.current !== null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-  }
-
-  useEffect(() => clearTimer, []);
-
-  function handleEnter() {
-    if (!summary) return;
-    clearTimer();
-    timer.current = window.setTimeout(() => setShowTip(true), 3000);
-  }
-
-  function handleLeave() {
-    clearTimer();
-    setShowTip(false);
-  }
-
-  return (
-    <div
-      className="dw-title-group"
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
-    >
-      <h3 className="dw-title">{title}</h3>
-      {showTip && summary ? (
-        <span className="dw-subtitle-tip" role="tooltip">{summary}</span>
-      ) : null}
-    </div>
-  );
-}
-
-function PanelChrome({ title, summary, icon, body, controls, editMode }: PresetChromeProps) {
+function PanelChrome({ title, icon, body, controls, editMode }: PresetChromeProps) {
   return (
     <div className="dw-preset dw-preset-panel">
       <div className={`dw-head${editMode ? " drag-handle" : ""}`}>
         <span className="dw-icon">{icon}</span>
-        <PanelTitle title={title} summary={summary} />
+        <h3 className="dw-title">{title}</h3>
         {controls}
       </div>
       <div className="dw-body">{body}</div>

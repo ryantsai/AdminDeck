@@ -759,7 +759,6 @@
         "addWidget": "新增 {{name}}",
         "addWidgetLabel": "新增小工具",
         "advanced": "進階",
-        "advancedNothing": "內建小工具無進階設定。",
         "agentWidgetBuiltInId": "請使用不同的小工具 ID；該 ID 屬於內建小工具。",
         "agentWidgetDialogHint": "從 AI 助理或編碼代理貼上已審核的小工具 JSON 區塊。KKTerm 將其儲存在本機，不執行程式碼。",
         "agentWidgetDialogTitle": "新增代理撰寫的小工具",

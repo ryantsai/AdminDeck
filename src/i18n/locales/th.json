@@ -758,7 +758,6 @@
         "addWidget": "เพิ่ม {{name}}",
         "addWidgetLabel": "เพิ่มวิดเจ็ต",
         "advanced": "ขั้นสูง",
-        "advancedNothing": "ไม่มีค่าขั้นสูงสำหรับวิดเจ็ตในตัว",
         "agentWidgetBuiltInId": "ใช้ ID วิดเจ็ตอื่น ID นั้นเป็นของวิดเจ็ตในตัว",
         "agentWidgetDialogHint": "วางบล็อก JSON วิดเจ็ตที่ตรวจสอบแล้วจากผู้ช่วย AI หรือเอเจนต์เขียนโค้ด KKTerm บันทึกในเครื่องและไม่เรียกใช้โค้ด",
         "agentWidgetDialogTitle": "เพิ่มวิดเจ็ตที่เอเจนต์เขียน",

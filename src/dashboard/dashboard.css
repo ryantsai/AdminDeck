@@ -685,14 +685,6 @@ main.dashboard-page.dashboard-page-hidden,
   border-bottom-color: color-mix(in srgb, var(--w-accent) 60%, transparent);
 }
 
-.dw-title-group {
-  display: grid;
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  gap: 2px;
-}
-
 .dw-title,
 .dw-action-title,
 .dw-hero-title {
@@ -709,23 +701,6 @@ main.dashboard-page.dashboard-page-hidden,
 .dw-preset-panel .dw-title {
   color: var(--w-title-text);
   text-shadow: 0 1px 1px rgb(0 0 0 / 22%);
-}
-
-.dw-subtitle-tip {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 20;
-  margin-top: 4px;
-  max-width: 240px;
-  padding: 6px 8px;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
-  font-size: 11px;
-  line-height: 1.3;
 }
 
 .dw-icon {
@@ -798,8 +773,8 @@ main.dashboard-page.dashboard-page-hidden,
 
 .dw-controls {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 10px;
+  right: 10px;
   z-index: 2;
   display: inline-flex;
   gap: 2px;
@@ -1203,8 +1178,8 @@ main.dashboard-page.dashboard-page-hidden,
 .dw-customize {
   position: fixed;
   z-index: 160;
-  width: 280px;
-  padding: 14px;
+  display: grid;
+  grid-template-columns: 124px 1fr;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1213,19 +1188,71 @@ main.dashboard-page.dashboard-page-hidden,
     0 16px 48px -12px rgb(0 0 0 / 28%),
     inset 0 0 0 1px rgb(255 255 255 / 5%);
   font-size: 12.5px;
+  overflow: hidden;
 }
 
-.dw-customize section + section {
+.dw-customize-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 6px;
+  background: var(--surface-muted);
+  border-right: 1px solid var(--border);
+}
+
+.dw-customize-nav-item {
+  display: block;
+  padding: 7px 10px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.dw-customize-nav-item:hover {
+  color: var(--text);
+}
+
+.dw-customize-nav-item.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.dw-customize-pane {
+  max-height: min(560px, 80vh);
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.dw-customize-pane section + section {
   margin-top: 12px;
 }
 
-.dw-customize h4 {
+.dw-customize-pane h4 {
   margin: 0 0 10px;
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.dw-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dw-field-row > span {
+  flex: 1 1 auto;
 }
 
 .dw-preset-picker,
@@ -1285,22 +1312,6 @@ main.dashboard-page.dashboard-page-hidden,
 .dw-accent-picker button.active {
   border-color: var(--text);
   box-shadow: inset 0 0 0 2px var(--surface);
-}
-
-.dw-advanced-toggle {
-  padding: 0;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.dw-advanced {
-  display: grid;
-  gap: 8px;
-  margin-top: 8px;
 }
 
 .dw-source-view {

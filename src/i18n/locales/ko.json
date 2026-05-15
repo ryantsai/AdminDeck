@@ -758,7 +758,6 @@
         "addWidget": "{{name}} 추가",
         "addWidgetLabel": "위젯 추가",
         "advanced": "고급",
-        "advancedNothing": "내장 위젯에는 고급 설정이 없습니다.",
         "agentWidgetBuiltInId": "다른 위젯 ID를 사용하세요. 해당 ID는 내장 위젯에 속합니다.",
         "agentWidgetDialogHint": "AI 어시스턴트 또는 코딩 에이전트에서 검토된 위젯 JSON 블록을 붙여넣으세요. KKTerm은 로컬에 저장하며 코드를 실행하지 않습니다.",
         "agentWidgetDialogTitle": "에이전트 작성 위젯 추가",

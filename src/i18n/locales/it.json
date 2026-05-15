@@ -759,7 +759,6 @@
         "addWidget": "Aggiungi {{name}}",
         "addWidgetLabel": "Aggiungi widget",
         "advanced": "Avanzate",
-        "advancedNothing": "Nessuna impostazione avanzata per i widget integrati.",
         "agentWidgetBuiltInId": "Usa un ID widget diverso; quell'ID appartiene a un widget integrato.",
         "agentWidgetDialogHint": "Incolla un blocco JSON di widget revisionato dall'Assistente IA o da un agente di codifica. KKTerm lo salva localmente e non esegue codice.",
         "agentWidgetDialogTitle": "Aggiungi widget creato da agente",

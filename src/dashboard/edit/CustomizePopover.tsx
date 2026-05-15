@@ -1,7 +1,8 @@
 import * as Icons from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invokeCommand, isTauriRuntime } from "../../lib/tauri";
+import { ToggleSwitch } from "../../settings/ToggleSwitch";
 import { useDashboardStore } from "../state/dashboardStore";
 import { ACCENT_PALETTE } from "../registry/palette";
 import {
@@ -23,17 +24,57 @@ export interface CustomizePopoverProps {
   onClose: () => void;
 }
 
+type SectionKey = "common" | "widget" | "advanced";
+
+const POPOVER_MARGIN = 8;
+const POPOVER_WIDTH = 440;
+
 export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePopoverProps) {
   const { t } = useTranslation();
-  const updateInstance = useDashboardStore((s) => s.updateInstance);
   const customWidgets = useDashboardStore((s) => s.customWidgets);
-  const updateCustomWidget = useDashboardStore((s) => s.updateCustomWidget);
   const ref = useRef<HTMLDivElement | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number; visible: boolean }>({
+    top: anchorRect.bottom + 6,
+    left: anchorRect.left,
+    visible: false,
+  });
+  const [section, setSection] = useState<SectionKey>("common");
+
+  const customSource =
+    instance.kind !== "builtIn" ? customWidgets.find((c) => c.id === instance.sourceId) : undefined;
+  const settingsSchema = useMemo(
+    () => (customSource ? parseSettingsSchema(customSource.settingsSchemaJson) : null),
+    [customSource],
+  );
+  const hasWidgetSettings = Boolean(customSource);
+  const hasAdvanced = instance.kind !== "builtIn";
+
+  const sections = useMemo(() => {
+    const list: { key: SectionKey; label: string }[] = [
+      { key: "common", label: t("dashboard.customize.sectionCommon") },
+    ];
+    if (hasWidgetSettings) {
+      list.push({ key: "widget", label: t("dashboard.customize.sectionWidget") });
+    }
+    if (hasAdvanced) {
+      list.push({ key: "advanced", label: t("dashboard.advanced") });
+    }
+    return list;
+  }, [hasWidgetSettings, hasAdvanced, t]);
 
   useEffect(() => {
-    function onDoc(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); }
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    if (!sections.some((s) => s.key === section)) {
+      setSection("common");
+    }
+  }, [section, sections]);
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -42,19 +83,73 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
     };
   }, [onClose]);
 
-  const top = anchorRect.bottom + 6;
-  const left = Math.min(anchorRect.left, window.innerWidth - 320);
-  const customSource =
-    instance.kind !== "builtIn" ? customWidgets.find((c) => c.id === instance.sourceId) : undefined;
-  const settingsSchema = customSource
-    ? parseSettingsSchema(customSource.settingsSchemaJson)
-    : null;
-  const settingsValues = settingsSchema
-    ? parseSettingsValues(settingsSchema, instance.settingsValuesJson)
-    : {};
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const height = rect.height;
+    const width = rect.width;
+    const below = anchorRect.bottom + 6;
+    const above = anchorRect.top - height - 6;
+    const fitsBelow = below + height + POPOVER_MARGIN <= window.innerHeight;
+    const top = fitsBelow ? below : Math.max(POPOVER_MARGIN, above);
+    let left = Math.min(anchorRect.left, window.innerWidth - width - POPOVER_MARGIN);
+    left = Math.max(POPOVER_MARGIN, left);
+    setPosition({ top, left, visible: true });
+  }, [anchorRect, section]);
 
   return (
-    <div ref={ref} className="dw-customize" style={{ top, left }}>
+    <div
+      ref={ref}
+      className="dw-customize"
+      style={{
+        top: position.top,
+        left: position.left,
+        width: POPOVER_WIDTH,
+        visibility: position.visible ? "visible" : "hidden",
+      }}
+    >
+      <nav className="dw-customize-nav">
+        {sections.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            className={`dw-customize-nav-item${section === s.key ? " active" : ""}`}
+            onClick={() => setSection(s.key)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </nav>
+      <div className="dw-customize-pane">
+        {section === "common" ? <CommonSection instance={instance} /> : null}
+        {section === "widget" ? (
+          <WidgetSection schema={settingsSchema} instance={instance} />
+        ) : null}
+        {section === "advanced" ? <AdvancedSection instance={instance} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function CommonSection({ instance }: { instance: DashboardWidgetInstance }) {
+  const { t } = useTranslation();
+  const updateInstance = useDashboardStore((s) => s.updateInstance);
+
+  return (
+    <>
+      <section>
+        <h4>{t("dashboard.titleLabel")}</h4>
+        <input
+          defaultValue={instance.customTitle ?? ""}
+          placeholder={t("dashboard.titlePlaceholder")}
+          onBlur={(e) => {
+            const value = e.target.value.trim();
+            updateInstance(instance.id, { customTitle: value.length === 0 ? null : value });
+          }}
+        />
+      </section>
+
       <section>
         <h4>{t("dashboard.presetLabel")}</h4>
         <div className="dw-preset-picker">
@@ -70,20 +165,19 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
         </div>
       </section>
 
-      {instance.preset === "ambient" && (
+      {instance.preset === "ambient" ? (
         <section>
-          <label className="dw-field">
-            <input
-              type="checkbox"
-              checked={instance.glass === true}
-              onChange={(e) => updateInstance(instance.id, { glass: e.target.checked })}
-            />
+          <label className="dw-field dw-field-row">
             <span>{t("dashboard.glassBackground")}</span>
+            <ToggleSwitch
+              checked={instance.glass === true}
+              onChange={(checked) => updateInstance(instance.id, { glass: checked })}
+            />
           </label>
         </section>
-      )}
+      ) : null}
 
-      {instance.preset === "action" && (
+      {instance.preset === "action" ? (
         <section>
           <h4>{t("dashboard.actionDirection")}</h4>
           <div className="dw-preset-picker">
@@ -98,7 +192,7 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
             ))}
           </div>
         </section>
-      )}
+      ) : null}
 
       <section>
         <h4>{t("dashboard.accent")}</h4>
@@ -139,65 +233,73 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
           })}
         </div>
       </section>
+    </>
+  );
+}
 
+function WidgetSection({
+  schema,
+  instance,
+}: {
+  schema: WidgetSettingsSchema | null;
+  instance: DashboardWidgetInstance;
+}) {
+  const { t } = useTranslation();
+  const updateInstance = useDashboardStore((s) => s.updateInstance);
+  const settingsValues = useMemo(
+    () => (schema ? parseSettingsValues(schema, instance.settingsValuesJson) : {}),
+    [schema, instance.settingsValuesJson],
+  );
+
+  if (!schema) {
+    return (
       <section>
-        <h4>{t("dashboard.titleLabel")}</h4>
-        <input
-          defaultValue={instance.customTitle ?? ""}
-          placeholder={t("dashboard.titlePlaceholder")}
-          onBlur={(e) => {
-            const value = e.target.value.trim();
-            updateInstance(instance.id, { customTitle: value.length === 0 ? null : value });
+        <h4>{t("dashboard.widgetSettings")}</h4>
+        <p className="dw-muted">{t("dashboard.widgetSettingsInvalid")}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <h4>{t("dashboard.widgetSettings")}</h4>
+      {schema.fields.length > 0 ? (
+        <WidgetSettingsFields
+          schema={schema}
+          values={settingsValues}
+          instanceId={instance.id}
+          onChange={(key, value) => {
+            const next = { ...settingsValues, [key]: value };
+            void updateInstance(instance.id, { settingsValuesJson: JSON.stringify(next) });
           }}
         />
-      </section>
-
-      {customSource ? (
-        <section>
-          <h4>{t("dashboard.widgetSettings")}</h4>
-          {settingsSchema ? (
-            settingsSchema.fields.length > 0 ? (
-              <WidgetSettingsFields
-                schema={settingsSchema}
-                values={settingsValues}
-                instanceId={instance.id}
-                onChange={(key, value) => {
-                  const next = { ...settingsValues, [key]: value };
-                  void updateInstance(instance.id, { settingsValuesJson: JSON.stringify(next) });
-                }}
-              />
-            ) : (
-              <p className="dw-muted">{t("dashboard.widgetSettingsEmpty")}</p>
-            )
-          ) : (
-            <p className="dw-muted">{t("dashboard.widgetSettingsInvalid")}</p>
-          )}
-        </section>
-      ) : null}
-
-      <section>
-        <button className="dw-advanced-toggle" onClick={() => setShowAdvanced((v) => !v)}>
-          {showAdvanced ? "▾ " : "▸ "}{t("dashboard.advanced")}
-        </button>
-        {showAdvanced && (
-          <div className="dw-advanced">
-            {instance.kind === "script" && customSource && (
-              <ScriptAdvanced
-                bodyJson={customSource.bodyJson}
-                onUpdate={(next) => updateCustomWidget(customSource.id, { bodyJson: next })}
-              />
-            )}
-            {instance.kind === "content" && customSource && (
-              <pre className="dw-source-view">{customSource.bodyJson}</pre>
-            )}
-            {instance.kind === "builtIn" && (
-              <p className="dw-muted">{t("dashboard.advancedNothing")}</p>
-            )}
-          </div>
-        )}
-      </section>
-    </div>
+      ) : (
+        <p className="dw-muted">{t("dashboard.widgetSettingsEmpty")}</p>
+      )}
+    </section>
   );
+}
+
+function AdvancedSection({ instance }: { instance: DashboardWidgetInstance }) {
+  const customWidgets = useDashboardStore((s) => s.customWidgets);
+  const updateCustomWidget = useDashboardStore((s) => s.updateCustomWidget);
+  const customSource =
+    instance.kind !== "builtIn" ? customWidgets.find((c) => c.id === instance.sourceId) : undefined;
+
+  if (!customSource) return null;
+
+  if (instance.kind === "script") {
+    return (
+      <ScriptAdvanced
+        bodyJson={customSource.bodyJson}
+        onUpdate={(next) => updateCustomWidget(customSource.id, { bodyJson: next })}
+      />
+    );
+  }
+  if (instance.kind === "content") {
+    return <pre className="dw-source-view">{customSource.bodyJson}</pre>;
+  }
+  return null;
 }
 
 function parseSettingsSchema(settingsSchemaJson: string): WidgetSettingsSchema | null {
@@ -256,13 +358,12 @@ function WidgetSettingsFieldControl({
 
   if (field.type === "boolean") {
     return (
-      <label className="dw-field">
-        <input
-          type="checkbox"
-          checked={value === true}
-          onChange={(event) => onChange(event.target.checked)}
-        />
+      <label className="dw-field dw-field-row">
         <span>{field.label}</span>
+        <ToggleSwitch
+          checked={value === true}
+          onChange={(checked) => onChange(checked)}
+        />
       </label>
     );
   }
@@ -387,16 +488,15 @@ function ScriptAdvanced({ bodyJson, onUpdate }: { bodyJson: string; onUpdate: (n
   }
   return (
     <div className="dw-stack-fields">
-      <label className="dw-field">
-        <input
-          type="checkbox"
+      <label className="dw-field dw-field-row">
+        <span>{t("dashboard.scriptNetwork")}</span>
+        <ToggleSwitch
           checked={parsed.permissions.network}
-          onChange={(e) => {
-            const next = { ...parsed, permissions: { ...parsed.permissions, network: e.target.checked } };
+          onChange={(checked) => {
+            const next = { ...parsed, permissions: { ...parsed.permissions, network: checked } };
             onUpdate(JSON.stringify(next));
           }}
         />
-        <span>{t("dashboard.scriptNetwork")}</span>
       </label>
       <label className="dw-field">
         <span>{t("dashboard.scriptPollSeconds")}</span>

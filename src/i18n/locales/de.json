@@ -759,7 +759,6 @@
         "addWidget": "{{name}} hinzufügen",
         "addWidgetLabel": "Widget hinzufügen",
         "advanced": "Erweitert",
-        "advancedNothing": "Keine erweiterten Einstellungen für integrierte Widgets.",
         "agentWidgetBuiltInId": "Verwenden Sie eine andere Widget-ID; diese ID gehört zu einem integrierten Widget.",
         "agentWidgetDialogHint": "Fügen Sie einen überprüften Widget-JSON-Block vom KI-Assistenten oder einem Coding-Agenten ein. KKTerm speichert ihn lokal und führt keinen Code aus.",
         "agentWidgetDialogTitle": "Agenten-erstelltes Widget hinzufügen",

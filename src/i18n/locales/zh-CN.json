@@ -759,7 +759,6 @@
         "addWidget": "添加 {{name}}",
         "addWidgetLabel": "添加小部件",
         "advanced": "高级",
-        "advancedNothing": "内置小部件无高级设置。",
         "agentWidgetBuiltInId": "请使用不同的小部件 ID；该 ID 属于内置小部件。",
         "agentWidgetDialogHint": "从 AI 助手或编码代理粘贴已审核的小部件 JSON 块。KKTerm 将其保存在本地，不执行代码。",
         "agentWidgetDialogTitle": "添加代理编写的小部件",

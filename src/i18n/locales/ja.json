@@ -759,7 +759,6 @@
         "addWidget": "{{name}} を追加",
         "addWidgetLabel": "ウィジェットを追加",
         "advanced": "詳細",
-        "advancedNothing": "組み込みウィジェットには詳細設定はありません。",
         "agentWidgetBuiltInId": "別のウィジェット ID を使用してください。その ID は組み込みウィジェットに属しています。",
         "agentWidgetDialogHint": "AI アシスタントまたはコーディングエージェントからレビュー済みのウィジェット JSON ブロックを貼り付けます。KKTerm はローカルに保存し、コードは実行しません。",
         "agentWidgetDialogTitle": "エージェント作成ウィジェットを追加",

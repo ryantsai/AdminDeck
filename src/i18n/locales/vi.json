@@ -758,7 +758,6 @@
         "addWidget": "Thêm {{name}}",
         "addWidgetLabel": "Thêm Tiện ích",
         "advanced": "Nâng cao",
-        "advancedNothing": "Không có cài đặt nâng cao cho tiện ích tích hợp.",
         "agentWidgetBuiltInId": "Hãy dùng id tiện ích khác; id đó thuộc về tiện ích tích hợp sẵn.",
         "agentWidgetDialogHint": "Dán khối JSON tiện ích đã được đánh giá từ AI Assistant hoặc tác nhân viết mã. KKTerm lưu cục bộ và không chạy mã.",
         "agentWidgetDialogTitle": "Thêm tiện ích do tác nhân soạn",

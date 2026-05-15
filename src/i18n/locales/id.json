@@ -758,7 +758,6 @@
         "addWidget": "Tambah {{name}}",
         "addWidgetLabel": "Tambah Widget",
         "advanced": "Lanjutan",
-        "advancedNothing": "Tidak ada pengaturan lanjutan untuk widget bawaan.",
         "agentWidgetBuiltInId": "Gunakan id widget yang berbeda; id tersebut milik widget bawaan.",
         "agentWidgetDialogHint": "Tempel blok JSON widget yang telah ditinjau dari AI Assistant atau agen koding. KKTerm menyimpannya secara lokal dan tidak menjalankan kode.",
         "agentWidgetDialogTitle": "Tambah widget buatan agen",
