@@ -5,12 +5,14 @@ import { writeToClipboard } from "../lib/clipboard";
 import {
   Bot,
   Camera,
+  Check,
   ChevronDown,
   ChevronRight,
   Copy,
   Eye,
   EyeOff,
   FileImage,
+  Hand,
   KeyRound,
   LoaderCircle,
   PanelRight,
@@ -19,6 +21,7 @@ import {
   ScrollText,
   SendHorizontal,
   Settings,
+  ShieldAlert,
   Square,
   Terminal,
   X,
@@ -639,6 +642,7 @@ export function AssistantPanel({
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
   const [assistantIntent, setAssistantIntent] = useState<AssistantPromptIntent>("chat");
   const [addContextMenuOpen, setAddContextMenuOpen] = useState(false);
+  const [permissionMenuOpen, setPermissionMenuOpen] = useState(false);
   const [pastedImageContexts, setPastedImageContexts] = useState<AssistantImageAttachment[]>([]);
   const [fileContexts, setFileContexts] = useState<AssistantFileAttachment[]>([]);
   const [imagePasteRejected, setImagePasteRejected] = useState(false);
@@ -647,6 +651,7 @@ export function AssistantPanel({
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addContextMenuRef = useRef<HTMLDivElement | null>(null);
+  const permissionMenuRef = useRef<HTMLDivElement | null>(null);
   const regionTargetRef = useRef<HTMLDivElement | null>(null);
   const regionSelectionRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantRequestIdRef = useRef(0);
@@ -670,6 +675,7 @@ export function AssistantPanel({
     pageContext?.contextKind === "dashboard" && Boolean(aiProviderSettings.tools?.dashboard);
   const providerDefinition = getAiProviderDefinition(aiProviderSettings.providerKind);
   const currentModel = aiProviderSettings.model || providerDefinition.defaultModel;
+  const currentToolPermissionMode = aiProviderSettings.toolPermissionMode ?? "prompt";
   const modelOptionIds = useMemo(
     () => new Set(providerDefinition.modelOptions.map((model) => model.id)),
     [providerDefinition],
@@ -788,6 +794,32 @@ export function AssistantPanel({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [addContextMenuOpen]);
+
+  useEffect(() => {
+    if (!permissionMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const node = permissionMenuRef.current;
+      if (node && !node.contains(event.target as Node)) {
+        setPermissionMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPermissionMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [permissionMenuOpen]);
 
   function handleSendCodeToTerminal(code: string) {
     if (activeTerminalPaneId) {
@@ -1185,6 +1217,11 @@ export function AssistantPanel({
   }
 
   async function handleToolPermissionModeChange(toolPermissionMode: AiToolPermissionMode) {
+    setPermissionMenuOpen(false);
+    if (toolPermissionMode === currentToolPermissionMode) {
+      return;
+    }
+
     const previousSettings = aiProviderSettings;
     const nextSettings = normalizeAiProviderDraft({
       ...previousSettings,
@@ -2150,6 +2187,57 @@ export function AssistantPanel({
               </div>
             ) : null}
           </div>
+          <div className="assistant-permission-menu-wrapper" ref={permissionMenuRef}>
+            <button
+              {...menuButtonAria(permissionMenuOpen)}
+              aria-label={t("ai.toolPermissionMode")}
+              className="assistant-permission-button"
+              data-mode={currentToolPermissionMode}
+              disabled={isSendingPrompt}
+              onClick={() => setPermissionMenuOpen((open) => !open)}
+              title={t("ai.toolPermissionMode")}
+              type="button"
+            >
+              {currentToolPermissionMode === "allowAll" ? (
+                <ShieldAlert size={15} />
+              ) : (
+                <Hand size={15} />
+              )}
+              <span>
+                {currentToolPermissionMode === "allowAll"
+                  ? t("ai.toolPermissionAllowAll")
+                  : t("ai.toolPermissionPrompt")}
+              </span>
+              <ChevronDown size={14} />
+            </button>
+            {permissionMenuOpen ? (
+              <div className="assistant-permission-menu" role="menu" aria-label={t("ai.toolPermissionMode")}>
+                <button
+                  aria-checked={currentToolPermissionMode === "prompt"}
+                  className="assistant-permission-menu-item"
+                  onClick={() => void handleToolPermissionModeChange("prompt")}
+                  role="menuitemradio"
+                  type="button"
+                >
+                  <Hand size={16} />
+                  <span>{t("ai.toolPermissionPrompt")}</span>
+                  {currentToolPermissionMode === "prompt" ? <Check size={16} /> : null}
+                </button>
+                <button
+                  aria-checked={currentToolPermissionMode === "allowAll"}
+                  className="assistant-permission-menu-item"
+                  data-mode="allowAll"
+                  onClick={() => void handleToolPermissionModeChange("allowAll")}
+                  role="menuitemradio"
+                  type="button"
+                >
+                  <ShieldAlert size={16} />
+                  <span>{t("ai.toolPermissionAllowAll")}</span>
+                  {currentToolPermissionMode === "allowAll" ? <Check size={16} /> : null}
+                </button>
+              </div>
+            ) : null}
+          </div>
           <select
             aria-label={t("settings.model")}
             className="assistant-model-select"
@@ -2164,21 +2252,6 @@ export function AssistantPanel({
                 {model.label}
               </option>
             ))}
-          </select>
-          <select
-            aria-label={t("ai.toolPermissionMode")}
-            className="assistant-permission-select"
-            disabled={isSendingPrompt}
-            onChange={(event) =>
-              void handleToolPermissionModeChange(
-                event.currentTarget.value as AiToolPermissionMode,
-              )
-            }
-            title={t("ai.toolPermissionMode")}
-            value={aiProviderSettings.toolPermissionMode ?? "prompt"}
-          >
-            <option value="prompt">{t("ai.toolPermissionPrompt")}</option>
-            <option value="allowAll">{t("ai.toolPermissionAllowAll")}</option>
           </select>
           <button
             aria-label={isSendingPrompt ? t("ai.stopMessage") : t("ai.sendMessage")}

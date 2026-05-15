@@ -4548,7 +4548,7 @@ progress {
 
 .assistant-composer-footer span,
 .assistant-model-select,
-.assistant-permission-select {
+.assistant-permission-button span {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -4556,8 +4556,7 @@ progress {
   white-space: nowrap;
 }
 
-.assistant-model-select,
-.assistant-permission-select {
+.assistant-model-select {
   height: 29px;
   padding: 0 2px;
   color: var(--text-faint);
@@ -4575,27 +4574,100 @@ progress {
   width: 28%;
 }
 
-.assistant-permission-select {
-  flex: 0 0 82px;
-  width: 82px;
+.assistant-permission-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex: 0 1 162px;
+  width: 162px;
+  min-width: 118px;
+}
+
+.assistant-permission-button {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  width: 100%;
+  height: 29px;
+  min-width: 0;
+  padding: 0 8px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  outline: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.assistant-permission-button[data-mode="allowAll"] {
+  color: #9b4d00;
+  background: rgba(180, 92, 0, 0.12);
 }
 
 .assistant-model-select:hover,
-.assistant-permission-select:hover {
+.assistant-permission-button:hover {
   color: var(--text-muted);
 }
 
 .assistant-model-select:focus,
-.assistant-permission-select:focus {
+.assistant-permission-button:focus {
   color: var(--text-muted);
   border-color: var(--accent);
   box-shadow: none;
 }
 
 .assistant-model-select:disabled,
-.assistant-permission-select:disabled {
+.assistant-permission-button:disabled {
   cursor: not-allowed;
   opacity: 0.62;
+}
+
+.assistant-permission-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  display: grid;
+  width: 228px;
+  padding: 8px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.assistant-permission-menu-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  gap: 10px;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 8px;
+  color: var(--text-muted);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.assistant-permission-menu-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-permission-menu-item:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.assistant-permission-menu-item[data-mode="allowAll"] {
+  color: #9b4d00;
 }
 
 .assistant-plus-button,
