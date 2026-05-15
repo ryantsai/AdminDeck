@@ -1330,7 +1330,17 @@ main.dashboard-page {
 }
 
 .app-launcher-widget {
+  position: relative;
   gap: 10px;
+  border-radius: 8px;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.app-launcher-widget.is-drop-target {
+  background: color-mix(in srgb, var(--w-accent-soft) 72%, transparent);
+  box-shadow: inset 0 0 0 1px var(--w-accent);
 }
 
 .app-launcher-widget-toolbar {
@@ -1338,6 +1348,13 @@ main.dashboard-page {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.app-launcher-widget .app-launcher-add {
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 
 .app-launcher-tile-grid {

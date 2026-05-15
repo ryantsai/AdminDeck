@@ -80,6 +80,10 @@ export function isRunnablePath(path: string) {
   return /\.(exe|lnk|bat|cmd|ps1)$/i.test(path.trim());
 }
 
+export function appLauncherNameFromPath(path: string) {
+  return launcherNameFromPath(path);
+}
+
 function readPreviewSettings(): AppLauncherSettings {
   if (typeof window === "undefined") {
     return { entries: [] };

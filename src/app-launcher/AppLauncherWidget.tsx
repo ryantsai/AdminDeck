@@ -10,9 +10,10 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
+import type { DragEvent, FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { selectAppLauncherFile, selectAppLauncherFolder, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import { useDashboardStore } from "../dashboard/state/dashboardStore";
@@ -24,6 +25,7 @@ import type {
   PreparedAppLauncherEntry,
 } from "../types";
 import {
+  appLauncherNameFromPath,
   isRunnablePath,
   launchAppLauncherEntry,
   parseAppLauncherSettingsJson,
@@ -64,12 +66,50 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
   const [dialogDraft, setDialogDraft] = useState<EntryDraft | null>(null);
   const [menuState, setMenuState] = useState<MenuState | null>(null);
   const [addMenuState, setAddMenuState] = useState<AddMenuState | null>(null);
+  const [isDropTarget, setIsDropTarget] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const addMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSettings(parseAppLauncherSettingsJson(instance.settingsValuesJson));
   }, [instance.settingsValuesJson]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    void getCurrentWebview().onDragDropEvent((event) => {
+      if (disposed) {
+        return;
+      }
+      if (event.payload.type === "over") {
+        setIsDropTarget(isPositionInsideWidget(event.payload.position.x, event.payload.position.y));
+      } else if (event.payload.type === "drop") {
+        const inside = isPositionInsideWidget(event.payload.position.x, event.payload.position.y);
+        setIsDropTarget(false);
+        if (inside) {
+          void saveDroppedPaths(event.payload.paths);
+        }
+      } else {
+        setIsDropTarget(false);
+      }
+    }).then((dispose) => {
+      if (disposed) {
+        dispose();
+      } else {
+        unlisten = dispose;
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [instance.id, settings.entries, showStatusBarNotice, t, updateInstance]);
 
   useEffect(() => {
     let disposed = false;
@@ -173,6 +213,17 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
   function openAddMenuFromElement(element: HTMLElement) {
     const bounds = element.getBoundingClientRect();
     setAddMenuState({ x: bounds.left, y: bounds.bottom + 4 });
+  }
+
+  function isPositionInsideWidget(x: number, y: number) {
+    const bounds = rootRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return false;
+    }
+    const scale = window.devicePixelRatio || 1;
+    const cssX = x / scale;
+    const cssY = y / scale;
+    return cssX >= bounds.left && cssX <= bounds.right && cssY >= bounds.top && cssY <= bounds.bottom;
   }
 
   async function addAppEntry() {
@@ -345,6 +396,71 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
     }
   }
 
+  async function saveDroppedPaths(paths: string[]) {
+    const uniquePaths = Array.from(new Set(paths.map((path) => path.trim()).filter(Boolean)));
+    if (uniquePaths.length === 0) {
+      return;
+    }
+
+    try {
+      const now = new Date().toISOString();
+      const droppedEntries = await Promise.all(
+        uniquePaths.map(async (path, index) => {
+          let prepared: PreparedAppLauncherEntry | undefined;
+          try {
+            prepared = await prepareAppLauncherEntry(path);
+          } catch {
+            prepared = undefined;
+          }
+          const entryPath = prepared?.path ?? path;
+          const entryName = prepared?.name ?? appLauncherNameFromPath(entryPath);
+          return {
+            id: `app-launcher-${Date.now()}-${index}`,
+            name: entryName,
+            path: entryPath,
+            arguments: null,
+            workingDirectory: null,
+            iconDataUrl: prepared?.iconDataUrl ?? null,
+            railPinned: false,
+            createdAt: now,
+            updatedAt: now,
+          } satisfies AppLauncherEntry;
+        }),
+      );
+      await saveSettings({ entries: [...settings.entries, ...droppedEntries] });
+      const lastEntry = droppedEntries[droppedEntries.length - 1];
+      if (lastEntry) {
+        showStatusBarNotice(t("appLauncher.savedStatus", { name: lastEntry.name }), {
+          tone: "success",
+        });
+      }
+    } catch (error) {
+      showStatusBarNotice(
+        t("appLauncher.saveError", { message: errorMessage(error) }),
+        { tone: "error" },
+      );
+    }
+  }
+
+  function handleBrowserDragOver(event: DragEvent<HTMLDivElement>) {
+    if (isTauriRuntime() || !hasBrowserDropPayload(event)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDropTarget(true);
+  }
+
+  function handleBrowserDrop(event: DragEvent<HTMLDivElement>) {
+    if (isTauriRuntime()) {
+      return;
+    }
+    event.preventDefault();
+    setIsDropTarget(false);
+    const paths = pathsFromBrowserDrop(event);
+    void saveDroppedPaths(paths);
+  }
+
   async function saveSettings(nextSettings: AppLauncherSettings) {
     const normalized = parseAppLauncherSettingsJson(serializeAppLauncherSettings(nextSettings));
     setSettings(normalized);
@@ -368,15 +484,21 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
   }
 
   return (
-    <div className="dashboard-widget-body app-launcher-widget">
+    <div
+      className={`dashboard-widget-body app-launcher-widget${isDropTarget ? " is-drop-target" : ""}`}
+      onDragLeave={() => setIsDropTarget(false)}
+      onDragOver={handleBrowserDragOver}
+      onDrop={handleBrowserDrop}
+      ref={rootRef}
+    >
       <div className="app-launcher-widget-toolbar">
         <button
           className="secondary-button app-launcher-add"
+          aria-label={t("common.add")}
           onClick={(event) => openAddMenuFromElement(event.currentTarget)}
           type="button"
         >
           <Plus size={14} />
-          {t("common.add")}
         </button>
       </div>
       {settings.entries.length > 0 ? (
@@ -716,6 +838,33 @@ function MenuButton({
 function optionalText(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function hasBrowserDropPayload(event: DragEvent<HTMLElement>) {
+  return event.dataTransfer.files.length > 0 || event.dataTransfer.getData("text/plain").trim().length > 0;
+}
+
+function pathsFromBrowserDrop(event: DragEvent<HTMLElement>) {
+  const filePaths = Array.from(event.dataTransfer.files)
+    .map((file) => filePathFromBrowserFile(file))
+    .filter(Boolean);
+  const textPaths = event.dataTransfer
+    .getData("text/plain")
+    .split(/\r?\n/u)
+    .map((path) => path.trim())
+    .filter(Boolean);
+  return [...filePaths, ...textPaths];
+}
+
+function filePathFromBrowserFile(file: File) {
+  const candidate = file as File & { path?: unknown; webkitRelativePath?: string };
+  if (typeof candidate.path === "string" && candidate.path.trim()) {
+    return candidate.path;
+  }
+  if (candidate.webkitRelativePath) {
+    return candidate.webkitRelativePath;
+  }
+  return file.name;
 }
 
 function errorMessage(error: unknown) {
