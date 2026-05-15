@@ -1,6 +1,7 @@
 import { anthropicProvider } from "./anthropic";
 import { azureOpenAiProvider } from "./azureOpenAi";
 import { deepSeekProvider } from "./deepseek";
+import { geminiProvider } from "./gemini";
 import { githubCopilotProvider } from "./githubCopilot";
 import { grokProvider } from "./grok";
 import { liteLlmProvider } from "./litellm";
@@ -17,6 +18,7 @@ export const AI_PROVIDER_DEFINITIONS: AiProviderDefinition[] = [
   anthropicProvider,
   openRouterProvider,
   deepSeekProvider,
+  geminiProvider,
   grokProvider,
   azureOpenAiProvider,
   liteLlmProvider,

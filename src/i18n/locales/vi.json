@@ -1,4 +1,4 @@
-{
+﻿{
     "ai": {
         "addContext": "Add context",
         "addFiles": "Add Files/Photos",
@@ -1037,7 +1037,6 @@
     },
     "settings": {
         "accent": "Accent",
-        "activeEndpoint": "Active endpoint",
         "activeUiFont": "Active UI font",
         "aiAllowInsecureTls": "Cho phép TLS không an toàn cho nhà cung cấp AI",
         "aiAllowInsecureTlsHint": "Bỏ qua chứng chỉ không hợp lệ hoặc tự ký cho các yêu cầu của nhà cung cấp AI. Chỉ sử dụng cho các điểm cuối cục bộ hoặc nội bộ đáng tin cậy.",
@@ -1110,7 +1109,6 @@
         "bar": "Bar",
         "bitmapCache": "Bitmap cache",
         "block": "Block",
-        "capabilities": "Capabilities",
         "capabilityLocalRuntime": "cục bộ",
         "capabilityMcpReady": "MCP sẵn sàng",
         "capabilityOpenAiCompatible": "tương thích OpenAI",
@@ -1264,7 +1262,6 @@
         "rdpResolutionHint": "Ánh xạ tới DesktopWidth, DesktopHeight, SmartSizing và đồng bộ hiển thị.",
         "rdpResolutionValue": "Vừa giới hạn không gian làm việc",
         "rdpSettingsSaved": "Đã lưu mặc định RDP.",
-        "reasoning": "Reasoning",
         "reasoningEffort": "Reasoning effort",
         "remoteResize": "Remote resize",
         "repository": "Repository",

@@ -1,4 +1,4 @@
-{
+﻿{
     "ai": {
         "addContext": "添加上下文",
         "addFiles": "添加文件/图片",
@@ -1038,7 +1038,6 @@
     },
     "settings": {
         "accent": "强调色",
-        "activeEndpoint": "使用中的端点",
         "activeUiFont": "当前 UI 字体",
         "aiAllowInsecureTls": "允许 AI 提供商使用不安全的 TLS",
         "aiAllowInsecureTlsHint": "忽略 AI 提供商请求的无效或自签名证书。仅用于受信任的本地或内部端点。",
@@ -1111,7 +1110,6 @@
         "bar": "条状",
         "bitmapCache": "位图缓存",
         "block": "方块",
-        "capabilities": "功能",
         "capabilityLocalRuntime": "本地",
         "capabilityMcpReady": "MCP 就绪",
         "capabilityOpenAiCompatible": "OpenAI 兼容",
@@ -1265,7 +1263,6 @@
         "rdpResolutionHint": "映射到 DesktopWidth、DesktopHeight、SmartSizing 和显示同步。",
         "rdpResolutionValue": "适配工作区边界",
         "rdpSettingsSaved": "RDP 默认值已保存。",
-        "reasoning": "推理",
         "reasoningEffort": "推理力度",
         "remoteResize": "远程调整大小",
         "repository": "仓库",
