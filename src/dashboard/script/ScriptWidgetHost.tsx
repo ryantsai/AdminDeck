@@ -29,24 +29,30 @@ import { loadWidgetLibraries, resolveWidgetLibraryKeys } from "./widgetLibraries
 // Set<string> would silently exceed the cap because the evicted iframe
 // would keep running.
 //
-// The cap value lives in Settings → Dashboard
+// The cap value lives in Settings -> Dashboard
 // (`dashboardSettings.maxActiveScriptWidgets`), defaults to 8, and is clamped
 // 1..=100 by the Rust validator. Components pass the current value into
-// `tryActivateScriptWidget`; existing iframes are not retroactively
-// re-capped when the user lowers the limit (the next mount picks it up).
+// `tryActivateScriptWidget`; lowering the cap enforces the new ceiling as
+// hosts re-run their effect, while raising it lets later mounts claim room.
 type SetCapped = (capped: boolean) => void;
 const activeScriptWidgets = new Map<string, SetCapped>();
+
+function normalizeScriptWidgetCap(cap: number): number {
+  return Math.max(1, Math.floor(Number.isFinite(cap) ? cap : 1));
+}
 
 function tryActivateScriptWidget(
   id: string,
   setCapped: SetCapped,
   cap: number,
 ): boolean {
+  const normalizedCap = normalizeScriptWidgetCap(cap);
   if (activeScriptWidgets.has(id)) {
     activeScriptWidgets.set(id, setCapped);
     return true;
   }
-  if (activeScriptWidgets.size >= cap) return false;
+  enforceActiveScriptWidgetCap(normalizedCap, id);
+  if (activeScriptWidgets.size >= normalizedCap) return false;
   activeScriptWidgets.set(id, setCapped);
   return true;
 }
@@ -66,6 +72,30 @@ function evictOldestActiveScriptWidget(exceptId: string): boolean {
     return true;
   }
   return false;
+}
+
+function enforceActiveScriptWidgetCap(cap: number, exceptId: string) {
+  while (activeScriptWidgets.size > cap) {
+    if (!evictOldestActiveScriptWidget(exceptId)) break;
+  }
+}
+
+function activateScriptWidgetWithEviction(
+  id: string,
+  setCapped: SetCapped,
+  cap: number,
+): boolean {
+  const normalizedCap = normalizeScriptWidgetCap(cap);
+  if (activeScriptWidgets.has(id)) {
+    activeScriptWidgets.set(id, setCapped);
+    return true;
+  }
+  while (activeScriptWidgets.size >= normalizedCap) {
+    if (!evictOldestActiveScriptWidget(id)) break;
+  }
+  if (activeScriptWidgets.size >= normalizedCap) return false;
+  activeScriptWidgets.set(id, setCapped);
+  return true;
 }
 
 export function ScriptWidgetHost({
@@ -105,9 +135,8 @@ export function ScriptWidgetHost({
 
   // Harden 3: register this widget in the active set. If the cap is exceeded,
   // show a lightweight placeholder instead of the full iframe. Re-runs when
-  // the user changes the cap in Settings so a raised cap can let an
-  // otherwise-capped widget mount in place (lowering it does not retroactively
-  // tear down already-running iframes — only new mounts honor the lower cap).
+  // the user changes the cap in Settings so the active set honors the current
+  // ceiling and capped widgets can claim newly available room.
   useEffect(() => {
     const activated = tryActivateScriptWidget(
       instance.id,
@@ -124,9 +153,12 @@ export function ScriptWidgetHost({
     // Evict the oldest active widget (notifying it so its iframe tears
     // down) before taking its slot. Without the notify step the evicted
     // iframe keeps running and the cap is silently exceeded.
-    evictOldestActiveScriptWidget(instance.id);
-    tryActivateScriptWidget(instance.id, setCapped, maxActiveScriptWidgets);
-    setCapped(false);
+    const activated = activateScriptWidgetWithEviction(
+      instance.id,
+      setCapped,
+      maxActiveScriptWidgets,
+    );
+    setCapped(!activated);
   }, [instance.id, maxActiveScriptWidgets]);
 
   useEffect(() => {
@@ -349,11 +381,6 @@ export function ScriptWidgetHost({
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") activateCapped(); }}
         role="button"
         tabIndex={0}
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          width: "100%", height: "100%", cursor: "pointer",
-          opacity: 0.65, fontSize: 12, userSelect: "none",
-        }}
       >
         {t("dashboard.scriptWidgetCapped", { max: maxActiveScriptWidgets })}
       </div>
@@ -376,10 +403,11 @@ export function ScriptWidgetHost({
     <iframe
       ref={iframeRef}
       key={reloadKey}
-      title="dashboard-script"
+      className="dw-script-frame"
+      title={t("dashboard.scriptWidgetFrameTitle")}
+      loading="lazy"
       sandbox="allow-scripts allow-downloads"
       srcDoc={srcdoc}
-      style={{ width: "100%", height: "100%", border: "none", background: "transparent" }}
     />
   );
 }

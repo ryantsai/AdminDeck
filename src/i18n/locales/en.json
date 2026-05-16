@@ -132,6 +132,7 @@
     "missingBuiltInWidget": "Missing built-in widget: {{sourceId}}",
     "missingCustomWidget": "Missing custom widget: {{sourceId}}",
     "scriptWidgetCapped": "Click to activate (max {{max}} active widgets)",
+    "scriptWidgetFrameTitle": "Dashboard script widget",
     "untitledWidget": "Widget",
     "customize": "Customize widget",
     "customizeSectionCommon": "Common",

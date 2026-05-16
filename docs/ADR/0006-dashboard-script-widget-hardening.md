@@ -100,12 +100,11 @@ regression threshold on the original incident hardware.
 `ScriptWidgetHost` reads the cap from `useWorkspaceStore` and passes it
 into `tryActivateScriptWidget`. The mount effect depends on the cap, so:
 
-- **Raising the cap** lets a previously-capped widget activate the next
-  time it mounts. We do not auto-activate already-mounted placeholders —
-  the user can click any of them to swap in.
-- **Lowering the cap** does *not* retroactively tear down running iframes.
-  Only new mounts honor the lower value. This is intentional: we never
-  tear down a widget the user is actively looking at.
+- **Raising the cap** gives capped hosts room to activate on their next cap
+  effect pass, up to the new ceiling.
+- **Lowering the cap** enforces the new ceiling as hosts re-run their cap
+  effect. This may replace older running iframes with placeholders, but it
+  preserves the hard resource boundary the setting promises.
 
 The constants live in two places that must stay in sync:
 
@@ -171,10 +170,11 @@ the prompt missed.
 
 - Validation runs at the layer where the AI's mistake is cheapest to reject
   (before SQLite write). Bad widgets never reach the renderer.
-- The cap bounds the worst case: at most three simultaneous animation loops
-  from script widgets, regardless of how many widgets exist on the Dashboard.
+- The cap bounds the worst case: at most the configured number of script
+  widget iframes can run at once, regardless of how many widgets exist on
+  the Dashboard.
 - A poisoned mutex no longer cascades into an app-wide crash.
-- Dynamic backgrounds (e.g., Matrix) still run alongside the three capped
+- Dynamic backgrounds (e.g., Matrix) still run alongside the capped script
   widgets, but they are app-owned and well-bounded.
 
 **Negative**
@@ -196,6 +196,9 @@ the prompt missed.
   the same `setVisible` message channel.
 - The validator and the cap are independent — adjusting either does not
   require touching the other.
+- Network permission covers remote data and images, not remote script
+  execution. Runtime CDN script injection stays blocked by CSP; new shared
+  code should be added through the curated local library registry.
 
 ## Operational notes
 

@@ -859,6 +859,37 @@ button {
   gap: 10px;
 }
 
+.dw-script-frame {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 0;
+}
+
+.dw-script-capped {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0.65;
+  user-select: none;
+  font-size: 12px;
+}
+
+.dw-script-capped:hover,
+.dw-script-capped:focus-visible {
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.dw-script-capped:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .dashboard-field,
 .dashboard-field-row {
   display: grid;

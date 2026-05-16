@@ -9,7 +9,7 @@ export interface ResolvedWidgetLibrary {
 export function buildCsp(perm: ScriptBody["permissions"]): string {
   const connect = perm.network ? "*" : "'none'";
   const images = perm.network ? "http: https: data: blob:" : "data: blob:";
-  const scripts = perm.network ? "'unsafe-inline' blob: http: https:" : "'unsafe-inline' blob:";
+  const scripts = "'unsafe-inline' blob:";
   return [
     "default-src 'none'",
     "style-src 'unsafe-inline'",

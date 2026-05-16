@@ -210,6 +210,7 @@ Declared permissions:
 - `permissions.network: false` → CSP blocks `connect-src`; `fetch`, XHR, and WebSocket all fail.
 - `permissions.network: false` → external images are blocked; only `data:` and `blob:` images may load.
 - `permissions.network: true` → `connect-src *` is permitted and `http:` / `https:` images may load.
+- `permissions.network: true` does **not** permit external scripts. Script widgets may run their own source plus KKTerm's curated bundled libraries only; runtime CDN script injection stays blocked by CSP so generated widgets cannot bypass the local library catalog.
 - `permissions.pollSeconds` → informational; the script self-schedules. The host may enforce a minimum floor in a follow-up.
 
 External website links must leave the widget iframe. The host script intercepts absolute `http:` / `https:` anchor clicks and sends an `openExternalUrl` bridge message to the parent, where `ScriptWidgetHost.tsx` validates the URL and calls Tauri's opener plugin. Script widgets may also call `KK.openExternal(url)` directly. This avoids navigating third-party sites inside a sandboxed `srcdoc` iframe with an opaque origin, which can produce site errors such as unknown/null origin headers.
