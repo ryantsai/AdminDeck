@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { invokeCommand, openExternalUrl } from "../../lib/tauri";
+import {
+  invokeCommand,
+  openExternalUrl,
+  pickAndReadFile,
+  pickAndSaveFile,
+  type WidgetFilePickFilter,
+} from "../../lib/tauri";
 import { useDashboardStore } from "../state/dashboardStore";
 import type { DashboardWidgetInstance, ScriptBody } from "../types";
 import {
@@ -88,6 +94,14 @@ export function ScriptWidgetHost({
       }
       if (isScriptWidgetGetSecretMessage(data)) {
         void sendSecretResponse(data);
+        return;
+      }
+      if (isScriptWidgetSaveFileMessage(data)) {
+        void sendSaveFileResponse(data);
+        return;
+      }
+      if (isScriptWidgetReadFileMessage(data)) {
+        void sendReadFileResponse(data);
       }
     }
 
@@ -104,6 +118,63 @@ export function ScriptWidgetHost({
         target.postMessage({
           kk: true,
           type: "secretValue",
+          requestId: data.requestId,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }, "*");
+      }
+    }
+
+    async function sendSaveFileResponse(data: {
+      requestId: string;
+      filename: string;
+      bytes: Uint8Array;
+      filters?: WidgetFilePickFilter[];
+    }) {
+      const target = iframeRef.current?.contentWindow;
+      if (!target) return;
+      try {
+        const bytes = data.bytes instanceof Uint8Array
+          ? data.bytes
+          : new Uint8Array(data.bytes as unknown as ArrayBuffer);
+        const path = await pickAndSaveFile(data.filename, bytes, data.filters);
+        target.postMessage({
+          kk: true,
+          type: "saveFileResult",
+          requestId: data.requestId,
+          ok: true,
+          path,
+        }, "*");
+      } catch (error) {
+        target.postMessage({
+          kk: true,
+          type: "saveFileResult",
+          requestId: data.requestId,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }, "*");
+      }
+    }
+
+    async function sendReadFileResponse(data: {
+      requestId: string;
+      filters?: WidgetFilePickFilter[];
+    }) {
+      const target = iframeRef.current?.contentWindow;
+      if (!target) return;
+      try {
+        const result = await pickAndReadFile(data.filters);
+        target.postMessage({
+          kk: true,
+          type: "readLocalFileResult",
+          requestId: data.requestId,
+          ok: true,
+          file: result ? { name: result.name, bytes: result.bytes } : null,
+        }, "*");
+      } catch (error) {
+        target.postMessage({
+          kk: true,
+          type: "readLocalFileResult",
           requestId: data.requestId,
           ok: false,
           error: error instanceof Error ? error.message : String(error),
@@ -186,6 +257,57 @@ function isScriptWidgetGetSecretMessage(value: unknown): value is { kk: true; ty
     typeof candidate.key === "string" &&
     candidate.key.length > 0
   );
+}
+
+function isFilterArray(value: unknown): value is WidgetFilePickFilter[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((entry) =>
+    entry !== null &&
+    typeof entry === "object" &&
+    typeof (entry as WidgetFilePickFilter).name === "string" &&
+    Array.isArray((entry as WidgetFilePickFilter).extensions) &&
+    (entry as WidgetFilePickFilter).extensions.every((ext) => typeof ext === "string"),
+  );
+}
+
+function isScriptWidgetSaveFileMessage(value: unknown): value is {
+  kk: true;
+  type: "saveFile";
+  requestId: string;
+  filename: string;
+  bytes: Uint8Array;
+  filters?: WidgetFilePickFilter[];
+} {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as {
+    kk?: unknown;
+    type?: unknown;
+    requestId?: unknown;
+    filename?: unknown;
+    bytes?: unknown;
+    filters?: unknown;
+  };
+  if (candidate.kk !== true || candidate.type !== "saveFile") return false;
+  if (typeof candidate.requestId !== "string" || typeof candidate.filename !== "string") return false;
+  if (!candidate.filename) return false;
+  const bytesOk = candidate.bytes instanceof Uint8Array || candidate.bytes instanceof ArrayBuffer;
+  if (!bytesOk) return false;
+  if (candidate.filters !== undefined && !isFilterArray(candidate.filters)) return false;
+  return true;
+}
+
+function isScriptWidgetReadFileMessage(value: unknown): value is {
+  kk: true;
+  type: "readLocalFile";
+  requestId: string;
+  filters?: WidgetFilePickFilter[];
+} {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { kk?: unknown; type?: unknown; requestId?: unknown; filters?: unknown };
+  if (candidate.kk !== true || candidate.type !== "readLocalFile") return false;
+  if (typeof candidate.requestId !== "string") return false;
+  if (candidate.filters !== undefined && !isFilterArray(candidate.filters)) return false;
+  return true;
 }
 
 export function useScriptReloadHandle() {

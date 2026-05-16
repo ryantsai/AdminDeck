@@ -5,7 +5,7 @@ import {
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
 import type { ConfirmDialogOptions } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { readFile, writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import i18next from "../i18n/config";
 import type {
@@ -1809,6 +1809,62 @@ export function isTauriRuntime() {
     "__TAURI_INTERNALS__" in
       (window as Window & { __TAURI_INTERNALS__?: unknown })
   );
+}
+
+export interface WidgetFilePickFilter {
+  name: string;
+  extensions: string[];
+}
+
+export interface WidgetReadFileResult {
+  name: string;
+  bytes: Uint8Array;
+  path: string;
+}
+
+/**
+ * Open a native file picker and return the selected file's bytes. Used by
+ * dashboard script widgets via KK.readLocalFile. Returns null when the user
+ * cancels.
+ */
+export async function pickAndReadFile(
+  filters?: WidgetFilePickFilter[],
+): Promise<WidgetReadFileResult | null> {
+  if (!isTauriRuntime()) {
+    throw new Error("File picker is only available in the Tauri runtime.");
+  }
+  const selection = await openDialog({
+    directory: false,
+    multiple: false,
+    filters: filters && filters.length > 0 ? filters : undefined,
+  });
+  const path = typeof selection === "string" ? selection : null;
+  if (!path) return null;
+  const bytes = await readFile(path);
+  const name = path.split(/[/\\]/).pop() ?? path;
+  return { name, bytes, path };
+}
+
+/**
+ * Show a native save dialog and write the supplied bytes to the chosen path.
+ * Used by dashboard script widgets via KK.saveFile. Returns the chosen path
+ * or null if the user cancels.
+ */
+export async function pickAndSaveFile(
+  defaultFilename: string,
+  bytes: Uint8Array,
+  filters?: WidgetFilePickFilter[],
+): Promise<string | null> {
+  if (!isTauriRuntime()) {
+    throw new Error("Save dialog is only available in the Tauri runtime.");
+  }
+  const path = await saveDialog({
+    defaultPath: defaultFilename,
+    filters: filters && filters.length > 0 ? filters : undefined,
+  });
+  if (typeof path !== "string" || !path) return null;
+  await writeFile(path, bytes);
+  return path;
 }
 
 export async function selectWikiExportPath(defaultFilename: string) {

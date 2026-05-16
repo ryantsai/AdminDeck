@@ -161,6 +161,69 @@ export function buildSrcdoc(
           KK.setSettings(nextSettings);
         },
         openExternal: function (url) { window.parent.postMessage({ kk: true, type: 'openExternalUrl', url }, "*"); },
+        saveFile: function (filename, bytes, filters) {
+          return new Promise(function (resolve, reject) {
+            if (typeof filename !== 'string' || !filename) {
+              reject(new Error('filename is required.'));
+              return;
+            }
+            let buffer = null;
+            if (bytes instanceof Uint8Array) {
+              buffer = bytes;
+            } else if (bytes instanceof ArrayBuffer) {
+              buffer = new Uint8Array(bytes);
+            } else if (bytes && bytes.buffer instanceof ArrayBuffer) {
+              buffer = new Uint8Array(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
+            }
+            if (!buffer) {
+              reject(new Error('bytes must be a Uint8Array, ArrayBuffer, or typed array.'));
+              return;
+            }
+            var requestId = 'file-save-' + Math.random().toString(36).slice(2);
+            function onMessage(event) {
+              var data = event.data;
+              if (!data || data.kk !== true || data.type !== 'saveFileResult' || data.requestId !== requestId) return;
+              window.removeEventListener('message', onMessage);
+              if (data.ok) {
+                resolve(data.path || null);
+              } else {
+                reject(new Error(data.error || 'File save failed.'));
+              }
+            }
+            window.addEventListener('message', onMessage);
+            window.parent.postMessage({
+              kk: true,
+              type: 'saveFile',
+              requestId: requestId,
+              filename: filename,
+              bytes: buffer,
+              filters: Array.isArray(filters) ? filters : undefined,
+            }, "*");
+          });
+        },
+        readLocalFile: function (options) {
+          return new Promise(function (resolve, reject) {
+            var filters = options && Array.isArray(options.filters) ? options.filters : undefined;
+            var requestId = 'file-read-' + Math.random().toString(36).slice(2);
+            function onMessage(event) {
+              var data = event.data;
+              if (!data || data.kk !== true || data.type !== 'readLocalFileResult' || data.requestId !== requestId) return;
+              window.removeEventListener('message', onMessage);
+              if (data.ok) {
+                resolve(data.file || null);
+              } else {
+                reject(new Error(data.error || 'File read failed.'));
+              }
+            }
+            window.addEventListener('message', onMessage);
+            window.parent.postMessage({
+              kk: true,
+              type: 'readLocalFile',
+              requestId: requestId,
+              filters: filters,
+            }, "*");
+          });
+        },
         postMessage: function (payload) { window.parent.postMessage({ kk: true, payload }, "*"); },
         requestPermission: function () { return Promise.resolve(false); },
       };
