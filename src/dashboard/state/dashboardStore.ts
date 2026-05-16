@@ -13,6 +13,7 @@ interface DashboardStoreState {
   views: DashboardView[];
   instances: DashboardWidgetInstance[];
   customWidgets: DashboardCustomWidget[];
+  agentCreatedRevealInstanceIds: string[];
   activeViewId: string | null;
   editMode: boolean;
   lastError: string | null;
@@ -41,6 +42,7 @@ interface DashboardStoreState {
   }) => Promise<DashboardCustomWidget | null>;
   updateCustomWidget: (id: string, patch: CustomWidgetPatch) => Promise<void>;
   removeCustomWidget: (id: string, forceDeleteInstances: boolean) => Promise<void>;
+  clearAgentCreatedReveal: (id: string) => void;
   resetDashboard: () => Promise<void>;
 }
 
@@ -67,6 +69,7 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
   views: [],
   instances: [],
   customWidgets: [],
+  agentCreatedRevealInstanceIds: [],
   activeViewId: null,
   editMode: false,
   lastError: null,
@@ -76,6 +79,7 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
     set({ loading: true });
     try {
       const state = await persistence.loadDashboardState();
+      const previous = get();
       const currentActiveViewId = get().activeViewId;
       const defaultLandingView =
         useWorkspaceStore.getState().dashboardSettings.defaultLandingView;
@@ -88,7 +92,32 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
         ?? (currentActiveViewId && state.views.some((view) => view.id === currentActiveViewId)
           ? currentActiveViewId
           : (state.views[0]?.id ?? null));
-      set({ ...state, activeViewId, ready: true, loading: false, lastError: null });
+      const previousInstanceIds = new Set(previous.instances.map((instance) => instance.id));
+      const previousCustomWidgetIds = new Set(previous.customWidgets.map((widget) => widget.id));
+      const newlyCreatedAgentWidgetIds = new Set(
+        previous.ready
+          ? state.customWidgets
+              .filter((widget) => widget.createdBy === "agent" && !previousCustomWidgetIds.has(widget.id))
+              .map((widget) => widget.id)
+          : [],
+      );
+      const agentCreatedRevealInstanceIds = previous.ready
+        ? state.instances
+            .filter(
+              (instance) =>
+                !previousInstanceIds.has(instance.id)
+                && newlyCreatedAgentWidgetIds.has(instance.sourceId),
+            )
+            .map((instance) => instance.id)
+        : [];
+      set({
+        ...state,
+        agentCreatedRevealInstanceIds,
+        activeViewId,
+        ready: true,
+        loading: false,
+        lastError: null,
+      });
     } catch (e) {
       set({ lastError: String(e), loading: false });
     }
@@ -215,6 +244,12 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
         instances: force ? s.instances.filter((i) => i.sourceId !== id) : s.instances,
       }));
     } catch (e) { set({ lastError: String(e) }); }
+  },
+
+  clearAgentCreatedReveal: (id) => {
+    set((s) => ({
+      agentCreatedRevealInstanceIds: s.agentCreatedRevealInstanceIds.filter((instanceId) => instanceId !== id),
+    }));
   },
 
   resetDashboard: async () => {

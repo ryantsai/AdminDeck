@@ -20,9 +20,11 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
   const editMode = useDashboardStore((s) => s.editMode);
   const removeInstance = useDashboardStore((s) => s.removeInstance);
   const customWidgets = useDashboardStore((s) => s.customWidgets);
+  const agentCreatedRevealInstanceIds = useDashboardStore((s) => s.agentCreatedRevealInstanceIds);
+  const clearAgentCreatedReveal = useDashboardStore((s) => s.clearAgentCreatedReveal);
   const [confirming, setConfirming] = useState(false);
-  const [revealing, setRevealing] = useState(instance.kind !== "builtIn");
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldSpaceWarp = agentCreatedRevealInstanceIds.includes(instance.id);
 
   const accent = resolveAccent(instance.accentName);
   const Render = PRESET_RENDERERS[instance.preset];
@@ -46,14 +48,10 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
   }, []);
 
   useEffect(() => {
-    if (instance.kind === "builtIn") {
-      setRevealing(false);
-      return;
-    }
-    setRevealing(true);
-    const timer = setTimeout(() => setRevealing(false), 2000);
+    if (!shouldSpaceWarp) return;
+    const timer = setTimeout(() => clearAgentCreatedReveal(instance.id), 1000);
     return () => clearTimeout(timer);
-  }, [instance.id, instance.kind]);
+  }, [clearAgentCreatedReveal, instance.id, shouldSpaceWarp]);
 
   function handleRemoveClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -110,7 +108,7 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
   const className = [
     "dw-instance",
     instance.kind !== "builtIn" ? "dw-custom-widget" : "",
-    revealing ? "dw-reveal-pixelating" : "",
+    shouldSpaceWarp ? "dw-reveal-space-warp" : "",
     editMode ? "dw-edit" : "",
   ].filter(Boolean).join(" ");
 
