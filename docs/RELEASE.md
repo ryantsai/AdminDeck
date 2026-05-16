@@ -23,6 +23,8 @@ The current bundle is a local folder under the app data directory. It includes:
 - `manifest.json` with app version, target OS/architecture, local performance snapshot, last native SSH terminal readiness when measured, and included-file list.
 - `kkterm.log` when the local startup log is available.
 
+Debug builds may also create `aiassistant.debug.log` beside `kkterm.log`. This file is not ordinary release telemetry and must not be emitted by release builds. It is a raw local troubleshooting log for AI Assistant interactions, including provider payloads, stream chunks, tool calls/results, permission blocks, live Session bridge traffic, and Dashboard widget creation checkpoints. It may contain prompts, attached context, terminal buffer text returned through tools, generated widget source, and other user-provided content. Review it carefully before sharing.
+
 The bundle intentionally excludes by default:
 
 - terminal output

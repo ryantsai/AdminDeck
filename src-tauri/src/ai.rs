@@ -33,6 +33,15 @@ use crate::storage::{
 static LIVE_TOOL_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 const COPILOT_SDK_RESPONSE_TIMEOUT: Duration = Duration::from_secs(300);
 
+macro_rules! ai_interaction_debug {
+    ($event:expr, $payload:expr) => {
+        if cfg!(debug_assertions) {
+            let payload = $payload;
+            crate::logging::ai_assistant_debug($event, &payload);
+        }
+    };
+}
+
 pub struct AssistantLiveToolBridge {
     pending: Mutex<HashMap<String, oneshot::Sender<String>>>,
 }
@@ -102,19 +111,52 @@ impl AssistantLiveToolBridge {
             "toolName": tool_name,
             "args": args,
         });
+        ai_interaction_debug!("live_tool.request", payload.clone());
         if let Err(error) = app.emit("assistant-live-tool-request", payload) {
             let _ = self.take_pending(&request_id);
+            ai_interaction_debug!(
+                "live_tool.dispatch_error",
+                json!({
+                    "requestId": request_id,
+                    "toolName": tool_name,
+                    "error": error.to_string(),
+                })
+            );
             return json!({"ok": false, "error": format!("failed to dispatch live tool request: {error}")})
                 .to_string();
         }
 
         match timeout(Duration::from_secs(15), rx).await {
-            Ok(Ok(result)) => result,
+            Ok(Ok(result)) => {
+                ai_interaction_debug!(
+                    "live_tool.result",
+                    json!({
+                        "requestId": request_id,
+                        "toolName": tool_name,
+                        "result": result,
+                    })
+                );
+                result
+            }
             Ok(Err(_)) => {
+                ai_interaction_debug!(
+                    "live_tool.channel_closed",
+                    json!({
+                        "requestId": request_id,
+                        "toolName": tool_name,
+                    })
+                );
                 json!({"ok": false, "error": "live tool response channel closed"}).to_string()
             }
             Err(_) => {
                 let _ = self.take_pending(&request_id);
+                ai_interaction_debug!(
+                    "live_tool.timeout",
+                    json!({
+                        "requestId": request_id,
+                        "toolName": tool_name,
+                    })
+                );
                 json!({"ok": false, "error": "live tool timed out waiting for the frontend"})
                     .to_string()
             }
@@ -149,6 +191,13 @@ pub fn complete_live_tool_request(
     bridge: &AssistantLiveToolBridge,
     completion: AssistantLiveToolCompletion,
 ) -> Result<(), String> {
+    ai_interaction_debug!(
+        "live_tool.frontend_completion",
+        json!({
+            "requestId": completion.request_id,
+            "result": completion.result,
+        })
+    );
     bridge.complete(&completion.request_id, completion.result)
 }
 
@@ -342,14 +391,14 @@ pub struct AgentChatMessage {
     reasoning_content: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentScreenshotContext {
     source_label: String,
     data_url: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentFileContext {
     source_label: String,
@@ -359,14 +408,14 @@ pub struct AgentFileContext {
     text: Option<String>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentPageContext {
     source_label: String,
     text: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentRunRequest {
     prompt: String,
@@ -430,8 +479,26 @@ pub async fn run_agent(
     api_key: Option<String>,
     request: AgentRunRequest,
 ) -> Result<AgentRunResponse, String> {
+    ai_interaction_debug!(
+        "agent.run_start",
+        json!({
+            "mode": "nonStreaming",
+            "settings": &settings,
+            "hasApiKey": api_key.as_ref().is_some_and(|value| !value.trim().is_empty()),
+            "request": &request,
+        })
+    );
     let provider = provider_for(settings.provider_kind())?;
-    provider.run(app, settings, api_key, request).await
+    let result = provider.run(app, settings, api_key, request).await;
+    match &result {
+        Ok(response) => {
+            ai_interaction_debug!("agent.run_success", json!({ "response": response }));
+        }
+        Err(error) => {
+            ai_interaction_debug!("agent.run_error", json!({ "error": error }));
+        }
+    }
+    result
 }
 
 pub async fn run_agent_streaming(
@@ -441,10 +508,28 @@ pub async fn run_agent_streaming(
     request: AgentRunRequest,
     channel: Channel<Value>,
 ) -> Result<AgentRunResponse, String> {
+    ai_interaction_debug!(
+        "agent.run_start",
+        json!({
+            "mode": "streaming",
+            "settings": &settings,
+            "hasApiKey": api_key.as_ref().is_some_and(|value| !value.trim().is_empty()),
+            "request": &request,
+        })
+    );
     let provider = provider_for(settings.provider_kind())?;
-    provider
+    let result = provider
         .run_streaming(app, settings, api_key, request, channel)
-        .await
+        .await;
+    match &result {
+        Ok(response) => {
+            ai_interaction_debug!("agent.run_success", json!({ "response": response }));
+        }
+        Err(error) => {
+            ai_interaction_debug!("agent.run_error", json!({ "error": error }));
+        }
+    }
+    result
 }
 
 trait AgentProvider {
@@ -703,6 +788,48 @@ fn ai_http_client(allow_insecure_tls: bool) -> Result<reqwest::Client, String> {
         .map_err(|error| format!("failed to configure AI HTTP client: {error}"))
 }
 
+fn log_provider_request<T: Serialize>(
+    api: &str,
+    provider_kind: &str,
+    model: &str,
+    turn_index: usize,
+    endpoint: &str,
+    body: &T,
+) {
+    ai_interaction_debug!(
+        "provider.request",
+        json!({
+            "api": api,
+            "providerKind": provider_kind,
+            "model": model,
+            "turn": turn_index,
+            "endpoint": endpoint,
+            "body": body,
+        })
+    );
+}
+
+fn log_provider_response(
+    api: &str,
+    provider_kind: &str,
+    model: &str,
+    turn_index: usize,
+    status: u16,
+    body: &str,
+) {
+    ai_interaction_debug!(
+        "provider.response",
+        json!({
+            "api": api,
+            "providerKind": provider_kind,
+            "model": model,
+            "turn": turn_index,
+            "status": status,
+            "body": body,
+        })
+    );
+}
+
 macro_rules! ai_debug {
     ($($arg:tt)*) => {
         if cfg!(debug_assertions) {
@@ -905,8 +1032,10 @@ fn apply_responses_stream_event(
 }
 
 fn emit_stream(channel: &Channel<Value>, event: &AiStreamEvent) -> Result<(), String> {
+    let value = serde_json::to_value(event).map_err(|e| e.to_string())?;
+    ai_interaction_debug!("stream.emit", value.clone());
     channel
-        .send(serde_json::to_value(event).map_err(|e| e.to_string())?)
+        .send(value)
         .map_err(|e| format!("failed to send stream event: {e}"))
 }
 
@@ -936,8 +1065,16 @@ async fn stream_chat_completions(
                 None => continue,
             };
             if data == "[DONE]" {
+                ai_interaction_debug!(
+                    "provider.stream_data",
+                    json!({ "api": "chat_completions", "data": data })
+                );
                 break;
             }
+            ai_interaction_debug!(
+                "provider.stream_data",
+                json!({ "api": "chat_completions", "data": data })
+            );
             let chunk: ChatSseChunk =
                 serde_json::from_str(data).map_err(|e| format!("SSE parse error: {e}"))?;
             for choice in chunk.choices {
@@ -1038,8 +1175,16 @@ async fn stream_responses_completions(
                 None => continue,
             };
             if data == "[DONE]" {
+                ai_interaction_debug!(
+                    "provider.stream_data",
+                    json!({ "api": "responses", "event": current_event.clone(), "data": data })
+                );
                 break;
             }
+            ai_interaction_debug!(
+                "provider.stream_data",
+                json!({ "api": "responses", "event": current_event.clone(), "data": data })
+            );
 
             let event: Value =
                 serde_json::from_str(data).map_err(|e| format!("SSE parse error: {e}"))?;
@@ -1108,21 +1253,30 @@ impl OpenAiCompatibleProvider {
         let mut reasoning_content: Option<String> = None;
         let mut exhausted = true;
 
-        for _ in 0..10 {
+        for turn_index in 0..10 {
+            let request_body = OpenAiCompatibleChatRequest {
+                model: settings.model().to_string(),
+                messages: messages.clone(),
+                stream: false,
+                tools: tool_definitions.clone(),
+                tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
+                thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
+            };
+            log_provider_request(
+                "chat_completions",
+                self.provider_kind,
+                settings.model(),
+                turn_index + 1,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiCompatibleChatRequest {
-                    model: settings.model().to_string(),
-                    messages: messages.clone(),
-                    stream: false,
-                    tools: tool_definitions.clone(),
-                    tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
-                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1132,6 +1286,14 @@ impl OpenAiCompatibleProvider {
                 .text()
                 .await
                 .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+            log_provider_response(
+                "chat_completions",
+                self.provider_kind,
+                settings.model(),
+                turn_index + 1,
+                status.as_u16(),
+                &response_text,
+            );
 
             if !status.is_success() {
                 return Err(format!(
@@ -1187,20 +1349,29 @@ impl OpenAiCompatibleProvider {
         }
 
         if exhausted {
+            let request_body = OpenAiCompatibleChatRequest {
+                model: settings.model().to_string(),
+                messages: messages.clone(),
+                stream: false,
+                tools: vec![],
+                tool_choice: None,
+                thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
+            };
+            log_provider_request(
+                "chat_completions",
+                self.provider_kind,
+                settings.model(),
+                11,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiCompatibleChatRequest {
-                    model: settings.model().to_string(),
-                    messages: messages.clone(),
-                    stream: false,
-                    tools: vec![],
-                    tool_choice: None,
-                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1210,6 +1381,14 @@ impl OpenAiCompatibleProvider {
                 .text()
                 .await
                 .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+            log_provider_response(
+                "chat_completions",
+                self.provider_kind,
+                settings.model(),
+                11,
+                status.as_u16(),
+                &response_text,
+            );
 
             if !status.is_success() {
                 return Err(format!(
@@ -1271,21 +1450,30 @@ impl OpenAiCompatibleProvider {
         let mut reasoning_content: Option<String> = None;
         let mut exhausted = true;
 
-        for _ in 0..10 {
+        for turn_index in 0..10 {
+            let request_body = OpenAiResponsesRequest {
+                model: settings.model().to_string(),
+                input: input.clone(),
+                stream: false,
+                store: false,
+                tools: responses_tool_definitions(&tool_definitions),
+                tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
+            };
+            log_provider_request(
+                "responses",
+                self.provider_kind,
+                settings.model(),
+                turn_index + 1,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiResponsesRequest {
-                    model: settings.model().to_string(),
-                    input: input.clone(),
-                    stream: false,
-                    store: false,
-                    tools: responses_tool_definitions(&tool_definitions),
-                    tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1295,6 +1483,14 @@ impl OpenAiCompatibleProvider {
                 .text()
                 .await
                 .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+            log_provider_response(
+                "responses",
+                self.provider_kind,
+                settings.model(),
+                turn_index + 1,
+                status.as_u16(),
+                &response_text,
+            );
 
             if !status.is_success() {
                 return Err(format!(
@@ -1343,20 +1539,29 @@ impl OpenAiCompatibleProvider {
         }
 
         if exhausted {
+            let request_body = OpenAiResponsesRequest {
+                model: settings.model().to_string(),
+                input: input.clone(),
+                stream: false,
+                store: false,
+                tools: vec![],
+                tool_choice: None,
+            };
+            log_provider_request(
+                "responses",
+                self.provider_kind,
+                settings.model(),
+                11,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiResponsesRequest {
-                    model: settings.model().to_string(),
-                    input: input.clone(),
-                    stream: false,
-                    store: false,
-                    tools: vec![],
-                    tool_choice: None,
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1366,6 +1571,14 @@ impl OpenAiCompatibleProvider {
                 .text()
                 .await
                 .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+            log_provider_response(
+                "responses",
+                self.provider_kind,
+                settings.model(),
+                11,
+                status.as_u16(),
+                &response_text,
+            );
 
             if !status.is_success() {
                 return Err(format!(
@@ -1446,20 +1659,29 @@ impl OpenAiCompatibleProvider {
                 messages.len(),
                 tool_definitions.len()
             );
+            let request_body = OpenAiCompatibleChatRequest {
+                model: model.clone(),
+                messages: messages.clone(),
+                stream: true,
+                tools: tool_definitions.clone(),
+                tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
+                thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
+            };
+            log_provider_request(
+                "chat_completions_stream",
+                self.provider_kind,
+                &model,
+                turn_index + 1,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiCompatibleChatRequest {
-                    model: model.clone(),
-                    messages: messages.clone(),
-                    stream: true,
-                    tools: tool_definitions.clone(),
-                    tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
-                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1470,6 +1692,14 @@ impl OpenAiCompatibleProvider {
                     .text()
                     .await
                     .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+                log_provider_response(
+                    "chat_completions_stream",
+                    self.provider_kind,
+                    &model,
+                    turn_index + 1,
+                    status.as_u16(),
+                    &response_text,
+                );
                 ai_debug!(
                     "chat stream HTTP error provider={} model={} subturn={} status={} body={}",
                     self.provider_kind,
@@ -1583,20 +1813,29 @@ impl OpenAiCompatibleProvider {
                 model,
                 messages.len()
             );
+            let request_body = OpenAiCompatibleChatRequest {
+                model: model.clone(),
+                messages: messages.clone(),
+                stream: true,
+                tools: vec![],
+                tool_choice: None,
+                thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
+            };
+            log_provider_request(
+                "chat_completions_stream",
+                self.provider_kind,
+                &model,
+                11,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiCompatibleChatRequest {
-                    model: model.clone(),
-                    messages: messages.clone(),
-                    stream: true,
-                    tools: vec![],
-                    tool_choice: None,
-                    thinking: deepseek_thinking(self.provider_kind, settings.reasoning_effort()),
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1607,6 +1846,14 @@ impl OpenAiCompatibleProvider {
                     .text()
                     .await
                     .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+                log_provider_response(
+                    "chat_completions_stream",
+                    self.provider_kind,
+                    &model,
+                    11,
+                    status.as_u16(),
+                    &response_text,
+                );
                 return Err(format!(
                     "{} returned HTTP {}: {}",
                     self.label,
@@ -1672,21 +1919,30 @@ impl OpenAiCompatibleProvider {
         let mut input = responses_input_from_messages(messages, request.files);
         let resp_tool_defs = responses_tool_definitions(&tool_definitions);
 
-        for _ in 0..10 {
+        for turn_index in 0..10 {
+            let request_body = OpenAiResponsesRequest {
+                model: model.clone(),
+                input: input.clone(),
+                stream: true,
+                store: false,
+                tools: resp_tool_defs.clone(),
+                tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
+            };
+            log_provider_request(
+                "responses_stream",
+                self.provider_kind,
+                &model,
+                turn_index + 1,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiResponsesRequest {
-                    model: model.clone(),
-                    input: input.clone(),
-                    stream: true,
-                    store: false,
-                    tools: resp_tool_defs.clone(),
-                    tool_choice: (!tool_definitions.is_empty()).then(|| "auto".to_string()),
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1697,6 +1953,14 @@ impl OpenAiCompatibleProvider {
                     .text()
                     .await
                     .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+                log_provider_response(
+                    "responses_stream",
+                    self.provider_kind,
+                    &model,
+                    turn_index + 1,
+                    status.as_u16(),
+                    &response_text,
+                );
                 return Err(format!(
                     "{} returned HTTP {}: {}",
                     self.label,
@@ -1765,20 +2029,29 @@ impl OpenAiCompatibleProvider {
         }
 
         if exhausted {
+            let request_body = OpenAiResponsesRequest {
+                model: model.clone(),
+                input: input.clone(),
+                stream: true,
+                store: false,
+                tools: vec![],
+                tool_choice: None,
+            };
+            log_provider_request(
+                "responses_stream",
+                self.provider_kind,
+                &model,
+                11,
+                &endpoint,
+                &request_body,
+            );
             let response = client
                 .post(endpoint.clone())
                 .headers(openai_compatible_headers(
                     api_key.as_deref(),
                     self.auth_style,
                 )?)
-                .json(&OpenAiResponsesRequest {
-                    model: model.clone(),
-                    input: input.clone(),
-                    stream: true,
-                    store: false,
-                    tools: vec![],
-                    tool_choice: None,
-                })
+                .json(&request_body)
                 .send()
                 .await
                 .map_err(|error| format!("failed to reach {}: {error}", self.label))?;
@@ -1789,6 +2062,14 @@ impl OpenAiCompatibleProvider {
                     .text()
                     .await
                     .map_err(|error| format!("failed to read {} response: {error}", self.label))?;
+                log_provider_response(
+                    "responses_stream",
+                    self.provider_kind,
+                    &model,
+                    11,
+                    status.as_u16(),
+                    &response_text,
+                );
                 return Err(format!(
                     "{} returned HTTP {}: {}",
                     self.label,
@@ -1982,6 +2263,14 @@ async fn run_copilot_sdk(
         .map_err(|error| format!("failed to create app data directory: {error}"))?;
 
     let client_options = build_copilot_sdk_client_options(app_data_dir, token);
+    ai_interaction_debug!(
+        "copilot.request",
+        json!({
+            "model": settings.model(),
+            "prompt": prompt,
+            "requestPermission": false,
+        })
+    );
     let client = CopilotSdkClient::start(client_options)
         .await
         .map_err(|error| format_copilot_sdk_error("start", error))?;
@@ -2032,6 +2321,14 @@ async fn run_copilot_sdk(
         ai_debug!("copilot sdk client stop failed: {error}");
     }
 
+    match &result {
+        Ok(content) => {
+            ai_interaction_debug!("copilot.response", json!({ "content": content }));
+        }
+        Err(error) => {
+            ai_interaction_debug!("copilot.error", json!({ "error": error }));
+        }
+    }
     result
 }
 
@@ -2968,11 +3265,31 @@ async fn run_ai_tool(
 ) -> String {
     let args: Value = serde_json::from_str(&call.function.arguments).unwrap_or_else(|_| json!({}));
     let tool_settings = settings.tools();
+    ai_interaction_debug!(
+        "tool.call",
+        json!({
+            "id": &call.id,
+            "name": &call.function.name,
+            "arguments": &call.function.arguments,
+            "parsedArguments": &args,
+            "permissionMode": settings.tool_permission_mode(),
+        })
+    );
     if tool_requires_allow_all(&call.function.name) && settings.tool_permission_mode() != "allowAll"
     {
-        return tool_permission_required_result(&call.function.name);
+        let result = tool_permission_required_result(&call.function.name);
+        ai_interaction_debug!(
+            "tool.permission_required",
+            json!({
+                "id": &call.id,
+                "name": &call.function.name,
+                "permissionMode": settings.tool_permission_mode(),
+                "result": &result,
+            })
+        );
+        return result;
     }
-    match call.function.name.as_str() {
+    let result = match call.function.name.as_str() {
         "request_secret_entry" => {
             request_secret_entry_tool(args, settings.provider_kind(), stream_channel)
         }
@@ -2996,7 +3313,16 @@ async fn run_ai_tool(
             live_session_tool(app, name, args).await
         }
         _ => "Tool is disabled in AI Assistant settings.".to_string(),
-    }
+    };
+    ai_interaction_debug!(
+        "tool.result",
+        json!({
+            "id": &call.id,
+            "name": &call.function.name,
+            "result": &result,
+        })
+    );
+    result
 }
 
 fn tool_requires_allow_all(tool_name: &str) -> bool {
@@ -3269,6 +3595,31 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
             if grid_h < 1 {
                 grid_h = 1;
             }
+            ai_interaction_debug!(
+                "dashboard.create_widget.prepare",
+                json!({
+                    "viewId": &view_id,
+                    "kind": &kind,
+                    "title": &title,
+                    "summary": &summary,
+                    "category": &category,
+                    "bodyJson": &body_json,
+                    "settingsSchemaJson": &settings_schema_json,
+                    "requestedGrid": {
+                        "w": requested_grid_w,
+                        "h": requested_grid_h,
+                    },
+                    "normalizedGrid": {
+                        "x": grid_x,
+                        "y": grid_y,
+                        "w": grid_w,
+                        "h": grid_h,
+                    },
+                    "preset": &preset,
+                    "accentName": &accent_name,
+                    "iconName": &icon_name,
+                })
+            );
             let custom_widget_id = new_dashboard_id("cw");
             let instance_id = new_dashboard_id("inst");
             let custom_widget = ds::create_custom_widget(
@@ -3283,6 +3634,14 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
                 "agent",
             )
             .map_err(|e| format!("{e:?}"))?;
+            ai_interaction_debug!(
+                "dashboard.create_widget.custom_created",
+                json!({
+                    "customWidgetId": &custom_widget_id,
+                    "instanceId": &instance_id,
+                    "customWidget": &custom_widget,
+                })
+            );
             let instance = match ds::add_instance(
                 conn,
                 &instance_id,
@@ -3300,9 +3659,25 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
                 Ok(instance) => instance,
                 Err(error) => {
                     let _ = ds::remove_custom_widget(conn, &custom_widget_id, true);
+                    ai_interaction_debug!(
+                        "dashboard.create_widget.instance_error_rollback",
+                        json!({
+                            "customWidgetId": &custom_widget_id,
+                            "instanceId": &instance_id,
+                            "error": format!("{error:?}"),
+                        })
+                    );
                     return Err(format!("{error:?}"));
                 }
             };
+            ai_interaction_debug!(
+                "dashboard.create_widget.instance_created",
+                json!({
+                    "customWidgetId": &custom_widget_id,
+                    "instanceId": &instance_id,
+                    "instance": &instance,
+                })
+            );
             Ok(json!({ "customWidget": custom_widget, "instance": instance }))
         }
         "dashboard_create_custom_widget" => {
@@ -4080,13 +4455,13 @@ struct OpenAiCompatibleResponseMessage {
     reasoning_content: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct OpenAiToolCall {
     id: String,
     function: OpenAiToolCallFunction,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct OpenAiToolCallFunction {
     name: String,
     arguments: String,
