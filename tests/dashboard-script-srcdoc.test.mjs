@@ -27,7 +27,7 @@ test("script widget source is encoded as data before iframe execution", async ()
   });
 
   assert.match(srcdoc, /script-src 'unsafe-inline' blob:/);
-  assert.match(srcdoc, /const source = /);
+  assert.match(srcdoc, /return injectScript\(/);
   assert.match(srcdoc, /padding:\s*4px;/);
   assert.doesNotMatch(srcdoc, /<script>alert\(1\)<\/script><\/div>`;/);
   assert.match(srcdoc, /\\u003cscript>alert\(1\)\\u003c\/script>\\u003c\/div>`;/);
@@ -76,4 +76,25 @@ test("script widget host exposes keyed secret bridge", async () => {
   assert.match(srcdoc, /type: 'getSecret'/);
   assert.match(srcdoc, /type !== 'secretValue'/);
   assert.doesNotMatch(srcdoc, /widget-api-key/);
+});
+
+test("script widget infers common local libraries from legacy generated source", async () => {
+  const { resolveWidgetLibraryKeys } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/widgetLibraries.ts", import.meta.url),
+  );
+
+  assert.deepEqual(
+    resolveWidgetLibraryKeys(undefined, "mermaid.initialize({ startOnLoad: false }); anime.timeline();"),
+    ["mermaid", "animejs"],
+  );
+});
+
+test("script widget resolver accepts every advertised local library", async () => {
+  const { WIDGET_LIBRARIES, resolveWidgetLibraryKeys } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/widgetLibraries.ts", import.meta.url),
+  );
+
+  const keys = Object.keys(WIDGET_LIBRARIES);
+  assert.ok(keys.length > 20);
+  assert.deepEqual(resolveWidgetLibraryKeys(keys, ""), keys);
 });

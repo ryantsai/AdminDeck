@@ -2938,7 +2938,7 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
         ));
         tools.push(tool_definition(
             "dashboard_create_widget",
-            "Create a validated AI-authored custom widget and place it on the selected Dashboard view in one step. Prefer this for user requests to create a visible widget. Prefer content widgets for static markdown, key/value summaries, checklists, and stats. Use script widgets only when the user explicitly needs live JavaScript behavior. For script widgets that display remote images, fetch remote data, or load external libraries such as Three.js from a CDN, set permissions.network to true; otherwise keep it false. External website links must be normal http/https anchors or call KK.openExternal(url), and KKTerm will open them in the user's external browser. Choose preset, accentName, iconName, and grid size deliberately from the widget purpose: panel for standard tools, tile/stat for compact metrics, action for launch/action surfaces, hero only for rare high-priority summaries. Size widgets generously enough to avoid inner scrollbars: simple timers/counters need at least 4x3, forms or images need 5x4 or larger, lists need height for expected rows. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. Prefer calm app-like accents such as blue, teal, slate, emerald, amber for warnings, and red/rose only for destructive or error-oriented widgets. Never set text and background to the same or low-contrast colors; use host CSS variables and compact app-style controls. If the widget needs user-configurable/persistent per-instance options, provide settingsSchema.fields with text, number, boolean, select, or secret fields. Use secret fields for passwords, API keys, tokens, and similar values; secret fields require type, key, label, and placeholder only, with no defaultValue. SQLite stores only secret references and scripts must call await KK.getSecret('fieldKey') to read the OS-keychain value at runtime. After this tool returns, use the returned instance.id to request any needed widget secret with ownerId dashboard-widget-secret:<instance.id>:<fieldKey>. Do not generate full HTML documents; script source should create or update DOM nodes inside the provided root.",
+            "Create a validated AI-authored custom widget and place it on the selected Dashboard view in one step. Prefer this for user requests to create a visible widget. Prefer content widgets for static markdown, key/value summaries, checklists, and stats. Use script widgets only when the user explicitly needs live JavaScript behavior. For script widgets that use curated local libraries such as mermaid or animejs, list their keys in body.libraries so KKTerm preloads them before running source. For script widgets that display remote images, fetch remote data, or load external libraries from a CDN, set permissions.network to true; otherwise keep it false. External website links must be normal http/https anchors or call KK.openExternal(url), and KKTerm will open them in the user's external browser. Choose preset, accentName, iconName, and grid size deliberately from the widget purpose: panel for standard tools, tile/stat for compact metrics, action for launch/action surfaces, hero only for rare high-priority summaries. Size widgets generously enough to avoid inner scrollbars: simple timers/counters need at least 4x3, forms or images need 5x4 or larger, lists need height for expected rows. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. Prefer calm app-like accents such as blue, teal, slate, emerald, amber for warnings, and red/rose only for destructive or error-oriented widgets. Never set text and background to the same or low-contrast colors; use host CSS variables and compact app-style controls. If the widget needs user-configurable/persistent per-instance options, provide settingsSchema.fields with text, number, boolean, select, or secret fields. Use secret fields for passwords, API keys, tokens, and similar values; secret fields require type, key, label, and placeholder only, with no defaultValue. SQLite stores only secret references and scripts must call await KK.getSecret('fieldKey') to read the OS-keychain value at runtime. After this tool returns, use the returned instance.id to request any needed widget secret with ownerId dashboard-widget-secret:<instance.id>:<fieldKey>. Do not generate full HTML documents; script source should create or update DOM nodes inside the provided root.",
             dashboard_create_widget_schema(),
         ).strict());
         tools.push(tool_definition(
@@ -3161,9 +3161,43 @@ fn dashboard_widget_body_schema() -> Value {
             {"type":"object","properties":{"shape":{"type":"string","enum":["kvList"]},"data":{"type":"object","properties":{"rows":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"string"}},"required":["label","value"],"additionalProperties":false}}},"required":["rows"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
             {"type":"object","properties":{"shape":{"type":"string","enum":["checklist"]},"data":{"type":"object","properties":{"items":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"done":{"type":"boolean"}},"required":["label","done"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
             {"type":"object","properties":{"shape":{"type":"string","enum":["stat"]},"data":{"type":"object","properties":{"value":{"type":"string","minLength":1},"unit":{"type":["string","null"]},"delta":{"type":["string","null"]},"caption":{"type":["string","null"]}},"required":["value","unit","delta","caption"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
-            {"type":"object","properties":{"source":{"type":"string","minLength":1},"permissions":{"type":"object","properties":{"network":{"type":"boolean"},"pollSeconds":{"type":["integer","null"],"minimum":1}},"required":["network","pollSeconds"],"additionalProperties":false},"htmlShim":{"type":["string","null"]}},"required":["source","permissions","htmlShim"],"additionalProperties":false}
+            {"type":"object","properties":{"source":{"type":"string","minLength":1},"permissions":{"type":"object","properties":{"network":{"type":"boolean"},"pollSeconds":{"type":["integer","null"],"minimum":1}},"required":["network","pollSeconds"],"additionalProperties":false},"htmlShim":{"type":["string","null"]},"libraries":{"type":"array","maxItems":8,"items":{"type":"string","enum":dashboard_widget_library_keys()}}},"required":["source","permissions","htmlShim"],"additionalProperties":false}
         ]
     })
+}
+
+fn dashboard_widget_library_keys() -> Value {
+    json!([
+        "mermaid",
+        "echarts",
+        "chartjs",
+        "qrcode",
+        "jsbarcode",
+        "jspdf",
+        "mathjs",
+        "papaparse",
+        "pica",
+        "dayjs",
+        "konva",
+        "roughjs",
+        "alasql",
+        "three",
+        "pixijs",
+        "matter",
+        "prism",
+        "jsyaml",
+        "gridjs",
+        "ansitohtml",
+        "cronstrue",
+        "cronparser",
+        "jwtdecode",
+        "diffmatchpatch",
+        "chroma",
+        "leaflet",
+        "fflate",
+        "marked",
+        "animejs",
+    ])
 }
 
 fn dashboard_widget_settings_field_schema() -> Value {
@@ -4491,7 +4525,7 @@ fn build_agent_messages(
         "SECRETS: Never ask the user to paste API keys, passwords, or tokens into normal chat text. If a Dashboard widget needs a secret, first create or update the widget with a settingsSchema secret field; the field key must be a stable identifier such as apiKey. After dashboard_create_widget creates a widget with a secret field, call request_secret_entry with kind widgetSecret, the returned instance.id as instanceId, and the exact fieldKey. Use request_secret_entry for AI provider API keys too. The secret value is captured by KKTerm locally and is not visible to you. Do not include or request the plaintext secret.".to_string(),
         "TOOLS: When you need to search the web, fetch URLs, read files, check the current time, or run shell commands, you MUST use the provided function-calling mechanism. Always make the actual function call alongside your explanation. Do not describe what you plan to do with a tool without calling it — invoke the tool in the same response.".to_string(),
         "SESSION TOOLS: Use session_state to discover active Tabs, pane ids, remote desktop targets, and SFTP/FTP browser Sessions before using session_* interaction tools. Terminal, remote desktop, and file browser tools operate on live Sessions, not saved Connections. Prefer read tools before mutating tools. For RDP/VNC, use send_text for text, keypress for named keys, and mouse_click for remote surface coordinates. In Prompt permission mode, mutating tools return permissionRequired; explain that the user must switch AI Assistant tool permissions to Allow All if they want automatic execution.".to_string(),
-        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, repair, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. When the user reports an error in an existing AI-authored widget, use dashboard_load_state to read the current Dashboard custom widget source, then call dashboard_update_custom_widget with the matching custom widget id. Prefer patch.body for widget source edits; patch.body is structured JSON and avoids escaping mistakes. Do not ask the user to paste widget source that KKTerm can read through dashboard_load_state. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style; do not pick decorative colors at random. Be boundary-aware: size simple timers/counters at least 4x3, forms or images at least 5x4, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read non-secret values with KK.getSettings() and save via KK.setSetting(key, value). Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret with no defaultValue; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret, and scripts read it with await KK.getSecret('fieldKey') only when needed. After creating a widget with a secret field, call request_secret_entry using the returned widget instance id and the exact secret field key instead of asking the user to paste the secret in chat. When a widget embeds remote images, fetches remote data, or loads external libraries such as Three.js from a CDN, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
+        "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, repair, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. When the user reports an error in an existing AI-authored widget, use dashboard_load_state to read the current Dashboard custom widget source, then call dashboard_update_custom_widget with the matching custom widget id. Prefer patch.body for widget source edits; patch.body is structured JSON and avoids escaping mistakes. Do not ask the user to paste widget source that KKTerm can read through dashboard_load_state. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style; do not pick decorative colors at random. Be boundary-aware: size simple timers/counters at least 4x3, forms or images at least 5x4, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use body.libraries for curated local script libraries such as mermaid and animejs; use permissions.network=true only for remote network access or CDN-loaded libraries. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read non-secret values with KK.getSettings() and save via KK.setSetting(key, value). Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret with no defaultValue; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret, and scripts read it with await KK.getSecret('fieldKey') only when needed. After creating a widget with a secret field, call request_secret_entry using the returned widget instance id and the exact secret field key instead of asking the user to paste the secret in chat. When a widget embeds remote images, fetches remote data, or loads external libraries from a CDN, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
     ];
     if let Some(language) = normalize_output_language(output_language) {
         system_instructions.push(language);
@@ -5691,6 +5725,48 @@ mod tests {
             .parameters
             .pointer("/properties/patch/properties/bodyJson")
             .is_some());
+    }
+
+    #[test]
+    fn dashboard_widget_tool_schema_exposes_script_libraries() {
+        let settings: AiAssistantToolSettings = serde_json::from_value(json!({
+            "dashboard": true
+        }))
+        .expect("tool settings deserialize");
+
+        let tools = ai_tool_definitions(&settings);
+        let create_tool = tools
+            .iter()
+            .find(|tool| tool.function.name == "dashboard_create_widget")
+            .expect("dashboard create widget tool exists");
+        let update_tool = tools
+            .iter()
+            .find(|tool| tool.function.name == "dashboard_update_custom_widget")
+            .expect("dashboard update custom widget tool exists");
+
+        assert!(create_tool
+            .function
+            .parameters
+            .pointer("/properties/body/anyOf/4/properties/libraries")
+            .is_some());
+        assert!(update_tool
+            .function
+            .parameters
+            .pointer("/properties/patch/properties/body/anyOf/4/properties/libraries")
+            .is_some());
+
+        let enum_values = create_tool
+            .function
+            .parameters
+            .pointer("/properties/body/anyOf/4/properties/libraries/items/enum")
+            .and_then(Value::as_array)
+            .expect("script libraries are enumerated");
+        for library in ["mermaid", "animejs", "echarts", "chartjs", "qrcode", "three"] {
+            assert!(
+                enum_values.contains(&json!(library)),
+                "script library enum should include {library}"
+            );
+        }
     }
 
     #[test]

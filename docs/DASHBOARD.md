@@ -216,6 +216,18 @@ External website links must leave the widget iframe. The host script intercepts 
 
 The bridge exposes `KK.openExternal(url)`, `KK.getSettings()`, `KK.setSetting(key, value)`, `KK.setSettings(nextSettings)`, `KK.getSecret(key)`, `KK.requestPermission(name)`, and `KK.postMessage(payload)` at the iframe globals. Future Tauri command access is added by extending this bridge with explicit handlers — not by widening the iframe surface.
 
+### Script Widget Libraries
+
+Curated local libraries are registered in `src/dashboard/script/widgetLibraries.ts` and requested by AI-authored scripts through `body.libraries`. The script host loads every requested library before running widget source, so generated code must declare libraries it uses instead of assuming globals already exist.
+
+When adding or renaming a script-widget library:
+
+- Add the npm package dependency if the library is not already present.
+- Add the registry entry in `src/dashboard/script/widgetLibraries.ts` with a stable key, global name, description, and loader.
+- Add the same key to `dashboard_widget_library_keys()` in `src-tauri/src/ai.rs` so `dashboard_create_widget` and `dashboard_update_custom_widget` expose the key to the AI Assistant tool schema.
+- If old generated widgets may already reference the global without `body.libraries`, add a narrow legacy inference pattern in `resolveWidgetLibraryKeys`.
+- Run `node --test tests/dashboard-script-srcdoc.test.mjs`, `npm run build`, and `cargo test --manifest-path src-tauri/Cargo.toml dashboard_widget_tool_schema_exposes_script_libraries`. `npm run build` is the check that proves the registered loader and package dependency can actually bundle.
+
 ### Finding: Broken Script HTML
 
 The original script host pasted AI-generated `source` directly inside the host `<script>` block. That made generated snippets fragile: a common string such as `` `<script>...</script>` `` or a full HTML document could close the host script early, leaving the rest of the JavaScript visible as broken widget body text. The fix is to encode source as a JavaScript string literal, escape `<`, and load it through a blob-backed script element. Runtime and unhandled promise errors render into a small `<pre>` inside the iframe instead of replacing the Dashboard surface with raw host code.

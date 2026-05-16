@@ -18,7 +18,7 @@ import {
   validateWidgetSettingsSchemaJson,
 } from "../schema";
 import { buildSrcdoc, type ResolvedWidgetLibrary } from "./permissions";
-import { loadWidgetLibraries } from "./widgetLibraries";
+import { loadWidgetLibraries, resolveWidgetLibraryKeys } from "./widgetLibraries";
 
 export function ScriptWidgetHost({
   bodyJson,
@@ -45,14 +45,18 @@ export function ScriptWidgetHost({
   );
   const [libraries, setLibraries] = useState<ResolvedWidgetLibrary[] | null>(null);
   const [libraryError, setLibraryError] = useState<string | null>(null);
-  const requestedLibKey = useMemo(() => (parsed?.libraries ?? []).join("|"), [parsed]);
+  const requestedLibraries = useMemo(
+    () => (parsed ? resolveWidgetLibraryKeys(parsed.libraries, parsed.source) : []),
+    [parsed],
+  );
+  const requestedLibKey = requestedLibraries.join("|");
   useEffect(() => {
     if (!parsed) {
       setLibraries(null);
       setLibraryError(null);
       return;
     }
-    if (!parsed.libraries || parsed.libraries.length === 0) {
+    if (requestedLibraries.length === 0) {
       setLibraries([]);
       setLibraryError(null);
       return;
@@ -60,7 +64,7 @@ export function ScriptWidgetHost({
     let cancelled = false;
     setLibraries(null);
     setLibraryError(null);
-    loadWidgetLibraries(parsed.libraries)
+    loadWidgetLibraries(requestedLibraries)
       .then((resolved) => {
         if (cancelled) return;
         setLibraries(resolved);
@@ -72,7 +76,7 @@ export function ScriptWidgetHost({
     return () => {
       cancelled = true;
     };
-  }, [parsed, requestedLibKey]);
+  }, [parsed, requestedLibraries, requestedLibKey]);
   const srcdoc = useMemo(
     () => (parsed && libraries ? buildSrcdoc(parsed, settingsValuesJson, libraries) : ""),
     [parsed, settingsValuesJson, libraries],

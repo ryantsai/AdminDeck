@@ -228,6 +228,27 @@ export const WIDGET_LIBRARIES: Record<string, WidgetLibrary> = {
   },
 };
 
+const LEGACY_GLOBAL_LIBRARY_PATTERNS: { key: string; pattern: RegExp }[] = [
+  { key: "mermaid", pattern: /\bmermaid\b/ },
+  { key: "animejs", pattern: /\banime\b/ },
+];
+
+export function resolveWidgetLibraryKeys(keys: string[] | undefined, source: string): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  function add(key: string) {
+    if (!WIDGET_LIBRARIES[key] || seen.has(key)) return;
+    seen.add(key);
+    ordered.push(key);
+  }
+
+  keys?.forEach(add);
+  for (const entry of LEGACY_GLOBAL_LIBRARY_PATTERNS) {
+    if (entry.pattern.test(source)) add(entry.key);
+  }
+  return ordered;
+}
+
 const sourceCache = new Map<string, Promise<string>>();
 
 /**
