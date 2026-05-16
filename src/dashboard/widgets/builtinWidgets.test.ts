@@ -2,7 +2,6 @@ import type { DashboardWidgetInstance } from "../types";
 import { BUILT_IN_WIDGETS, type BuiltInWidgetBodyProps } from "../registry/builtInRegistry";
 import type { Connection, WorkspaceTab } from "../../types";
 import { createConnectionWidgetTab } from "./ConnectionWidgetBody";
-import { createUrlWidgetTab, normalizeUrlWidgetConfig } from "./UrlViewerBody";
 
 const instance: DashboardWidgetInstance = {
   id: "inst-test",
@@ -32,20 +31,14 @@ const connection: Connection = {
 
 const bodyProps: BuiltInWidgetBodyProps = { instance };
 const connectionTab: WorkspaceTab = createConnectionWidgetTab(instance.id, connection);
-const urlConfig = normalizeUrlWidgetConfig({
-  url: "example.com",
-  reloadSeconds: -1,
-});
-const urlTab = createUrlWidgetTab(instance.id, urlConfig, 1);
 const builtInIds = BUILT_IN_WIDGETS.map((entry) => entry.id);
 
 const defaultAccent: DashboardWidgetInstance["accentName"] = "default";
 
-if (!builtInIds.includes("connectionPane") || !builtInIds.includes("urlViewer")) {
-  throw new Error("Dashboard built-in registry is missing the Connection Pane or URL Viewer widgets.");
+if (!builtInIds.includes("connectionPane")) {
+  throw new Error("Dashboard built-in registry is missing the Connection Pane widget.");
 }
 
 void bodyProps;
 void connectionTab;
-void urlTab;
 void defaultAccent;

@@ -1,4 +1,4 @@
-import { Trash2, X } from "lucide-react";
+import { AlertTriangle, Trash2, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -182,23 +182,21 @@ export function CatalogOverlay({ viewId, onClose }: CatalogOverlayProps) {
               role="dialog"
               onClick={(e) => e.stopPropagation()}
             >
-              <header className="connection-dialog-header compact">
-                <div>
-                  <p className="panel-label">{t("dashboard.catalogGroupCustom")}</p>
-                  <h2>{t("dashboard.deleteCustomWidgetTitle")}</h2>
-                </div>
+              <header className="connection-dialog-header compact dw-catalog-confirm-header">
+                <AlertTriangle className="dw-catalog-confirm-warning" size={22} aria-hidden="true" />
+                <h2>{t("dashboard.deleteCustomWidgetTitle")}</h2>
               </header>
               <p className="field-hint">
                 {t("dashboard.deleteCustomWidgetBody", { name: deleteTarget.title })}
               </p>
-              <div className="dialog-actions">
+              <div className="dialog-actions dw-catalog-confirm-actions">
                 <button
-                  className="secondary-button danger"
+                  className="secondary-button danger dw-catalog-confirm-delete"
                   onClick={() => void handleDeleteConfirm()}
                   type="button"
                 >
-                  <Trash2 size={15} />
-                  {t("dashboard.deleteCustomWidgetConfirm")}
+                  <Trash2 size={15} aria-hidden="true" />
+                  <span>{t("dashboard.deleteCustomWidgetConfirm")}</span>
                 </button>
                 <button
                   className="toolbar-button"

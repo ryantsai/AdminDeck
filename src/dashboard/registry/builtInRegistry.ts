@@ -2,7 +2,6 @@ import type { ComponentType } from "react";
 import type { AccentName, IconName, WidgetPreset } from "../types";
 import { AppLauncherBody } from "../widgets/AppLauncherBody";
 import { ConnectionWidgetBody } from "../widgets/ConnectionWidgetBody";
-import { UrlViewerBody } from "../widgets/UrlViewerBody";
 import type { DashboardWidgetInstance } from "../types";
 
 export interface BuiltInWidgetBodyProps {
@@ -43,17 +42,6 @@ export const BUILT_IN_WIDGETS: BuiltInWidgetEntry[] = [
     defaultIcon: "Server",
     defaultSize: { w: 8, h: 5 },
     Body: ConnectionWidgetBody,
-  },
-  {
-    id: "urlViewer",
-    titleKey: "dashboard.urlViewerTitle",
-    summaryKey: "dashboard.urlViewerSummary",
-    category: "url",
-    defaultPreset: "panel",
-    defaultAccent: "sky",
-    defaultIcon: "Globe",
-    defaultSize: { w: 6, h: 5 },
-    Body: UrlViewerBody,
   },
 ];
 
