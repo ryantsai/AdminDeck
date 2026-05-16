@@ -88,12 +88,13 @@ function App() {
       } ${aiPanelLayout.collapsed ? "ai-assist-collapsed" : ""}`}
     >
       <ActivityRail
+        key="activity-rail"
         activePage={activePage}
         connectionsCollapsed={connectionPanelLayout.collapsed}
         onConnectionsToggle={toggleConnectionPanel}
         onNavigate={navigateToPage}
       />
-      <div className="workspace-page" {...ariaHidden(activePage !== "workspace")}>
+      <div key="workspace-page" className="workspace-page" {...ariaHidden(activePage !== "workspace")}>
         <ConnectionSidebar
           collapsed={connectionPanelLayout.collapsed}
           onToggleCollapsed={toggleConnectionPanel}
@@ -114,6 +115,7 @@ function App() {
       </div>
       {activePage !== "settings" ? (
         <PanelResizeHandle
+          key="ai-resize-handle"
           ariaLabel={t("app.resizeAiAssistant")}
           side="right"
           collapsed={aiPanelLayout.collapsed}
@@ -123,6 +125,7 @@ function App() {
         />
       ) : null}
       <AssistantPanel
+        key="assistant-panel"
         collapsed={aiPanelLayout.collapsed}
         onOpenSettings={() => navigateToPage("settings")}
         onToggleCollapsed={toggleAiPanel}
@@ -130,17 +133,19 @@ function App() {
       />
       {activePage === "settings" ? (
         <SettingsPage
+          key="settings-page"
           onBack={() => setActivePage(previousNonSettingsPageRef.current)}
           onResetLayout={resetWorkspaceChromeLayout}
         />
       ) : null}
       {dashboardMounted ? (
         <DashboardPage
+          key="dashboard-page"
           dashboardActive={activePage === "dashboard"}
           onAssistantContextChange={setDashboardAssistantContext}
         />
       ) : null}
-      <StatusBar activePage={activePage} onOpenAssistant={openAssistantPanel} />
+      <StatusBar key="status-bar" activePage={activePage} onOpenAssistant={openAssistantPanel} />
     </div>
   );
 }
