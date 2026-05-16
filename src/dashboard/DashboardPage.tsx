@@ -2,6 +2,7 @@ import { Edit3, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssistantPageContext } from "../ai/AssistantPanel";
+import { invokeCommand, type McpServer } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 import { BackgroundPopover } from "./edit/BackgroundPopover";
 import { CatalogOverlay } from "./edit/CatalogOverlay";
@@ -40,7 +41,22 @@ export function DashboardPage({
   const [customize, setCustomize] = useState<{ instance: DashboardWidgetInstance; rect: DOMRect } | null>(null);
   const [editingViewId, setEditingViewId] = useState<string | null>(null);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const appliedLandingPref = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void invokeCommand("mcp_list_servers", undefined)
+      .then((list) => {
+        if (!cancelled) setMcpServers(list);
+      })
+      .catch(() => {
+        if (!cancelled) setMcpServers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!ready) void load();
@@ -113,6 +129,13 @@ export function DashboardPage({
         summary: widget.summary,
         activeOnView: activeCustomSourceIds.has(widget.id),
       })),
+      mcpServers: mcpServers.map((server) => ({
+        id: server.id,
+        name: server.name,
+        url: server.url,
+        status: server.lastStatus,
+        tools: server.tools,
+      })),
     };
     onAssistantContextChange({
       contextKind: "dashboard",
@@ -133,6 +156,7 @@ export function DashboardPage({
         "Passwords, API keys, tokens, and similar sensitive options must use settingsSchema field type secret. KKTerm stores those values in the OS keychain as widgetSecret entries; Dashboard instance JSON stores only secretRef objects. Scripts read a secret only when needed with await KK.getSecret('fieldKey').",
         "For script widgets that display remote images or fetch remote data, set permissions.network to true. Use normal http/https anchors or KK.openExternal(url) for external website links; links open in the user's external browser, not inside the widget iframe.",
         "Script widgets can read and save local files through native OS dialogs. await KK.readLocalFile({ filters: [{ name: 'CSV', extensions: ['csv'] }] }) returns { name, bytes: Uint8Array } or null if the user cancels. await KK.saveFile(filename, bytesUint8Array, filtersOptional) returns the saved path or null if cancelled. Use these for PDF export, CSV import, config viewers, etc.",
+        "Script widgets can call tools on user-configured Remote MCP servers via KK.callMcpTool(serverName, toolName, args). The server name is the user-assigned name from mcpServers below; the tool name and argument schema come from that server's tools list. Returns { content, isError }. Reference servers by name, not internal id, so the widget keeps working if the server is removed and re-added.",
         "Script widgets can request curated npm libraries via a body.libraries string array. The libraries load before the widget source and expose documented globals (see catalog below). Only list libraries you actually use; do not declare more than 8. The 64KB source budget applies to your code, not to library bytes.",
         "Available widget libraries:",
         libraryCatalogForAi(),
@@ -140,7 +164,7 @@ export function DashboardPage({
         JSON.stringify(dashboardSnapshot, null, 2),
       ].join("\n"),
     });
-  }, [activeView, viewInstances, activeCustomSourceIds, customWidgets, onAssistantContextChange, t]);
+  }, [activeView, viewInstances, activeCustomSourceIds, customWidgets, mcpServers, onAssistantContextChange, t]);
 
   if (!ready || !activeView) {
     return (

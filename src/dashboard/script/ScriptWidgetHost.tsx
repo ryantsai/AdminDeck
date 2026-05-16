@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  describeMcpError,
   invokeCommand,
   openExternalUrl,
   pickAndReadFile,
@@ -102,6 +103,10 @@ export function ScriptWidgetHost({
       }
       if (isScriptWidgetReadFileMessage(data)) {
         void sendReadFileResponse(data);
+        return;
+      }
+      if (isScriptWidgetCallMcpToolMessage(data)) {
+        void sendMcpToolResponse(data);
       }
     }
 
@@ -178,6 +183,38 @@ export function ScriptWidgetHost({
           requestId: data.requestId,
           ok: false,
           error: error instanceof Error ? error.message : String(error),
+        }, "*");
+      }
+    }
+
+    async function sendMcpToolResponse(data: {
+      requestId: string;
+      serverIdOrName: string;
+      toolName: string;
+      arguments: unknown;
+    }) {
+      const target = iframeRef.current?.contentWindow;
+      if (!target) return;
+      try {
+        const result = await invokeCommand("mcp_call_tool", {
+          serverIdOrName: data.serverIdOrName,
+          toolName: data.toolName,
+          arguments: data.arguments,
+        });
+        target.postMessage({
+          kk: true,
+          type: "mcpToolResult",
+          requestId: data.requestId,
+          ok: true,
+          result,
+        }, "*");
+      } catch (error) {
+        target.postMessage({
+          kk: true,
+          type: "mcpToolResult",
+          requestId: data.requestId,
+          ok: false,
+          error: describeMcpError(error),
         }, "*");
       }
     }
@@ -308,6 +345,33 @@ function isScriptWidgetReadFileMessage(value: unknown): value is {
   if (typeof candidate.requestId !== "string") return false;
   if (candidate.filters !== undefined && !isFilterArray(candidate.filters)) return false;
   return true;
+}
+
+function isScriptWidgetCallMcpToolMessage(value: unknown): value is {
+  kk: true;
+  type: "callMcpTool";
+  requestId: string;
+  serverIdOrName: string;
+  toolName: string;
+  arguments: unknown;
+} {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as {
+    kk?: unknown;
+    type?: unknown;
+    requestId?: unknown;
+    serverIdOrName?: unknown;
+    toolName?: unknown;
+  };
+  return (
+    candidate.kk === true &&
+    candidate.type === "callMcpTool" &&
+    typeof candidate.requestId === "string" &&
+    typeof candidate.serverIdOrName === "string" &&
+    candidate.serverIdOrName.length > 0 &&
+    typeof candidate.toolName === "string" &&
+    candidate.toolName.length > 0
+  );
 }
 
 export function useScriptReloadHandle() {

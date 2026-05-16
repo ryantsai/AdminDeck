@@ -201,6 +201,38 @@ export function buildSrcdoc(
             }, "*");
           });
         },
+        callMcpTool: function (serverIdOrName, toolName, args) {
+          return new Promise(function (resolve, reject) {
+            if (typeof serverIdOrName !== 'string' || !serverIdOrName) {
+              reject(new Error('serverIdOrName is required.'));
+              return;
+            }
+            if (typeof toolName !== 'string' || !toolName) {
+              reject(new Error('toolName is required.'));
+              return;
+            }
+            var requestId = 'mcp-' + Math.random().toString(36).slice(2);
+            function onMessage(event) {
+              var data = event.data;
+              if (!data || data.kk !== true || data.type !== 'mcpToolResult' || data.requestId !== requestId) return;
+              window.removeEventListener('message', onMessage);
+              if (data.ok) {
+                resolve(data.result);
+              } else {
+                reject(new Error(data.error || 'MCP tool call failed.'));
+              }
+            }
+            window.addEventListener('message', onMessage);
+            window.parent.postMessage({
+              kk: true,
+              type: 'callMcpTool',
+              requestId: requestId,
+              serverIdOrName: serverIdOrName,
+              toolName: toolName,
+              arguments: args == null ? {} : args,
+            }, "*");
+          });
+        },
         readLocalFile: function (options) {
           return new Promise(function (resolve, reject) {
             var filters = options && Array.isArray(options.filters) ? options.filters : undefined;
