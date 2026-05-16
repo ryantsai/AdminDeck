@@ -17,6 +17,7 @@ import {
 import { ConnectionSidebar } from "./connections/ConnectionSidebar";
 import { DashboardPage } from "./dashboard/DashboardPage";
 import { useDashboardBackendInvalidation } from "./dashboard/state/invalidation";
+import { ariaHidden } from "./lib/aria";
 import { useBootstrapSettings } from "./lib/settings";
 import { SettingsPage } from "./settings/SettingsPage";
 import { useWorkspaceStore } from "./store";
@@ -85,7 +86,7 @@ function App() {
         onConnectionsToggle={toggleConnectionPanel}
         onNavigate={navigateToPage}
       />
-      <div className="workspace-page" aria-hidden={activePage !== "workspace"}>
+      <div className="workspace-page" {...ariaHidden(activePage !== "workspace")}>
         <ConnectionSidebar
           collapsed={connectionPanelLayout.collapsed}
           onToggleCollapsed={toggleConnectionPanel}

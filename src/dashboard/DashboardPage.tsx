@@ -2,6 +2,7 @@ import { Edit3, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { AssistantPageContext } from "../ai/AssistantPanel";
+import { ariaHidden } from "../lib/aria";
 import { useWorkspaceStore } from "../store";
 import { BackgroundPopover } from "./edit/BackgroundPopover";
 import { CatalogOverlay } from "./edit/CatalogOverlay";
@@ -141,7 +142,7 @@ export function DashboardPage({
     return (
       <div
         className={`dashboard-loading${dashboardActive ? "" : " dashboard-page-hidden"}`}
-        aria-hidden={!dashboardActive}
+        {...ariaHidden(!dashboardActive)}
       >
         {t("common.loading")}
       </div>
@@ -151,57 +152,70 @@ export function DashboardPage({
   return (
     <main
       className={`dashboard-page${dashboardActive ? "" : " dashboard-page-hidden"}`}
-      aria-hidden={!dashboardActive}
+      {...ariaHidden(!dashboardActive)}
     >
       <header className="dashboard-topbar">
         <div className="dashboard-brand">
           <span className="crumb">{t("dashboard.title")}</span>
         </div>
         <div className="dashboard-view-pills">
-          {views.map((v) => (
-            <button
-              key={v.id}
-              className={`dashboard-pill${v.id === activeView.id ? " active" : ""}`}
-              onClick={() => setActiveView(v.id)}
-              onDoubleClick={() => {
-                setActiveView(v.id);
-                setEditingViewId(v.id);
-              }}
-            >
-              {editingViewId === v.id ? (
-                <input
-                  className="dashboard-pill-rename"
-                  defaultValue={v.title}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                  onBlur={(e) => {
-                    const next = e.currentTarget.value.trim();
-                    if (next) void renameView(v.id, next);
-                    setEditingViewId(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+          {views.map((v) => {
+            const isActiveView = v.id === activeView.id;
+            const isEditingView = editingViewId === v.id;
+            const renameInputLabel = t("dashboard.renameView");
+
+            return (
+              <div
+                key={v.id}
+                className={`dashboard-pill${isActiveView ? " active" : ""}${isEditingView ? " editing" : ""}`}
+              >
+                {isEditingView ? (
+                  <input
+                    aria-label={renameInputLabel}
+                    className="dashboard-pill-rename"
+                    defaultValue={v.title}
+                    autoFocus
+                    onBlur={(e) => {
                       const next = e.currentTarget.value.trim();
                       if (next) void renameView(v.id, next);
                       setEditingViewId(null);
-                    } else if (e.key === "Escape") {
-                      setEditingViewId(null);
-                    }
-                  }}
-                />
-              ) : (
-                v.title
-              )}
-              {views.length > 1 && (
-                <span
-                  className="dashboard-pill-close"
-                  onClick={(e) => { e.stopPropagation(); void removeView(v.id); }}
-                  role="button"
-                  aria-label={t("dashboard.removeView")}
-                >×</span>
-              )}
-            </button>
-          ))}
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const next = e.currentTarget.value.trim();
+                        if (next) void renameView(v.id, next);
+                        setEditingViewId(null);
+                      } else if (e.key === "Escape") {
+                        setEditingViewId(null);
+                      }
+                    }}
+                  />
+                ) : (
+                  <button
+                    className="dashboard-pill-main"
+                    onClick={() => setActiveView(v.id)}
+                    onDoubleClick={() => {
+                      setActiveView(v.id);
+                      setEditingViewId(v.id);
+                    }}
+                    type="button"
+                  >
+                    {v.title}
+                  </button>
+                )}
+                {views.length > 1 && (
+                  <button
+                    aria-label={t("dashboard.removeView")}
+                    className="dashboard-pill-close"
+                    onClick={() => void removeView(v.id)}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
           <button
             className="dashboard-pill-add"
             onClick={async () => {

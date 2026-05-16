@@ -36,7 +36,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { dialogButtonAria, menuButtonAria } from "../lib/aria";
+import { ariaChecked, ariaExpanded, dialogButtonAria, menuButtonAria } from "../lib/aria";
 import { invokeCommand, isTauriRuntime, openExternalUrl } from "../lib/tauri";
 import type { AiStreamEvent, CaptureScreenshotRequest } from "../lib/tauri";
 import {
@@ -2170,6 +2170,7 @@ export function AssistantPanel({
         <div className="assistant-composer-footer">
           <div className="assistant-add-menu-wrapper" ref={addContextMenuRef}>
             <input
+              aria-label={t("ai.addFiles")}
               ref={fileInputRef}
               accept="image/*,.pdf,.txt,.log,.md,.json,.jsonl,.csv,.tsv,.yaml,.yml,.xml,.toml,.ini,.conf"
               className="sr-only"
@@ -2257,7 +2258,7 @@ export function AssistantPanel({
             {permissionMenuOpen ? (
               <div className="assistant-permission-menu" role="menu" aria-label={t("ai.toolPermissionMode")}>
                 <button
-                  aria-checked={currentToolPermissionMode === "prompt"}
+                  {...ariaChecked(currentToolPermissionMode === "prompt")}
                   className="assistant-permission-menu-item"
                   onClick={() => void handleToolPermissionModeChange("prompt")}
                   role="menuitemradio"
@@ -2268,7 +2269,7 @@ export function AssistantPanel({
                   {currentToolPermissionMode === "prompt" ? <Check size={16} /> : null}
                 </button>
                 <button
-                  aria-checked={currentToolPermissionMode === "allowAll"}
+                  {...ariaChecked(currentToolPermissionMode === "allowAll")}
                   className="assistant-permission-menu-item"
                   data-mode="allowAll"
                   onClick={() => void handleToolPermissionModeChange("allowAll")}
@@ -2899,7 +2900,7 @@ function AssistantWorkPanel({ message }: { message: AssistantChatMessage }) {
   return (
     <section className="assistant-work-panel">
       <button
-        aria-expanded={expanded}
+        {...ariaExpanded(expanded)}
         className="assistant-work-toggle"
         onClick={() => setExpanded((e) => !e)}
         type="button"

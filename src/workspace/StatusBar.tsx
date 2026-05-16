@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ActivePage } from "../app/ActivityRail";
+import { ariaPressed } from "../lib/aria";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import { useWorkspaceStore } from "../store";
 
@@ -160,7 +161,7 @@ function DontSleepStatusButton() {
       className={`status-bar-action status-bar-dont-sleep ${enabled ? "active" : ""}`}
       aria-label={label}
       aria-describedby="dont-sleep-status-tooltip"
-      aria-pressed={enabled}
+      {...ariaPressed(enabled)}
       disabled={updating}
       onClick={() => void handleClick()}
       type="button"

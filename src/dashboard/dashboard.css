@@ -109,6 +109,16 @@ main.dashboard-page.dashboard-page-hidden,
   padding-left: 12px;
 }
 
+.dashboard-pill-main {
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
 .dashboard-pill:hover,
 .dashboard-pill-add:hover {
   color: var(--text);
@@ -137,8 +147,12 @@ main.dashboard-page.dashboard-page-hidden,
   justify-content: center;
   width: 16px;
   height: 16px;
+  padding: 0;
   color: var(--text-faint);
+  background: transparent;
+  border: 0;
   border-radius: 4px;
+  cursor: pointer;
   opacity: 0;
 }
 
@@ -475,8 +489,8 @@ main.dashboard-page.dashboard-page-hidden,
     linear-gradient(90deg, rgb(255 94 156 / 55%) 1px, transparent 1px) 0 0 / 40px 100%;
   transform: perspective(380px) rotateX(60deg);
   transform-origin: center top;
-  mask-image: linear-gradient(180deg, transparent 0%, #000 25%, #000 100%);
   -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 25%, #000 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 25%, #000 100%);
   animation: dw-sw-grid 2.4s linear infinite;
 }
 
@@ -794,6 +808,7 @@ main.dashboard-page.dashboard-page-hidden,
   background: rgb(255 255 255 / 78%);
   border: 1px solid var(--border);
   border-radius: 5px;
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   cursor: pointer;
 }
@@ -855,8 +870,8 @@ main.dashboard-page.dashboard-page-hidden,
     0 1px 1px rgb(20 30 55 / 4%),
     0 8px 24px -10px rgb(20 30 55 / 18%),
     0 24px 48px -24px rgb(20 30 55 / 22%);
-  backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
   -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
+  backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
 }
 
 .dw-preset-ambient--glass::before {
@@ -1332,6 +1347,7 @@ main.dashboard-page.dashboard-page-hidden,
   padding: 40px 24px;
   overflow: auto;
   background: color-mix(in srgb, var(--app-bg) 60%, transparent);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 

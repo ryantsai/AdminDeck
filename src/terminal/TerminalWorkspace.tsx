@@ -11,7 +11,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import i18next from "../i18n/config";
-import { dialogButtonAria, menuButtonAria } from "../lib/aria";
+import { ariaInvalid, dialogButtonAria, menuButtonAria } from "../lib/aria";
 import { invokeCommand, isTauriRuntime, saveTextFile, type RemoteLoopbackPort, type TerminalOutput, type TmuxSession } from "../lib/tauri";
 import { defaultTerminalSettings } from "../app-defaults";
 import { forgetTmuxSessionId, getTmuxSessionLabel, useWorkspaceStore } from "../store";
@@ -636,7 +636,7 @@ function TmuxSessionTag({
                               handleCancelRename();
                             }
                           }}
-                          aria-invalid={renameError ? "true" : undefined}
+                          {...ariaInvalid(Boolean(renameError))}
                         />
                         <button
                           className="terminal-pane-action"

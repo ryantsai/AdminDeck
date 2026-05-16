@@ -5257,6 +5257,7 @@ progress {
   height: 100%;
   object-fit: fill;
   pointer-events: none;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -7766,6 +7767,7 @@ fieldset.connection-specific-options > legend {
 
 .wiki-tree-row {
   cursor: default;
+  -webkit-user-select: none;
   user-select: none;
   color: var(--wiki-muted);
   transition: background 100ms ease, color 100ms ease;

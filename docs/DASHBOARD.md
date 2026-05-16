@@ -32,7 +32,7 @@ It does not own:
 **Widget Kind** — three values, layered by capability:
 
 | Kind | Body source | Execution model |
-|---|---|---|
+| --- | --- | --- |
 | `builtIn` | TypeScript component in `src/dashboard/widgets/` registered in `builtInRegistry.ts` | Normal React render. App Launcher is the only current built-in. |
 | `content` | Validated JSON in `dashboard_custom_widgets.body_json` | Declarative renderer in `ContentWidgetRenderer.tsx` — switches over `shape: 'markdown' \| 'kvList' \| 'checklist' \| 'stat'`. No code execution. |
 | `script` | JavaScript source string in `dashboard_custom_widgets.body_json` | Hosted inside an isolated `iframe srcdoc` via `ScriptWidgetHost.tsx`. Has `document`, `fetch`, `setInterval`, and a minimal `KK` postMessage bridge. Permissions (`network`, `pollSeconds`) declared per widget. Fault-isolation boundary — a bad script breaks one widget, not the dashboard. |
@@ -75,7 +75,7 @@ If a script widget displays remote images, the assistant must set `permissions.n
 SQLite holds three Dashboard tables, defined in `src-tauri/src/storage.rs` under `CURRENT_SCHEMA`. Dashboard schema additions that are safe defaults use `ensure_column` during startup so existing local databases keep their saved views/widgets.
 
 | Table | Purpose |
-|---|---|
+| --- | --- |
 | `dashboard_views` | One row per view. Holds `title`, `sort_order`, and `grid_density`. |
 | `dashboard_widget_instances` | One row per placed widget. Holds `kind`, `source_id`, presentation fields (`preset`, `accent_name`, `icon_name`, `custom_title`), per-instance `settings_values_json`, and layout (`grid_x`, `grid_y`, `grid_w`, `grid_h`). Secret fields store only `secretRef` metadata here. |
 | `dashboard_custom_widgets` | One row per AI-authored `content` or `script` widget definition. Holds `body_json`, validated against the kind, plus optional app-rendered `settings_schema_json`. |
@@ -92,7 +92,7 @@ Cascade rules:
 Each command is a thin handler over the storage layer with up-front validation:
 
 | Command | Notes |
-|---|---|
+| --- | --- |
 | `dashboard_load_state` | One batched read on mount; returns `{ views, instances, customWidgets }`. |
 | `dashboard_create_view` | Returns the new view. |
 | `dashboard_update_view` | Patch over `title`, `gridDensity`, `sortOrder`. |
@@ -129,7 +129,7 @@ The `dashboard_create_widget` assistant tool schema is strict-compatible where p
 
 ## Frontend Module Map (Dashboard)
 
-```
+```text
 src/dashboard/
   DashboardPage.tsx              ── shell, topbar, view pills, edit-mode toggle
   motion.tsx                     ── existing centralized motion wrappers

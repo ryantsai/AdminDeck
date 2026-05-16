@@ -1,6 +1,7 @@
 import * as Icons from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ariaSelected } from "../../lib/aria";
 import { invokeCommand, isTauriRuntime } from "../../lib/tauri";
 import { ToggleSwitch } from "../../settings/ToggleSwitch";
 import { useDashboardStore } from "../state/dashboardStore";
@@ -115,7 +116,7 @@ export function CustomizePopover({ instance, anchorRect, onClose }: CustomizePop
             key={s.key}
             type="button"
             role="tab"
-            aria-selected={section === s.key}
+            {...ariaSelected(section === s.key)}
             className={section === s.key ? "active" : ""}
             onClick={() => setSection(s.key)}
           >
