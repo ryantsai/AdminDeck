@@ -1,5 +1,5 @@
-import { ExternalLink, Plus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ExternalLink, Plus, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConnectionIcon } from "../../connections/ConnectionIcon";
 import { connectionSubtitle, connectionTypeLabel } from "../../connections/utils";
@@ -123,7 +123,9 @@ export function ConnectionWidgetBody({ instance }: BuiltInWidgetBodyProps) {
   );
   const [tree, setTree] = useState<ConnectionTree>(emptyConnectionTree);
   const [loadError, setLoadError] = useState("");
-  const [draftConnectionId, setDraftConnectionId] = useState("");
+  const [showLauncher, setShowLauncher] = useState(false);
+  const [launcherSearch, setLauncherSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const activeSessionCounts = useWorkspaceStore((state) => state.activeSessionCounts);
   const openConnection = useWorkspaceStore((state) => state.openConnection);
 
@@ -176,15 +178,23 @@ export function ConnectionWidgetBody({ instance }: BuiltInWidgetBodyProps) {
     return connection ? [connection] : [];
   });
   const activeConnection =
-    selectedConnections.find((connection) => connection.id === config.activeConnectionId)
-    ?? selectedConnections[0]
-    ?? null;
+    selectedConnections.find((connection) => connection.id === config.activeConnectionId) ??
+    selectedConnections[0] ??
+    null;
   const sessionConnection = activeConnection
-    ? sessionConnectionsById.get(activeConnection.id) ?? activeConnection
+    ? (sessionConnectionsById.get(activeConnection.id) ?? activeConnection)
     : null;
-  const availableConnections = allConnections.filter(
-    (connection) => !config.connectionIds.includes(connection.id),
-  );
+
+  const filteredConnections = useMemo(() => {
+    const q = launcherSearch.toLowerCase().trim();
+    if (!q) return allConnections;
+    return allConnections.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        connectionSubtitle(c).toLowerCase().includes(q) ||
+        connectionTypeLabel(c.type).toLowerCase().includes(q),
+    );
+  }, [allConnections, launcherSearch]);
 
   function updateConfig(nextConfig: ConnectionWidgetConfig) {
     const knownIds = new Set(allConnections.map((connection) => connection.id));
@@ -196,115 +206,157 @@ export function ConnectionWidgetBody({ instance }: BuiltInWidgetBodyProps) {
     setConfig({ connectionIds, activeConnectionId });
   }
 
-  function addDraftConnection() {
-    if (!draftConnectionId || config.connectionIds.includes(draftConnectionId)) {
-      return;
-    }
-    updateConfig({
-      connectionIds: [...config.connectionIds, draftConnectionId],
-      activeConnectionId: draftConnectionId,
-    });
-    setDraftConnectionId("");
-  }
-
   function removeConnection(connectionId: string) {
     const nextIds = config.connectionIds.filter((id) => id !== connectionId);
     updateConfig({
       connectionIds: nextIds,
       activeConnectionId:
-        config.activeConnectionId === connectionId ? (nextIds[0] ?? null) : config.activeConnectionId,
+        config.activeConnectionId === connectionId
+          ? (nextIds[0] ?? null)
+          : config.activeConnectionId,
     });
+  }
+
+  function openLauncher() {
+    setShowLauncher(true);
+    setLauncherSearch("");
+    requestAnimationFrame(() => searchRef.current?.focus());
+  }
+
+  function closeLauncher() {
+    setShowLauncher(false);
+    setLauncherSearch("");
+  }
+
+  function selectFromLauncher(connectionId: string) {
+    if (!config.connectionIds.includes(connectionId)) {
+      updateConfig({
+        connectionIds: [...config.connectionIds, connectionId],
+        activeConnectionId: connectionId,
+      });
+    } else {
+      updateConfig({ ...config, activeConnectionId: connectionId });
+    }
+    closeLauncher();
+  }
+
+  const subtitle = activeConnection ? connectionSubtitle(activeConnection) : "";
+
+  if (showLauncher) {
+    return (
+      <div
+        className="dashboard-connection-widget"
+        onKeyDown={(e) => e.key === "Escape" && closeLauncher()}
+      >
+        <div className="dashboard-connection-launcher">
+          <div className="dashboard-connection-launcher-search">
+            <Search size={13} />
+            <input
+              ref={searchRef}
+              type="text"
+              value={launcherSearch}
+              onChange={(e) => setLauncherSearch(e.currentTarget.value)}
+              placeholder={t("common.search")}
+            />
+            <button className="dashboard-widget-icon-button" onClick={closeLauncher} type="button">
+              <X size={13} />
+            </button>
+          </div>
+          <div className="dashboard-connection-launcher-list">
+            {filteredConnections.map((connection) => (
+              <button
+                key={connection.id}
+                className={connection.id === activeConnection?.id ? "active" : ""}
+                onClick={() => selectFromLauncher(connection.id)}
+                type="button"
+              >
+                <ConnectionIcon
+                  localShell={connection.localShell}
+                  size={14}
+                  type={connection.type}
+                />
+                <span className="dashboard-connection-launcher-name">{connection.name}</span>
+                <span className="dashboard-connection-launcher-sub">
+                  {connectionSubtitle(connection)}
+                </span>
+                <span className={`status-dot ${connection.status}`} />
+                {config.connectionIds.includes(connection.id) ? (
+                  <span
+                    className="dashboard-connection-tab-remove"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("dashboard.connectionWidgetRemove", { name: connection.name })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeConnection(connection.id);
+                    }}
+                  >
+                    <X size={11} />
+                  </span>
+                ) : null}
+              </button>
+            ))}
+            {filteredConnections.length === 0 ? (
+              <p className="dashboard-connection-launcher-empty">
+                {t("dashboard.connectionWidgetNoResults")}
+              </p>
+            ) : null}
+          </div>
+          {loadError ? (
+            <p className="dashboard-widget-error">
+              {t("dashboard.connectionWidgetLoadError", { message: loadError })}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeConnection) {
+    return (
+      <div className="dashboard-connection-widget dashboard-connection-widget-empty">
+        <button className="dashboard-connection-add" onClick={openLauncher} type="button">
+          <Plus size={15} />
+          {t("common.add")}
+        </button>
+      </div>
+    );
   }
 
   return (
     <div className="dashboard-connection-widget">
-      <div className="dashboard-connection-controls">
-        <label className="dw-field dashboard-connection-select">
-          <span>{t("dashboard.connectionWidgetSelect")}</span>
-          <select
-            value={draftConnectionId}
-            onChange={(event) => setDraftConnectionId(event.currentTarget.value)}
+      <div className="dashboard-connection-pane">
+        <div className="dashboard-connection-pane-toolbar">
+          <button
+            className="dashboard-connection-pane-name"
+            onClick={openLauncher}
+            type="button"
           >
-            <option value="">{t("dashboard.connectionWidgetSelectPlaceholder")}</option>
-            {availableConnections.map((connection) => (
-              <option key={connection.id} value={connection.id}>
-                {connection.name} · {connectionTypeLabel(connection.type)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="dashboard-widget-icon-button" onClick={addDraftConnection} type="button">
-          <Plus size={14} />
-          {t("common.add")}
-        </button>
+            <ConnectionIcon
+              localShell={activeConnection.localShell}
+              size={13}
+              type={activeConnection.type}
+            />
+            <span>{activeConnection.name}</span>
+          </button>
+          {subtitle ? <span>{subtitle}</span> : null}
+          <button
+            className="dashboard-widget-icon-button compact"
+            onClick={() => openConnection(activeConnection)}
+            type="button"
+          >
+            <ExternalLink size={13} />
+            {t("dashboard.connectionWidgetOpenWorkspace")}
+          </button>
+        </div>
+        {sessionConnection ? (
+          <ConnectionWidgetSession
+            connection={sessionConnection}
+            instanceId={instance.id}
+            key={sessionConnection.id}
+          />
+        ) : null}
       </div>
-
-      {loadError ? (
-        <p className="dashboard-widget-error">
-          {t("dashboard.connectionWidgetLoadError", { message: loadError })}
-        </p>
-      ) : null}
-
-      {allConnections.length === 0 ? (
-        <div className="dashboard-widget-empty-state">
-          <h4>{t("dashboard.connectionWidgetNoConnectionsTitle")}</h4>
-          <p>{t("dashboard.connectionWidgetNoConnectionsHint")}</p>
-        </div>
-      ) : selectedConnections.length === 0 ? (
-        <div className="dashboard-widget-empty-state">
-          <h4>{t("dashboard.connectionWidgetEmptyTitle")}</h4>
-          <p>{t("dashboard.connectionWidgetEmptyHint")}</p>
-        </div>
-      ) : (
-        <>
-          <div className="dashboard-connection-tabs" aria-label={t("dashboard.connectionWidgetActivePane")}>
-            {selectedConnections.map((connection) => (
-              <button
-                className={connection.id === activeConnection?.id ? "active" : ""}
-                key={connection.id}
-                onClick={() => updateConfig({ ...config, activeConnectionId: connection.id })}
-                type="button"
-              >
-                <ConnectionIcon localShell={connection.localShell} size={14} type={connection.type} />
-                <span>{connection.name}</span>
-                <span className={`status-dot ${connection.status}`} />
-                <span
-                  className="dashboard-connection-tab-remove"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    removeConnection(connection.id);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t("dashboard.connectionWidgetRemove", { name: connection.name })}
-                >
-                  <X size={12} />
-                </span>
-              </button>
-            ))}
-          </div>
-          {activeConnection && sessionConnection ? (
-            <div className="dashboard-connection-pane">
-              <div className="dashboard-connection-pane-toolbar">
-                <span>{connectionSubtitle(activeConnection)}</span>
-                <button
-                  className="dashboard-widget-icon-button compact"
-                  onClick={() => openConnection(activeConnection)}
-                  type="button"
-                >
-                  <ExternalLink size={13} />
-                  {t("dashboard.connectionWidgetOpenWorkspace")}
-                </button>
-              </div>
-              <ConnectionWidgetSession
-                connection={sessionConnection}
-                instanceId={instance.id}
-                key={sessionConnection.id}
-              />
-            </div>
-          ) : null}
-        </>
-      )}
     </div>
   );
 }

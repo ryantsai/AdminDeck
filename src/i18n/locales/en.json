@@ -190,6 +190,7 @@
     "connectionWidgetEmptyHint": "Add a saved Connection to show its live pane directly inside this widget.",
     "connectionWidgetActivePane": "Pinned Connection panes",
     "connectionWidgetRemove": "Remove {{name}} from this widget",
+    "connectionWidgetNoResults": "No Connections match your search",
     "connectionWidgetOpenWorkspace": "Open in Workspace",
     "urlViewerTitle": "URL Viewer",
     "urlViewerSummary": "Open a website with the native URL viewer and optional auto-reload.",
