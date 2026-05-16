@@ -4594,6 +4594,106 @@ progress {
   line-height: 1.35;
 }
 
+.assistant-intent-composer {
+  display: grid;
+  gap: 7px;
+  justify-items: start;
+}
+
+.assistant-intent-chip,
+.assistant-message-intent-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  color: var(--intent-color, var(--accent));
+  background: var(--intent-bg, var(--accent-soft));
+  border: 1px solid var(--intent-color, var(--accent));
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.assistant-intent-chip {
+  gap: 6px;
+  padding: 5px 6px 5px 8px;
+}
+
+.assistant-message-intent-label {
+  margin-bottom: 6px;
+  padding: 5px 8px;
+}
+
+.assistant-intent-chip[data-intent="createWidget"],
+.assistant-message-intent-label[data-intent="createWidget"] {
+  --intent-color: var(--green);
+  --intent-bg: var(--green-soft);
+}
+
+.assistant-intent-chip[data-intent="watchdog"],
+.assistant-message-intent-label[data-intent="watchdog"] {
+  --intent-color: var(--amber);
+  --intent-bg: var(--amber-soft);
+}
+
+.assistant-intent-chip[data-intent="extensionCreation"],
+.assistant-message-intent-label[data-intent="extensionCreation"] {
+  --intent-color: var(--green);
+  --intent-bg: var(--green-soft);
+}
+
+.assistant-intent-chip span,
+.assistant-message-intent-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-intent-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: inherit;
+  background: rgb(255 255 255 / 18%);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.assistant-intent-chip button:hover {
+  background: rgb(0 0 0 / 10%);
+}
+
+.assistant-intent-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.assistant-intent-example-bubble {
+  max-width: 100%;
+  padding: 6px 9px;
+  color: var(--text-muted);
+  text-align: left;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.assistant-intent-example-bubble:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
 .assistant-composer-footer {
   display: flex;
   gap: 8px;

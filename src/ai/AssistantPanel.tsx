@@ -112,7 +112,7 @@ type AssistantChatThread = {
   updatedAt: string;
 };
 
-type AssistantPromptIntent = "chat" | "extensionCreation";
+type AssistantPromptIntent = "chat" | "extensionCreation" | "createWidget" | "watchdog";
 
 type AssistantTextAttachment = {
   id: string;
@@ -216,6 +216,66 @@ function assistantThreadPreview(thread: AssistantChatThread) {
   const lastMessage = thread.messages[thread.messages.length - 1];
   const preview = lastMessage?.content.trim().replace(/\s+/g, " ") || i18next.t("ai.noMessages");
   return preview.length > 64 ? `${preview.slice(0, 61)}...` : preview;
+}
+
+function assistantAgentIntent(intent: AssistantPromptIntent): "chat" | "extensionCreation" {
+  return intent === "extensionCreation" ? "extensionCreation" : "chat";
+}
+
+function assistantPromptForIntent(intent: AssistantPromptIntent, prompt: string) {
+  if (intent === "createWidget") {
+    return `Create a Dashboard widget for this request:\n${prompt}`;
+  }
+  if (intent === "watchdog") {
+    return `Configure or draft a Watchdog for this monitoring request:\n${prompt}`;
+  }
+  return prompt;
+}
+
+function assistantIntentLabel(
+  intent: AssistantPromptIntent,
+  t: ReturnType<typeof useTranslation>["t"],
+) {
+  if (intent === "extensionCreation") {
+    return t("ai.extensionDraft");
+  }
+  if (intent === "createWidget") {
+    return t("ai.createWidget");
+  }
+  if (intent === "watchdog") {
+    return t("ai.watchdog");
+  }
+  return t("ai.title");
+}
+
+function assistantIntentExamples(
+  intent: AssistantPromptIntent,
+  t: ReturnType<typeof useTranslation>["t"],
+) {
+  const key =
+    intent === "createWidget"
+      ? "ai.createWidgetExamples"
+      : intent === "watchdog"
+        ? "ai.watchdogExamples"
+        : undefined;
+  if (!key) {
+    return [];
+  }
+  const examples = t(key, { returnObjects: true });
+  return Array.isArray(examples) ? examples.map(String) : [];
+}
+
+function assistantIntentPlaceholder(
+  intent: AssistantPromptIntent,
+  t: ReturnType<typeof useTranslation>["t"],
+) {
+  if (intent === "createWidget") {
+    return t("ai.createWidgetPlaceholder");
+  }
+  if (intent === "watchdog") {
+    return t("ai.watchdogPlaceholder");
+  }
+  return t("ai.composerPlaceholder");
 }
 
 function sanitizeAssistantThreadTitle(value: string) {
@@ -432,7 +492,7 @@ function assistantIntentForPrompt(
   activeIntent: AssistantPromptIntent,
   prompt: string,
 ): AssistantPromptIntent {
-  if (activeIntent === "extensionCreation") {
+  if (activeIntent !== "chat") {
     return activeIntent;
   }
 
@@ -522,7 +582,10 @@ function normalizeAssistantChatMessage(value: unknown): AssistantChatMessage[] {
       imageAttachments: normalizeImageAttachments(candidate.imageAttachments),
       fileAttachments: normalizeFileAttachments(candidate.fileAttachments),
       intent:
-        candidate.intent === "chat" || candidate.intent === "extensionCreation"
+        candidate.intent === "chat" ||
+        candidate.intent === "extensionCreation" ||
+        candidate.intent === "createWidget" ||
+        candidate.intent === "watchdog"
           ? candidate.intent
           : undefined,
       createdAt: normalizeDateString(candidate.createdAt) ?? new Date().toISOString(),
@@ -669,6 +732,13 @@ export function AssistantPanel({
   const [imagePasteRejected, setImagePasteRejected] = useState(false);
   const [screenshotRegionState, setScreenshotRegionState] =
     useState<ScreenshotRegionState | null>(null);
+  const activeComposerIntent = assistantIntent === "chat" ? undefined : assistantIntent;
+  const activeComposerIntentLabel = activeComposerIntent
+    ? assistantIntentLabel(activeComposerIntent, t)
+    : "";
+  const activeComposerIntentExamples = activeComposerIntent
+    ? assistantIntentExamples(activeComposerIntent, t)
+    : [];
   const [refreshedModelOptions, setRefreshedModelOptions] = useState<AiProviderModelOption[]>([]);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
@@ -1425,6 +1495,28 @@ export function AssistantPanel({
     setScreenshotRegionState({ bounds: appViewportBounds() });
   }
 
+  function handleSelectAssistantIntent(intent: AssistantPromptIntent) {
+    setAssistantIntent(intent);
+    setAddContextMenuOpen(false);
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+    });
+  }
+
+  function handleClearAssistantIntent() {
+    setAssistantIntent("chat");
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+    });
+  }
+
+  function handleUseIntentExample(example: string) {
+    setPrompt(example);
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+    });
+  }
+
   async function handleAddTerminalBuffer() {
     setAddContextMenuOpen(false);
     const pane = activeFocusedTerminalPane;
@@ -1483,7 +1575,7 @@ export function AssistantPanel({
           "Create a concise chat title for this user request. Return only the title, no quotes, no markdown, maximum 8 words.\n\nUser request:\n" +
           userPrompt,
         contextLabel,
-        intent: requestIntent,
+        intent: assistantAgentIntent(requestIntent),
         messages: [],
         pageContext: pageContextPayload,
         allowTools: false,
@@ -1658,9 +1750,9 @@ export function AssistantPanel({
       const response = await invokeCommand("run_ai_agent_streaming", {
         channel,
         request: {
-          prompt: normalizedPrompt,
+          prompt: assistantPromptForIntent(requestIntent, normalizedPrompt),
           contextLabel,
-          intent: requestIntent,
+          intent: assistantAgentIntent(requestIntent),
           selectedOutput: textAttachments[0]?.text,
           pageContext: pageContextPayload,
           screenshots: imageAttachments.map((attachment) => ({
@@ -2249,13 +2341,46 @@ export function AssistantPanel({
             {t("ai.imageInputNotSupported")}
           </p>
         ) : null}
+        {activeComposerIntent ? (
+          <section
+            aria-label={t("ai.selectedIntent")}
+            className="assistant-intent-composer"
+            data-intent={activeComposerIntent}
+          >
+            <div className="assistant-intent-chip" data-intent={activeComposerIntent}>
+              {activeComposerIntent === "watchdog" ? <Eye size={14} /> : <Plus size={14} />}
+              <span>{activeComposerIntentLabel}</span>
+              <button
+                aria-label={t("ai.clearIntent", { intent: activeComposerIntentLabel })}
+                onClick={handleClearAssistantIntent}
+                type="button"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            {activeComposerIntentExamples.length > 0 ? (
+              <div className="assistant-intent-examples">
+                {activeComposerIntentExamples.map((example) => (
+                  <button
+                    className="assistant-intent-example-bubble"
+                    key={example}
+                    onClick={() => handleUseIntentExample(example)}
+                    type="button"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         <textarea
           ref={composerTextareaRef}
           onKeyDown={handleComposerKeyDown}
           onPaste={(event) => void handleComposerPaste(event)}
           onChange={(event) => setPrompt(event.currentTarget.value)}
           disabled={isSendingPrompt}
-          placeholder={t("ai.composerPlaceholder")}
+          placeholder={assistantIntentPlaceholder(assistantIntent, t)}
           rows={3}
           value={prompt}
         />
@@ -2309,6 +2434,26 @@ export function AssistantPanel({
                 >
                   <Camera size={15} />
                   {t("ai.addScreenshot")}
+                </button>
+                <button
+                  {...ariaChecked(assistantIntent === "createWidget")}
+                  className="assistant-add-menu-item"
+                  onClick={() => handleSelectAssistantIntent("createWidget")}
+                  role="menuitemradio"
+                  type="button"
+                >
+                  <Plus size={15} />
+                  {t("ai.createWidget")}
+                </button>
+                <button
+                  {...ariaChecked(assistantIntent === "watchdog")}
+                  className="assistant-add-menu-item"
+                  onClick={() => handleSelectAssistantIntent("watchdog")}
+                  role="menuitemradio"
+                  type="button"
+                >
+                  <Eye size={15} />
+                  {t("ai.watchdog")}
                 </button>
                 {canAttachTerminalBuffer ? (
                   <button
@@ -2490,6 +2635,11 @@ function AssistantMessageView({
         <div
           className={`assistant-message-bubble${shouldTruncateUserMessage && !isUserMessageExpanded ? " assistant-message-bubble-truncated" : ""}`}
         >
+          {message.role === "user" && message.intent && message.intent !== "chat" ? (
+            <span className="assistant-message-intent-label" data-intent={message.intent}>
+              {assistantIntentLabel(message.intent, t)}
+            </span>
+          ) : null}
           {message.textAttachments?.length ? (
             <div className="assistant-message-text-attachments">
               {message.textAttachments.map((attachment) => (

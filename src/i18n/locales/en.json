@@ -1305,6 +1305,10 @@
     "addFiles": "Add Files/Photos",
     "addScreenshot": "Add Screenshot",
     "addTerminalBuffer": "Add Terminal Buffer",
+    "createWidget": "Create Widget",
+    "watchdog": "Watchdog",
+    "selectedIntent": "Selected Assistant intent",
+    "clearIntent": "Clear {{intent}}",
     "extensions": "Extensions",
     "draftExtension": "Draft Extension",
     "pastedImageSource": "Pasted image",
@@ -1318,6 +1322,18 @@
     "fileTooLarge": "{{name}} is larger than 10 MB.",
     "imageInputNotSupported": "This model does not support image input, so pasted screenshots are not sent.",
     "composerPlaceholder": "Ask AI Assistant anything.",
+    "createWidgetPlaceholder": "Describe the widget to create.",
+    "watchdogPlaceholder": "Describe what to watch.",
+    "createWidgetExamples": [
+      "a round clock widget",
+      "a CPU and RAM mini monitor",
+      "a quick SSH jump list"
+    ],
+    "watchdogExamples": [
+      "monitor every 5 minutes and E-Mail me if the process has stopped",
+      "watch this SSH service and report failures",
+      "check disk space every hour"
+    ],
     "toolPermissionMode": "Tool permissions",
     "toolPermissionPrompt": "Default permissions",
     "toolPermissionAllowAll": "Allow all",
