@@ -201,6 +201,8 @@ The catalog overlay is a separate modal with search + two source-group tabs: Bui
 - An optional `htmlShim` body markup (default: a single `<div id="root">`).
 - A small host `<script>` that loads the stored source as data. The generated source is never pasted directly into the host script text, because generated snippets commonly contain HTML/script literals such as `</script>` that would prematurely close the host script and render broken JavaScript as widget body text.
 - A per-instance settings snapshot loaded through `KK.getSettings()`. Scripts can persist small non-secret user options with `KK.setSetting(key, value)` or replace the object with `KK.setSettings(nextSettings)`.
+- A viewport helper for canvas/WebGL widgets: `KK.getViewport()` returns `{ width, height, dpr }` measured from the script root, and `KK.onViewportResize(callback)` calls back with the same shape when the widget body changes size.
+- A small app-owned CSS primitive set for generated UI: `kk-shell`, `kk-toolbar`, `kk-cluster`, `kk-title`, `kk-subtitle`, `kk-muted`, `kk-panel`, `kk-card`, `kk-grid`, `kk-stat`, `kk-stat-value`, `kk-stat-label`, `kk-pill`, `kk-badge`, `kk-stage`, and `kk-fill`. These are the default building blocks for polished script widgets; they avoid pulling a third-party UI framework into every iframe.
 - A secret bridge exposed as `await KK.getSecret(fieldKey)`. The parent frame validates the field against the custom widget schema and instance `secretRef` before asking Rust to read the OS keychain.
 
 The iframe is a **fault-isolation** boundary, not a security boundary. KKTerm is MIT and single-user; the iframe exists so a typo in one script widget cannot crash the dashboard, and so future Tauri-command exposure (a postMessage bridge) is a deliberate per-handler decision rather than an accidental global.
@@ -215,7 +217,7 @@ Declared permissions:
 
 External website links must leave the widget iframe. The host script intercepts absolute `http:` / `https:` anchor clicks and sends an `openExternalUrl` bridge message to the parent, where `ScriptWidgetHost.tsx` validates the URL and calls Tauri's opener plugin. Script widgets may also call `KK.openExternal(url)` directly. This avoids navigating third-party sites inside a sandboxed `srcdoc` iframe with an opaque origin, which can produce site errors such as unknown/null origin headers.
 
-The bridge exposes `KK.openExternal(url)`, `KK.getSettings()`, `KK.setSetting(key, value)`, `KK.setSettings(nextSettings)`, `KK.getSecret(key)`, `KK.requestPermission(name)`, and `KK.postMessage(payload)` at the iframe globals. Future Tauri command access is added by extending this bridge with explicit handlers — not by widening the iframe surface.
+The bridge exposes `KK.openExternal(url)`, `KK.getSettings()`, `KK.setSetting(key, value)`, `KK.setSettings(nextSettings)`, `KK.getViewport()`, `KK.onViewportResize(callback)`, `KK.getSecret(key)`, `KK.requestPermission(name)`, and `KK.postMessage(payload)` at the iframe globals. Future Tauri command access is added by extending this bridge with explicit handlers — not by widening the iframe surface.
 
 ### Script Widget Libraries
 

@@ -106,6 +106,95 @@ export function buildSrcdoc(
     }
     .kk-row { display: flex; align-items: center; gap: 8px; }
     .kk-stack { display: grid; gap: 8px; }
+    .kk-shell {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+      min-height: 100%;
+    }
+    .kk-toolbar,
+    .kk-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .kk-title {
+      color: var(--kk-text);
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .kk-subtitle,
+    .kk-muted {
+      color: var(--kk-muted);
+      font-size: 12px;
+    }
+    .kk-panel,
+    .kk-card {
+      min-width: 0;
+      border: 1px solid var(--kk-border);
+      border-radius: 8px;
+      background: var(--kk-surface);
+      box-shadow: 0 8px 22px -20px rgba(15, 23, 42, 0.45);
+    }
+    .kk-panel { padding: 10px; }
+    .kk-card { padding: 9px; }
+    .kk-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+      gap: 8px;
+    }
+    .kk-stat {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid var(--kk-border);
+      border-radius: 7px;
+      background: var(--kk-surface-muted);
+    }
+    .kk-stat-value {
+      color: var(--kk-text);
+      font-size: 18px;
+      font-weight: 780;
+      line-height: 1.1;
+    }
+    .kk-stat-label {
+      color: var(--kk-muted);
+      font-size: 11.5px;
+    }
+    .kk-pill,
+    .kk-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 24px;
+      padding: 3px 8px;
+      border: 1px solid rgba(37, 99, 235, 0.24);
+      border-radius: 999px;
+      background: var(--kk-accent-soft);
+      color: var(--kk-accent);
+      font-size: 11.5px;
+      font-weight: 650;
+    }
+    .kk-stage {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--kk-border);
+      border-radius: 8px;
+      background: #0f172a;
+    }
+    .kk-stage > canvas,
+    canvas.kk-fill,
+    svg.kk-fill,
+    .kk-fill {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
     .kk-result {
       border: 1px solid var(--kk-border);
       border-radius: 6px;
@@ -126,8 +215,43 @@ export function buildSrcdoc(
           settings = parsedSettings;
         }
       } catch (_err) {}
+      function readViewport() {
+        var target = document.getElementById('root') || document.documentElement || document.body;
+        var rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+        var width = Math.max(1, Math.floor((rect && rect.width) || (target && target.clientWidth) || window.innerWidth || 1));
+        var height = Math.max(1, Math.floor((rect && rect.height) || (target && target.clientHeight) || window.innerHeight || 1));
+        var dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+        return { width: width, height: height, dpr: dpr };
+      }
       const KK = {
         getSettings: function () { return JSON.parse(JSON.stringify(settings)); },
+        getViewport: readViewport,
+        onViewportResize: function (callback) {
+          if (typeof callback !== 'function') return function () {};
+          var target = document.getElementById('root') || document.documentElement || document.body;
+          var disposed = false;
+          var pending = false;
+          function notify() {
+            if (disposed || pending) return;
+            pending = true;
+            requestAnimationFrame(function () {
+              pending = false;
+              if (!disposed) callback(readViewport());
+            });
+          }
+          var observer = null;
+          if (typeof ResizeObserver !== 'undefined' && target) {
+            observer = new ResizeObserver(notify);
+            observer.observe(target);
+          }
+          window.addEventListener('resize', notify);
+          setTimeout(notify, 0);
+          return function () {
+            disposed = true;
+            if (observer) observer.disconnect();
+            window.removeEventListener('resize', notify);
+          };
+        },
         getSecret: function (key) {
           return new Promise(function (resolve, reject) {
             if (typeof key !== 'string' || !key) {

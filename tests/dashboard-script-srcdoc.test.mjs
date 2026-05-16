@@ -80,6 +80,42 @@ test("script widget host exposes keyed secret bridge", async () => {
   assert.doesNotMatch(srcdoc, /widget-api-key/);
 });
 
+test("script widget host exposes measured viewport bridge", async () => {
+  const { buildSrcdoc } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/permissions.ts", import.meta.url),
+  );
+  const srcdoc = buildSrcdoc({
+    source: "const viewport = KK.getViewport(); KK.onViewportResize(() => {});",
+    permissions: { network: false },
+  });
+
+  assert.match(srcdoc, /function readViewport\(\)/);
+  assert.match(srcdoc, /getViewport: readViewport/);
+  assert.match(srcdoc, /onViewportResize: function \(callback\)/);
+  assert.match(srcdoc, /new ResizeObserver\(notify\)/);
+});
+
+test("script widget host exposes app-owned UI primitives", async () => {
+  const { buildSrcdoc } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/permissions.ts", import.meta.url),
+  );
+  const srcdoc = buildSrcdoc({
+    source: "document.getElementById('root').className = 'kk-shell';",
+    permissions: { network: false },
+  });
+
+  for (const className of [
+    "kk-shell",
+    "kk-toolbar",
+    "kk-panel",
+    "kk-stat-value",
+    "kk-stage",
+    "kk-fill",
+  ]) {
+    assert.match(srcdoc, new RegExp(`\\.${className}`));
+  }
+});
+
 test("script widget wraps user source in IIFE so top-level return is legal", async () => {
   const { buildSrcdoc } = await importTypeScriptModule(
     new URL("../src/dashboard/script/permissions.ts", import.meta.url),

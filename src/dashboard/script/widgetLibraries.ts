@@ -53,19 +53,19 @@ export const WIDGET_LIBRARIES: Record<string, WidgetLibrary> = {
   mermaid: {
     key: "mermaid",
     global: "mermaid",
-    description: "Text-to-diagram (flowchart, sequence, gantt, class, state, er, pie).",
+    description: "Text-to-diagram (flowchart, sequence, gantt, class, state, er, pie). Render into a measured kk-panel and re-run or scale SVG on resize.",
     load: () => rawDefault(() => import("widget-lib:mermaid?global=mermaid")),
   },
   echarts: {
     key: "echarts",
     global: "echarts",
-    description: "Apache ECharts data visualization (bar, line, scatter, treemap, heatmap, radar).",
+    description: "Apache ECharts data visualization (bar, line, scatter, treemap, heatmap, radar). Mount in a measured kk-stage/kk-panel and call chart.resize() on viewport resize.",
     load: () => rawDefault(() => import("widget-lib:echarts?global=echarts")),
   },
   chartjs: {
     key: "chartjs",
     global: "Chart",
-    description: "Chart.js canvas charts (bar, line, pie, doughnut, radar).",
+    description: "Chart.js canvas charts (bar, line, pie, doughnut, radar). Use responsive canvas sizing and call chart.resize() when KK.onViewportResize fires.",
     load: () => rawDefault(() => import("widget-lib:chart.js?global=Chart")),
   },
   qrcode: {
@@ -113,7 +113,7 @@ export const WIDGET_LIBRARIES: Record<string, WidgetLibrary> = {
   konva: {
     key: "konva",
     global: "Konva",
-    description: "Interactive canvas stage/layer model with events.",
+    description: "Interactive canvas stage/layer model with events. Size the Stage from KK.getViewport() and update stage.size() on resize.",
     load: () => rawDefault(() => import("widget-lib:konva?global=Konva")),
   },
   roughjs: {
@@ -131,19 +131,19 @@ export const WIDGET_LIBRARIES: Record<string, WidgetLibrary> = {
   three: {
     key: "three",
     global: "THREE",
-    description: "Three.js 3D scenes (scene, camera, renderer, geometry, materials).",
+    description: "Three.js 3D scenes (scene, camera, renderer, geometry, materials). Size from KK.getViewport(), update camera on resize, and fit camera to scene bounds.",
     load: () => rawDefault(() => import("widget-lib:three?global=THREE")),
   },
   pixijs: {
     key: "pixijs",
     global: "PIXI",
-    description: "PixiJS 2D WebGL rendering (sprites, graphics, animations).",
+    description: "PixiJS 2D WebGL rendering (sprites, graphics, animations). Use KK.getViewport() for renderer size and renderer.resize() on resize.",
     load: () => rawDefault(() => import("widget-lib:pixi.js?global=PIXI")),
   },
   matter: {
     key: "matter",
     global: "Matter",
-    description: "2D physics engine (bodies, constraints, collisions).",
+    description: "2D physics engine (bodies, constraints, collisions). Pair with measured canvas bounds and explicit wall/floor bodies sized from KK.getViewport().",
     load: () => rawDefault(() => import("matter-js/build/matter.min.js?raw")),
   },
   prism: {
@@ -162,7 +162,7 @@ export const WIDGET_LIBRARIES: Record<string, WidgetLibrary> = {
   gridjs: {
     key: "gridjs",
     global: "gridjs",
-    description: "Sortable/filterable/paginated HTML tables.",
+    description: "Sortable/filterable/paginated HTML tables. Mount inside kk-panel, constrain height, and keep columns compact for widget widths.",
     load: () => rawDefault(() => import("widget-lib:gridjs?global=gridjs")),
   },
   ansitohtml: {
@@ -204,7 +204,7 @@ export const WIDGET_LIBRARIES: Record<string, WidgetLibrary> = {
   leaflet: {
     key: "leaflet",
     global: "L",
-    description: "Interactive maps (tile layers, markers, popups). Requires network: true.",
+    description: "Interactive maps (tile layers, markers, popups). Requires network: true. Mount in kk-stage and call map.invalidateSize() on resize.",
     load: () => rawDefault(() => import("leaflet/dist/leaflet.js?raw")),
   },
   fflate: {
