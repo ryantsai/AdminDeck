@@ -164,6 +164,13 @@ export function ConnectionWidgetBody({ instance }: BuiltInWidgetBodyProps) {
     () => new Map(allConnections.map((connection) => [connection.id, connection])),
     [allConnections],
   );
+  // Stable, status-free connection lookup. The embedded workspace must not see a
+  // new connection object every time activeSessionCounts changes, otherwise the
+  // terminal session effect tears down and restarts in an infinite loop.
+  const sessionConnectionsById = useMemo(
+    () => new Map(flattenConnections(tree).map((connection) => [connection.id, connection])),
+    [tree],
+  );
   const selectedConnections = config.connectionIds.flatMap((id) => {
     const connection = connectionsById.get(id);
     return connection ? [connection] : [];
@@ -172,6 +179,9 @@ export function ConnectionWidgetBody({ instance }: BuiltInWidgetBodyProps) {
     selectedConnections.find((connection) => connection.id === config.activeConnectionId)
     ?? selectedConnections[0]
     ?? null;
+  const sessionConnection = activeConnection
+    ? sessionConnectionsById.get(activeConnection.id) ?? activeConnection
+    : null;
   const availableConnections = allConnections.filter(
     (connection) => !config.connectionIds.includes(connection.id),
   );
@@ -273,7 +283,7 @@ export function ConnectionWidgetBody({ instance }: BuiltInWidgetBodyProps) {
               </button>
             ))}
           </div>
-          {activeConnection ? (
+          {activeConnection && sessionConnection ? (
             <div className="dashboard-connection-pane">
               <div className="dashboard-connection-pane-toolbar">
                 <span>{connectionSubtitle(activeConnection)}</span>
@@ -287,9 +297,9 @@ export function ConnectionWidgetBody({ instance }: BuiltInWidgetBodyProps) {
                 </button>
               </div>
               <ConnectionWidgetSession
-                connection={activeConnection}
+                connection={sessionConnection}
                 instanceId={instance.id}
-                key={activeConnection.id}
+                key={sessionConnection.id}
               />
             </div>
           ) : null}

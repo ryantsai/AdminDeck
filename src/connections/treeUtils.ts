@@ -8,6 +8,13 @@ export function upsertRootConnection(tree: ConnectionTree, connection: Connectio
   };
 }
 
+// Display-only. Each connection is shallow-cloned to attach `status`, so the
+// returned tree has fresh references on every `activeSessionCounts` change.
+// Never feed the result into a workspace component (Terminal/WebView/RDP/VNC/
+// SFTP) — `TerminalWorkspace`'s session `useEffect` depends on `pane.connection`
+// and reference churn drives an unbounded mount/unmount loop. Look up the raw
+// `Connection` by `id` from the un-augmented tree when handing it to a
+// workspace; see `AGENTS.md` and `ConnectionWidgetBody.tsx`.
 export function withLiveConnectionStatuses(
   tree: ConnectionTree,
   activeSessionCounts: Record<string, number>,
