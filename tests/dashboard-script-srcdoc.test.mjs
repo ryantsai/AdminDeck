@@ -40,7 +40,8 @@ test("script widget CSP allows remote images only with network permission", asyn
 
   assert.match(buildCsp({ network: true }), /img-src http: https: data: blob:/);
   assert.match(buildCsp({ network: true }), /connect-src \*/);
-  assert.match(buildCsp({ network: true }), /script-src 'unsafe-inline' blob: http: https:/);
+  assert.match(buildCsp({ network: true }), /script-src 'unsafe-inline' blob:/);
+  assert.doesNotMatch(buildCsp({ network: true }), /script-src[^;]*https:/);
   assert.match(buildCsp({ network: false }), /img-src data: blob:/);
   assert.match(buildCsp({ network: false }), /connect-src 'none'/);
   assert.match(buildCsp({ network: false }), /script-src 'unsafe-inline' blob:/);

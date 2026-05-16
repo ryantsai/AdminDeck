@@ -205,6 +205,12 @@ export interface AppLauncherSettings {
 export interface DashboardSettings {
   confirmRemove: boolean;
   defaultLandingView: string;
+  /**
+   * Hard cap on simultaneously active script widgets per renderer. Backed by
+   * the same field on the Rust DashboardSettings struct; validated 1..=100 at
+   * the storage boundary. See ADR 0006.
+   */
+  maxActiveScriptWidgets: number;
 }
 
 export interface PreparedAppLauncherEntry {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   describeMcpError,
@@ -9,6 +9,7 @@ import {
   type WidgetFilePickFilter,
 } from "../../lib/tauri";
 import { useDashboardStore } from "../state/dashboardStore";
+import { useWorkspaceStore } from "../../store";
 import type { DashboardWidgetInstance, ScriptBody } from "../types";
 import {
   parseJsonObject,
@@ -19,6 +20,83 @@ import {
 } from "../schema";
 import { buildSrcdoc, type ResolvedWidgetLibrary } from "./permissions";
 import { loadWidgetLibraries, resolveWidgetLibraryKeys } from "./widgetLibraries";
+
+// Harden 3: cap the number of concurrently active script widgets to prevent
+// too many simultaneous rAF/animation loops from saturating the renderer.
+// The Map stores each active widget's React setter so that when we evict an
+// older widget to make room for a newer one, we can notify the evicted
+// component to flip its `capped` state and tear its iframe down. A bare
+// Set<string> would silently exceed the cap because the evicted iframe
+// would keep running.
+//
+// The cap value lives in Settings -> Dashboard
+// (`dashboardSettings.maxActiveScriptWidgets`), defaults to 8, and is clamped
+// 1..=100 by the Rust validator. Components pass the current value into
+// `tryActivateScriptWidget`; lowering the cap enforces the new ceiling as
+// hosts re-run their effect, while raising it lets later mounts claim room.
+type SetCapped = (capped: boolean) => void;
+const activeScriptWidgets = new Map<string, SetCapped>();
+
+function normalizeScriptWidgetCap(cap: number): number {
+  return Math.max(1, Math.floor(Number.isFinite(cap) ? cap : 1));
+}
+
+function tryActivateScriptWidget(
+  id: string,
+  setCapped: SetCapped,
+  cap: number,
+): boolean {
+  const normalizedCap = normalizeScriptWidgetCap(cap);
+  if (activeScriptWidgets.has(id)) {
+    activeScriptWidgets.set(id, setCapped);
+    return true;
+  }
+  enforceActiveScriptWidgetCap(normalizedCap, id);
+  if (activeScriptWidgets.size >= normalizedCap) return false;
+  activeScriptWidgets.set(id, setCapped);
+  return true;
+}
+
+function deactivateScriptWidget(id: string) {
+  activeScriptWidgets.delete(id);
+}
+
+// Evict the oldest active widget (Map preserves insertion order) and notify
+// it so its iframe is replaced by the capped placeholder. Returns true if
+// an eviction actually happened.
+function evictOldestActiveScriptWidget(exceptId: string): boolean {
+  for (const [id, setCapped] of activeScriptWidgets) {
+    if (id === exceptId) continue;
+    activeScriptWidgets.delete(id);
+    setCapped(true);
+    return true;
+  }
+  return false;
+}
+
+function enforceActiveScriptWidgetCap(cap: number, exceptId: string) {
+  while (activeScriptWidgets.size > cap) {
+    if (!evictOldestActiveScriptWidget(exceptId)) break;
+  }
+}
+
+function activateScriptWidgetWithEviction(
+  id: string,
+  setCapped: SetCapped,
+  cap: number,
+): boolean {
+  const normalizedCap = normalizeScriptWidgetCap(cap);
+  if (activeScriptWidgets.has(id)) {
+    activeScriptWidgets.set(id, setCapped);
+    return true;
+  }
+  while (activeScriptWidgets.size >= normalizedCap) {
+    if (!evictOldestActiveScriptWidget(id)) break;
+  }
+  if (activeScriptWidgets.size >= normalizedCap) return false;
+  activeScriptWidgets.set(id, setCapped);
+  return true;
+}
 
 export function ScriptWidgetHost({
   bodyJson,
@@ -32,7 +110,11 @@ export function ScriptWidgetHost({
   const { t } = useTranslation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const updateInstance = useDashboardStore((s) => s.updateInstance);
+  const maxActiveScriptWidgets = useWorkspaceStore(
+    (s) => s.dashboardSettings.maxActiveScriptWidgets,
+  );
   const { key: reloadKey } = useScriptReloadHandle();
+  const [capped, setCapped] = useState(false);
   const parsed = useMemo<ScriptBody | null>(() => {
     const json = parseJsonObject(bodyJson);
     if (!json.ok) return null;
@@ -50,8 +132,37 @@ export function ScriptWidgetHost({
     [parsed],
   );
   const requestedLibKey = requestedLibraries.join("|");
+
+  // Harden 3: register this widget in the active set. If the cap is exceeded,
+  // show a lightweight placeholder instead of the full iframe. Re-runs when
+  // the user changes the cap in Settings so the active set honors the current
+  // ceiling and capped widgets can claim newly available room.
   useEffect(() => {
-    if (!parsed) {
+    const activated = tryActivateScriptWidget(
+      instance.id,
+      setCapped,
+      maxActiveScriptWidgets,
+    );
+    setCapped(!activated);
+    return () => {
+      deactivateScriptWidget(instance.id);
+    };
+  }, [instance.id, maxActiveScriptWidgets]);
+
+  const activateCapped = useCallback(() => {
+    // Evict the oldest active widget (notifying it so its iframe tears
+    // down) before taking its slot. Without the notify step the evicted
+    // iframe keeps running and the cap is silently exceeded.
+    const activated = activateScriptWidgetWithEviction(
+      instance.id,
+      setCapped,
+      maxActiveScriptWidgets,
+    );
+    setCapped(!activated);
+  }, [instance.id, maxActiveScriptWidgets]);
+
+  useEffect(() => {
+    if (!parsed || capped) {
       setLibraries(null);
       setLibraryError(null);
       return;
@@ -76,11 +187,42 @@ export function ScriptWidgetHost({
     return () => {
       cancelled = true;
     };
-  }, [parsed, requestedLibraries, requestedLibKey]);
+  }, [parsed, capped, requestedLibraries, requestedLibKey]);
   const srcdoc = useMemo(
     () => (parsed && libraries ? buildSrcdoc(parsed, settingsValuesJson, libraries) : ""),
     [parsed, settingsValuesJson, libraries],
   );
+
+  // Harden 2: post visibility messages to the sandbox when the iframe
+  // scrolls off-screen or is occluded. Widgets can check KK.isVisible()
+  // to pause expensive rAF/animation loops.
+  useEffect(() => {
+    const el = iframeRef.current;
+    if (!el || capped || !libraries) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const visible = entry.isIntersecting && entry.intersectionRatio > 0.1;
+          el.contentWindow?.postMessage(
+            { kk: true, type: "setVisible", visible },
+            "*",
+          );
+        }
+      },
+      { threshold: [0, 0.1] },
+    );
+    observer.observe(el);
+    // Send initial visibility.
+    const rect = el.getBoundingClientRect();
+    const initiallyVisible = rect.width > 0 && rect.height > 0;
+    if (!initiallyVisible) {
+      el.contentWindow?.postMessage(
+        { kk: true, type: "setVisible", visible: false },
+        "*",
+      );
+    }
+    return () => observer.disconnect();
+  }, [capped, libraries]);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -231,6 +373,20 @@ export function ScriptWidgetHost({
     return <div className="dw-script-error">{t("dashboard.invalidScriptWidgetBody")}</div>;
   }
 
+  if (capped) {
+    return (
+      <div
+        className="dw-script-capped"
+        onClick={activateCapped}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") activateCapped(); }}
+        role="button"
+        tabIndex={0}
+      >
+        {t("dashboard.scriptWidgetCapped", { max: maxActiveScriptWidgets })}
+      </div>
+    );
+  }
+
   if (libraryError) {
     return (
       <div className="dw-script-error">
@@ -247,10 +403,11 @@ export function ScriptWidgetHost({
     <iframe
       ref={iframeRef}
       key={reloadKey}
-      title="dashboard-script"
+      className="dw-script-frame"
+      title={t("dashboard.scriptWidgetFrameTitle")}
+      loading="lazy"
       sandbox="allow-scripts allow-downloads"
       srcDoc={srcdoc}
-      style={{ width: "100%", height: "100%", border: "none", background: "transparent" }}
     />
   );
 }

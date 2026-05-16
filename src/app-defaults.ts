@@ -31,9 +31,18 @@ export const defaultGeneralSettings: GeneralSettings = {
   lastBackupAt: null,
 };
 
+// Active-widget cap defaults. Mirror the Rust constants in
+// `src-tauri/src/storage.rs` (default_max_active_script_widgets and
+// MAX_ACTIVE_SCRIPT_WIDGETS_LIMIT). Kept in sync manually — the Settings UI
+// and ScriptWidgetHost both read from these constants.
+export const MAX_ACTIVE_SCRIPT_WIDGETS_DEFAULT = 8;
+export const MAX_ACTIVE_SCRIPT_WIDGETS_LIMIT = 100;
+export const MAX_ACTIVE_SCRIPT_WIDGETS_MIN = 1;
+
 export const defaultDashboardSettings: DashboardSettings = {
   confirmRemove: true,
   defaultLandingView: "lastActive",
+  maxActiveScriptWidgets: MAX_ACTIVE_SCRIPT_WIDGETS_DEFAULT,
 };
 
 export const defaultTerminalSettings: TerminalSettings = {

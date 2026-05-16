@@ -9,7 +9,7 @@ export interface ResolvedWidgetLibrary {
 export function buildCsp(perm: ScriptBody["permissions"]): string {
   const connect = perm.network ? "*" : "'none'";
   const images = perm.network ? "http: https: data: blob:" : "data: blob:";
-  const scripts = perm.network ? "'unsafe-inline' blob: http: https:" : "'unsafe-inline' blob:";
+  const scripts = "'unsafe-inline' blob:";
   return [
     "default-src 'none'",
     "style-src 'unsafe-inline'",
@@ -260,6 +260,17 @@ export function buildSrcdoc(
         requestPermission: function () { return Promise.resolve(false); },
       };
       window.KK = KK;
+      // Harden 2: visibility-aware throttling. When the host reports the widget
+      // is off-screen or scrolled away, script authors can check KK.isVisible()
+      // to pause expensive rAF/animation loops.
+      var _kkVisible = true;
+      KK.isVisible = function () { return _kkVisible; };
+      window.addEventListener('message', function (event) {
+        var data = event.data;
+        if (!data || !data.kk || data.type !== 'setVisible') return;
+        _kkVisible = data.visible === true;
+      });
+
       document.addEventListener('click', function (event) {
         const target = event.target && event.target.closest ? event.target.closest('a[href]') : null;
         if (!target) return;

@@ -5,6 +5,10 @@ import { useDashboardStore } from "../dashboard/state/dashboardStore";
 import { useWorkspaceStore } from "../store";
 import { invokeCommand, isTauriRuntime } from "../lib/tauri";
 import type { DashboardSettings as DashboardSettingsState } from "../types";
+import {
+  MAX_ACTIVE_SCRIPT_WIDGETS_LIMIT,
+  MAX_ACTIVE_SCRIPT_WIDGETS_MIN,
+} from "../app-defaults";
 import { SettingsSectionHeader } from "./shared";
 
 export function DashboardSettings() {
@@ -72,6 +76,38 @@ export function DashboardSettings() {
                 </option>
               ))}
             </select>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset className="settings-subsection settings-fieldset">
+        <legend>{t("settings.dashboardPerformance")}</legend>
+        <div className="form-grid">
+          <label>
+            <span>{t("settings.dashboardMaxActiveScriptWidgets")}</span>
+            <input
+              inputMode="numeric"
+              max={MAX_ACTIVE_SCRIPT_WIDGETS_LIMIT}
+              min={MAX_ACTIVE_SCRIPT_WIDGETS_MIN}
+              onChange={(event) => {
+                const raw = Number(event.currentTarget.value);
+                const clamped = Number.isFinite(raw)
+                  ? Math.min(
+                      MAX_ACTIVE_SCRIPT_WIDGETS_LIMIT,
+                      Math.max(MAX_ACTIVE_SCRIPT_WIDGETS_MIN, Math.round(raw)),
+                    )
+                  : MAX_ACTIVE_SCRIPT_WIDGETS_MIN;
+                setDraft((s) => ({ ...s, maxActiveScriptWidgets: clamped }));
+              }}
+              step={1}
+              type="number"
+              value={draft.maxActiveScriptWidgets}
+            />
+            <small className="field-hint">
+              {t("settings.dashboardMaxActiveScriptWidgetsHint", {
+                min: MAX_ACTIVE_SCRIPT_WIDGETS_MIN,
+                max: MAX_ACTIVE_SCRIPT_WIDGETS_LIMIT,
+              })}
+            </small>
           </label>
         </div>
       </fieldset>
