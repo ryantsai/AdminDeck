@@ -22,18 +22,40 @@ import { loadWidgetLibraries, resolveWidgetLibraryKeys } from "./widgetLibraries
 
 // Harden 3: cap the number of concurrently active script widgets to prevent
 // too many simultaneous rAF/animation loops from saturating the renderer.
+// The Map stores each active widget's React setter so that when we evict an
+// older widget to make room for a newer one, we can notify the evicted
+// component to flip its `capped` state and tear its iframe down. A bare
+// Set<string> would silently exceed the cap because the evicted iframe
+// would keep running.
 const MAX_ACTIVE_SCRIPT_WIDGETS = 3;
-const activeScriptWidgetIds = new Set<string>();
+type SetCapped = (capped: boolean) => void;
+const activeScriptWidgets = new Map<string, SetCapped>();
 
-function tryActivateScriptWidget(id: string): boolean {
-  if (activeScriptWidgetIds.has(id)) return true;
-  if (activeScriptWidgetIds.size >= MAX_ACTIVE_SCRIPT_WIDGETS) return false;
-  activeScriptWidgetIds.add(id);
+function tryActivateScriptWidget(id: string, setCapped: SetCapped): boolean {
+  if (activeScriptWidgets.has(id)) {
+    activeScriptWidgets.set(id, setCapped);
+    return true;
+  }
+  if (activeScriptWidgets.size >= MAX_ACTIVE_SCRIPT_WIDGETS) return false;
+  activeScriptWidgets.set(id, setCapped);
   return true;
 }
 
 function deactivateScriptWidget(id: string) {
-  activeScriptWidgetIds.delete(id);
+  activeScriptWidgets.delete(id);
+}
+
+// Evict the oldest active widget (Map preserves insertion order) and notify
+// it so its iframe is replaced by the capped placeholder. Returns true if
+// an eviction actually happened.
+function evictOldestActiveScriptWidget(exceptId: string): boolean {
+  for (const [id, setCapped] of activeScriptWidgets) {
+    if (id === exceptId) continue;
+    activeScriptWidgets.delete(id);
+    setCapped(true);
+    return true;
+  }
+  return false;
 }
 
 export function ScriptWidgetHost({
@@ -71,7 +93,7 @@ export function ScriptWidgetHost({
   // Harden 3: register this widget in the active set. If the cap is exceeded,
   // show a lightweight placeholder instead of the full iframe.
   useEffect(() => {
-    const activated = tryActivateScriptWidget(instance.id);
+    const activated = tryActivateScriptWidget(instance.id, setCapped);
     setCapped(!activated);
     return () => {
       deactivateScriptWidget(instance.id);
@@ -79,10 +101,11 @@ export function ScriptWidgetHost({
   }, [instance.id]);
 
   const activateCapped = useCallback(() => {
-    // Deactivate the oldest entry to make room.
-    const oldest = activeScriptWidgetIds.values().next().value;
-    if (oldest) deactivateScriptWidget(oldest);
-    tryActivateScriptWidget(instance.id);
+    // Evict the oldest active widget (notifying it so its iframe tears
+    // down) before taking its slot. Without the notify step the evicted
+    // iframe keeps running and the cap is silently exceeded.
+    evictOldestActiveScriptWidget(instance.id);
+    tryActivateScriptWidget(instance.id, setCapped);
     setCapped(false);
   }, [instance.id]);
 

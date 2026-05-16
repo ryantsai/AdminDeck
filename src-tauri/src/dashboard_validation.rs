@@ -498,14 +498,24 @@ pub fn validate_script_body_json_detailed(
                 ));
             }
         }
+    }
+    // Harden 1: validate script source for dangerous patterns. The returned
+    // `code_only` view has strings and comments blanked out, which we reuse
+    // below so a library declared `matter` but only mentioned in a comment
+    // is still rejected as unused.
+    let code_only = validate_script_source_inner(&parsed.source)
+        .map_err(|detail| (ValidationError::InvalidScriptSource, Some(detail)))?;
+    if let Some(libs) = &parsed.libraries {
         // Harden 4: validate that every listed library is referenced in the source.
         // A library that loads but is never called wastes ~80KB+ and adds GC pressure.
+        // Word-boundary matching is required so short globals like `L` (Leaflet)
+        // don't pass through `null`, `let`, `class`, etc.
         for entry in libs {
             if let Some(&(_, global)) = KNOWN_LIBRARY_GLOBALS
                 .iter()
                 .find(|&&(key, _)| key == entry.as_str())
             {
-                if !parsed.source.contains(global) {
+                if !source_references_identifier(&code_only, global) {
                     return Err((
                         ValidationError::UnusedLibrary,
                         Some(format!(
@@ -516,10 +526,6 @@ pub fn validate_script_body_json_detailed(
             }
         }
     }
-    // Harden 1: validate script source for dangerous patterns.
-    validate_script_source(&parsed.source).map_err(|detail| {
-        (ValidationError::InvalidScriptSource, Some(detail))
-    })?;
     Ok(parsed)
 }
 
@@ -536,114 +542,205 @@ fn is_valid_library_key(value: &str) -> bool {
 }
 
 /// Harden 1: validate script source for dangerous patterns that can freeze the app.
-/// Returns Ok(()) or Err(human-readable detail string).
-pub fn validate_script_source(source: &str) -> Result<(), String> {
-    // Check for balanced delimiters (catches malformed/broken JS).
-    let mut parens: i32 = 0;
-    let mut braces: i32 = 0;
-    let mut brackets: i32 = 0;
-    let mut in_single = false;
-    let mut in_double = false;
-    let mut in_template = false;
-    let mut in_comment_line = false;
-    let mut in_comment_block = false;
-    let mut prev = '\0';
-    for ch in source.chars() {
-        // Track string state.
-        if !in_comment_line && !in_comment_block {
-            match ch {
-                '\'' if !in_double && !in_template && prev != '\\' => in_single = !in_single,
-                '"' if !in_single && !in_template && prev != '\\' => in_double = !in_double,
-                '`' if !in_single && !in_double && prev != '\\' => in_template = !in_template,
-                _ => {}
-            }
-        }
-        // Track comment state.
-        if !in_single && !in_double && !in_template {
-            if !in_comment_line && !in_comment_block && prev == '/' && ch == '/' {
-                in_comment_line = true;
-            }
-            if in_comment_line && ch == '\n' {
-                in_comment_line = false;
-            }
-            if !in_comment_line && !in_comment_block && prev == '/' && ch == '*' {
-                in_comment_block = true;
-            }
-            if in_comment_block && prev == '*' && ch == '/' {
-                in_comment_block = false;
-            }
-        }
-        if in_single || in_double || in_template || in_comment_line || in_comment_block {
-            prev = ch;
-            continue;
-        }
-        // Count delimiters.
-        match ch {
-            '(' => parens += 1,
-            ')' => parens -= 1,
-            '{' => braces += 1,
-            '}' => braces -= 1,
-            '[' => brackets += 1,
-            ']' => brackets -= 1,
-            _ => {}
-        }
-        if parens < 0 || braces < 0 || brackets < 0 {
-            return Err(format!(
-                "unbalanced delimiter: parens={parens} braces={braces} brackets={brackets}"
-            ));
-        }
-        prev = ch;
+///
+/// This is a heuristic textual check, not a real JS parser. It runs a single
+/// pass that strips strings, template literals, and comments to a "code-only"
+/// view, then runs three rejections against that view:
+///   * delimiter imbalance (parens / braces / brackets)
+///   * `while(true)`, `while(1)`, `for(;;)` infinite loops
+///   * null bytes
+///
+/// Known limitations (kept intentional so the check stays cheap):
+///   * Regex literals (`/foo(/`) are not tracked. A widget using a regex with
+///     unbalanced delimiters in source order can trigger a false reject.
+///   * `${expr}` interpolation inside template literals is treated as part of
+///     the string, so a `while(true)` hidden there would not be caught. The
+///     active-widget cap and visibility throttle still apply, so the impact
+///     is bounded.
+/// Runs the pattern checks and returns the "code-only" view of `source` so
+/// that downstream checks (such as the unused-library cross-reference in
+/// [`validate_script_body_json_detailed`]) can reuse it without re-scanning.
+fn validate_script_source_inner(source: &str) -> Result<String, String> {
+    if source.contains('\0') {
+        return Err("script source contains null bytes".to_string());
     }
-    if parens != 0 || braces != 0 || brackets != 0 {
-        return Err(format!(
-            "unbalanced delimiter at end: parens={parens} braces={braces} brackets={brackets}"
-        ));
-    }
-
-    // Detect while(true) / while (true) — common infinite loop pattern.
-    let collapsed: String = source
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
+    let code_only = strip_strings_and_comments(source)?;
+    let collapsed: String = code_only.chars().filter(|c| !c.is_whitespace()).collect();
     if collapsed.contains("while(true)") || collapsed.contains("while(1)") {
         return Err(
             "infinite loop detected: while(true) or while(1) is forbidden in widget scripts"
                 .to_string(),
         );
     }
-
-    // Detect for(;;) — another infinite loop.
     if collapsed.contains("for(;;)") {
         return Err(
             "infinite loop detected: for(;;) is forbidden in widget scripts".to_string(),
         );
     }
+    Ok(code_only)
+}
 
-    // Detect requestAnimationFrame that recursively calls itself without exit condition.
-    // We look for the pattern: function ... requestAnimationFrame(sameFunctionName)
-    // This is a heuristic — a sophisticated detector would need a real AST.
-    if collapsed.contains("requestAnimationFrame") {
-        // Check if the source has at least one exit path for the rAF loop
-        // (e.g., a return/break based on a state variable).
-        let has_game_over_check = collapsed.contains("gameOver")
-            || collapsed.contains("stopped")
-            || collapsed.contains("paused")
-            || collapsed.contains("!running")
-            || collapsed.contains("cancelAnimationFrame")
-            || collapsed.contains("return;");
-        if !has_game_over_check && collapsed.matches("requestAnimationFrame").count() > 1 {
-            // Multiple rAF calls with no visible exit — flag as suspicious.
-            // This is a soft warning, not a hard reject, since rAF itself is non-blocking.
-            // We only reject if combined with while(true).
+/// Returns the source with strings, template literals, and comments replaced by
+/// spaces (same character count, so byte offsets are preserved for any future
+/// diagnostic use). Errors when paren / brace / bracket delimiters are
+/// unbalanced *outside* string and comment regions.
+fn strip_strings_and_comments(source: &str) -> Result<String, String> {
+    #[derive(Copy, Clone, PartialEq, Eq)]
+    enum State {
+        Normal,
+        Single,
+        Double,
+        Template,
+        LineComment,
+        BlockComment,
+    }
+    let chars: Vec<char> = source.chars().collect();
+    let mut out = String::with_capacity(source.len());
+    let mut state = State::Normal;
+    let mut backslashes: u32 = 0;
+    let mut parens: i32 = 0;
+    let mut braces: i32 = 0;
+    let mut brackets: i32 = 0;
+    let mut i = 0;
+    while i < chars.len() {
+        let ch = chars[i];
+        let next = chars.get(i + 1).copied();
+        match state {
+            State::Normal => match ch {
+                '/' if next == Some('/') => {
+                    state = State::LineComment;
+                    out.push(' ');
+                    out.push(' ');
+                    i += 2;
+                    continue;
+                }
+                '/' if next == Some('*') => {
+                    state = State::BlockComment;
+                    out.push(' ');
+                    out.push(' ');
+                    i += 2;
+                    continue;
+                }
+                '\'' => {
+                    state = State::Single;
+                    backslashes = 0;
+                    out.push(' ');
+                }
+                '"' => {
+                    state = State::Double;
+                    backslashes = 0;
+                    out.push(' ');
+                }
+                '`' => {
+                    state = State::Template;
+                    backslashes = 0;
+                    out.push(' ');
+                }
+                '(' => {
+                    parens += 1;
+                    out.push(ch);
+                }
+                ')' => {
+                    parens -= 1;
+                    out.push(ch);
+                }
+                '{' => {
+                    braces += 1;
+                    out.push(ch);
+                }
+                '}' => {
+                    braces -= 1;
+                    out.push(ch);
+                }
+                '[' => {
+                    brackets += 1;
+                    out.push(ch);
+                }
+                ']' => {
+                    brackets -= 1;
+                    out.push(ch);
+                }
+                _ => out.push(ch),
+            },
+            State::Single | State::Double | State::Template => {
+                let closer = match state {
+                    State::Single => '\'',
+                    State::Double => '"',
+                    State::Template => '`',
+                    _ => unreachable!(),
+                };
+                // Track consecutive backslashes so '\\' closes the string but '\\\'' does not.
+                if ch == '\\' {
+                    backslashes += 1;
+                } else {
+                    let escaped = backslashes % 2 == 1;
+                    if ch == closer && !escaped {
+                        state = State::Normal;
+                    }
+                    backslashes = 0;
+                }
+                // Preserve newlines so line-based tooling still works; everything
+                // else inside a string becomes a space.
+                out.push(if ch == '\n' { '\n' } else { ' ' });
+            }
+            State::LineComment => {
+                if ch == '\n' {
+                    state = State::Normal;
+                    out.push('\n');
+                } else {
+                    out.push(' ');
+                }
+            }
+            State::BlockComment => {
+                if ch == '*' && next == Some('/') {
+                    state = State::Normal;
+                    out.push(' ');
+                    out.push(' ');
+                    i += 2;
+                    continue;
+                }
+                out.push(if ch == '\n' { '\n' } else { ' ' });
+            }
         }
+        if parens < 0 || braces < 0 || brackets < 0 {
+            return Err(format!(
+                "unbalanced delimiter: parens={parens} braces={braces} brackets={brackets}"
+            ));
+        }
+        i += 1;
     }
-
-    // Reject null bytes and other control characters (except common whitespace).
-    if source.contains('\0') {
-        return Err("script source contains null bytes".to_string());
+    if parens != 0 || braces != 0 || brackets != 0 {
+        return Err(format!(
+            "unbalanced delimiter at end: parens={parens} braces={braces} brackets={brackets}"
+        ));
     }
+    Ok(out)
+}
 
-    Ok(())
+/// Returns true if `identifier` appears in `source` as a whole-word token
+/// (preceded and followed by non-identifier characters or string boundaries).
+/// Used by the unused-library check so short globals like `L` (Leaflet) do
+/// not match unrelated identifiers like `null` or `let`.
+fn source_references_identifier(source: &str, identifier: &str) -> bool {
+    if identifier.is_empty() {
+        return false;
+    }
+    let bytes = source.as_bytes();
+    let pat = identifier.as_bytes();
+    let n = pat.len();
+    let is_ident_byte = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$';
+    let mut i = 0;
+    while i + n <= bytes.len() {
+        if &bytes[i..i + n] == pat {
+            let before_ok = i == 0 || !is_ident_byte(bytes[i - 1]);
+            let after_ok = i + n == bytes.len() || !is_ident_byte(bytes[i + n]);
+            if before_ok && after_ok {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
 }
 
 #[allow(dead_code)]
@@ -1128,6 +1225,144 @@ mod tests {
             validate_background_image("bg.jpg", "fill", -101),
             Err(ValidationError::InvalidBackground),
         );
+    }
+
+    // --- validate_script_source ---------------------------------------------
+
+    #[test]
+    fn script_source_accepts_typical_widget() {
+        assert!(validate_script_source_inner(
+            "const ctx = root.getContext('2d'); function draw(){ if (gameOver) return; requestAnimationFrame(draw); } draw();"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn script_source_rejects_while_true_in_code() {
+        assert!(validate_script_source_inner("while (true) { doStuff(); }").is_err());
+        assert!(validate_script_source_inner("while(1){ doStuff(); }").is_err());
+        assert!(validate_script_source_inner("for (;;) { doStuff(); }").is_err());
+    }
+
+    #[test]
+    fn script_source_allows_while_true_inside_string() {
+        // Regression: the original collapsed-string check rejected scripts that
+        // merely mentioned "while(true)" in a string or comment.
+        assert!(validate_script_source_inner(
+            "const note = 'never use while(true) here'; console.log(note);"
+        )
+        .is_ok());
+        assert!(validate_script_source_inner(
+            "// avoid while(true) and for(;;) in widget scripts\nconsole.log(1);"
+        )
+        .is_ok());
+        assert!(validate_script_source_inner(
+            "/* docs say while(true) is forbidden */ console.log(1);"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn script_source_handles_escaped_backslash_in_string() {
+        // Regression: the original prev != '\\' check left the parser stuck in
+        // a string after an escaped backslash, then reported unbalanced delims.
+        assert!(validate_script_source_inner(
+            "const path = 'C:\\\\Users\\\\widget'; console.log(path);"
+        )
+        .is_ok());
+        // Real backslash-escaped quote stays inside the string.
+        assert!(validate_script_source_inner(
+            "const q = 'it\\'s fine'; console.log(q);"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn script_source_rejects_unbalanced_delimiters() {
+        assert!(validate_script_source_inner("function f() { return 1;").is_err());
+        assert!(validate_script_source_inner("const a = [1, 2, 3").is_err());
+        assert!(validate_script_source_inner("const a = (1 + 2;").is_err());
+    }
+
+    #[test]
+    fn script_source_allows_braces_inside_template_literals() {
+        // We treat template literals as opaque strings — `${expr}` braces inside
+        // do not affect the outer delimiter balance.
+        assert!(validate_script_source_inner(
+            "const s = `hello {world}`; const t = `${1 + 2}`; console.log(s, t);"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn script_source_rejects_null_byte() {
+        assert!(validate_script_source_inner("console.log(1);\0").is_err());
+    }
+
+    // --- unused-library detection -------------------------------------------
+
+    #[test]
+    fn unused_library_short_global_word_boundary() {
+        // `L` (Leaflet) must not match `null`, `let`, `class`, etc.
+        let json = r#"{"source":"const x = null; let y = 0; class Foo {}","libraries":["leaflet"],"permissions":{"network":true}}"#;
+        assert_eq!(
+            validate_script_body_json(json),
+            Err(ValidationError::UnusedLibrary),
+        );
+    }
+
+    #[test]
+    fn unused_library_short_global_accepts_real_use() {
+        let json = r#"{"source":"const map = L.map(root).setView([0,0], 2);","libraries":["leaflet"],"permissions":{"network":true}}"#;
+        assert!(validate_script_body_json(json).is_ok());
+    }
+
+    #[test]
+    fn unused_library_ignores_reference_in_comment_or_string() {
+        // The original check used `source.contains(global)`, which would pass
+        // a library whose global appears only in a comment. The code-only view
+        // now strips comments and string literals.
+        let json = r#"{"source":"// uses chroma later\nconsole.log('chroma');","libraries":["chroma"],"permissions":{"network":false}}"#;
+        assert_eq!(
+            validate_script_body_json(json),
+            Err(ValidationError::UnusedLibrary),
+        );
+    }
+
+    #[test]
+    fn unused_library_detects_documented_global() {
+        // The original incident: matter and animejs declared, never called.
+        let json = r#"{"source":"const board = []; function step(){ board.push(1); } step();","libraries":["matter","animejs"],"permissions":{"network":false}}"#;
+        assert_eq!(
+            validate_script_body_json(json),
+            Err(ValidationError::UnusedLibrary),
+        );
+    }
+
+    #[test]
+    fn unused_library_accepts_mermaid_called() {
+        let json = r#"{"source":"mermaid.initialize({startOnLoad:true}); mermaid.run();","libraries":["mermaid"],"permissions":{"network":false}}"#;
+        assert!(validate_script_body_json(json).is_ok());
+    }
+
+    // --- delimiter-stripping internals --------------------------------------
+
+    #[test]
+    fn strip_treats_template_literal_as_opaque() {
+        let out = strip_strings_and_comments("const s = `a {b} c`; foo();").unwrap();
+        // Inside the backticks the `{` and `}` should not affect balance and
+        // should be blanked out.
+        assert!(!out.contains('{'));
+        assert!(!out.contains('}'));
+    }
+
+    #[test]
+    fn source_references_identifier_is_word_boundary() {
+        assert!(super::source_references_identifier("L.map()", "L"));
+        assert!(!super::source_references_identifier("const null = 0;", "L"));
+        assert!(!super::source_references_identifier("console.log(x);", "L"));
+        assert!(super::source_references_identifier("THREE.Scene()", "THREE"));
+        assert!(!super::source_references_identifier("THREEMore", "THREE"));
     }
 
     #[test]
