@@ -646,7 +646,7 @@ export function AssistantPanel({
   const aiProviderSettings = useWorkspaceStore((state) => state.aiProviderSettings);
   const setAiProviderSettings = useWorkspaceStore((state) => state.setAiProviderSettings);
   const aiProviderHasApiKey = useWorkspaceStore((state) => state.aiProviderHasApiKey);
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(() => sessionStorage.getItem("ai-chat-draft") ?? "");
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [currentThreadId, setCurrentThreadId] = useState(createAssistantChatThreadId);
   const [currentThreadTitle, setCurrentThreadTitle] = useState<string | undefined>();
@@ -771,6 +771,14 @@ export function AssistantPanel({
       setImagePasteRejected(false);
     }
   }, [currentModelSupportsImageInput]);
+
+  useEffect(() => {
+    if (prompt) {
+      sessionStorage.setItem("ai-chat-draft", prompt);
+    } else {
+      sessionStorage.removeItem("ai-chat-draft");
+    }
+  }, [prompt]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
