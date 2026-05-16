@@ -71,7 +71,7 @@ export const WIDGET_LIBRARIES: Record<string, WidgetLibrary> = {
   qrcode: {
     key: "qrcode",
     global: "QRCode",
-    description: "QR code generator (canvas, SVG, data URL).",
+    description: "QR code generator (canvas, SVG, data URL). For QRCode.toCanvas, pass a real <canvas> element, not a wrapper div.",
     load: () => rawDefault(() => import("widget-lib:qrcode?global=QRCode")),
   },
   jsbarcode: {

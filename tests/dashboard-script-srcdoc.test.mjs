@@ -160,3 +160,13 @@ test("script widget resolver accepts every advertised local library", async () =
   assert.ok(keys.length > 20);
   assert.deepEqual(resolveWidgetLibraryKeys(keys, ""), keys);
 });
+
+test("script widget library catalog documents qrcode canvas target contract", async () => {
+  const { libraryCatalogForAi } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/widgetLibraries.ts", import.meta.url),
+  );
+
+  const catalog = libraryCatalogForAi();
+  assert.match(catalog, /qrcode \(global: QRCode\)/);
+  assert.match(catalog, /QRCode\.toCanvas, pass a real <canvas> element, not a wrapper div/);
+});
