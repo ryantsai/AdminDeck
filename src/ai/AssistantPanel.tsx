@@ -75,6 +75,7 @@ import {
   secretRequestStorageNotice,
   type AssistantSecretRequest,
 } from "./secretRequest";
+import { scrollAssistantChatToBottom } from "./assistantScroll";
 import type { AiToolPermissionMode } from "../types";
 
 function resolveAssistantOutputLanguage(outputLanguage: string): string | undefined {
@@ -670,6 +671,7 @@ export function AssistantPanel({
     useState<ScreenshotRegionState | null>(null);
   const [refreshedModelOptions, setRefreshedModelOptions] = useState<AiProviderModelOption[]>([]);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatLogRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addContextMenuRef = useRef<HTMLDivElement | null>(null);
   const permissionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -679,6 +681,7 @@ export function AssistantPanel({
   const regionTargetRef = useRef<HTMLDivElement | null>(null);
   const regionSelectionRef = useRef<HTMLDivElement | null>(null);
   const activeAssistantRequestIdRef = useRef(0);
+  const forceChatScrollToBottomRef = useRef(false);
   const wasCollapsedRef = useRef(collapsed);
   const workspaceContextLabel = activeTab
     ? `${activeTab.title} - ${workspaceKindLabel(activeTab)}`
@@ -764,6 +767,8 @@ export function AssistantPanel({
   const sortedChatHistory = useMemo(() => sortedAssistantThreads(chatHistory), [chatHistory]);
   const recentChatHistory = sortedChatHistory.slice(0, 5);
   const shouldShowChatHistory = messages.length === 0 && !prompt.trim() && !isSendingPrompt;
+  const shouldShowPreStreamWaiting =
+    isSendingPrompt && !messages.some((message) => message.role === "assistant" && message.isStreaming);
 
   useEffect(() => {
     if (
@@ -841,6 +846,22 @@ export function AssistantPanel({
       sessionStorage.removeItem("ai-chat-draft");
     }
   }, [prompt]);
+
+  useLayoutEffect(() => {
+    if (!forceChatScrollToBottomRef.current) {
+      return;
+    }
+
+    scrollAssistantChatToBottom(chatLogRef.current);
+    const frame = window.requestAnimationFrame(() => {
+      scrollAssistantChatToBottom(chatLogRef.current);
+      if (!isSendingPrompt && !shouldShowPreStreamWaiting) {
+        forceChatScrollToBottomRef.current = false;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isSendingPrompt, messages, shouldShowPreStreamWaiting]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -1518,6 +1539,7 @@ export function AssistantPanel({
     );
     const previousMessages = messages;
     const nextMessages = [...previousMessages, userMessage];
+    forceChatScrollToBottomRef.current = true;
     const isFirstThreadMessage = previousMessages.length === 0;
     const fallbackTitle = currentThreadTitle ?? assistantThreadTitle(nextMessages);
     try {
@@ -1934,9 +1956,6 @@ export function AssistantPanel({
     return () => window.cancelAnimationFrame(frame);
   }, [screenshotRegionState]);
 
-  const shouldShowPreStreamWaiting =
-    isSendingPrompt && !messages.some((message) => message.role === "assistant" && message.isStreaming);
-
   return (
     <aside className="assistant-panel">
       <div className="assistant-topbar">
@@ -2083,7 +2102,10 @@ export function AssistantPanel({
         </section>
       ) : null}
 
-      <div className={`assistant-chat-log${showAllChats && shouldShowChatHistory ? " assistant-chat-log-condensed" : ""}`}>
+      <div
+        className={`assistant-chat-log${showAllChats && shouldShowChatHistory ? " assistant-chat-log-condensed" : ""}`}
+        ref={chatLogRef}
+      >
         {messages.map((message) => (
           <AssistantMessageView
             key={message.id}
