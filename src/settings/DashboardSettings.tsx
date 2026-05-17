@@ -10,6 +10,7 @@ import {
   MAX_ACTIVE_SCRIPT_WIDGETS_MIN,
 } from "../app-defaults";
 import { SettingsSectionHeader } from "./shared";
+import { ToggleSwitch } from "./ToggleSwitch";
 
 export function DashboardSettings() {
   const { t } = useTranslation();
@@ -108,6 +109,21 @@ export function DashboardSettings() {
                 max: MAX_ACTIVE_SCRIPT_WIDGETS_LIMIT,
               })}
             </small>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset className="settings-subsection settings-fieldset">
+        <legend>{t("settings.dashboardGeneral")}</legend>
+        <div className="settings-toggle-list">
+          <label className="settings-toggle-row">
+            <ToggleSwitch
+              checked={draft.allowWidgetNetworkTools}
+              onChange={(checked) => setDraft((s) => ({ ...s, allowWidgetNetworkTools: checked }))}
+            />
+            <span>
+              <strong>{t("settings.dashboardAllowWidgetNetworkTools")}</strong>
+              <small>{t("settings.dashboardAllowWidgetNetworkToolsDesc")}</small>
+            </span>
           </label>
         </div>
       </fieldset>
