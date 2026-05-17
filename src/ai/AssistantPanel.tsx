@@ -3261,7 +3261,19 @@ function AssistantWorkPanel({ message }: { message: AssistantChatMessage }) {
               <div>
                 <strong>{t("ai.thinkingStep")}</strong>
                 {reasoningContent ? (
-                  <p className="assistant-work-reasoning">{reasoningContent}</p>
+                  <div className="assistant-work-reasoning">
+                    <MarkdownContent
+                      canSendCode={false}
+                      content={reasoningContent}
+                      onCopyCode={(code) => {
+                        void writeToClipboard(code);
+                      }}
+                      onOpenLink={(url) => {
+                        void openExternalUrl(url);
+                      }}
+                      onSendCode={() => undefined}
+                    />
+                  </div>
                 ) : null}
               </div>
             </div>

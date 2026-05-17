@@ -763,7 +763,19 @@ struct ChatSseDelta {
     #[serde(default)]
     reasoning_content: Option<String>,
     #[serde(default)]
+    reasoning: Option<String>,
+    #[serde(default)]
+    reasoning_details: Vec<ReasoningDetail>,
+    #[serde(default)]
     tool_calls: Vec<SseToolCallDelta>,
+}
+
+#[derive(Deserialize, Default)]
+struct ReasoningDetail {
+    #[serde(default)]
+    summary: Option<String>,
+    #[serde(default)]
+    text: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1166,13 +1178,13 @@ async fn stream_chat_completions(
                         )?;
                     }
                 }
-                if let Some(r) = choice.delta.reasoning_content.as_deref() {
+                if let Some(r) = chat_sse_delta_reasoning(&choice.delta) {
                     if !r.is_empty() {
-                        reasoning.push_str(r);
+                        reasoning.push_str(&r);
                         emit_stream(
                             channel,
                             &AiStreamEvent::ReasoningDelta {
-                                delta: r.to_string(),
+                                delta: r,
                             },
                         )?;
                     }
@@ -1411,7 +1423,7 @@ impl OpenAiCompatibleProvider {
                 return Err(format!("{} response did not include a choice", self.label));
             };
             content = choice.message.content.trim().to_string();
-            reasoning_content = choice.message.reasoning_content.clone();
+            reasoning_content = chat_response_reasoning(&choice.message);
             if choice.message.tool_calls.is_empty() {
                 exhausted = false;
                 break;
@@ -1506,7 +1518,7 @@ impl OpenAiCompatibleProvider {
                 return Err(format!("{} response did not include a choice", self.label));
             };
             content = choice.message.content.trim().to_string();
-            reasoning_content = choice.message.reasoning_content.clone();
+            reasoning_content = chat_response_reasoning(&choice.message);
         }
 
         finish_agent_response(self, settings.model(), content, reasoning_content)
@@ -5261,6 +5273,42 @@ struct OpenAiCompatibleResponseMessage {
     tool_calls: Vec<OpenAiToolCall>,
     #[serde(default)]
     reasoning_content: Option<String>,
+    #[serde(default)]
+    reasoning: Option<String>,
+    #[serde(default)]
+    reasoning_details: Vec<ReasoningDetail>,
+}
+
+fn chat_sse_delta_reasoning(delta: &ChatSseDelta) -> Option<String> {
+    delta
+        .reasoning_content
+        .clone()
+        .or_else(|| delta.reasoning.clone())
+        .or_else(|| reasoning_details_text(&delta.reasoning_details))
+}
+
+fn chat_response_reasoning(message: &OpenAiCompatibleResponseMessage) -> Option<String> {
+    message
+        .reasoning_content
+        .clone()
+        .or_else(|| message.reasoning.clone())
+        .or_else(|| reasoning_details_text(&message.reasoning_details))
+}
+
+fn reasoning_details_text(details: &[ReasoningDetail]) -> Option<String> {
+    let text = details
+        .iter()
+        .filter_map(|detail| {
+            detail
+                .summary
+                .as_deref()
+                .or(detail.text.as_deref())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    (!text.is_empty()).then_some(text)
 }
 
 #[derive(Deserialize, Serialize)]
@@ -6367,6 +6415,86 @@ mod tests {
         assert_eq!(
             extract_responses_reasoning_text(&response).as_deref(),
             Some("Checked whether a tool is needed.")
+        );
+    }
+
+    #[test]
+    fn chat_sse_parser_accepts_reasoning_alias() {
+        let chunk: ChatSseChunk = serde_json::from_value(json!({
+            "choices": [
+                {
+                    "delta": {
+                        "reasoning": "**Plan**\n- inspect files"
+                    }
+                }
+            ]
+        }))
+        .expect("chat SSE chunk deserializes");
+
+        assert_eq!(
+            chat_sse_delta_reasoning(&chunk.choices[0].delta).as_deref(),
+            Some("**Plan**\n- inspect files")
+        );
+    }
+
+    #[test]
+    fn chat_sse_parser_accepts_reasoning_details() {
+        let chunk: ChatSseChunk = serde_json::from_value(json!({
+            "choices": [
+                {
+                    "delta": {
+                        "reasoning_details": [
+                            {"type": "reasoning.summary", "summary": "Read the request."},
+                            {"type": "reasoning.text", "text": "Now calling the tool."}
+                        ]
+                    }
+                }
+            ]
+        }))
+        .expect("chat SSE chunk with reasoning details deserializes");
+
+        assert_eq!(
+            chat_sse_delta_reasoning(&chunk.choices[0].delta).as_deref(),
+            Some("Read the request.\n\nNow calling the tool.")
+        );
+    }
+
+    #[test]
+    fn chat_response_parser_accepts_reasoning_aliases() {
+        let completion: OpenAiCompatibleChatResponse = serde_json::from_value(json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": "Done",
+                        "reasoning": "Checked provider-specific response fields."
+                    }
+                }
+            ]
+        }))
+        .expect("chat response with reasoning deserializes");
+
+        assert_eq!(
+            chat_response_reasoning(&completion.choices[0].message).as_deref(),
+            Some("Checked provider-specific response fields.")
+        );
+
+        let completion: OpenAiCompatibleChatResponse = serde_json::from_value(json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": "Done",
+                        "reasoning_details": [
+                            {"type": "reasoning.summary", "summary": "Used a normalized gateway field."}
+                        ]
+                    }
+                }
+            ]
+        }))
+        .expect("chat response with reasoning details deserializes");
+
+        assert_eq!(
+            chat_response_reasoning(&completion.choices[0].message).as_deref(),
+            Some("Used a normalized gateway field.")
         );
     }
 

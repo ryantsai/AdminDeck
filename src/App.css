@@ -4479,7 +4479,39 @@ progress {
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.5;
-  white-space: pre-wrap;
+}
+
+.assistant-work-reasoning .markdown-content {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.assistant-work-reasoning .markdown-content > div,
+.assistant-work-reasoning .markdown-content p,
+.assistant-work-reasoning .markdown-content ul,
+.assistant-work-reasoning .markdown-content ol,
+.assistant-work-reasoning .markdown-content blockquote {
+  margin-bottom: 6px;
+}
+
+.assistant-work-reasoning .markdown-content > :last-child,
+.assistant-work-reasoning .markdown-content > div:last-child > :last-child {
+  margin-bottom: 0;
+}
+
+.assistant-work-reasoning .markdown-content h1,
+.assistant-work-reasoning .markdown-content h2,
+.assistant-work-reasoning .markdown-content h3,
+.assistant-work-reasoning .markdown-content h4,
+.assistant-work-reasoning .markdown-content h5,
+.assistant-work-reasoning .markdown-content h6 {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.assistant-work-reasoning .markdown-code-block {
+  margin: 4px 0;
 }
 
 @keyframes assistant-tool-call-spin {
