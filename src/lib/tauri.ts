@@ -702,6 +702,15 @@ export interface AiProviderModelOption {
   supportsImageInput?: boolean | null;
 }
 
+export type NetError = {
+  kind:
+    | "timeout" | "refused" | "unreachable" | "hostNotFound" | "permissionDenied"
+    | "invalidArgument" | "resolverError" | "cancelled" | "concurrencyLimit"
+    | "policyDisabled" | "rateLimited" | "snmpError" | "internal";
+  hint?: string;
+  reason?: string;
+};
+
 type CommandMap = {
   app_bootstrap: {
     args: undefined;
@@ -1659,6 +1668,50 @@ type CommandMap = {
   mcp_call_tool: {
     args: { serverIdOrName: string; toolName: string; arguments: unknown };
     result: McpCallResult;
+  };
+  network_dns_lookup: {
+    args: { host: string; recordType?: string };
+    result: { records: Array<{ type: string; value: string; ttl?: number; priority?: number }>; resolverMs: number };
+  };
+  network_tcp_check: {
+    args: { host: string; port: number; timeoutMs?: number };
+    result: { open: boolean; rttMs?: number; error?: NetError };
+  };
+  network_interfaces: {
+    args: undefined;
+    result: Array<{ name: string; mac?: string; addresses: Array<{ ip: string; family: "v4" | "v6"; cidr?: number }>; isLoopback: boolean; isUp: boolean }>;
+  };
+  network_wol: {
+    args: { mac: string; broadcast?: string; port?: number };
+    result: { sent: boolean };
+  };
+  network_snmp_get: {
+    args: { args: { target: string; oid: string; community: string; version?: string; timeoutMs?: number } };
+    result: { oid: string; type: string; value: unknown };
+  };
+  network_whois: {
+    args: { domain: string };
+    result: { raw: string; parsed?: Record<string, string> };
+  };
+  network_ping_start: {
+    args: { args: { subscriptionId: string; host: string; count?: number; intervalMs?: number; timeoutMs?: number; ttl?: number; size?: number; fallbackTcpPort?: number } };
+    result: void;
+  };
+  network_port_scan_start: {
+    args: { args: { subscriptionId: string; host: string; ports: number[]; concurrency?: number; timeoutMs?: number; jitterMs?: number } };
+    result: void;
+  };
+  network_traceroute_start: {
+    args: { args: { subscriptionId: string; host: string; maxHops?: number; timeoutMs?: number; probesPerHop?: number } };
+    result: void;
+  };
+  network_snmp_walk_start: {
+    args: { args: { subscriptionId: string; target: string; rootOid: string; community: string; version?: string; timeoutMs?: number; maxResults?: number } };
+    result: void;
+  };
+  network_stream_cancel: {
+    args: { subscriptionId: string };
+    result: void;
   };
 };
 
