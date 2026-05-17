@@ -1107,6 +1107,10 @@
       "webSearch": {
         "description": "Cari web dan kembalikan judul hasil, tautan, dan cuplikan ringkas.",
         "label": "Pencarian web"
+      },
+      "network": {
+        "label": "Network admin tools",
+        "description": "Ping hosts, check TCP ports, resolve DNS, run WHOIS, list interfaces, and send Wake-on-LAN. Disabled by default."
       }
     },
     "aiToolsDescription": "Pilih alat bawaan mana yang dapat dipanggil AI Assistant saat menjawab. Matikan alat berisiko kecuali Anda membutuhkannya.",
@@ -1468,6 +1472,8 @@
     "dashboardPerformance": "Kinerja",
     "dashboardMaxActiveScriptWidgets": "Batas widget skrip aktif",
     "dashboardMaxActiveScriptWidgetsHint": "Jumlah maksimum widget skrip yang merender iframe-nya sekaligus di Dashboard. Widget berlebih menampilkan placeholder klik-untuk-mengaktifkan. Rentang yang diizinkan {{min}}–{{max}}.",
+    "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "Server MCP jarak jauh",
     "mcpServersHint": "Hubungkan ke server Model Context Protocol jarak jauh agar asisten AI dan widget Dashboard dapat memanggil alat mereka. KKTerm hanya mendukung server MCP HTTP streamable; konfigurasi stdio yang menjalankan proses lokal tidak didukung.",
     "mcpServersEmpty": "Tidak ada server MCP yang dikonfigurasi.",

@@ -1107,6 +1107,10 @@
       "webSearch": {
         "description": "Buscar en la web y devolver títulos de resultados, enlaces y fragmentos compactos.",
         "label": "Búsqueda web"
+      },
+      "network": {
+        "label": "Network admin tools",
+        "description": "Ping hosts, check TCP ports, resolve DNS, run WHOIS, list interfaces, and send Wake-on-LAN. Disabled by default."
       }
     },
     "aiToolsDescription": "Elija qué herramientas integradas puede usar el Asistente IA al responder. Mantenga las herramientas riesgosas desactivadas a menos que las necesite.",
@@ -1468,6 +1472,8 @@
     "dashboardPerformance": "Rendimiento",
     "dashboardMaxActiveScriptWidgets": "Límite de widgets de script activos",
     "dashboardMaxActiveScriptWidgetsHint": "Número máximo de widgets de script que muestran su iframe a la vez en un Dashboard. Los widgets excedentes muestran un marcador para activar. Rango permitido {{min}}–{{max}}.",
+    "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "Servidores MCP remotos",
     "mcpServersHint": "Conéctese a servidores remotos del Model Context Protocol para que el asistente de IA y los widgets del Dashboard puedan usar sus herramientas. KKTerm solo admite servidores MCP HTTP transmitibles; no se admiten configuraciones stdio que ejecuten procesos locales.",
     "mcpServersEmpty": "No hay servidores MCP configurados.",

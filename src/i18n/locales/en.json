@@ -730,6 +730,8 @@
     "dashboardPerformance": "Performance",
     "dashboardMaxActiveScriptWidgets": "Active script widgets cap",
     "dashboardMaxActiveScriptWidgetsHint": "Maximum script widgets that render their iframe at once on a Dashboard. Excess widgets show a click-to-activate placeholder. Allowed range {{min}}–{{max}}.",
+    "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "sectionUrl": "URL",
     "urlDefaults": "URL settings",
     "urlSecurity": "URL security",
@@ -812,6 +814,10 @@
       "sessions": {
         "label": "Live Sessions",
         "description": "Read visible session context and interact with active terminal, remote desktop, and file browser Sessions."
+      },
+      "network": {
+        "label": "Network admin tools",
+        "description": "Ping hosts, check TCP ports, resolve DNS, run WHOIS, list interfaces, and send Wake-on-LAN. Disabled by default."
       }
     },
     "searchProvider": "Search provider",

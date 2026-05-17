@@ -1108,6 +1108,10 @@
       "webSearch": {
         "description": "搜索网页并返回简洁的结果标题、链接和摘要。",
         "label": "网页搜索"
+      },
+      "network": {
+        "label": "Network admin tools",
+        "description": "Ping hosts, check TCP ports, resolve DNS, run WHOIS, list interfaces, and send Wake-on-LAN. Disabled by default."
       }
     },
     "aiToolsDescription": "选择 AI 助手在回答时可以调用的内置工具。除非需要，否则请保持有风险的工具关闭。",
@@ -1469,6 +1473,8 @@
     "dashboardPerformance": "性能",
     "dashboardMaxActiveScriptWidgets": "活动脚本小组件上限",
     "dashboardMaxActiveScriptWidgetsHint": "仪表板上同时渲染其 iframe 的脚本小组件最大数量。超出的小组件将显示点击激活占位符。允许范围 {{min}}–{{max}}。",
+    "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "远程 MCP 服务器",
     "mcpServersHint": "连接到远程 Model Context Protocol 服务器，以便 AI 助手和仪表板小组件可以调用它们的工具。KKTerm 仅支持 HTTP 流式 MCP 服务器；不支持启动本地进程的 stdio 配置。",
     "mcpServersEmpty": "未配置 MCP 服务器。",

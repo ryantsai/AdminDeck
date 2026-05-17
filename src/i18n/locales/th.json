@@ -1107,6 +1107,10 @@
       "webSearch": {
         "description": "ค้นหาเว็บและส่งคืนผลลัพธ์แบบย่อชื่อ ลิงก์ และตัวอย่าง",
         "label": "ค้นหาเว็บ"
+      },
+      "network": {
+        "label": "Network admin tools",
+        "description": "Ping hosts, check TCP ports, resolve DNS, run WHOIS, list interfaces, and send Wake-on-LAN. Disabled by default."
       }
     },
     "aiToolsDescription": "เลือกเครื่องมือในตัวที่ผู้ช่วย AI สามารถเรียกใช้ขณะตอบคำถาม ปิดเครื่องมือที่มีความเสี่ยงไว้ยกเว้นคุณจำเป็นต้องใช้",
@@ -1468,6 +1472,8 @@
     "dashboardPerformance": "ประสิทธิภาพ",
     "dashboardMaxActiveScriptWidgets": "ขีดจำกัดวิดเจ็ตสคริปต์ที่ทำงาน",
     "dashboardMaxActiveScriptWidgetsHint": "จำนวนสูงสุดของวิดเจ็ตสคริปต์ที่แสดงผล iframe พร้อมกันบนแดชบอร์ด วิดเจ็ตที่เกินจะแสดงตัวยึดคลิกเพื่อเปิดใช้งาน ช่วงที่อนุญาต {{min}}–{{max}}",
+    "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "เซิร์ฟเวอร์ MCP ระยะไกล",
     "mcpServersHint": "เชื่อมต่อกับเซิร์ฟเวอร์ Model Context Protocol ระยะไกลเพื่อให้ผู้ช่วย AI และวิดเจ็ตแดชบอร์ดสามารถเรียกใช้เครื่องมือของพวกเขาได้ KKTerm รองรับเฉพาะเซิร์ฟเวอร์ MCP แบบ HTTP สตรีมได้เท่านั้น ไม่รองรับการกำหนดค่า stdio ที่เรียกใช้โปรเซสภายใน",
     "mcpServersEmpty": "ยังไม่ได้กำหนดค่าเซิร์ฟเวอร์ MCP",

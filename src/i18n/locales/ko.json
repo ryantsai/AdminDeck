@@ -1107,6 +1107,10 @@
       "webSearch": {
         "description": "웹을 검색하고 간결한 결과 제목, 링크 및 스니펫을 반환합니다.",
         "label": "웹 검색"
+      },
+      "network": {
+        "label": "Network admin tools",
+        "description": "Ping hosts, check TCP ports, resolve DNS, run WHOIS, list interfaces, and send Wake-on-LAN. Disabled by default."
       }
     },
     "aiToolsDescription": "AI 어시스턴트가 응답 중에 호출할 수 있는 내장 도구를 선택합니다. 필요한 경우가 아니면 위험한 도구는 끄십시오.",
@@ -1468,6 +1472,8 @@
     "dashboardPerformance": "성능",
     "dashboardMaxActiveScriptWidgets": "활성 스크립트 위젯 제한",
     "dashboardMaxActiveScriptWidgetsHint": "대시보드에서 한 번에 iframe을 렌더링하는 최대 스크립트 위젯 수입니다. 초과 위젯은 클릭하여 활성화 플레이스홀더를 표시합니다. 허용 범위 {{min}}–{{max}}.",
+    "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "원격 MCP 서버",
     "mcpServersHint": "원격 Model Context Protocol 서버에 연결하여 AI 어시스턴트와 대시보드 위젯이 해당 도구를 호출할 수 있도록 합니다. KKTerm은 HTTP 스트리밍 가능한 MCP 서버만 지원하며, 로컬 프로세스를 생성하는 stdio 구성은 지원되지 않습니다.",
     "mcpServersEmpty": "구성된 MCP 서버가 없습니다.",
