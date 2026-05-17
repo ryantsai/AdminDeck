@@ -212,6 +212,45 @@ try {
     Invoke-Checked -FilePath "git" -ArgumentList @("push", $Remote, "HEAD:$Branch") -Action "Push release commit"
     Invoke-Checked -FilePath "git" -ArgumentList @("push", $Remote, $TagName) -Action "Push release tag"
 
+    # Optional VirusTotal pre-publish scan. Gated by VT_API_KEY presence so local
+    # release runs don't require an API key.
+    if ($env:VT_API_KEY) {
+        Write-Host "Submitting installer to VirusTotal..." -ForegroundColor Cyan
+        try {
+            $vtUrl = "https://www.virustotal.com/api/v3/files"
+            $form = @{ file = Get-Item -Path $InstallerExe }
+            $headers = @{ "x-apikey" = $env:VT_API_KEY }
+            $response = Invoke-RestMethod -Uri $vtUrl -Method Post -Headers $headers -Form $form
+            $analysisId = $response.data.id
+            Write-Host "VT analysis id: $analysisId"
+            # Poll the analysis (up to 3 minutes)
+            $analysisUrl = "https://www.virustotal.com/api/v3/analyses/$analysisId"
+            $maxWait = 180
+            $waited = 0
+            while ($waited -lt $maxWait) {
+                Start-Sleep -Seconds 10
+                $waited += 10
+                $r = Invoke-RestMethod -Uri $analysisUrl -Headers $headers
+                if ($r.data.attributes.status -eq "completed") {
+                    $stats = $r.data.attributes.stats
+                    Write-Host ("VT stats: malicious={0} suspicious={1} undetected={2}" -f $stats.malicious, $stats.suspicious, $stats.undetected)
+                    if ($stats.malicious -gt 2) {
+                        Write-Error "VirusTotal flagged $($stats.malicious) malicious engines. Release aborted."
+                        exit 1
+                    }
+                    break
+                }
+            }
+            if ($waited -ge $maxWait) {
+                Write-Warning "VirusTotal analysis did not complete in $maxWait seconds. Proceeding without gate."
+            }
+        } catch {
+            Write-Warning "VirusTotal submission failed: $_. Proceeding without gate."
+        }
+    } else {
+        Write-Host "VT_API_KEY not set; skipping VirusTotal pre-publish scan." -ForegroundColor DarkGray
+    }
+
     $GhArgs = @(
         "release",
         "create",
