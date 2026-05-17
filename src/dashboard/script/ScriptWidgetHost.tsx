@@ -194,8 +194,8 @@ export function ScriptWidgetHost({
     };
   }, [parsed, capped, requestedLibraries, requestedLibKey]);
   const srcdoc = useMemo(
-    () => (parsed && libraries ? buildSrcdoc(parsed, settingsValuesJson, libraries) : ""),
-    [parsed, settingsValuesJson, libraries],
+    () => (parsed && libraries ? buildSrcdoc(parsed, settingsValuesJson, libraries, allowWidgetNetworkTools) : ""),
+    [parsed, settingsValuesJson, libraries, allowWidgetNetworkTools],
   );
 
   // Harden 2: post visibility messages to the sandbox when the iframe
