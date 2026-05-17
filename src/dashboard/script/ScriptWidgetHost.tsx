@@ -8,6 +8,7 @@ import {
   pickAndSaveFile,
   type WidgetFilePickFilter,
 } from "../../lib/tauri";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useDashboardStore } from "../state/dashboardStore";
 import { useWorkspaceStore } from "../../store";
 import type { DashboardWidgetInstance, ScriptBody } from "../types";
@@ -109,9 +110,13 @@ export function ScriptWidgetHost({
 }) {
   const { t } = useTranslation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const activeSubscriptionsRef = useRef<Set<string>>(new Set());
   const updateInstance = useDashboardStore((s) => s.updateInstance);
   const maxActiveScriptWidgets = useWorkspaceStore(
     (s) => s.dashboardSettings.maxActiveScriptWidgets,
+  );
+  const allowWidgetNetworkTools = useWorkspaceStore(
+    (s) => s.dashboardSettings.allowWidgetNetworkTools,
   );
   const { key: reloadKey } = useScriptReloadHandle();
   const [capped, setCapped] = useState(false);
@@ -224,6 +229,35 @@ export function ScriptWidgetHost({
     return () => observer.disconnect();
   }, [capped, libraries]);
 
+  // Forward net://event Tauri events to this widget's iframe subscribers.
+  useEffect(() => {
+    let unlisten: UnlistenFn | undefined;
+    let mounted = true;
+    void (async () => {
+      unlisten = await listen<{ kind: string; subscriptionId: string; payload?: unknown; ok?: boolean; error?: unknown }>(
+        "net://event",
+        (evt) => {
+          if (!mounted) return;
+          const body = evt.payload;
+          if (!body?.subscriptionId) return;
+          if (!activeSubscriptionsRef.current.has(body.subscriptionId)) return;
+          const target = iframeRef.current?.contentWindow;
+          if (!target) return;
+          if (body.kind === "event") {
+            target.postMessage({ kk: true, type: "netEvent", subscriptionId: body.subscriptionId, payload: body.payload }, "*");
+          } else if (body.kind === "done") {
+            target.postMessage({ kk: true, type: "netDone", subscriptionId: body.subscriptionId, ok: body.ok === true, error: body.error }, "*");
+            activeSubscriptionsRef.current.delete(body.subscriptionId);
+          }
+        },
+      );
+    })();
+    return () => {
+      mounted = false;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.source !== iframeRef.current?.contentWindow) return;
@@ -253,6 +287,57 @@ export function ScriptWidgetHost({
       }
       if (isScriptWidgetCallMcpToolMessage(data)) {
         void sendMcpToolResponse(data);
+        return;
+      }
+      if (isScriptWidgetNetCallMessage(data)) {
+        void sendNetCallResponse(data);
+        return;
+      }
+      if (isScriptWidgetNetSubscribeMessage(data)) {
+        void startNetSubscription(data);
+        return;
+      }
+      if (isScriptWidgetNetCancelMessage(data)) {
+        void cancelNetSubscription(data.subscriptionId);
+      }
+    }
+
+    async function sendNetCallResponse(data: { requestId: string; op: string; args: unknown }) {
+      const target = iframeRef.current?.contentWindow;
+      if (!target) return;
+      try {
+        const value = await routeNetCall(data.op, data.args);
+        target.postMessage({ kk: true, type: "netCallResult", requestId: data.requestId, ok: true, value }, "*");
+      } catch (error) {
+        target.postMessage({ kk: true, type: "netCallResult", requestId: data.requestId, ok: false, error: toNetError(error) }, "*");
+      }
+    }
+
+    async function startNetSubscription(data: { subscriptionId: string; op: string; args: unknown }) {
+      activeSubscriptionsRef.current.add(data.subscriptionId);
+      try {
+        await routeNetSubscribe(data.op, data.subscriptionId, data.args);
+      } catch (error) {
+        const target = iframeRef.current?.contentWindow;
+        if (target) {
+          target.postMessage({
+            kk: true, type: "netDone", subscriptionId: data.subscriptionId,
+            ok: false, error: toNetError(error),
+          }, "*");
+        }
+        activeSubscriptionsRef.current.delete(data.subscriptionId);
+      }
+    }
+
+    async function cancelNetSubscription(subscriptionId: string) {
+      try {
+        await invokeCommand("network_stream_cancel", { subscriptionId });
+      } catch {
+        // best-effort; StreamRegistry treats unknown ids as no-ops
+      }
+      const target = iframeRef.current?.contentWindow;
+      if (target) {
+        target.postMessage({ kk: true, type: "netCancelAck", subscriptionId }, "*");
       }
     }
 
@@ -366,7 +451,13 @@ export function ScriptWidgetHost({
     }
 
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      for (const id of activeSubscriptionsRef.current) {
+        void invokeCommand("network_stream_cancel", { subscriptionId: id });
+      }
+      activeSubscriptionsRef.current.clear();
+    };
   }, [instance.id, updateInstance]);
 
   if (!parsed) {
@@ -538,4 +629,68 @@ function isScriptWidgetCallMcpToolMessage(value: unknown): value is {
 export function useScriptReloadHandle() {
   const [key, setKey] = useState(0);
   return { key, reload: () => setKey((k) => k + 1) };
+}
+
+function isScriptWidgetNetCallMessage(value: unknown): value is {
+  kk: true; type: "netCall"; requestId: string; op: string; args: unknown;
+} {
+  if (!value || typeof value !== "object") return false;
+  const c = value as { kk?: unknown; type?: unknown; requestId?: unknown; op?: unknown };
+  return c.kk === true && c.type === "netCall" && typeof c.requestId === "string" && typeof c.op === "string";
+}
+
+function isScriptWidgetNetSubscribeMessage(value: unknown): value is {
+  kk: true; type: "netSubscribe"; subscriptionId: string; op: string; args: unknown;
+} {
+  if (!value || typeof value !== "object") return false;
+  const c = value as { kk?: unknown; type?: unknown; subscriptionId?: unknown; op?: unknown };
+  return c.kk === true && c.type === "netSubscribe" && typeof c.subscriptionId === "string" && typeof c.op === "string";
+}
+
+function isScriptWidgetNetCancelMessage(value: unknown): value is {
+  kk: true; type: "netCancel"; subscriptionId: string;
+} {
+  if (!value || typeof value !== "object") return false;
+  const c = value as { kk?: unknown; type?: unknown; subscriptionId?: unknown };
+  return c.kk === true && c.type === "netCancel" && typeof c.subscriptionId === "string";
+}
+
+async function routeNetCall(op: string, args: unknown): Promise<unknown> {
+  const a = (args ?? {}) as Record<string, unknown>;
+  switch (op) {
+    case "dns": return invokeCommand("network_dns_lookup", { host: a.host as string, recordType: a.type as string | undefined });
+    case "tcpCheck": return invokeCommand("network_tcp_check", { host: a.host as string, port: a.port as number, timeoutMs: a.timeoutMs as number | undefined });
+    case "interfaces": return invokeCommand("network_interfaces");
+    case "wol": return invokeCommand("network_wol", { mac: a.mac as string, broadcast: a.broadcast as string | undefined, port: a.port as number | undefined });
+    case "snmpGet": return invokeCommand("network_snmp_get", { args: a as never });
+    case "whois": return invokeCommand("network_whois", { domain: a.domain as string });
+    default: throw new Error(`Unknown net op: ${op}`);
+  }
+}
+
+async function routeNetSubscribe(op: string, subscriptionId: string, args: unknown): Promise<void> {
+  const a = (args ?? {}) as Record<string, unknown>;
+  switch (op) {
+    case "ping":
+      await invokeCommand("network_ping_start", { args: { subscriptionId, ...a } as never });
+      return;
+    case "portScan":
+      await invokeCommand("network_port_scan_start", { args: { subscriptionId, ...a } as never });
+      return;
+    case "traceroute":
+      await invokeCommand("network_traceroute_start", { args: { subscriptionId, ...a } as never });
+      return;
+    case "snmpWalk":
+      await invokeCommand("network_snmp_walk_start", { args: { subscriptionId, ...a } as never });
+      return;
+    default:
+      throw new Error(`Unknown stream op: ${op}`);
+  }
+}
+
+function toNetError(error: unknown): { kind: string; reason?: string } {
+  if (error && typeof error === "object" && "kind" in (error as Record<string, unknown>)) {
+    return error as { kind: string; reason?: string };
+  }
+  return { kind: "internal", reason: error instanceof Error ? error.message : String(error) };
 }
