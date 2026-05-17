@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "A travaillé pendant {{duration}}",
-    "workspace": "Espace de travail"
+    "workspace": "Espace de travail",
+    "createWidget": "Créer un widget",
+    "createWidgetPlaceholder": "Décrivez le widget à créer.",
+    "createWidgetExamples": [
+      "un widget horloge rond",
+      "un mini moniteur CPU et RAM",
+      "une liste de saut SSH rapide"
+    ],
+    "watchdog": "Chien de garde",
+    "watchdogPlaceholder": "Décrivez ce qu'il faut surveiller.",
+    "watchdogExamples": [
+      "surveiller toutes les 5 minutes et m'envoyer un e-mail si le processus s'est arrêté",
+      "surveiller ce service SSH et signaler les échecs",
+      "vérifier l'espace disque toutes les heures"
+    ],
+    "selectedIntent": "Intention de l'assistant sélectionnée",
+    "clearIntent": "Effacer {{intent}}"
   },
   "app": {
     "aiAssistant": "Assistant IA",
@@ -990,7 +1006,10 @@
     "wildcardMask": "Masque générique",
     "scriptWidgetCapped": "Cliquer pour activer (max {{max}} widgets actifs)",
     "scriptWidgetFrameTitle": "Widget de script du tableau de bord",
-    "widgetLibraryLoadFailed": "Échec du chargement des bibliothèques de widgets : {{error}}"
+    "widgetLibraryLoadFailed": "Échec du chargement des bibliothèques de widgets : {{error}}",
+    "connectionWidgetNoResults": "Aucune connexion ne correspond à votre recherche",
+    "viewTabGradient": "Dégradé de l'onglet de vue pour {{view}}",
+    "clearViewTabGradient": "Effacer le dégradé de l'onglet de vue pour {{view}}"
   },
   "languages": {
     "de": "Deutsch",
@@ -1504,7 +1523,10 @@
     "mcpStdioGuidance": "Recherchez un point de terminaison MCP basé sur HTTP du même fournisseur ou consultez sa documentation pour une option hébergée.",
     "mcpErrorNotFound": "Serveur MCP introuvable.",
     "mcpErrorDuplicateName": "Un serveur MCP avec ce nom existe déjà.",
-    "mcpErrorKeychain": "Le trousseau du système d'exploitation est indisponible ; les secrets ne peuvent pas être stockés."
+    "mcpErrorKeychain": "Le trousseau du système d'exploitation est indisponible ; les secrets ne peuvent pas être stockés.",
+    "aiCustomInstructions": "Instructions personnalisées",
+    "aiCustomInstructionsHint": "Guide optionnel de l'assistant, jusqu'à {{count}} caractères. Les contraintes de sécurité, d'approbation et de local-first de KKTerm s'appliquent toujours.",
+    "aiCustomInstructionsTooLong": "Les instructions personnalisées de l'assistant IA doivent comporter {{count}} caractères ou moins."
   },
   "sftp": {
     "accessed": "Accédé",

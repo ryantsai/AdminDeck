@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "Bekerja selama {{duration}}",
-    "workspace": "Ruang kerja"
+    "workspace": "Ruang kerja",
+    "createWidget": "Buat widget",
+    "createWidgetPlaceholder": "Jelaskan widget yang akan dibuat.",
+    "createWidgetExamples": [
+      "widget jam bundar",
+      "monitor mini CPU dan RAM",
+      "daftar lompat SSH cepat"
+    ],
+    "watchdog": "Pengawas",
+    "watchdogPlaceholder": "Jelaskan apa yang harus diawasi.",
+    "watchdogExamples": [
+      "pantau setiap 5 menit dan kirim email jika proses telah berhenti",
+      "awasi layanan SSH ini dan laporkan kegagalan",
+      "periksa ruang disk setiap jam"
+    ],
+    "selectedIntent": "Intent asisten yang dipilih",
+    "clearIntent": "Hapus {{intent}}"
   },
   "app": {
     "aiAssistant": "AI Assistant",
@@ -989,7 +1005,10 @@
     "wildcardMask": "Wildcard mask",
     "scriptWidgetCapped": "Klik untuk mengaktifkan (maks {{max}} widget aktif)",
     "scriptWidgetFrameTitle": "Widget skrip Dashboard",
-    "widgetLibraryLoadFailed": "Gagal memuat pustaka widget: {{error}}"
+    "widgetLibraryLoadFailed": "Gagal memuat pustaka widget: {{error}}",
+    "connectionWidgetNoResults": "Tidak ada koneksi yang cocok dengan pencarian Anda",
+    "viewTabGradient": "Gradien tab tampilan untuk {{view}}",
+    "clearViewTabGradient": "Hapus gradien tab tampilan untuk {{view}}"
   },
   "languages": {
     "de": "Deutsch",
@@ -1503,7 +1522,10 @@
     "mcpStdioGuidance": "Cari endpoint MCP berbasis HTTP dari penyedia yang sama, atau periksa dokumentasi mereka untuk opsi yang dihosting.",
     "mcpErrorNotFound": "Server MCP tidak ditemukan.",
     "mcpErrorDuplicateName": "Server MCP dengan nama tersebut sudah ada.",
-    "mcpErrorKeychain": "Keychain OS tidak tersedia; rahasia tidak dapat disimpan."
+    "mcpErrorKeychain": "Keychain OS tidak tersedia; rahasia tidak dapat disimpan.",
+    "aiCustomInstructions": "Instruksi kustom",
+    "aiCustomInstructionsHint": "Panduan asisten opsional, hingga {{count}} karakter. Batasan keamanan, persetujuan, dan local-first KKTerm tetap berlaku.",
+    "aiCustomInstructionsTooLong": "Instruksi kustom asisten AI harus {{count}} karakter atau kurang."
   },
   "sftp": {
     "accessed": "Diakses",

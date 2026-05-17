@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "Ha lavorato per {{duration}}",
-    "workspace": "Spazio di lavoro"
+    "workspace": "Spazio di lavoro",
+    "createWidget": "Crea widget",
+    "createWidgetPlaceholder": "Descrivi il widget da creare.",
+    "createWidgetExamples": [
+      "un widget orologio rotondo",
+      "un mini monitor CPU e RAM",
+      "una lista rapida di salti SSH"
+    ],
+    "watchdog": "Watchdog",
+    "watchdogPlaceholder": "Descrivi cosa monitorare.",
+    "watchdogExamples": [
+      "monitora ogni 5 minuti e inviami un'email se il processo si è fermato",
+      "controlla questo servizio SSH e segnala guasti",
+      "controlla lo spazio su disco ogni ora"
+    ],
+    "selectedIntent": "Intento assistente selezionato",
+    "clearIntent": "Cancella {{intent}}"
   },
   "app": {
     "aiAssistant": "Assistente IA",
@@ -990,7 +1006,10 @@
     "wildcardMask": "Maschera wildcard",
     "scriptWidgetCapped": "Clicca per attivare (max {{max}} widget attivi)",
     "scriptWidgetFrameTitle": "Widget script Dashboard",
-    "widgetLibraryLoadFailed": "Impossibile caricare le librerie widget: {{error}}"
+    "widgetLibraryLoadFailed": "Impossibile caricare le librerie widget: {{error}}",
+    "connectionWidgetNoResults": "Nessuna connessione corrisponde alla tua ricerca",
+    "viewTabGradient": "Gradiente scheda vista per {{view}}",
+    "clearViewTabGradient": "Cancella gradiente scheda vista per {{view}}"
   },
   "languages": {
     "de": "Deutsch",
@@ -1504,7 +1523,10 @@
     "mcpStdioGuidance": "Cerca un endpoint MCP basato su HTTP dello stesso provider o consulta la loro documentazione per un'opzione ospitata.",
     "mcpErrorNotFound": "Server MCP non trovato.",
     "mcpErrorDuplicateName": "Un server MCP con quel nome esiste già.",
-    "mcpErrorKeychain": "Il portachiavi del sistema operativo non è disponibile; i segreti non possono essere archiviati."
+    "mcpErrorKeychain": "Il portachiavi del sistema operativo non è disponibile; i segreti non possono essere archiviati.",
+    "aiCustomInstructions": "Istruzioni personalizzate",
+    "aiCustomInstructionsHint": "Guida opzionale dell'assistente, fino a {{count}} caratteri. Le restrizioni di sicurezza, approvazione e local-first di KKTerm rimangono valide.",
+    "aiCustomInstructionsTooLong": "Le istruzioni personalizzate dell'assistente IA devono essere di {{count}} caratteri o meno."
   },
   "sftp": {
     "accessed": "Accesso",

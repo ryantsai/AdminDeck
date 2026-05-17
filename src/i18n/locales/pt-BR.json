@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "Trabalhou por {{duration}}",
-    "workspace": "Área de trabalho"
+    "workspace": "Área de trabalho",
+    "createWidget": "Criar widget",
+    "createWidgetPlaceholder": "Descreva o widget a ser criado.",
+    "createWidgetExamples": [
+      "um widget de relógio redondo",
+      "um mini monitor de CPU e RAM",
+      "uma lista rápida de saltos SSH"
+    ],
+    "watchdog": "Vigilante",
+    "watchdogPlaceholder": "Descreva o que vigiar.",
+    "watchdogExamples": [
+      "monitorar a cada 5 minutos e enviar e-mail se o processo parou",
+      "vigiar este serviço SSH e relatar falhas",
+      "verificar espaço em disco a cada hora"
+    ],
+    "selectedIntent": "Intenção do assistente selecionada",
+    "clearIntent": "Limpar {{intent}}"
   },
   "app": {
     "aiAssistant": "Assistente IA",
@@ -989,7 +1005,10 @@
     "wildcardMask": "Máscara curinga",
     "scriptWidgetCapped": "Clique para ativar (máx {{max}} widgets ativos)",
     "scriptWidgetFrameTitle": "Widget de script do Dashboard",
-    "widgetLibraryLoadFailed": "Falha ao carregar bibliotecas de widgets: {{error}}"
+    "widgetLibraryLoadFailed": "Falha ao carregar bibliotecas de widgets: {{error}}",
+    "connectionWidgetNoResults": "Nenhuma conexão corresponde à sua pesquisa",
+    "viewTabGradient": "Gradiente da aba de visualização para {{view}}",
+    "clearViewTabGradient": "Limpar gradiente da aba de visualização para {{view}}"
   },
   "languages": {
     "de": "Deutsch",
@@ -1503,7 +1522,10 @@
     "mcpStdioGuidance": "Procure um endpoint MCP baseado em HTTP do mesmo provedor ou verifique a documentação para uma opção hospedada.",
     "mcpErrorNotFound": "Servidor MCP não encontrado.",
     "mcpErrorDuplicateName": "Já existe um servidor MCP com esse nome.",
-    "mcpErrorKeychain": "O chaveiro do SO está indisponível; os segredos não podem ser armazenados."
+    "mcpErrorKeychain": "O chaveiro do SO está indisponível; os segredos não podem ser armazenados.",
+    "aiCustomInstructions": "Instruções personalizadas",
+    "aiCustomInstructionsHint": "Orientação opcional do assistente, até {{count}} caracteres. As restrições de segurança, aprovação e local-first do KKTerm ainda se aplicam.",
+    "aiCustomInstructionsTooLong": "As instruções personalizadas do assistente IA devem ter {{count}} caracteres ou menos."
   },
   "sftp": {
     "accessed": "Acessado",

@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "{{duration}} 동안 작업함",
-    "workspace": "워크스페이스"
+    "workspace": "워크스페이스",
+    "createWidget": "위젯 만들기",
+    "createWidgetPlaceholder": "만들 위젯을 설명하세요.",
+    "createWidgetExamples": [
+      "원형 시계 위젯",
+      "CPU 및 RAM 미니 모니터",
+      "빠른 SSH 점프 목록"
+    ],
+    "watchdog": "감시",
+    "watchdogPlaceholder": "감시할 내용을 설명하세요.",
+    "watchdogExamples": [
+      "5분마다 모니터링하고 프로세스가 중지되면 이메일로 알림",
+      "이 SSH 서비스를 감시하고 실패 보고",
+      "매시간 디스크 공간 확인"
+    ],
+    "selectedIntent": "선택된 어시스턴트 인텐트",
+    "clearIntent": "{{intent}} 지우기"
   },
   "app": {
     "aiAssistant": "AI 어시스턴트",
@@ -989,7 +1005,10 @@
     "wildcardMask": "와일드카드 마스크",
     "scriptWidgetCapped": "클릭하여 활성화 (최대 {{max}}개 활성 위젯)",
     "scriptWidgetFrameTitle": "대시보드 스크립트 위젯",
-    "widgetLibraryLoadFailed": "위젯 라이브러리 로드 실패: {{error}}"
+    "widgetLibraryLoadFailed": "위젯 라이브러리 로드 실패: {{error}}",
+    "connectionWidgetNoResults": "검색과 일치하는 연결이 없습니다",
+    "viewTabGradient": "{{view}}의 보기 탭 그라데이션",
+    "clearViewTabGradient": "{{view}}의 보기 탭 그라데이션 지우기"
   },
   "languages": {
     "de": "Deutsch",
@@ -1503,7 +1522,10 @@
     "mcpStdioGuidance": "동일한 제공업체의 HTTP 기반 MCP 엔드포인트를 찾거나 호스팅된 옵션에 대한 설명서를 확인하세요.",
     "mcpErrorNotFound": "MCP 서버를 찾을 수 없습니다.",
     "mcpErrorDuplicateName": "해당 이름의 MCP 서버가 이미 존재합니다.",
-    "mcpErrorKeychain": "OS 키체인을 사용할 수 없습니다. 비밀을 저장할 수 없습니다."
+    "mcpErrorKeychain": "OS 키체인을 사용할 수 없습니다. 비밀을 저장할 수 없습니다.",
+    "aiCustomInstructions": "사용자 지정 지침",
+    "aiCustomInstructionsHint": "최대 {{count}}자까지의 선택적 어시스턴트 안내입니다. KKTerm 안전, 승인 및 로컬 우선 제약 조건이 계속 적용됩니다.",
+    "aiCustomInstructionsTooLong": "AI 어시스턴트 사용자 지정 지침은 {{count}}자 이하여야 합니다."
   },
   "sftp": {
     "accessed": "접근일",

@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "耗时 {{duration}}",
-    "workspace": "工作区"
+    "workspace": "工作区",
+    "createWidget": "创建小部件",
+    "createWidgetPlaceholder": "描述要创建的小部件。",
+    "createWidgetExamples": [
+      "一个圆形时钟小部件",
+      "一个 CPU 和 RAM 迷你监视器",
+      "一个快速 SSH 跳转列表"
+    ],
+    "watchdog": "监视",
+    "watchdogPlaceholder": "描述要监视的内容。",
+    "watchdogExamples": [
+      "每 5 分钟监控一次，如果进程停止则发送电子邮件",
+      "监控此 SSH 服务并报告故障",
+      "每小时检查磁盘空间"
+    ],
+    "selectedIntent": "已选择的助手意图",
+    "clearIntent": "清除 {{intent}}"
   },
   "app": {
     "aiAssistant": "AI 助手",
@@ -990,7 +1006,10 @@
     "wildcardMask": "通配符掩码",
     "scriptWidgetCapped": "点击激活（最多 {{max}} 个活动小组件）",
     "scriptWidgetFrameTitle": "仪表板脚本小组件",
-    "widgetLibraryLoadFailed": "加载小组件库失败：{{error}}"
+    "widgetLibraryLoadFailed": "加载小组件库失败：{{error}}",
+    "connectionWidgetNoResults": "没有匹配搜索的连接",
+    "viewTabGradient": "{{view}}的视图选项卡渐变",
+    "clearViewTabGradient": "清除{{view}}的视图选项卡渐变"
   },
   "languages": {
     "de": "Deutsch",
@@ -1504,7 +1523,10 @@
     "mcpStdioGuidance": "查找同一提供商的基于 HTTP 的 MCP 端点，或查看其文档以获取托管选项。",
     "mcpErrorNotFound": "未找到 MCP 服务器。",
     "mcpErrorDuplicateName": "该名称的 MCP 服务器已存在。",
-    "mcpErrorKeychain": "操作系统密钥链不可用；无法存储密钥。"
+    "mcpErrorKeychain": "操作系统密钥链不可用；无法存储密钥。",
+    "aiCustomInstructions": "自定义指令",
+    "aiCustomInstructionsHint": "可选的助手指导，最多 {{count}} 个字符。KKTerm 的安全、批准和本地优先限制仍然适用。",
+    "aiCustomInstructionsTooLong": "AI 助手自定义指令不得超过 {{count}} 个字符。"
   },
   "sftp": {
     "accessed": "访问日期",

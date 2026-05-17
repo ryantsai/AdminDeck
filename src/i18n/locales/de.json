@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "Gearbeitet für {{duration}}",
-    "workspace": "Arbeitsbereich"
+    "workspace": "Arbeitsbereich",
+    "createWidget": "Widget erstellen",
+    "createWidgetPlaceholder": "Beschreiben Sie das zu erstellende Widget.",
+    "createWidgetExamples": [
+      "ein rundes Uhren-Widget",
+      "ein CPU- und RAM-Minimonitor",
+      "eine schnelle SSH-Sprungliste"
+    ],
+    "watchdog": "Wachhund",
+    "watchdogPlaceholder": "Beschreiben Sie, was überwacht werden soll.",
+    "watchdogExamples": [
+      "alle 5 Minuten überwachen und per E-Mail benachrichtigen, wenn der Prozess gestoppt wurde",
+      "diesen SSH-Dienst überwachen und Ausfälle melden",
+      "Festplattenspeicher stündlich prüfen"
+    ],
+    "selectedIntent": "Ausgewählte Assistenten-Absicht",
+    "clearIntent": "{{intent}} löschen"
   },
   "app": {
     "aiAssistant": "KI-Assistent",
@@ -990,7 +1006,10 @@
     "wildcardMask": "Wildcard-Maske",
     "scriptWidgetCapped": "Zum Aktivieren klicken (max {{max}} aktive Widgets)",
     "scriptWidgetFrameTitle": "Dashboard-Skript-Widget",
-    "widgetLibraryLoadFailed": "Widget-Bibliotheken konnten nicht geladen werden: {{error}}"
+    "widgetLibraryLoadFailed": "Widget-Bibliotheken konnten nicht geladen werden: {{error}}",
+    "connectionWidgetNoResults": "Keine Verbindungen stimmen mit Ihrer Suche überein",
+    "viewTabGradient": "Ansicht-Tab-Farbverlauf für {{view}}",
+    "clearViewTabGradient": "Ansicht-Tab-Farbverlauf für {{view}} löschen"
   },
   "languages": {
     "de": "Deutsch",
@@ -1504,7 +1523,10 @@
     "mcpStdioGuidance": "Suchen Sie einen HTTP-basierten MCP-Endpunkt desselben Anbieters oder prüfen Sie dessen Dokumentation auf eine gehostete Option.",
     "mcpErrorNotFound": "MCP-Server nicht gefunden.",
     "mcpErrorDuplicateName": "Ein MCP-Server mit diesem Namen existiert bereits.",
-    "mcpErrorKeychain": "OS-Schlüsselbund ist nicht verfügbar; Secrets können nicht gespeichert werden."
+    "mcpErrorKeychain": "OS-Schlüsselbund ist nicht verfügbar; Secrets können nicht gespeichert werden.",
+    "aiCustomInstructions": "Benutzerdefinierte Anweisungen",
+    "aiCustomInstructionsHint": "Optionale Assistenten-Anleitung, bis zu {{count}} Zeichen. KKTerm-Sicherheits-, Genehmigungs- und Local-First-Einschränkungen gelten weiterhin.",
+    "aiCustomInstructionsTooLong": "KI-Assistent benutzerdefinierte Anweisungen dürfen maximal {{count}} Zeichen haben."
   },
   "sftp": {
     "accessed": "Zugegriffen",

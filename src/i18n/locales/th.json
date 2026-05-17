@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "ทำงานเป็นเวลา {{duration}}",
-    "workspace": "พื้นที่ทำงาน"
+    "workspace": "พื้นที่ทำงาน",
+    "createWidget": "สร้างวิดเจ็ต",
+    "createWidgetPlaceholder": "อธิบายวิดเจ็ตที่จะสร้าง",
+    "createWidgetExamples": [
+      "วิดเจ็ตนาฬิกาทรงกลม",
+      "มินิมอนิเตอร์ CPU และ RAM",
+      "รายการข้าม SSH ด่วน"
+    ],
+    "watchdog": "เฝ้าระวัง",
+    "watchdogPlaceholder": "อธิบายสิ่งที่ต้องการเฝ้าระวัง",
+    "watchdogExamples": [
+      "ตรวจสอบทุก 5 นาทีและส่งอีเมลหากกระบวนการหยุดทำงาน",
+      "เฝ้าระวังบริการ SSH นี้และรายงานความล้มเหลว",
+      "ตรวจสอบพื้นที่ดิสก์ทุกชั่วโมง"
+    ],
+    "selectedIntent": "เจตนาผู้ช่วยที่เลือก",
+    "clearIntent": "ล้าง {{intent}}"
   },
   "app": {
     "aiAssistant": "ผู้ช่วย AI",
@@ -989,7 +1005,10 @@
     "wildcardMask": "ไวลด์การ์ดมาสก์",
     "scriptWidgetCapped": "คลิกเพื่อเปิดใช้งาน (สูงสุด {{max}} วิดเจ็ตที่ทำงาน)",
     "scriptWidgetFrameTitle": "วิดเจ็ตสคริปต์แดชบอร์ด",
-    "widgetLibraryLoadFailed": "โหลดไลบรารีวิดเจ็ตล้มเหลว: {{error}}"
+    "widgetLibraryLoadFailed": "โหลดไลบรารีวิดเจ็ตล้มเหลว: {{error}}",
+    "connectionWidgetNoResults": "ไม่มีการเชื่อมต่อที่ตรงกับการค้นหาของคุณ",
+    "viewTabGradient": "การไล่ระดับสีแท็บมุมมองสำหรับ {{view}}",
+    "clearViewTabGradient": "ล้างการไล่ระดับสีแท็บมุมมองสำหรับ {{view}}"
   },
   "languages": {
     "de": "Deutsch",
@@ -1503,7 +1522,10 @@
     "mcpStdioGuidance": "ค้นหาปลายทาง MCP แบบ HTTP จากผู้ให้บริการเดียวกัน หรือตรวจสอบเอกสารสำหรับตัวเลือกแบบโฮสต์",
     "mcpErrorNotFound": "ไม่พบเซิร์ฟเวอร์ MCP",
     "mcpErrorDuplicateName": "มีเซิร์ฟเวอร์ MCP ที่ชื่อนั้นอยู่แล้ว",
-    "mcpErrorKeychain": "พวงกุญแจระบบปฏิบัติการไม่พร้อมใช้งาน ไม่สามารถจัดเก็บข้อมูลลับได้"
+    "mcpErrorKeychain": "พวงกุญแจระบบปฏิบัติการไม่พร้อมใช้งาน ไม่สามารถจัดเก็บข้อมูลลับได้",
+    "aiCustomInstructions": "คำแนะนำที่กำหนดเอง",
+    "aiCustomInstructionsHint": "คำแนะนำผู้ช่วยเสริม สูงสุด {{count}} ตัวอักษร ข้อจำกัดด้านความปลอดภัย การอนุมัติ และ local-first ของ KKTerm ยังคงมีผล",
+    "aiCustomInstructionsTooLong": "คำแนะนำที่กำหนดเองของผู้ช่วย AI ต้องมี {{count}} ตัวอักษรหรือน้อยกว่า"
   },
   "sftp": {
     "accessed": "เข้าถึงเมื่อ",

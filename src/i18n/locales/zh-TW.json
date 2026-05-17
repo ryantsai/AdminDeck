@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "耗時 {{duration}}",
-    "workspace": "工作區"
+    "workspace": "工作區",
+    "createWidget": "建立小工具",
+    "createWidgetPlaceholder": "描述要建立的小工具。",
+    "createWidgetExamples": [
+      "一個圓形時鐘小工具",
+      "一個 CPU 和 RAM 迷你監視器",
+      "一個快速 SSH 跳轉清單"
+    ],
+    "watchdog": "監視",
+    "watchdogPlaceholder": "描述要監視的內容。",
+    "watchdogExamples": [
+      "每 5 分鐘監控一次，如果處理程序停止則發送電子郵件",
+      "監控此 SSH 服務並報告故障",
+      "每小時檢查磁碟空間"
+    ],
+    "selectedIntent": "已選擇的助理意圖",
+    "clearIntent": "清除 {{intent}}"
   },
   "app": {
     "aiAssistant": "AI 助理",
@@ -990,7 +1006,10 @@
     "wildcardMask": "萬用遮罩",
     "scriptWidgetCapped": "點擊啟用（最多 {{max}} 個活動小工具）",
     "scriptWidgetFrameTitle": "儀表板指令碼小工具",
-    "widgetLibraryLoadFailed": "載入小工具庫失敗：{{error}}"
+    "widgetLibraryLoadFailed": "載入小工具庫失敗：{{error}}",
+    "connectionWidgetNoResults": "沒有符合搜尋的連線",
+    "viewTabGradient": "{{view}} 的檢視頁籤漸層",
+    "clearViewTabGradient": "清除 {{view}} 的檢視頁籤漸層"
   },
   "languages": {
     "de": "Deutsch",
@@ -1504,7 +1523,10 @@
     "mcpStdioGuidance": "尋找相同提供者的 HTTP 型 MCP 端點，或查看其文件以取得託管選項。",
     "mcpErrorNotFound": "找不到 MCP 伺服器。",
     "mcpErrorDuplicateName": "該名稱的 MCP 伺服器已存在。",
-    "mcpErrorKeychain": "作業系統金鑰鏈無法使用；無法儲存密鑰。"
+    "mcpErrorKeychain": "作業系統金鑰鏈無法使用；無法儲存密鑰。",
+    "aiCustomInstructions": "自訂指示",
+    "aiCustomInstructionsHint": "可選的助理指導，最多 {{count}} 個字元。KKTerm 的安全性、核准和本地優先限制仍然適用。",
+    "aiCustomInstructionsTooLong": "AI 助理自訂指示不得超過 {{count}} 個字元。"
   },
   "sftp": {
     "accessed": "存取日期",

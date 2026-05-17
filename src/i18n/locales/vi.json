@@ -410,7 +410,23 @@
         "workDurationSeconds": "{{count}}s",
         "workDurationUnderSecond": "<1s",
         "workedFor": "Đã làm việc trong {{duration}}",
-        "workspace": "Workspace"
+        "workspace": "Workspace",
+        "createWidget": "Tạo tiện ích",
+        "createWidgetPlaceholder": "Mô tả tiện ích cần tạo.",
+        "createWidgetExamples": [
+            "một tiện ích đồng hồ tròn",
+            "một màn hình nhỏ CPU và RAM",
+            "một danh sách nhảy SSH nhanh"
+        ],
+        "watchdog": "Giám sát",
+        "watchdogPlaceholder": "Mô tả những gì cần giám sát.",
+        "watchdogExamples": [
+            "giám sát mỗi 5 phút và gửi email nếu tiến trình đã dừng",
+            "giám sát dịch vụ SSH này và báo cáo lỗi",
+            "kiểm tra dung lượng đĩa mỗi giờ"
+        ],
+        "selectedIntent": "Ý định trợ lý đã chọn",
+        "clearIntent": "Xóa {{intent}}"
     },
     "app": {
         "aiAssistant": "Trợ lý AI",
@@ -986,7 +1002,10 @@
         "widgetSettings": "Cài đặt widget",
         "widgetSettingsEmpty": "Không có cài đặt tùy chỉnh cho widget này.",
         "widgetSettingsInvalid": "Lược đồ cài đặt widget không hợp lệ.",
-        "wildcardMask": "Mặt nạ ký tự đại diện"
+        "wildcardMask": "Mặt nạ ký tự đại diện",
+        "connectionWidgetNoResults": "Không có kết nối nào khớp với tìm kiếm của bạn",
+        "viewTabGradient": "Dải màu tab xem cho {{view}}",
+        "clearViewTabGradient": "Xóa dải màu tab xem cho {{view}}"
     },
     "languages": {
         "de": "Deutsch",
@@ -1457,7 +1476,10 @@
         "workspaceAccess": "Truy cập không gian làm việc",
         "workspaceAccessHint": "Kiểm soát truy cập nhanh và quyền runtime cục bộ.",
         "wsl": "WSL",
-        "yuGothicUi": "Yu Gothic UI"
+        "yuGothicUi": "Yu Gothic UI",
+        "aiCustomInstructions": "Hướng dẫn tùy chỉnh",
+        "aiCustomInstructionsHint": "Hướng dẫn trợ lý tùy chọn, tối đa {{count}} ký tự. Các ràng buộc về an toàn, phê duyệt và local-first của KKTerm vẫn được áp dụng.",
+        "aiCustomInstructionsTooLong": "Hướng dẫn tùy chỉnh của trợ lý AI phải từ {{count}} ký tự trở xuống."
     },
     "sftp": {
         "accessed": "Accessed",

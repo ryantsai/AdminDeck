@@ -410,7 +410,23 @@
     "workDurationSeconds": "{{count}}s",
     "workDurationUnderSecond": "<1s",
     "workedFor": "作業時間 {{duration}}",
-    "workspace": "ワークスペース"
+    "workspace": "ワークスペース",
+    "createWidget": "ウィジェットを作成",
+    "createWidgetPlaceholder": "作成するウィジェットを説明してください。",
+    "createWidgetExamples": [
+      "丸い時計ウィジェット",
+      "CPUとRAMのミニモニター",
+      "クイックSSHジャンプリスト"
+    ],
+    "watchdog": "監視",
+    "watchdogPlaceholder": "監視する内容を説明してください。",
+    "watchdogExamples": [
+      "5分ごとに監視し、プロセスが停止したらメールで通知",
+      "このSSHサービスを監視して障害を報告",
+      "1時間ごとにディスク空き容量を確認"
+    ],
+    "selectedIntent": "選択されたアシスタントインテント",
+    "clearIntent": "{{intent}}をクリア"
   },
   "app": {
     "aiAssistant": "AIアシスタント",
@@ -990,7 +1006,10 @@
     "wildcardMask": "ワイルドカードマスク",
     "scriptWidgetCapped": "クリックして有効化（最大 {{max}} 個のアクティブウィジェット）",
     "scriptWidgetFrameTitle": "ダッシュボード スクリプト ウィジェット",
-    "widgetLibraryLoadFailed": "ウィジェットライブラリの読み込みに失敗しました: {{error}}"
+    "widgetLibraryLoadFailed": "ウィジェットライブラリの読み込みに失敗しました: {{error}}",
+    "connectionWidgetNoResults": "検索に一致する接続はありません",
+    "viewTabGradient": "{{view}}のビュータブグラデーション",
+    "clearViewTabGradient": "{{view}}のビュータブグラデーションをクリア"
   },
   "languages": {
     "de": "Deutsch",
@@ -1504,7 +1523,10 @@
     "mcpStdioGuidance": "同じプロバイダーの HTTP ベースの MCP エンドポイントを探すか、ホスト型オプションについてドキュメントを確認してください。",
     "mcpErrorNotFound": "MCP サーバーが見つかりません。",
     "mcpErrorDuplicateName": "その名前の MCP サーバーは既に存在します。",
-    "mcpErrorKeychain": "OS キーチェーンが利用できません。シークレットを保存できません。"
+    "mcpErrorKeychain": "OS キーチェーンが利用できません。シークレットを保存できません。",
+    "aiCustomInstructions": "カスタム指示",
+    "aiCustomInstructionsHint": "オプションのアシスタントガイダンス、最大{{count}}文字。KKTermの安全性、承認、ローカルファーストの制約が引き続き適用されます。",
+    "aiCustomInstructionsTooLong": "AIアシスタントのカスタム指示は{{count}}文字以下である必要があります。"
   },
   "sftp": {
     "accessed": "アクセス日時",
