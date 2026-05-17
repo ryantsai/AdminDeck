@@ -12,6 +12,7 @@ mod github_copilot;
 mod import;
 mod logging;
 mod mcp;
+mod net;
 mod performance;
 mod power;
 mod rdp;
