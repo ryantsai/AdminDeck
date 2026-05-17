@@ -93,6 +93,7 @@ function AiProviderSettingsFieldControl({
 }) {
   const { t } = useTranslation();
   const [isApiKeyInputFocused, setIsApiKeyInputFocused] = useState(false);
+  const [modelSearchQuery, setModelSearchQuery] = useState("");
   const shouldShowStoredApiKeyMask =
     field === "apiKey" &&
     shouldShowStoredAiProviderKeyMask({
@@ -100,6 +101,10 @@ function AiProviderSettingsFieldControl({
       hasProviderApiKey: hasApiKey,
       isInputFocused: isApiKeyInputFocused,
     });
+
+  useEffect(() => {
+    setModelSearchQuery("");
+  }, [definition.kind]);
 
   switch (field) {
     case "baseUrl":
@@ -118,7 +123,23 @@ function AiProviderSettingsFieldControl({
         definition.kind,
         modelOptions ?? definition.modelOptions,
       );
+      const normalizedModelSearchQuery = modelSearchQuery.trim().toLowerCase();
+      const filteredOptions = normalizedModelSearchQuery
+        ? options.filter((model) => {
+            const label = model.label.toLowerCase();
+            const id = model.id.toLowerCase();
+            return (
+              label.includes(normalizedModelSearchQuery) ||
+              id.includes(normalizedModelSearchQuery)
+            );
+          })
+        : options;
       const modelOptionIds = new Set(options.map((model) => model.id));
+      const selectedModelOption = options.find((model) => model.id === draft.model);
+      const selectedModelOptionIsFilteredOut = Boolean(
+        selectedModelOption &&
+          !filteredOptions.some((model) => model.id === selectedModelOption.id),
+      );
       const hasCustomModel = draft.model.trim().length > 0 && !modelOptionIds.has(draft.model);
       return (
         <>
@@ -143,17 +164,34 @@ function AiProviderSettingsFieldControl({
                 </button>
               ) : null}
             </span>
-            <select
-              onChange={(event) => onDraftChange({ model: event.currentTarget.value })}
-              value={draft.model}
-            >
-              {hasCustomModel ? <option value={draft.model}>{draft.model}</option> : null}
-              {options.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
+            <div className="ai-model-picker">
+              <input
+                aria-label={t("settings.searchModels")}
+                className="ai-model-search-input"
+                onChange={(event) => setModelSearchQuery(event.currentTarget.value)}
+                placeholder={t("settings.searchModelsPlaceholder")}
+                value={modelSearchQuery}
+              />
+              <select
+                onChange={(event) => onDraftChange({ model: event.currentTarget.value })}
+                value={draft.model}
+              >
+                {hasCustomModel ? <option value={draft.model}>{draft.model}</option> : null}
+                {selectedModelOptionIsFilteredOut && selectedModelOption ? (
+                  <option hidden value={selectedModelOption.id}>
+                    {selectedModelOption.label}
+                  </option>
+                ) : null}
+                {filteredOptions.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.label}
+                  </option>
+                ))}
+              </select>
+              {normalizedModelSearchQuery && filteredOptions.length === 0 ? (
+                <small className="field-hint">{t("settings.noModelsMatchSearch")}</small>
+              ) : null}
+            </div>
           </label>
           {definition.allowsCustomModel ? (
             <label>

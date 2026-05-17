@@ -9019,6 +9019,18 @@ fieldset.connection-specific-options > legend {
   margin-top: 0;
 }
 
+.settings-section label:not(.settings-toggle-row) > .ai-model-picker {
+  display: grid;
+  grid-column: 2;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-section .ai-model-search-input {
+  height: 28px;
+  font-size: 13px;
+}
+
 .settings-api-key-link {
   align-items: center;
   background: none;

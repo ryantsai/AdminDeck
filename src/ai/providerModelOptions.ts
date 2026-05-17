@@ -10,19 +10,18 @@ const OPENROUTER_MODEL_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
 });
 
-function compareOpenRouterModelsDescending(
+function compareModelsByNameDescending(
   left: ProviderModelOption,
   right: ProviderModelOption,
 ) {
-  const byId = OPENROUTER_MODEL_COLLATOR.compare(right.id, left.id);
-  if (byId !== 0) return byId;
-  return OPENROUTER_MODEL_COLLATOR.compare(right.label, left.label);
+  const byLabel = OPENROUTER_MODEL_COLLATOR.compare(right.label, left.label);
+  if (byLabel !== 0) return byLabel;
+  return OPENROUTER_MODEL_COLLATOR.compare(right.id, left.id);
 }
 
 export function sortModelOptionsForProvider<T extends ProviderModelOption>(
-  providerKind: AiProviderKind,
+  _providerKind: AiProviderKind,
   models: T[],
 ) {
-  if (providerKind !== "openrouter") return models;
-  return [...models].sort(compareOpenRouterModelsDescending);
+  return [...models].sort(compareModelsByNameDescending);
 }
