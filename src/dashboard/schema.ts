@@ -156,6 +156,7 @@ export function validateScriptWidgetBody(value: unknown): ValidationResult<Scrip
       source: value.source,
       permissions: {
         network: value.permissions.network === true,
+        networkTools: value.permissions.networkTools === true,
         pollSeconds,
       },
       htmlShim: typeof value.htmlShim === "string" ? value.htmlShim : undefined,
