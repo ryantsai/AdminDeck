@@ -1665,7 +1665,22 @@ type CommandMap = {
     args: { serverIdOrName: string; toolName: string; arguments: unknown };
     result: McpCallResult;
   };
+  list_manual_chapters: {
+    args: undefined;
+    result: ManualChapter[];
+  };
+  read_manual_chapter: {
+    args: { filename: string };
+    result: string;
+  };
 };
+
+export interface ManualChapter {
+  slug: string;
+  order: number;
+  filename: string;
+  title: string;
+}
 
 export interface McpServer {
   id: string;
