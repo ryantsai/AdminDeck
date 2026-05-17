@@ -35,6 +35,10 @@ The bundle intentionally excludes by default:
 
 Users should review the generated files before sharing them. Future diagnostics work may add opt-in selected terminal output or redacted database summaries, but those must remain explicit user actions.
 
+## Bundled Operation Manual
+
+The user-facing operation manual under `docs/manual/` ships with every installer build. Tauri copies each chapter declared in `src-tauri/tauri.conf.json` → `bundle.resources` (mapped to `manual/<filename>.md` in the resource directory). The in-app viewer (Activity Rail → `app.manual`) reads these files through the typed `list_manual_chapters` / `read_manual_chapter` commands in `src-tauri/src/manual.rs`. When a chapter is added or removed, update three places in the same PR: the new/removed `docs/manual/*.md` file, the `bundle.resources` map in `tauri.conf.json`, and the `CHAPTERS` list in `src-tauri/src/manual.rs`. `npm run build` + `cargo check` is sufficient to catch mismatched entries.
+
 ## Windows Installer
 
 Create the Windows installer with:

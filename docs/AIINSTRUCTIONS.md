@@ -234,6 +234,7 @@ Before touching code, read these definitions — they matter for naming, storage
 - `docs/PRD.md` — full product requirements and user stories
 - `docs/ROADMAP.md` — what is planned vs. deferred (don't build deferred features)
 - `docs/AI_PROVIDERS.md` — rules for adding or changing AI provider entries
+- `docs/manual/INDEX.md` — **operation manual** shipped with the app. One chapter per user-facing module; each chapter starts with an `## AI grep hints` block listing i18n keys and synonyms. When a user asks "how do I…" inside the app, the built-in AI Assistant searches this folder. **When a PR changes UI behavior, update the matching chapter in `docs/manual/` in the same PR**, and prefer referencing i18n keys (e.g. `connections.quickConnect`) over English label text so locale changes don't invalidate the manual.
 
 ---
 

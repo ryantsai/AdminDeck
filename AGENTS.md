@@ -4,6 +4,12 @@
 
 KKTerm is a Windows-first, local-first Tauri v2 desktop app — Rust backend, React/TypeScript frontend. Product direction: `docs/PRD.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/ADR/`. Before changing behavior or terminology, read `CONTEXT.md` and preserve its domain boundaries.
 
+## Operation Manual
+
+End-user operation docs live in `docs/manual/` and ship with the app. `docs/manual/INDEX.md` is the entry point; one chapter per user-facing module (Workspace, Connections, Terminal, SSH/tmux, SFTP, URL, RDP/VNC, Dashboard, App Launcher, Wiki, AI Assistant, Screenshots, Settings, Localization, Data/Backup). The manual references i18n keys (e.g. `connections.quickConnect`), not English labels, so locale changes do not invalidate it.
+
+**Update rule:** any PR that changes UI behavior in a chapter's scope must update that chapter in the same PR. When a key is renamed or removed, run `git grep "<old.key>" docs/manual` and fix every reference. New UI surfaces require either a new chapter or a new section in the closest existing chapter — choose by activity-rail module, matching `INDEX.md`. Do not document English label text directly; reference the i18n key. The in-app AI Assistant grep-searches `docs/manual/` to answer "how do I…" questions, so keep each chapter's `## AI grep hints` block accurate (keys, file paths, common synonyms).
+
 ## Constitution
 
 These rules apply to every task in this project unless explicitly overridden.

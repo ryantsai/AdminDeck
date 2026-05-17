@@ -11,6 +11,7 @@ mod ftp;
 mod github_copilot;
 mod import;
 mod logging;
+mod manual;
 mod mcp;
 mod performance;
 mod power;
@@ -2446,7 +2447,9 @@ pub fn run() {
             mcp::mcp_update_server,
             mcp::mcp_delete_server,
             mcp::mcp_refresh_tools,
-            mcp::mcp_call_tool
+            mcp::mcp_call_tool,
+            manual::list_manual_chapters,
+            manual::read_manual_chapter
         ])
         .run(tauri::generate_context!())
         .expect("error while running KKTerm");

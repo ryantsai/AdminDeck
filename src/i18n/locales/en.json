@@ -13,6 +13,7 @@
     "resizeAiAssistant": "Resize AI Assistant panel",
     "aiAssistant": "AI Assistant",
     "wiki": "Wiki",
+    "manual": "Manual",
     "connectionRail": "Connection Rail",
     "connectedConnectionsRail": "Connected Connections",
     "openConnectedConnection": "Open {{name}}",
@@ -1930,5 +1931,14 @@
     "wordCount": "{{count}} words",
     "characterCount": "{{count}} characters",
     "editorAria": "Wiki editor"
+  },
+  "manual": {
+    "title": "Operation Manual",
+    "subtitle": "How to operate KKTerm. Shipped with each release.",
+    "chaptersLabel": "Chapters",
+    "back": "Back",
+    "loading": "Loading…",
+    "loadError": "Could not load manual: {{message}}",
+    "tauriRequired": "The manual is available only in the desktop runtime."
   }
 }

@@ -47,6 +47,26 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../docs/manual/INDEX.md": "manual/INDEX.md",
+      "../docs/manual/01-getting-started.md": "manual/01-getting-started.md",
+      "../docs/manual/02-app-layout.md": "manual/02-app-layout.md",
+      "../docs/manual/03-connections.md": "manual/03-connections.md",
+      "../docs/manual/04-workspace-tabs-panes.md": "manual/04-workspace-tabs-panes.md",
+      "../docs/manual/05-terminal.md": "manual/05-terminal.md",
+      "../docs/manual/06-ssh-and-tmux.md": "manual/06-ssh-and-tmux.md",
+      "../docs/manual/07-sftp.md": "manual/07-sftp.md",
+      "../docs/manual/08-url-webview.md": "manual/08-url-webview.md",
+      "../docs/manual/09-remote-desktop.md": "manual/09-remote-desktop.md",
+      "../docs/manual/10-dashboard.md": "manual/10-dashboard.md",
+      "../docs/manual/11-app-launcher.md": "manual/11-app-launcher.md",
+      "../docs/manual/12-wiki.md": "manual/12-wiki.md",
+      "../docs/manual/13-ai-assistant.md": "manual/13-ai-assistant.md",
+      "../docs/manual/14-screenshots.md": "manual/14-screenshots.md",
+      "../docs/manual/15-settings.md": "manual/15-settings.md",
+      "../docs/manual/16-localization.md": "manual/16-localization.md",
+      "../docs/manual/17-data-backup-secrets.md": "manual/17-data-backup-secrets.md"
+    },
     "windows": {
       "allowDowngrades": false,
       "webviewInstallMode": {

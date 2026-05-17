@@ -19,6 +19,7 @@ import { DashboardPage } from "./dashboard/DashboardPage";
 import { useDashboardBackendInvalidation } from "./dashboard/state/invalidation";
 import { ariaHidden } from "./lib/aria";
 import { useBootstrapSettings } from "./lib/settings";
+import { ManualPage } from "./manual/ManualPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import { useWorkspaceStore } from "./store";
 import { StatusBar } from "./workspace/StatusBar";
@@ -30,21 +31,25 @@ function App() {
   const { t } = useTranslation();
   const [activePage, setActivePage] = useState<ActivePage>("workspace");
   const [dashboardMounted, setDashboardMounted] = useState(false);
-  const previousNonSettingsPageRef = useRef<Exclude<ActivePage, "settings">>("workspace");
+  const previousBasePageRef = useRef<"workspace" | "dashboard">("workspace");
+
+  function isOverlayPage(page: ActivePage): page is "settings" | "manual" {
+    return page === "settings" || page === "manual";
+  }
 
   function navigateToPage(page: ActivePage) {
     if (page === "dashboard") {
       setDashboardMounted(true);
     }
-    if (page === "settings" && activePage !== "settings") {
-      previousNonSettingsPageRef.current = activePage as Exclude<ActivePage, "settings">;
+    if (isOverlayPage(page) && !isOverlayPage(activePage)) {
+      previousBasePageRef.current = activePage as "workspace" | "dashboard";
     }
     setActivePage(page);
   }
 
   function openAssistantPanel() {
     if (activePage === "settings") {
-      setActivePage(previousNonSettingsPageRef.current);
+      setActivePage(previousBasePageRef.current);
     }
     expandAiPanel();
   }
@@ -134,8 +139,14 @@ function App() {
       {activePage === "settings" ? (
         <SettingsPage
           key="settings-page"
-          onBack={() => setActivePage(previousNonSettingsPageRef.current)}
+          onBack={() => setActivePage(previousBasePageRef.current)}
           onResetLayout={resetWorkspaceChromeLayout}
+        />
+      ) : null}
+      {activePage === "manual" ? (
+        <ManualPage
+          key="manual-page"
+          onBack={() => setActivePage(previousBasePageRef.current)}
         />
       ) : null}
       {dashboardMounted ? (
