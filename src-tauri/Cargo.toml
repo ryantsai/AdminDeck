@@ -53,8 +53,8 @@ shared_library = "0.1.9"
 winapi = "0.3.9"
 
 # Network admin tools — see docs/superpowers/specs/2026-05-17-network-tools-lego-blocks-design.md §10 (AV-friendly choices)
+# MVP scope: DNS, ping, port scan/check, WoL, interfaces, WHOIS. SNMP + traceroute deferred.
 hickory-resolver = "0.26"
-snmp2 = "0.5"
 if-addrs = "0.15"
 tokio-util = { version = "0.7", features = ["rt"] }
 
