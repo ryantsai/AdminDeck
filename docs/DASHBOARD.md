@@ -66,6 +66,8 @@ Script widget UI should use the provided root and compact app-style controls. Do
 
 Generated widgets must be boundary-aware. The assistant should choose `grid_w` and `grid_h` from the expected content, not from a fixed default: simple timers and counters normally start at 4x3; forms, remote image widgets, and multi-row lists usually need 5x4 or larger. A successful generated widget should not show an inner vertical scrollbar for its intended initial state.
 
+Generated widgets must also treat the widget root as the full allocated surface. Script widgets should make their outermost wrapper fill `100%` width and height, normally through `kk-shell`, `kk-stage`, `kk-panel`, or `kk-fill`, then align, center, or scale any naturally smaller object inside that full-size wrapper. Do not duplicate the host widget frame with a smaller centered app card. Script widgets should avoid `max-width`, fixed-height, or shrink-to-content outer wrappers unless the user explicitly asks for an inset miniature object.
+
 Generated widgets must preserve readable contrast. Script widgets should prefer host CSS variables (`--kk-text`, `--kk-muted`, `--kk-surface`, `--kk-accent`) and only override backgrounds when text and control colors remain explicit and legible.
 
 If a script widget displays remote images, the assistant must set `permissions.network: true`; otherwise KKTerm's CSP blocks those image requests. Plain `<img src="https://...">` loads do not normally require CORS unless widget code tries to read the image data through canvas/fetch or the remote site blocks hotlinking. Fetching images with `fetch()` is subject to normal browser CORS and may fail even when CSP allows network access.
