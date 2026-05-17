@@ -125,6 +125,13 @@ export function validateScriptWidgetBody(value: unknown): ValidationResult<Scrip
   if (encodedLength(value.source) > MAX_SCRIPT_SOURCE_BYTES) {
     return { ok: false, reason: "scriptTooLarge" };
   }
+  const domMountValidation = validateScriptDomMounts(
+    value.source,
+    typeof value.htmlShim === "string" ? value.htmlShim : undefined,
+  );
+  if (!domMountValidation.ok) {
+    return domMountValidation;
+  }
   const rawPollSeconds = value.permissions.pollSeconds;
   if (rawPollSeconds !== undefined && rawPollSeconds !== null && typeof rawPollSeconds !== "number") {
     return { ok: false, reason: "invalidPollSeconds" };
@@ -162,6 +169,46 @@ export function validateScriptWidgetBody(value: unknown): ValidationResult<Scrip
       libraries,
     },
   };
+}
+
+function validateScriptDomMounts(
+  source: string,
+  htmlShim: string | undefined,
+): ValidationResult<undefined> {
+  for (const id of extractGetElementByIdTargets(source)) {
+    if (id === "root" || htmlShimContainsId(htmlShim, id) || sourceCreatesId(source, id)) {
+      continue;
+    }
+    return { ok: false, reason: "invalidScriptDomMount" };
+  }
+  return { ok: true, value: undefined };
+}
+
+function extractGetElementByIdTargets(source: string): string[] {
+  const ids: string[] = [];
+  const expression = /document\.getElementById\s*\(\s*(["'])(.*?)\1\s*\)/g;
+  for (const match of source.matchAll(expression)) {
+    ids.push(match[2] ?? "");
+  }
+  return ids;
+}
+
+function htmlShimContainsId(htmlShim: string | undefined, id: string) {
+  if (!htmlShim) return false;
+  return htmlShim.includes(`id="${id}"`) || htmlShim.includes(`id='${id}'`);
+}
+
+function sourceCreatesId(source: string, id: string) {
+  return [
+    `.id = "${id}"`,
+    `.id = '${id}'`,
+    `.id="${id}"`,
+    `.id='${id}'`,
+    `setAttribute("id", "${id}")`,
+    `setAttribute('id', '${id}')`,
+    `setAttribute("id","${id}")`,
+    `setAttribute('id','${id}')`,
+  ].some((needle) => source.includes(needle));
 }
 
 export function validateCustomWidgetBodyJson(kind: WidgetCustomKind, bodyJson: string): ValidationResult<ContentBody | ScriptBody> {

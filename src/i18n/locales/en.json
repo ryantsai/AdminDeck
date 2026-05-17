@@ -136,6 +136,7 @@
     "scriptWidgetCapped": "Click to activate (max {{max}} active widgets)",
     "scriptWidgetFrameTitle": "Dashboard script widget",
     "untitledWidget": "Widget",
+    "properties": "Properties",
     "customize": "Customize widget",
     "customizeSectionCommon": "Common",
     "customizeSectionWidget": "Widget",

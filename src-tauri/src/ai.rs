@@ -38,6 +38,7 @@ const COPILOT_SDK_RESPONSE_TIMEOUT: Duration = Duration::from_secs(300);
 const DASHBOARD_WIDGET_COMPLETION_CONTRACT: &str = "Dashboard widget completion contract: complete the first created widget to the user's requested outcome before giving the final answer. If the request implies live/realtime data, MCP-backed data, web-fetched data, local file/session data, or any other changing external input, do not create a text-only placeholder or scaffold. In the same assistant turn, use multiple tool-call rounds as needed to discover schemas, read or fetch sample data, inspect real responses, self-correct validation errors, and then create a script widget wired to the actual data source with loading, error, empty, and refresh states. Use polling or event refresh when freshness matters. Create a static content widget only when the user explicitly asks for static text or when live data is impossible in the available permissions. If missing credentials or API access blocks live data, create settingsSchema secret/config fields and request the secret after creation, or ask one narrow blocking question instead of shipping a fake widget.";
 const DASHBOARD_WIDGET_SURFACE_CONTRACT: &str = "Dashboard widget surface contract: treat the widget root as the full allocated surface. Script widgets should make their outermost wrapper fill 100% width and height, usually with kk-shell, kk-stage, kk-panel, or kk-fill, and use KK.getViewport() plus KK.onViewportResize for canvases and visual libraries. Do not create a smaller centered app card, duplicate the host widget frame, or leave accidental blank space around the main content. If the useful object is naturally smaller, still use a full-size wrapper to align, center, or scale it intentionally. Script widgets should avoid max-width, fixed-height, or shrink-to-content outer wrappers unless the user explicitly asks for an inset miniature object.";
 const DASHBOARD_WIDGET_PERFORMANCE_COUNTER_CONTRACT: &str = "Dashboard performance counter contract: for local performance widgets, use a script widget that calls await KK.getPerformanceCounters(). It returns a low-overhead local snapshot with CPU, RAM, commit, process/thread/handle counts, aggregate network rates, KKTerm process memory/I/O rates, uptime, and system-drive free space. Poll at a modest interval such as 2-5 seconds; do not use requestAnimationFrame for counters.";
+const DASHBOARD_WIDGET_DOM_CONTRACT: &str = "Dashboard widget DOM contract: the generated source is smoke-checked before it is saved. Build the UI from the provided #root element with document.createElement and root.replaceChildren, or provide htmlShim for every extra element id you query. Do not call document.getElementById('some-id').innerHTML/textContent/appendChild unless that id is root, appears in htmlShim, or is created in source before use. After a dashboard_create_widget or dashboard_update_custom_widget call, inspect the tool result; if validation reports a DOM mount, JSON, library, or script-source error, fix the widget and retry before yielding to the user.";
 
 macro_rules! ai_interaction_debug {
     ($event:expr, $payload:expr) => {
@@ -3088,15 +3089,20 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
             .function
             .description
             .push_str(DASHBOARD_WIDGET_PERFORMANCE_COUNTER_CONTRACT);
+        create_widget_tool.function.description.push(' ');
+        create_widget_tool
+            .function
+            .description
+            .push_str(DASHBOARD_WIDGET_DOM_CONTRACT);
         tools.push(create_widget_tool.strict());
         tools.push(tool_definition(
             "dashboard_create_custom_widget",
-            "Create a reusable AI-authored custom widget definition only; this does not place it on a view. bodyJson must be a JSON string matching the selected kind. Optional settingsSchemaJson defines app-rendered per-instance settings fields; use type secret for passwords, API keys, and tokens so only secret references are stored in SQLite. Prefer dashboard_create_widget when the user expects a visible widget.",
+            format!("Create a reusable AI-authored custom widget definition only; this does not place it on a view. bodyJson must be a JSON string matching the selected kind. Optional settingsSchemaJson defines app-rendered per-instance settings fields; use type secret for passwords, API keys, and tokens so only secret references are stored in SQLite. Prefer dashboard_create_widget when the user expects a visible widget. {DASHBOARD_WIDGET_DOM_CONTRACT}"),
             json!({"type":"object","properties":{"kind":{"type":"string","enum":["content","script"]},"title":{"type":"string"},"summary":{"type":"string"},"category":{"type":"string"},"bodyJson":{"type":"string"},"settingsSchemaJson":{"type":"string"},"createdBy":{"type":"string","enum":["user","agent"]}},"required":["kind","title","summary","category","bodyJson","createdBy"]}),
         ));
         tools.push(tool_definition(
             "dashboard_update_custom_widget",
-            "Update an existing custom widget's title, summary, category, or body. Prefer patch.body with the same structured body shape used by dashboard_create_widget so KKTerm serializes valid JSON for you. Use legacy patch.bodyJson only when you intentionally need to submit a pre-serialized JSON string.",
+            format!("Update an existing custom widget's title, summary, category, or body. Prefer patch.body with the same structured body shape used by dashboard_create_widget so KKTerm serializes valid JSON for you. Use legacy patch.bodyJson only when you intentionally need to submit a pre-serialized JSON string. {DASHBOARD_WIDGET_DOM_CONTRACT}"),
             dashboard_update_custom_widget_schema(),
         ));
         tools.push(tool_definition(
@@ -5138,6 +5144,7 @@ fn build_agent_messages(
         DASHBOARD_WIDGET_COMPLETION_CONTRACT.to_string(),
         DASHBOARD_WIDGET_SURFACE_CONTRACT.to_string(),
         DASHBOARD_WIDGET_PERFORMANCE_COUNTER_CONTRACT.to_string(),
+        DASHBOARD_WIDGET_DOM_CONTRACT.to_string(),
         "PERFORMANCE COUNTERS: Use the performance_counters tool when the user asks about current local system load, memory pressure, network throughput, KKTerm process resource use, uptime, or drive free space. For Dashboard performance widgets, create a script widget that calls await KK.getPerformanceCounters() and polls at a modest interval such as 2-5 seconds; never poll counters from requestAnimationFrame or high-frequency animation loops.".to_string(),
         "MCP IN WIDGETS: When a widget's source will call KK.callMcpTool('<server>', '<tool>', <args>), you MUST first discover the real tool list and parameter shape of that server before writing the widget. Use the mcp_list_tools tool (or read tool schemas from current page context) to look up the exact tool names, required argument keys, and response field names. Do not guess tool names like 'opendata-search_datasets' or invent arguments like 'agency' or 'normalised_only' and do not assume a response has fields like 'datasets[0].dataset_id' without verifying. Quote the tool's documented argument keys verbatim in the widget source, and parse the actual response shape returned by that tool. If a tool result does not match what the widget expects at runtime, fix the parser to match the real shape rather than retrying with the same guess. If the user names an MCP server (for example twinkle-hub) but no tool list is available, ask the user to confirm the server is connected before generating widget code that depends on it.".to_string(),
     ];
@@ -6505,6 +6512,18 @@ mod tests {
             .function
             .description
             .contains("KK.getPerformanceCounters"));
+        assert!(create_tool
+            .function
+            .description
+            .contains("generated source is smoke-checked"));
+        assert!(create_tool
+            .function
+            .description
+            .contains("document.getElementById('some-id')"));
+        assert!(update_tool
+            .function
+            .description
+            .contains("validation reports a DOM mount"));
         assert!(create_tool
             .function
             .description

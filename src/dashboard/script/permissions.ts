@@ -541,6 +541,15 @@ export function buildSrcdoc(
           // Relative and non-URL links stay inside the sandbox.
         }
       }, true);
+      document.addEventListener('contextmenu', function (event) {
+        event.preventDefault();
+        window.parent.postMessage({
+          kk: true,
+          type: 'widgetContextMenu',
+          x: event.clientX || 0,
+          y: event.clientY || 0,
+        }, "*");
+      }, true);
       function showError(err) {
         const pre = document.createElement('pre');
         pre.className = 'kk-widget-error';

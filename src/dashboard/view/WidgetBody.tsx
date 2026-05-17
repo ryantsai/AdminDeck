@@ -4,8 +4,15 @@ import { getBuiltInWidget } from "../registry/builtInRegistry";
 import { ContentWidgetRenderer } from "../content/ContentWidgetRenderer";
 import { ScriptWidgetHost } from "../script/ScriptWidgetHost";
 import type { DashboardWidgetInstance } from "../types";
+import type { NativeContextMenuPosition } from "../../lib/nativeContextMenu";
 
-export function WidgetBody({ instance }: { instance: DashboardWidgetInstance }) {
+export function WidgetBody({
+  instance,
+  onWidgetContextMenu,
+}: {
+  instance: DashboardWidgetInstance;
+  onWidgetContextMenu: (position: NativeContextMenuPosition) => void | Promise<void>;
+}) {
   const { t } = useTranslation();
   const customWidgets = useDashboardStore((s) => s.customWidgets);
 
@@ -36,6 +43,7 @@ export function WidgetBody({ instance }: { instance: DashboardWidgetInstance }) 
       <ScriptWidgetHost
         bodyJson={cw.bodyJson}
         instance={instance}
+        onWidgetContextMenu={onWidgetContextMenu}
         settingsSchemaJson={cw.settingsSchemaJson}
       />
     );

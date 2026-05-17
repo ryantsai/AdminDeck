@@ -539,6 +539,8 @@ pub fn validate_script_body_json_detailed(
     // is still rejected as unused.
     let code_only = validate_script_source_inner(&parsed.source)
         .map_err(|detail| (ValidationError::InvalidScriptSource, Some(detail)))?;
+    validate_script_dom_mounts(&parsed.source, parsed.html_shim.as_deref())
+        .map_err(|detail| (ValidationError::InvalidScriptSource, Some(detail)))?;
     if let Some(libs) = &parsed.libraries {
         // Harden 4: validate that every listed library is referenced in the source.
         // A library that loads but is never called wastes ~80KB+ and adds GC pressure.
@@ -561,6 +563,85 @@ pub fn validate_script_body_json_detailed(
         }
     }
     Ok(parsed)
+}
+
+fn validate_script_dom_mounts(source: &str, html_shim: Option<&str>) -> Result<(), String> {
+    for id in extract_get_element_by_id_targets(source) {
+        if id == "root" || html_shim_contains_id(html_shim, &id) || source_creates_id(source, &id)
+        {
+            continue;
+        }
+        return Err(format!(
+            "script calls document.getElementById({id:?}) but no matching element exists in htmlShim and the source does not create that id; mount from document.getElementById('root') or create the element before reading properties such as innerHTML"
+        ));
+    }
+    Ok(())
+}
+
+fn extract_get_element_by_id_targets(source: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    let needle = "document.getElementById";
+    let bytes = source.as_bytes();
+    let mut offset = 0;
+    while let Some(relative) = source[offset..].find(needle) {
+        let mut i = offset + relative + needle.len();
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if bytes.get(i) != Some(&b'(') {
+            offset = i;
+            continue;
+        }
+        i += 1;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let Some(&quote) = bytes.get(i) else {
+            offset = i;
+            continue;
+        };
+        if quote != b'\'' && quote != b'"' {
+            offset = i;
+            continue;
+        }
+        i += 1;
+        let start = i;
+        let mut escaped = false;
+        while i < bytes.len() {
+            let byte = bytes[i];
+            if byte == b'\\' && !escaped {
+                escaped = true;
+                i += 1;
+                continue;
+            }
+            if byte == quote && !escaped {
+                ids.push(source[start..i].to_string());
+                break;
+            }
+            escaped = false;
+            i += 1;
+        }
+        offset = i.saturating_add(1);
+    }
+    ids
+}
+
+fn html_shim_contains_id(html_shim: Option<&str>, id: &str) -> bool {
+    let Some(html_shim) = html_shim else {
+        return false;
+    };
+    html_shim.contains(&format!("id=\"{id}\"")) || html_shim.contains(&format!("id='{id}'"))
+}
+
+fn source_creates_id(source: &str, id: &str) -> bool {
+    source.contains(&format!(".id = \"{id}\""))
+        || source.contains(&format!(".id = '{id}'"))
+        || source.contains(&format!(".id=\"{id}\""))
+        || source.contains(&format!(".id='{id}'"))
+        || source.contains(&format!("setAttribute(\"id\", \"{id}\")"))
+        || source.contains(&format!("setAttribute('id', '{id}')"))
+        || source.contains(&format!("setAttribute(\"id\",\"{id}\")"))
+        || source.contains(&format!("setAttribute('id','{id}')"))
 }
 
 fn is_valid_library_key(value: &str) -> bool {
@@ -1376,6 +1457,27 @@ mod tests {
     #[test]
     fn script_source_rejects_null_byte() {
         assert!(validate_script_source_inner("console.log(1);\0").is_err());
+    }
+
+    #[test]
+    fn script_body_rejects_missing_get_element_by_id_target() {
+        let json = r#"{"source":"document.getElementById('game').innerHTML = 'ready';","permissions":{"network":false}}"#;
+        let err = validate_script_body_json_detailed(json).expect_err("missing target rejected");
+
+        assert_eq!(err.0, ValidationError::InvalidScriptSource);
+        assert!(err.1.unwrap().contains("document.getElementById"));
+    }
+
+    #[test]
+    fn script_body_accepts_get_element_by_id_target_from_html_shim() {
+        let json = r#"{"source":"document.getElementById('game').innerHTML = 'ready';","htmlShim":"<div id=\"game\"></div>","permissions":{"network":false}}"#;
+        assert!(validate_script_body_json(json).is_ok());
+    }
+
+    #[test]
+    fn script_body_accepts_root_mount_target() {
+        let json = r#"{"source":"document.getElementById('root').replaceChildren(document.createElement('div'));","permissions":{"network":false}}"#;
+        assert!(validate_script_body_json(json).is_ok());
     }
 
     // --- unused-library detection -------------------------------------------

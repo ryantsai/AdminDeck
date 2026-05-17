@@ -759,6 +759,7 @@ function AppLauncherTile({
       draggable={false}
       onContextMenu={(event) => {
         event.preventDefault();
+        event.stopPropagation();
         if (!editMode) {
           onMenu({ entry, prepared, x: event.clientX, y: event.clientY });
         }
@@ -923,7 +924,10 @@ function AppLauncherMenu({
     <div
       ref={menuRef}
       className="terminal-menu app-launcher-menu"
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       role="menu"
     >
       <MenuButton
@@ -991,7 +995,10 @@ function AppLauncherAddMenu({
     <div
       ref={menuRef}
       className="terminal-menu app-launcher-menu app-launcher-add-menu"
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       role="menu"
     >
       <MenuButton

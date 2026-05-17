@@ -20,6 +20,7 @@ import {
 } from "../schema";
 import { buildSrcdoc, type ResolvedWidgetLibrary } from "./permissions";
 import { loadWidgetLibraries, resolveWidgetLibraryKeys } from "./widgetLibraries";
+import type { NativeContextMenuPosition } from "../../lib/nativeContextMenu";
 
 // Harden 3: cap the number of concurrently active script widgets to prevent
 // too many simultaneous rAF/animation loops from saturating the renderer.
@@ -101,10 +102,12 @@ function activateScriptWidgetWithEviction(
 export function ScriptWidgetHost({
   bodyJson,
   instance,
+  onWidgetContextMenu,
   settingsSchemaJson,
 }: {
   bodyJson: string;
   instance: DashboardWidgetInstance;
+  onWidgetContextMenu: (position: NativeContextMenuPosition) => void | Promise<void>;
   settingsSchemaJson: string;
 }) {
   const { t } = useTranslation();
@@ -257,6 +260,16 @@ export function ScriptWidgetHost({
       }
       if (isScriptWidgetPerformanceCountersMessage(data)) {
         void sendPerformanceCountersResponse(data);
+        return;
+      }
+      if (isScriptWidgetContextMenuMessage(data)) {
+        const frameRect = iframeRef.current?.getBoundingClientRect();
+        if (frameRect) {
+          void onWidgetContextMenu({
+            x: frameRect.left + data.x,
+            y: frameRect.top + data.y,
+          });
+        }
       }
     }
 
@@ -394,7 +407,7 @@ export function ScriptWidgetHost({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [instance.id, updateInstance]);
+  }, [instance.id, onWidgetContextMenu, updateInstance]);
 
   if (!parsed) {
     return <div className="dw-script-error">{t("dashboard.invalidScriptWidgetBody")}</div>;
@@ -573,6 +586,24 @@ function isScriptWidgetPerformanceCountersMessage(value: unknown): value is {
     candidate.kk === true &&
     candidate.type === "getPerformanceCounters" &&
     typeof candidate.requestId === "string"
+  );
+}
+
+function isScriptWidgetContextMenuMessage(value: unknown): value is {
+  kk: true;
+  type: "widgetContextMenu";
+  x: number;
+  y: number;
+} {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { kk?: unknown; type?: unknown; x?: unknown; y?: unknown };
+  return (
+    candidate.kk === true &&
+    candidate.type === "widgetContextMenu" &&
+    typeof candidate.x === "number" &&
+    Number.isFinite(candidate.x) &&
+    typeof candidate.y === "number" &&
+    Number.isFinite(candidate.y)
   );
 }
 
