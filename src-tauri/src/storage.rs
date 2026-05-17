@@ -319,6 +319,12 @@ pub struct DashboardSettings {
     /// without this field load with [`default_max_active_script_widgets`].
     #[serde(default = "default_max_active_script_widgets")]
     pub max_active_script_widgets: u32,
+    /// Global kill-switch for KK.net.* APIs in script widgets. When false,
+    /// the AI cannot create widgets that perform ping/portScan/DNS/WoL/WHOIS
+    /// even if `permissions.networkTools` is set on the widget body. Default
+    /// true (per-widget permission flag remains the primary opt-in).
+    #[serde(default = "default_allow_widget_network_tools")]
+    pub allow_widget_network_tools: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -439,6 +445,8 @@ pub struct AiAssistantToolSettings {
     connections: bool,
     #[serde(default = "default_ai_sessions_tool_enabled")]
     sessions: bool,
+    #[serde(default)]
+    network: bool,
 }
 
 impl AiAssistantToolSettings {
@@ -469,6 +477,9 @@ impl AiAssistantToolSettings {
     pub(crate) fn sessions(&self) -> bool {
         self.sessions
     }
+    pub(crate) fn network(&self) -> bool {
+        self.network
+    }
     pub(crate) fn any_enabled(&self) -> bool {
         self.web_search
             || self.web_fetch
@@ -479,6 +490,7 @@ impl AiAssistantToolSettings {
             || self.dashboard
             || self.connections
             || self.sessions
+            || self.network
     }
 }
 
@@ -3710,6 +3722,7 @@ fn default_dashboard_settings() -> DashboardSettings {
         confirm_remove: true,
         default_landing_view: "lastActive".to_string(),
         max_active_script_widgets: default_max_active_script_widgets(),
+        allow_widget_network_tools: default_allow_widget_network_tools(),
     }
 }
 
@@ -3719,6 +3732,14 @@ fn default_dashboard_settings() -> DashboardSettings {
 /// 100 upper bound so heavy widgets do not silently regress the freeze.
 fn default_max_active_script_widgets() -> u32 {
     8
+}
+
+/// Default for the per-install network-tools kill-switch. true means widgets
+/// that explicitly opt in via `permissions.networkTools: true` can use KK.net.*;
+/// users can flip this off globally to disable network tools across all widgets
+/// without editing each one.
+fn default_allow_widget_network_tools() -> bool {
+    true
 }
 
 /// Hard upper bound applied at the storage boundary. The Settings UI
@@ -3944,6 +3965,7 @@ fn default_ai_assistant_tool_settings() -> AiAssistantToolSettings {
         dashboard: default_ai_dashboard_tool_enabled(),
         connections: default_ai_connections_tool_enabled(),
         sessions: default_ai_sessions_tool_enabled(),
+        network: false,
     }
 }
 
@@ -5512,6 +5534,7 @@ mod tests {
                 confirm_remove: false,
                 default_landing_view: " view-default ".to_string(),
                 max_active_script_widgets: 20,
+                allow_widget_network_tools: true,
             })
             .expect("dashboard settings update");
         assert!(!updated.confirm_remove);
@@ -5530,12 +5553,14 @@ mod tests {
             confirm_remove: true,
             default_landing_view: "lastActive".to_string(),
             max_active_script_widgets: 0,
+            allow_widget_network_tools: true,
         });
         assert!(too_low.is_err(), "0 must be rejected");
         let too_high = storage.update_dashboard_settings(DashboardSettings {
             confirm_remove: true,
             default_landing_view: "lastActive".to_string(),
             max_active_script_widgets: 101,
+            allow_widget_network_tools: true,
         });
         assert!(too_high.is_err(), "101 must be rejected");
     }
