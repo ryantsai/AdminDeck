@@ -1474,7 +1474,7 @@
     "dashboardMaxActiveScriptWidgets": "Maximale aktive Skript-Widgets",
     "dashboardMaxActiveScriptWidgetsHint": "Maximale Anzahl von Skript-Widgets, die gleichzeitig ihr iframe auf einem Dashboard rendern. Überschüssige Widgets zeigen einen Platzhalter zum Aktivieren. Zulässiger Bereich {{min}}–{{max}}.",
     "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
-    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "Remote MCP-Server",
     "mcpServersHint": "Verbinden Sie sich mit Remote Model Context Protocol-Servern, damit der KI-Assistent und Dashboard-Widgets deren Tools aufrufen können. KKTerm unterstützt nur HTTP-Streamable-MCP-Server; stdio-Konfigurationen, die lokale Prozesse starten, werden nicht unterstützt.",
     "mcpServersEmpty": "Keine MCP-Server konfiguriert.",

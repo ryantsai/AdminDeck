@@ -1474,7 +1474,7 @@
     "dashboardMaxActiveScriptWidgets": "活動指令碼小工具上限",
     "dashboardMaxActiveScriptWidgetsHint": "儀表板上同時呈現其 iframe 的指令碼小工具最大數量。超出的小工具會顯示點擊啟用預留位置。允許範圍 {{min}}–{{max}}。",
     "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
-    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "遠端 MCP 伺服器",
     "mcpServersHint": "連接到遠端 Model Context Protocol 伺服器，以便 AI 助手和儀表板小工具可以呼叫它們的工具。KKTerm 僅支援 HTTP 串流 MCP 伺服器；不支援啟動本機處理程序的 stdio 設定。",
     "mcpServersEmpty": "尚未設定 MCP 伺服器。",

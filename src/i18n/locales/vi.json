@@ -1463,7 +1463,7 @@
     "wsl": "WSL",
     "yuGothicUi": "Yu Gothic UI",
     "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
-    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets."
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, and Wake-on-LAN. Disable to globally block these from all widgets."
   },
   "sftp": {
     "accessed": "Accessed",

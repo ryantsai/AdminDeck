@@ -197,6 +197,7 @@ export function ScriptWidgetHost({
     () => (parsed && libraries ? buildSrcdoc(parsed, settingsValuesJson, libraries, allowWidgetNetworkTools) : ""),
     [parsed, settingsValuesJson, libraries, allowWidgetNetworkTools],
   );
+  const canUseNetworkTools = parsed?.permissions.networkTools === true && allowWidgetNetworkTools;
 
   // Harden 2: post visibility messages to the sandbox when the iframe
   // scrolls off-screen or is occluded. Widgets can check KK.isVisible()
@@ -306,6 +307,7 @@ export function ScriptWidgetHost({
       const target = iframeRef.current?.contentWindow;
       if (!target) return;
       try {
+        ensureNetworkToolsAllowed();
         const value = await routeNetCall(data.op, data.args);
         target.postMessage({ kk: true, type: "netCallResult", requestId: data.requestId, ok: true, value }, "*");
       } catch (error) {
@@ -314,8 +316,9 @@ export function ScriptWidgetHost({
     }
 
     async function startNetSubscription(data: { subscriptionId: string; op: string; args: unknown }) {
-      activeSubscriptionsRef.current.add(data.subscriptionId);
       try {
+        ensureNetworkToolsAllowed();
+        activeSubscriptionsRef.current.add(data.subscriptionId);
         await routeNetSubscribe(data.op, data.subscriptionId, data.args);
       } catch (error) {
         const target = iframeRef.current?.contentWindow;
@@ -326,6 +329,12 @@ export function ScriptWidgetHost({
           }, "*");
         }
         activeSubscriptionsRef.current.delete(data.subscriptionId);
+      }
+    }
+
+    function ensureNetworkToolsAllowed() {
+      if (!canUseNetworkTools) {
+        throw { kind: "policyDisabled", reason: "Network tools are disabled for this widget." };
       }
     }
 
@@ -458,7 +467,7 @@ export function ScriptWidgetHost({
       }
       activeSubscriptionsRef.current.clear();
     };
-  }, [instance.id, updateInstance]);
+  }, [canUseNetworkTools, instance.id, updateInstance]);
 
   if (!parsed) {
     return <div className="dw-script-error">{t("dashboard.invalidScriptWidgetBody")}</div>;
@@ -662,8 +671,7 @@ async function routeNetCall(op: string, args: unknown): Promise<unknown> {
     case "tcpCheck": return invokeCommand("network_tcp_check", { host: a.host as string, port: a.port as number, timeoutMs: a.timeoutMs as number | undefined });
     case "interfaces": return invokeCommand("network_interfaces");
     case "wol": return invokeCommand("network_wol", { mac: a.mac as string, broadcast: a.broadcast as string | undefined, port: a.port as number | undefined });
-    case "snmpGet": return invokeCommand("network_snmp_get", { args: a as never });
-    case "whois": return invokeCommand("network_whois", { domain: a.domain as string });
+    case "whois": return invokeCommand("network_whois", { domain: (a.domain ?? a.query) as string });
     default: throw new Error(`Unknown net op: ${op}`);
   }
 }
@@ -676,12 +684,6 @@ async function routeNetSubscribe(op: string, subscriptionId: string, args: unkno
       return;
     case "portScan":
       await invokeCommand("network_port_scan_start", { args: { subscriptionId, ...a } as never });
-      return;
-    case "traceroute":
-      await invokeCommand("network_traceroute_start", { args: { subscriptionId, ...a } as never });
-      return;
-    case "snmpWalk":
-      await invokeCommand("network_snmp_walk_start", { args: { subscriptionId, ...a } as never });
       return;
     default:
       throw new Error(`Unknown stream op: ${op}`);

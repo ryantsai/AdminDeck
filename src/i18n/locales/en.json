@@ -731,7 +731,7 @@
     "dashboardMaxActiveScriptWidgets": "Active script widgets cap",
     "dashboardMaxActiveScriptWidgetsHint": "Maximum script widgets that render their iframe at once on a Dashboard. Excess widgets show a click-to-activate placeholder. Allowed range {{min}}–{{max}}.",
     "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
-    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "sectionUrl": "URL",
     "urlDefaults": "URL settings",
     "urlSecurity": "URL security",

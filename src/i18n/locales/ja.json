@@ -1474,7 +1474,7 @@
     "dashboardMaxActiveScriptWidgets": "アクティブスクリプトウィジェットの上限",
     "dashboardMaxActiveScriptWidgetsHint": "ダッシュボードで同時に iframe をレンダリングするスクリプトウィジェットの最大数。超過したウィジェットにはクリックして有効化するプレースホルダーが表示されます。許容範囲 {{min}}–{{max}}。",
     "dashboardAllowWidgetNetworkTools": "Allow network tools in widgets",
-    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, SNMP, and Wake-on-LAN. Disable to globally block these from all widgets.",
+    "dashboardAllowWidgetNetworkToolsDesc": "When enabled, script widgets that request permissions.networkTools can run ping, port scan, DNS, WHOIS, and Wake-on-LAN. Disable to globally block these from all widgets.",
     "mcpServersTitle": "リモート MCP サーバー",
     "mcpServersHint": "リモート Model Context Protocol サーバーに接続して、AI アシスタントとダッシュボードウィジェットがそのツールを呼び出せるようにします。KKTerm は HTTP ストリーミング可能な MCP サーバーのみをサポートし、ローカルプロセスを起動する stdio 構成はサポートされません。",
     "mcpServersEmpty": "MCP サーバーが設定されていません。",

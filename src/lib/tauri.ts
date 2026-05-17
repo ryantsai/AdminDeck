@@ -706,7 +706,7 @@ export type NetError = {
   kind:
     | "timeout" | "refused" | "unreachable" | "hostNotFound" | "permissionDenied"
     | "invalidArgument" | "resolverError" | "cancelled" | "concurrencyLimit"
-    | "policyDisabled" | "rateLimited" | "snmpError" | "internal";
+    | "policyDisabled" | "internal";
   hint?: string;
   reason?: string;
 };
@@ -1685,10 +1685,6 @@ type CommandMap = {
     args: { mac: string; broadcast?: string; port?: number };
     result: { sent: boolean };
   };
-  network_snmp_get: {
-    args: { args: { target: string; oid: string; community: string; version?: string; timeoutMs?: number } };
-    result: { oid: string; type: string; value: unknown };
-  };
   network_whois: {
     args: { domain: string };
     result: { raw: string; parsed?: Record<string, string> };
@@ -1699,14 +1695,6 @@ type CommandMap = {
   };
   network_port_scan_start: {
     args: { args: { subscriptionId: string; host: string; ports: number[]; concurrency?: number; timeoutMs?: number; jitterMs?: number } };
-    result: void;
-  };
-  network_traceroute_start: {
-    args: { args: { subscriptionId: string; host: string; maxHops?: number; timeoutMs?: number; probesPerHop?: number } };
-    result: void;
-  };
-  network_snmp_walk_start: {
-    args: { args: { subscriptionId: string; target: string; rootOid: string; community: string; version?: string; timeoutMs?: number; maxResults?: number } };
     result: void;
   };
   network_stream_cancel: {

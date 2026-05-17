@@ -16,9 +16,6 @@ pub enum NetError {
     ResolverError { reason: String },
     Cancelled,
     ConcurrencyLimit,
-    PolicyDisabled { reason: String },
-    RateLimited { reason: String },
-    SnmpError { reason: String },
     Internal { reason: String },
 }
 

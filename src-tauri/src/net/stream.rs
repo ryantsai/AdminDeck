@@ -48,6 +48,7 @@ impl StreamRegistry {
         guard.remove(id);
     }
 
+    #[cfg(test)]
     pub fn active_count(&self) -> usize {
         self.inner.lock().expect("StreamRegistry mutex poisoned").len()
     }

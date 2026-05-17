@@ -31,7 +31,7 @@ export function buildKkNetSnippet(enabled: boolean): string {
   if (!enabled) return "";
   return `
       (function () {
-        function _netCall(cmd, args) {
+        function _netCall(op, args) {
           return new Promise(function (resolve, reject) {
             var rid = 'nc-' + Math.random().toString(36).slice(2);
             function onMsg(event) {
@@ -39,18 +39,18 @@ export function buildKkNetSnippet(enabled: boolean): string {
               if (!d || d.kk !== true || d.type !== 'netCallResult' || d.requestId !== rid) return;
               window.removeEventListener('message', onMsg);
               if (d.ok) {
-                resolve(d.result);
+                resolve(d.value);
               } else {
-                var err = new Error(d.error || 'Network tool failed.');
-                if (d.netError) { err.code = d.netError.kind; err.hint = d.netError.hint; err.reason = d.netError.reason; }
+                var err = new Error((d.error && (d.error.reason || d.error.hint || d.error.kind)) || 'Network tool failed.');
+                if (d.error) { err.code = d.error.kind; err.hint = d.error.hint; err.reason = d.error.reason; }
                 reject(err);
               }
             }
             window.addEventListener('message', onMsg);
-            window.parent.postMessage({ kk: true, type: 'netCall', requestId: rid, command: cmd, args: args || {} }, '*');
+            window.parent.postMessage({ kk: true, type: 'netCall', requestId: rid, op: op, args: args || {} }, '*');
           });
         }
-        function _netStream(cmd, args) {
+        function _netStream(op, args) {
           var sid = 'ns-' + Math.random().toString(36).slice(2);
           var queue = [];
           var waiters = [];
@@ -71,19 +71,19 @@ export function buildKkNetSnippet(enabled: boolean): string {
           function onMsg(event) {
             var d = event.data;
             if (!d || d.kk !== true || d.subscriptionId !== sid) return;
-            if (d.type === 'netEvent') { enqueue(d.event); }
+            if (d.type === 'netEvent') { enqueue(d.payload); }
             else if (d.type === 'netDone') {
               window.removeEventListener('message', onMsg);
               if (d.ok) { finalize(null); }
               else {
-                var err = new Error(d.error || 'Stream error.');
-                if (d.netError) { err.code = d.netError.kind; err.hint = d.netError.hint; err.reason = d.netError.reason; }
+                var err = new Error((d.error && (d.error.reason || d.error.hint || d.error.kind)) || 'Stream error.');
+                if (d.error) { err.code = d.error.kind; err.hint = d.error.hint; err.reason = d.error.reason; }
                 finalize(err);
               }
             }
           }
           window.addEventListener('message', onMsg);
-          window.parent.postMessage({ kk: true, type: 'netSubscribe', subscriptionId: sid, command: cmd, args: args || {} }, '*');
+          window.parent.postMessage({ kk: true, type: 'netSubscribe', subscriptionId: sid, op: op, args: args || {} }, '*');
           function cancel() {
             window.removeEventListener('message', onMsg);
             window.parent.postMessage({ kk: true, type: 'netCancel', subscriptionId: sid }, '*');
@@ -114,12 +114,9 @@ export function buildKkNetSnippet(enabled: boolean): string {
           tcpCheck: function (host, port, opts) { return _netCall('tcpCheck', Object.assign({ host: host, port: port }, opts)); },
           interfaces: function () { return _netCall('interfaces', {}); },
           wol: function (mac, opts) { return _netCall('wol', Object.assign({ mac: mac }, opts)); },
-          snmpGet: function (host, oid, opts) { return _netCall('snmpGet', Object.assign({ host: host, oid: oid }, opts)); },
           whois: function (query, opts) { return _netCall('whois', Object.assign({ query: query }, opts)); },
           ping: function (host, opts) { return _netStream('ping', Object.assign({ host: host }, opts)); },
           portScan: function (host, opts) { return _netStream('portScan', Object.assign({ host: host }, opts)); },
-          traceroute: function (host, opts) { return _netStream('traceroute', Object.assign({ host: host }, opts)); },
-          snmpWalk: function (host, oid, opts) { return _netStream('snmpWalk', Object.assign({ host: host, oid: oid }, opts)); },
         };
       })();`;
 }

@@ -21,7 +21,7 @@ pub struct WhoisResult {
 
 pub async fn lookup(domain: &str) -> Result<WhoisResult, NetError> {
     let d = domain.trim().to_ascii_lowercase();
-    if d.is_empty() || !d.contains('.') {
+    if !is_valid_domain_query(&d) {
         return Err(NetError::invalid("expected a valid domain (e.g. example.com)"));
     }
     let fut = async {
@@ -38,6 +38,15 @@ pub async fn lookup(domain: &str) -> Result<WhoisResult, NetError> {
     timeout(Duration::from_millis(PER_OP_TIMEOUT_MS), fut)
         .await
         .map_err(|_| NetError::Timeout)?
+}
+
+fn is_valid_domain_query(value: &str) -> bool {
+    if value.is_empty() || value.len() > 253 || !value.contains('.') {
+        return false;
+    }
+    value
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
 }
 
 async fn whois_query(server: &str, query: &str) -> Result<String, NetError> {
@@ -85,6 +94,12 @@ mod tests {
     async fn rejects_invalid_domain() {
         assert!(matches!(lookup("not-a-domain").await.unwrap_err(), NetError::InvalidArgument { .. }));
         assert!(matches!(lookup("").await.unwrap_err(), NetError::InvalidArgument { .. }));
+    }
+
+    #[tokio::test]
+    async fn rejects_query_with_control_characters() {
+        let err = lookup("example.com\r\nwhois.evil.test").await.unwrap_err();
+        assert!(matches!(err, NetError::InvalidArgument { .. }));
     }
 
     #[test]
