@@ -15,9 +15,9 @@ import {
 } from "../schema";
 import type {
   AccentName, DashboardWidgetInstance, IconName,
-  WidgetPreset, WidgetSettingsField, WidgetSettingsSchema,
+  WidgetSettingsField, WidgetSettingsSchema,
 } from "../types";
-import { ICON_NAMES, WIDGET_PRESETS } from "../types";
+import { defaultWidgetPresentationForPreset, ICON_NAMES, WIDGET_PRESETS } from "../types";
 
 export interface CustomizePopoverProps {
   instance: DashboardWidgetInstance;
@@ -160,7 +160,10 @@ function CommonSection({ instance }: { instance: DashboardWidgetInstance }) {
             <button
               key={p}
               className={instance.preset === p ? "active" : ""}
-              onClick={() => updateInstance(instance.id, { preset: p as WidgetPreset })}
+              onClick={() => updateInstance(instance.id, {
+                preset: p,
+                ...defaultWidgetPresentationForPreset(p),
+              })}
             >
               {t(`dashboard.preset.${p}`)}
             </button>
@@ -184,23 +187,6 @@ function CommonSection({ instance }: { instance: DashboardWidgetInstance }) {
               onChange={(checked) => updateInstance(instance.id, { hideTitle: checked })}
             />
           </label>
-        </section>
-      ) : null}
-
-      {instance.preset === "action" ? (
-        <section>
-          <h4>{t("dashboard.actionDirection")}</h4>
-          <div className="dw-preset-picker">
-            {(["vertical", "horizontal"] as const).map((d) => (
-              <button
-                key={d}
-                className={(instance.actionDirection ?? "vertical") === d ? "active" : ""}
-                onClick={() => updateInstance(instance.id, { actionDirection: d })}
-              >
-                {t(`dashboard.actionDirectionOptions.${d}`)}
-              </button>
-            ))}
-          </div>
         </section>
       ) : null}
 

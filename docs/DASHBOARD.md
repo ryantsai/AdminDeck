@@ -37,7 +37,7 @@ It does not own:
 | `content` | Validated JSON in `dashboard_custom_widgets.body_json` | Declarative renderer in `ContentWidgetRenderer.tsx` — switches over `shape: 'markdown' \| 'kvList' \| 'checklist' \| 'stat'`. Markdown-shaped content sets `data.mode: 'markdown' \| 'html'`; markdown mode parses Markdown and html mode sanitizes and renders an HTML fragment. No code execution. |
 | `script` | JavaScript source string in `dashboard_custom_widgets.body_json` | Hosted inside an isolated `iframe srcdoc` via `ScriptWidgetHost.tsx`. Has `document`, `fetch`, `setInterval`, and a minimal `KK` postMessage bridge. Permissions (`network`, `pollSeconds`) declared per widget. Fault-isolation boundary — a bad script breaks one widget, not the dashboard. |
 
-**Visual Preset** — one of five framing styles applied per widget instance: `panel`, `ambient`, `tile`, `hero`, `action`. Implemented in `presetRegistry.tsx` as thin CSS-driven chrome wrappers. Each preset reads `--w-accent` and `--w-accent-soft` for the widget's accent color; presets do not encode their own palette. Ambient supports optional frosted-glass background and title-bar visibility toggles; Action supports a layout direction toggle (vertical/horizontal).
+**Visual Preset** — one of three framing styles applied per widget instance: `panel`, `ambient`, `hero`. Implemented in `presetRegistry.tsx` as thin CSS-driven chrome wrappers. Each preset reads `--w-accent` and `--w-accent-soft` for the widget's accent color; presets do not encode their own palette. Ambient supports optional frosted-glass background and hides its title bar by default.
 
 **Accent** — a palette name (not a hex), persisted on each instance. Resolved to color values from a shared palette table at render time so future palette tweaks affect all dashboards uniformly.
 
@@ -50,8 +50,6 @@ The AI Assistant must choose `preset`, `accent_name`, `icon_name`, and grid size
 Preset guidance:
 
 - `panel` — default for ordinary tools, forms, checklists, and mixed content.
-- `tile` — compact status, short summaries, and small metrics.
-- `action` — launchers, one-command actions, and command-like workflows.
 - `ambient` — soft informational summaries where low visual weight matters.
 - `hero` — rare high-priority summary widgets; avoid for normal utilities.
 

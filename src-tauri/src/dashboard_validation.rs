@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const PRESETS: &[&str] = &["panel", "ambient", "tile", "hero", "action"];
+pub const PRESETS: &[&str] = &["panel", "ambient", "hero"];
 
 pub const ACCENTS: &[&str] = &[
     "default", "blue", "indigo", "teal", "green", "amber", "red", "purple", "pink", "slate",
@@ -1021,6 +1021,12 @@ mod tests {
     #[test]
     fn preset_mono_is_removed() {
         assert_eq!(validate_preset("mono"), Err(ValidationError::InvalidPreset));
+    }
+
+    #[test]
+    fn preset_tile_and_action_are_removed() {
+        assert_eq!(validate_preset("tile"), Err(ValidationError::InvalidPreset));
+        assert_eq!(validate_preset("action"), Err(ValidationError::InvalidPreset));
     }
 
     #[test]

@@ -2,9 +2,19 @@ export type WidgetKind = "builtIn" | "content" | "script";
 export type WidgetCustomKind = "content" | "script";
 
 export const WIDGET_PRESETS = [
-  "panel", "ambient", "tile", "hero", "action",
+  "panel", "ambient", "hero",
 ] as const;
 export type WidgetPreset = (typeof WIDGET_PRESETS)[number];
+
+export const DEFAULT_WIDGET_PRESENTATION_BY_PRESET = {
+  panel: { hideTitle: false },
+  ambient: { hideTitle: true },
+  hero: { hideTitle: false },
+} as const satisfies Record<WidgetPreset, { hideTitle: boolean }>;
+
+export function defaultWidgetPresentationForPreset<T extends WidgetPreset>(preset: T) {
+  return DEFAULT_WIDGET_PRESENTATION_BY_PRESET[preset];
+}
 
 export const ACCENT_NAMES = [
   "default", "blue", "indigo", "teal", "green", "amber", "red", "purple", "pink",
@@ -55,7 +65,6 @@ export interface DashboardWidgetInstance {
   customTitle: string | null;
   glass?: boolean;
   hideTitle?: boolean;
-  actionDirection?: "vertical" | "horizontal";
   settingsValuesJson: string;
   gridX: number;
   gridY: number;
@@ -88,7 +97,6 @@ export interface InstancePatch {
   customTitle?: string | null;
   glass?: boolean;
   hideTitle?: boolean;
-  actionDirection?: "vertical" | "horizontal";
   settingsValuesJson?: string;
   gridX?: number;
   gridY?: number;

@@ -911,7 +911,6 @@ button.dashboard-pill-dot:focus-visible {
 }
 
 .dw-title,
-.dw-action-title,
 .dw-hero-title {
   margin: 0;
   overflow: hidden;
@@ -974,26 +973,12 @@ button.dashboard-pill-dot:focus-visible {
   padding: 9px;
 }
 
-.dw-custom-widget.dw-instance .dw-preset-tile {
-  padding: 7px 8px;
-}
-
 .dw-custom-widget .dw-hero-head {
   padding: 9px 9px 0;
 }
 
 .dw-custom-widget .dw-hero-body {
   padding: 6px 9px 9px;
-}
-
-.dw-custom-widget.dw-instance .dw-preset-action {
-  gap: 5px;
-  padding: 8px;
-}
-
-.dw-custom-widget.dw-instance .dw-preset-action--horizontal {
-  gap: 6px;
-  padding: 6px 8px;
 }
 
 .dw-controls {
@@ -1121,48 +1106,6 @@ button.dashboard-pill-dot:focus-visible {
   z-index: 1;
 }
 
-.dw-preset-tile {
-  gap: 6px;
-  min-height: 110px;
-  padding: 14px 16px;
-}
-
-.dw-tile-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 11.5px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.dw-tile-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dw-tile-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  color: var(--w-accent);
-  background: var(--w-accent-soft);
-  border-radius: 7px;
-}
-
-.dw-tile-body {
-  color: var(--text);
-  font-size: 14px;
-}
-
 .dw-preset-hero {
   position: relative;
   min-height: 130px;
@@ -1210,74 +1153,6 @@ button.dashboard-pill-dot:focus-visible {
   padding: 12px 18px 18px;
   opacity: 0.92;
   font-size: 13px;
-}
-
-.dw-preset-action {
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 120px;
-  padding: 16px;
-  border: 1px dashed var(--border-strong);
-  box-shadow: none;
-}
-
-.dw-action-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  color: var(--w-accent);
-  background: var(--w-accent-soft);
-  border-radius: 10px;
-}
-
-.dw-action-body {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.dw-preset-action--horizontal {
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-  min-height: 72px;
-  padding: 12px 16px;
-  background: var(--w-accent-soft);
-  border: 1px solid color-mix(in srgb, var(--w-accent) 30%, transparent);
-  border-radius: var(--dashboard-radius);
-  box-shadow: none;
-}
-
-.dw-preset-action--horizontal .dw-action-icon {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  color: var(--surface);
-  background: var(--w-accent);
-  border-radius: 8px;
-}
-
-.dw-preset-action--horizontal .dw-action-body {
-  flex: 1 1 auto;
-  min-width: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.dw-preset-action--horizontal .dw-action-title {
-  margin: 0;
-  overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 650;
 }
 
 .dw-stack-fields {

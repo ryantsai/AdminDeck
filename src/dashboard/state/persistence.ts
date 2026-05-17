@@ -11,6 +11,7 @@ import type {
   CustomWidgetPatch, InstancePatch, LayoutEntry, ViewPatch,
   WidgetKind, WidgetCustomKind, WidgetPreset, AccentName, IconName, GridDensity,
 } from "../types";
+import { defaultWidgetPresentationForPreset } from "../types";
 
 let previewIdCounter = 0;
 let previewState: DashboardLoadState | null = null;
@@ -45,7 +46,6 @@ function browserPreviewState() {
           customTitle: null,
           glass: false,
           hideTitle: false,
-          actionDirection: undefined,
           settingsValuesJson: "{}",
           gridX: 0,
           gridY: 0,
@@ -134,6 +134,8 @@ export async function addInstance(input: {
     const instance: DashboardWidgetInstance = {
       id: createPreviewId("inst"),
       customTitle: null,
+      glass: false,
+      ...defaultWidgetPresentationForPreset(input.preset),
       settingsValuesJson: "{}",
       sortOrder: state.instances.filter((item) => item.viewId === input.viewId).length,
       ...input,
@@ -162,6 +164,9 @@ export async function updateInstance(id: string, patch: InstancePatch): Promise<
       if (!validation.ok) {
         throw new Error(`Invalid Dashboard widget settings values: ${validation.reason}`);
       }
+    }
+    if (patch.preset === "ambient" && patch.hideTitle === undefined) {
+      Object.assign(instance, defaultWidgetPresentationForPreset(patch.preset));
     }
     Object.assign(instance, patch);
     return { ...instance };

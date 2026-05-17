@@ -102,7 +102,6 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
           editMode={editMode}
           glass={instance.glass}
           hideTitle={instance.hideTitle}
-          actionDirection={instance.actionDirection}
         />
       </div>
       {deleteConfirmOpen ? (

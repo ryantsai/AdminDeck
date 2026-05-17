@@ -74,7 +74,7 @@ fn background_to_json(
 }
 
 fn normalize_loaded_preset(preset: String) -> String {
-    if preset == "mono" {
+    if matches!(preset.as_str(), "mono" | "tile" | "action") {
         "panel".to_string()
     } else {
         preset
@@ -479,6 +479,7 @@ pub fn add_instance(
     validate_accent(accent_name)?;
     validate_icon(icon_name)?;
     validate_grid_bounds(x, y, w, h)?;
+    let hide_title = preset == "ambient";
 
     let next_sort: i64 = conn.query_row(
         "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM dashboard_widget_instances WHERE view_id = ?",
@@ -489,8 +490,8 @@ pub fn add_instance(
         "INSERT INTO dashboard_widget_instances
             (id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
              glass, hide_title, action_direction, settings_values_json, grid_x, grid_y, grid_w, grid_h, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, NULL, '{}', ?, ?, ?, ?, ?)",
-        params![id, view_id, kind, source_id, preset, accent_name, icon_name, x, y, w, h, next_sort],
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, NULL, '{}', ?, ?, ?, ?, ?)",
+        params![id, view_id, kind, source_id, preset, accent_name, icon_name, hide_title as i64, x, y, w, h, next_sort],
     )?;
     Ok(DashboardWidgetInstance {
         id: id.to_string(),
@@ -502,7 +503,7 @@ pub fn add_instance(
         icon_name: icon_name.to_string(),
         custom_title: None,
         glass: false,
-        hide_title: false,
+        hide_title,
         action_direction: None,
         settings_values_json: "{}".to_string(),
         grid_x: x,
@@ -556,6 +557,7 @@ pub fn update_instance(
         other => DashboardStorageError::Sqlite(other),
     })?;
 
+    let preset_changed_to_ambient = patch.preset.as_deref() == Some("ambient");
     if let Some(p) = patch.preset.clone() {
         current.preset = p;
     }
@@ -573,6 +575,8 @@ pub fn update_instance(
     }
     if let Some(ht) = patch.hide_title {
         current.hide_title = ht;
+    } else if preset_changed_to_ambient {
+        current.hide_title = true;
     }
     if let Some(ad) = patch.action_direction.clone() {
         current.action_direction = ad;
@@ -1097,6 +1101,72 @@ mod tests {
 
         let state = load_state(&conn).unwrap();
         assert!(state.instances[0].hide_title);
+    }
+
+    #[test]
+    fn ambient_instance_hides_title_by_default() {
+        let conn = open_test_db();
+        create_view(&conn, "v1", "First", None).unwrap();
+        let inst = add_instance(
+            &conn,
+            "i1",
+            "v1",
+            "builtIn",
+            "hashCalculator",
+            "ambient",
+            "indigo",
+            "Hash",
+            0,
+            0,
+            3,
+            2,
+        )
+        .unwrap();
+        assert!(inst.hide_title);
+
+        let state = load_state(&conn).unwrap();
+        assert!(state.instances[0].hide_title);
+    }
+
+    #[test]
+    fn switching_to_ambient_hides_title_by_default() {
+        let conn = open_test_db();
+        create_view(&conn, "v1", "First", None).unwrap();
+        add_instance(
+            &conn,
+            "i1",
+            "v1",
+            "builtIn",
+            "hashCalculator",
+            "panel",
+            "indigo",
+            "Hash",
+            0,
+            0,
+            3,
+            2,
+        )
+        .unwrap();
+        let updated = update_instance(
+            &conn,
+            "i1",
+            &InstancePatch {
+                preset: Some("ambient".into()),
+                accent_name: None,
+                icon_name: None,
+                custom_title: None,
+                glass: None,
+                action_direction: None,
+                hide_title: None,
+                settings_values_json: None,
+                grid_x: None,
+                grid_y: None,
+                grid_w: None,
+                grid_h: None,
+            },
+        )
+        .unwrap();
+        assert!(updated.hide_title);
     }
 
     #[test]

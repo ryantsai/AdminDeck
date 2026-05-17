@@ -60,7 +60,7 @@ An AI-authored widget definition stored in `dashboard_custom_widgets`. Has `kind
 _Avoid_: plugin, extension, custom tile
 
 **Widget Preset**:
-One of nine visual chrome styles applied per Widget Instance: `panel`, `ambient`, `glass`, `tile`, `hero`, `mono`, `stack`, `action`, `band`. Presets are CSS wrappers that read the Instance's `--w-accent` / `--w-accent-soft` variables; presets do not encode their own palette.
+One of three visual chrome styles applied per Widget Instance: `panel`, `ambient`, `hero`. Presets are CSS wrappers that read the Instance's `--w-accent` / `--w-accent-soft` variables; presets do not encode their own palette. Ambient hides the title bar by default.
 _Avoid_: theme, style, layout
 
 **Widget Kind**:
