@@ -41,5 +41,5 @@ When a doc says "right-click on X", the implementation is a Tauri native context
 
 - **Surgical updates only.** Touch the one chapter that changed. Do not "improve" adjacent chapters in the same change.
 - **Localization keys instead of English UI text.** When you rename a button label, you change `en.json` — not this manual. When you rename or remove a **key**, you must update every chapter that references it. `git grep "connections.quickConnect" docs/manual` shows the affected chapters.
-- **Ship-with-release.** This directory is bundled with the installer via `src-tauri/tauri.conf.json` → `bundle.resources` (each chapter mapped under `manual/`). The same files back the in-app viewer reached from the Activity Rail (`app.manual`). See `docs/RELEASE.md`.
+- **Ship-with-release.** This directory is bundled with the installer via `src-tauri/tauri.conf.json` → `bundle.resources` (each chapter mapped under `manual/`). The same files are available to the built-in AI Assistant's help/search flow. See `docs/RELEASE.md`.
 - **Update triggers.** Any PR that changes UI behavior in a chapter's scope must update that chapter in the same PR. `AGENTS.md` lists this requirement; the AI assistant is reminded of it via `docs/AIINSTRUCTIONS.md`.

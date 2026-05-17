@@ -19,7 +19,6 @@ import { DashboardPage } from "./dashboard/DashboardPage";
 import { useDashboardBackendInvalidation } from "./dashboard/state/invalidation";
 import { ariaHidden } from "./lib/aria";
 import { useBootstrapSettings } from "./lib/settings";
-import { ManualPage } from "./manual/ManualPage";
 import { SettingsPage } from "./settings/SettingsPage";
 import { useWorkspaceStore } from "./store";
 import { StatusBar } from "./workspace/StatusBar";
@@ -33,8 +32,8 @@ function App() {
   const [dashboardMounted, setDashboardMounted] = useState(false);
   const previousBasePageRef = useRef<"workspace" | "dashboard">("workspace");
 
-  function isOverlayPage(page: ActivePage): page is "settings" | "manual" {
-    return page === "settings" || page === "manual";
+  function isOverlayPage(page: ActivePage): page is "settings" {
+    return page === "settings";
   }
 
   function navigateToPage(page: ActivePage) {
@@ -141,12 +140,6 @@ function App() {
           key="settings-page"
           onBack={() => setActivePage(previousBasePageRef.current)}
           onResetLayout={resetWorkspaceChromeLayout}
-        />
-      ) : null}
-      {activePage === "manual" ? (
-        <ManualPage
-          key="manual-page"
-          onBack={() => setActivePage(previousBasePageRef.current)}
         />
       ) : null}
       {dashboardMounted ? (

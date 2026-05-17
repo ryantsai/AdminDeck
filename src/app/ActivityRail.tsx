@@ -1,5 +1,4 @@
 import {
-  BookOpen,
   Gauge,
   LayoutDashboard,
   Pin,
@@ -18,7 +17,7 @@ import { useWorkspaceStore } from "../store";
 import type { Connection } from "../types";
 import { RailTooltip } from "./RailTooltip";
 
-export type ActivePage = "workspace" | "dashboard" | "manual" | "settings";
+export type ActivePage = "workspace" | "dashboard" | "settings";
 
 type ConnectedRailItem = {
   connection: Connection;
@@ -583,14 +582,6 @@ export function ActivityRail({
           </button>
         </div>
       ) : null}
-      <button
-        className={`rail-button rail-button-manual ${activePage === "manual" ? "active" : ""}`}
-        aria-label={t("app.manual")}
-        onClick={() => onNavigate("manual")}
-      >
-        <BookOpen size={18} />
-        <RailTooltip label={t("app.manual")} />
-      </button>
       <button
         className={`rail-button rail-button-settings ${activePage === "settings" ? "active" : ""}`}
         aria-label={t("app.settings")}
