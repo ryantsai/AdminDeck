@@ -429,6 +429,27 @@ export function buildSrcdoc(
             }, "*");
           });
         },
+        getPerformanceCounters: function () {
+          return new Promise(function (resolve, reject) {
+            var requestId = 'perf-' + Math.random().toString(36).slice(2);
+            function onMessage(event) {
+              var data = event.data;
+              if (!data || data.kk !== true || data.type !== 'performanceCountersResult' || data.requestId !== requestId) return;
+              window.removeEventListener('message', onMessage);
+              if (data.ok) {
+                resolve(data.snapshot);
+              } else {
+                reject(new Error(data.error || 'Performance counters unavailable.'));
+              }
+            }
+            window.addEventListener('message', onMessage);
+            window.parent.postMessage({
+              kk: true,
+              type: 'getPerformanceCounters',
+              requestId: requestId,
+            }, "*");
+          });
+        },
         readLocalFile: function (options) {
           return new Promise(function (resolve, reject) {
             var filters = options && Array.isArray(options.filters) ? options.filters : undefined;

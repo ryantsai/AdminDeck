@@ -781,6 +781,10 @@
         "label": "Current time",
         "description": "Get local time in RFC 3339 format."
       },
+      "performanceCounters": {
+        "label": "Performance counters",
+        "description": "Read low-overhead local CPU, memory, network, process, uptime, and drive-space counters."
+      },
       "webSearch": {
         "label": "Web search",
         "description": "Return compact titles, links, and snippets."
@@ -1414,6 +1418,7 @@
     "toolFileSearch": "Searching files\u2026",
     "toolFileRead": "Reading file\u2026",
     "toolCurrentTime": "Checking current time\u2026",
+    "toolPerformanceCounters": "Reading performance counters\u2026",
     "toolSecretRequest": "Requesting secret entry\u2026",
     "toolDashboard": "Updating Dashboard...",
     "toolConnections": "Managing Connections...",
@@ -1424,6 +1429,7 @@
     "toolFileSearchDone": "Searched files",
     "toolFileReadDone": "Read file",
     "toolCurrentTimeDone": "Checked current time",
+    "toolPerformanceCountersDone": "Read performance counters",
     "toolSecretRequestDone": "Requested secret entry",
     "toolDashboardDone": "Updated Dashboard",
     "toolConnectionsDone": "Managed Connections",

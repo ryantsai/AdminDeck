@@ -385,6 +385,7 @@ export type AiAssistantToolId =
   | "appDataFileSearch"
   | "appDataFileRead"
   | "currentTime"
+  | "performanceCounters"
   | "dashboard"
   | "connections"
   | "sessions";
@@ -463,6 +464,35 @@ export interface HostUsageSnapshot {
   ramPercent?: number;
   networkDownstreamBytesPerSecond?: number;
   networkUpstreamBytesPerSecond?: number;
+  sampledAtUnixSeconds: number;
+  source: string;
+}
+
+export interface SystemPerformanceCountersSnapshot {
+  cpuPercent?: number;
+  logicalProcessorCount?: number;
+  ramPercent?: number;
+  ramTotalBytes?: number;
+  ramAvailableBytes?: number;
+  commitPercent?: number;
+  commitTotalBytes?: number;
+  commitLimitBytes?: number;
+  systemCacheBytes?: number;
+  handleCount?: number;
+  processCount?: number;
+  threadCount?: number;
+  networkDownstreamBytesPerSecond?: number;
+  networkUpstreamBytesPerSecond?: number;
+  appWorkingSetBytes?: number;
+  appPrivateBytes?: number;
+  appPagefileBytes?: number;
+  appReadBytesPerSecond?: number;
+  appWriteBytesPerSecond?: number;
+  appOtherBytesPerSecond?: number;
+  systemUptimeSeconds?: number;
+  systemDriveTotalBytes?: number;
+  systemDriveFreeBytes?: number;
+  systemDriveFreePercent?: number;
   sampledAtUnixSeconds: number;
   source: string;
 }

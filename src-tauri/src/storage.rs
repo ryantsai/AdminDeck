@@ -433,6 +433,8 @@ pub struct AiAssistantToolSettings {
     app_data_file_read: bool,
     #[serde(default = "default_ai_current_time_tool_enabled")]
     current_time: bool,
+    #[serde(default = "default_ai_performance_counters_tool_enabled")]
+    performance_counters: bool,
     #[serde(default = "default_ai_dashboard_tool_enabled")]
     dashboard: bool,
     #[serde(default = "default_ai_connections_tool_enabled")]
@@ -460,6 +462,9 @@ impl AiAssistantToolSettings {
     pub(crate) fn current_time(&self) -> bool {
         self.current_time
     }
+    pub(crate) fn performance_counters(&self) -> bool {
+        self.performance_counters
+    }
     pub(crate) fn dashboard(&self) -> bool {
         self.dashboard
     }
@@ -476,6 +481,7 @@ impl AiAssistantToolSettings {
             || self.app_data_file_search
             || self.app_data_file_read
             || self.current_time
+            || self.performance_counters
             || self.dashboard
             || self.connections
             || self.sessions
@@ -3941,6 +3947,7 @@ fn default_ai_assistant_tool_settings() -> AiAssistantToolSettings {
         app_data_file_search: false,
         app_data_file_read: false,
         current_time: default_ai_current_time_tool_enabled(),
+        performance_counters: default_ai_performance_counters_tool_enabled(),
         dashboard: default_ai_dashboard_tool_enabled(),
         connections: default_ai_connections_tool_enabled(),
         sessions: default_ai_sessions_tool_enabled(),
@@ -3948,6 +3955,10 @@ fn default_ai_assistant_tool_settings() -> AiAssistantToolSettings {
 }
 
 fn default_ai_current_time_tool_enabled() -> bool {
+    false
+}
+
+fn default_ai_performance_counters_tool_enabled() -> bool {
     false
 }
 

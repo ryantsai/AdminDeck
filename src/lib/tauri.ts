@@ -42,6 +42,7 @@ import type {
   ScreenshotSettings,
   SshSettings,
   StoreSecretRequest,
+  SystemPerformanceCountersSnapshot,
   DeleteStoredCredentialRequest,
   TerminalSettings,
   UpdateConnectionRequest,
@@ -997,6 +998,10 @@ type CommandMap = {
   get_host_usage_snapshot: {
     args: undefined;
     result: HostUsageSnapshot;
+  };
+  get_system_performance_counters: {
+    args: undefined;
+    result: SystemPerformanceCountersSnapshot;
   };
   create_diagnostics_bundle: {
     args: undefined;

@@ -34,6 +34,7 @@ static LIVE_TOOL_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 const COPILOT_SDK_RESPONSE_TIMEOUT: Duration = Duration::from_secs(300);
 const DASHBOARD_WIDGET_COMPLETION_CONTRACT: &str = "Dashboard widget completion contract: complete the first created widget to the user's requested outcome before giving the final answer. If the request implies live/realtime data, MCP-backed data, web-fetched data, local file/session data, or any other changing external input, do not create a text-only placeholder or scaffold. In the same assistant turn, use multiple tool-call rounds as needed to discover schemas, read or fetch sample data, inspect real responses, self-correct validation errors, and then create a script widget wired to the actual data source with loading, error, empty, and refresh states. Use polling or event refresh when freshness matters. Create a static content widget only when the user explicitly asks for static text or when live data is impossible in the available permissions. If missing credentials or API access blocks live data, create settingsSchema secret/config fields and request the secret after creation, or ask one narrow blocking question instead of shipping a fake widget.";
 const DASHBOARD_WIDGET_SURFACE_CONTRACT: &str = "Dashboard widget surface contract: treat the widget root as the full allocated surface. Script widgets should make their outermost wrapper fill 100% width and height, usually with kk-shell, kk-stage, kk-panel, or kk-fill, and use KK.getViewport() plus KK.onViewportResize for canvases and visual libraries. Do not create a smaller centered app card, duplicate the host widget frame, or leave accidental blank space around the main content. If the useful object is naturally smaller, still use a full-size wrapper to align, center, or scale it intentionally. Script widgets should avoid max-width, fixed-height, or shrink-to-content outer wrappers unless the user explicitly asks for an inset miniature object.";
+const DASHBOARD_WIDGET_PERFORMANCE_COUNTER_CONTRACT: &str = "Dashboard performance counter contract: for local performance widgets, use a script widget that calls await KK.getPerformanceCounters(). It returns a low-overhead local snapshot with CPU, RAM, commit, process/thread/handle counts, aggregate network rates, KKTerm process memory/I/O rates, uptime, and system-drive free space. Poll at a modest interval such as 2-5 seconds; do not use requestAnimationFrame for counters.";
 
 macro_rules! ai_interaction_debug {
     ($event:expr, $payload:expr) => {
@@ -2973,6 +2974,13 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
             json!({"type":"object","properties":{}}),
         ));
     }
+    if settings.performance_counters() {
+        tools.push(tool_definition(
+            "performance_counters",
+            "Read a low-overhead local Windows performance snapshot for troubleshooting and widgets. Includes CPU percent, logical processor count, RAM and commit usage, process/thread/handle counts, aggregate network throughput, KKTerm process memory and I/O rates, system uptime, and system-drive free space. Does not enumerate processes, event logs, WMI, or high-cardinality PDH counters.",
+            json!({"type":"object","properties":{}}),
+        ));
+    }
     if settings.web_search() {
         tools.push(tool_definition(
             "web_search",
@@ -3065,6 +3073,11 @@ fn ai_tool_definitions(settings: &AiAssistantToolSettings) -> Vec<OpenAiToolDefi
             .function
             .description
             .push_str(DASHBOARD_WIDGET_SURFACE_CONTRACT);
+        create_widget_tool.function.description.push(' ');
+        create_widget_tool
+            .function
+            .description
+            .push_str(DASHBOARD_WIDGET_PERFORMANCE_COUNTER_CONTRACT);
         tools.push(create_widget_tool.strict());
         tools.push(tool_definition(
             "dashboard_create_custom_widget",
@@ -3462,6 +3475,9 @@ async fn run_ai_tool(
             app_data_file_read_tool(app_data_dir, args)
         }
         "shell_command" if tool_settings.shell_command() => shell_command_tool(app_data_dir, args),
+        "performance_counters" if tool_settings.performance_counters() => {
+            performance_counters_tool(app)
+        }
         name if tool_settings.dashboard() && name.starts_with("dashboard_") => {
             dashboard_tool(app, name, args)
         }
@@ -4046,6 +4062,17 @@ fn current_time_tool() -> String {
             utc.format(&time::format_description::well_known::Rfc3339)
                 .unwrap_or_else(|_| utc.unix_timestamp().to_string())
         })
+}
+
+fn performance_counters_tool(app: &tauri::AppHandle) -> String {
+    match app.try_state::<crate::performance::PerformanceMonitor>() {
+        Some(performance) => serde_json::to_string(&performance.system_performance_counters_snapshot())
+            .unwrap_or_else(|error| {
+                json!({"ok": false, "error": format!("failed to serialize performance counters: {error}")})
+                    .to_string()
+            }),
+        None => json!({"ok": false, "error": "performance monitor is unavailable"}).to_string(),
+    }
 }
 
 async fn web_search_tool(settings: &AiProviderSettings, args: Value) -> String {
@@ -4691,6 +4718,8 @@ fn build_agent_messages(
         "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, repair, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. When the user reports an error in an existing AI-authored widget, use dashboard_load_state to read the current Dashboard custom widget source, then call dashboard_update_custom_widget with the matching custom widget id. Prefer patch.body for widget source edits; patch.body is structured JSON and avoids escaping mistakes. Do not ask the user to paste widget source that KKTerm can read through dashboard_load_state. Design AI-authored widgets as polished, self-contained Mac OS X Dashboard-style widgets: a single-purpose singleton object with a focused visual state, minimal explanatory text, and only the controls needed for the task. Make widgets as graphical as possible by default, using charts, meters, maps, timelines, canvases, imagery, icons, and spatial layout instead of prose-first blocks; avoid text-only widgets unless the user explicitly asks for text-only output. When an illustrative or photographic asset would improve the widget, search for and use or download Creative Commons images from credible sources, prefer stable source URLs, avoid arbitrary copyrighted/hotlinked images, and preserve attribution/licensing context in source comments or nearby metadata when practical. Avoid generic form-like layouts unless the user explicitly asks for a data-entry form; prefer compact meters, clocks, gauges, search boxes, calculators, monitors, launchers, canvases, and other object-like surfaces. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style. Choose an accent color that fits the widget theme; if no accent is clearly preferable, choose a random non-default accent. Be boundary-aware: size simple timers/counters at least 4x3, forms or images need 5x4 or larger, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Content markdown widgets MUST set data.mode to either markdown or html: use markdown when data.source is Markdown text that KKTerm should parse, and html when data.source is an HTML fragment that KKTerm should sanitize and render. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. For Three.js widgets, list body.libraries [\"three\"], size the renderer from KK.getViewport(), update renderer/camera on KK.onViewportResize, center the scene at world origin, and fit the camera to a Box3/Sphere around the complete object with about 15-25% margin so it remains centered and fully visible instead of oversized or clipped. For QR code widgets, list body.libraries [\"qrcode\"] and pass a real canvas element to QRCode.toCanvas; create a wrapping div only for padding/background, then append the canvas inside it. For chartjs, echarts, leaflet, konva, pixijs, matter, mermaid, qrcode, jsbarcode, and gridjs widgets, mount the visual area inside kk-stage or kk-panel and size it from KK.getViewport() or the containing element; on KK.onViewportResize call the library's resize/update method so it stays centered and proportionate. Script widgets can create file and folder drop zones with KK.onFileDrop(elementOrSelector, callback, options); the callback receives dropped file and directory entries, and file entries include bytes as Uint8Array. Prefer schema/content widgets when possible, and keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use KKTerm's built-in script UI classes before writing custom CSS: kk-shell, kk-toolbar, kk-cluster, kk-title, kk-subtitle, kk-muted, kk-panel, kk-card, kk-grid, kk-stat, kk-stat-value, kk-stat-label, kk-pill, kk-badge, kk-stage, and kk-fill. Avoid default unstyled browser controls and oversized explanatory text. Use body.libraries for curated local script libraries such as mermaid and animejs; use permissions.network=true only for remote network access or CDN-loaded libraries. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read non-secret values with KK.getSettings() and save via KK.setSetting(key, value). KK.getSettings() is synchronous; do not await it. Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret with no defaultValue; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret. Top-level await is not available because script widgets run inside a synchronous function wrapper; wrap async bridge calls such as KK.getSecret('fieldKey') in an async IIFE. After creating a widget with a secret field, call request_secret_entry using the returned widget instance id and the exact secret field key instead of asking the user to paste the secret in chat. When a widget embeds remote images, fetches remote data, or loads external libraries from a CDN, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
         DASHBOARD_WIDGET_COMPLETION_CONTRACT.to_string(),
         DASHBOARD_WIDGET_SURFACE_CONTRACT.to_string(),
+        DASHBOARD_WIDGET_PERFORMANCE_COUNTER_CONTRACT.to_string(),
+        "PERFORMANCE COUNTERS: Use the performance_counters tool when the user asks about current local system load, memory pressure, network throughput, KKTerm process resource use, uptime, or drive free space. For Dashboard performance widgets, create a script widget that calls await KK.getPerformanceCounters() and polls at a modest interval such as 2-5 seconds; never poll counters from requestAnimationFrame or high-frequency animation loops.".to_string(),
         "MCP IN WIDGETS: When a widget's source will call KK.callMcpTool('<server>', '<tool>', <args>), you MUST first discover the real tool list and parameter shape of that server before writing the widget. Use the mcp_list_tools tool (or read tool schemas from current page context) to look up the exact tool names, required argument keys, and response field names. Do not guess tool names like 'opendata-search_datasets' or invent arguments like 'agency' or 'normalised_only' and do not assume a response has fields like 'datasets[0].dataset_id' without verifying. Quote the tool's documented argument keys verbatim in the widget source, and parse the actual response shape returned by that tool. If a tool result does not match what the widget expects at runtime, fix the parser to match the real shape rather than retrying with the same guess. If the user names an MCP server (for example twinkle-hub) but no tool list is available, ask the user to confirm the server is connected before generating widget code that depends on it.".to_string(),
     ];
     if let Some(language) = normalize_output_language(output_language) {
@@ -6056,6 +6085,10 @@ mod tests {
         assert!(create_tool
             .function
             .description
+            .contains("KK.getPerformanceCounters"));
+        assert!(create_tool
+            .function
+            .description
             .contains("folder drop zones"));
         assert!(create_tool
             .function
@@ -6130,6 +6163,29 @@ mod tests {
                 "{provider_kind} should omit explicit strict tool flags"
             );
         }
+    }
+
+    #[test]
+    fn tool_definitions_include_performance_counters_tool() {
+        let settings: AiAssistantToolSettings = serde_json::from_value(json!({
+            "performanceCounters": true
+        }))
+        .expect("tool settings deserialize");
+
+        let tools = ai_tool_definitions(&settings);
+        let tool = tools
+            .iter()
+            .find(|tool| tool.function.name == "performance_counters")
+            .expect("performance counters tool is available");
+
+        assert!(tool
+            .function
+            .description
+            .contains("low-overhead local Windows performance snapshot"));
+        assert_eq!(
+            tool.function.parameters,
+            json!({"type":"object","properties":{}})
+        );
     }
 
     #[test]
@@ -6242,7 +6298,8 @@ mod tests {
         assert!(system_content.contains("KK.getViewport()"));
         assert!(system_content.contains("treat the widget root as the full allocated surface"));
         assert!(system_content.contains("Do not create a smaller centered app card"));
-        assert!(system_content.contains("avoid max-width, fixed-height, or shrink-to-content outer wrappers"));
+        assert!(system_content
+            .contains("avoid max-width, fixed-height, or shrink-to-content outer wrappers"));
         assert!(system_content.contains("kk-shell"));
         assert!(system_content.contains("chartjs, echarts, leaflet"));
         assert!(system_content.contains("KK.onFileDrop"));
@@ -6442,6 +6499,7 @@ mod tests {
         ));
         assert!(!tool_requires_allow_all("session_file_browser_list"));
         assert!(!tool_requires_allow_all("current_time"));
+        assert!(!tool_requires_allow_all("performance_counters"));
 
         let result = tool_permission_required_result("dashboard_reset");
         let value: Value = serde_json::from_str(&result).expect("permission result is JSON");

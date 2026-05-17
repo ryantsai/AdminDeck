@@ -338,6 +338,7 @@ const AI_ASSISTANT_TOOL_IDS: AiAssistantToolId[] = [
   "webFetch",
   "appDataFileSearch",
   "appDataFileRead",
+  "performanceCounters",
   "shellCommand",
   "dashboard",
   "connections",

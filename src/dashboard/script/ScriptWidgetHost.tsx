@@ -253,6 +253,10 @@ export function ScriptWidgetHost({
       }
       if (isScriptWidgetCallMcpToolMessage(data)) {
         void sendMcpToolResponse(data);
+        return;
+      }
+      if (isScriptWidgetPerformanceCountersMessage(data)) {
+        void sendPerformanceCountersResponse(data);
       }
     }
 
@@ -361,6 +365,29 @@ export function ScriptWidgetHost({
           requestId: data.requestId,
           ok: false,
           error: describeMcpError(error),
+        }, "*");
+      }
+    }
+
+    async function sendPerformanceCountersResponse(data: { requestId: string }) {
+      const target = iframeRef.current?.contentWindow;
+      if (!target) return;
+      try {
+        const snapshot = await invokeCommand("get_system_performance_counters");
+        target.postMessage({
+          kk: true,
+          type: "performanceCountersResult",
+          requestId: data.requestId,
+          ok: true,
+          snapshot,
+        }, "*");
+      } catch (error) {
+        target.postMessage({
+          kk: true,
+          type: "performanceCountersResult",
+          requestId: data.requestId,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
         }, "*");
       }
     }
@@ -532,6 +559,20 @@ function isScriptWidgetCallMcpToolMessage(value: unknown): value is {
     candidate.serverIdOrName.length > 0 &&
     typeof candidate.toolName === "string" &&
     candidate.toolName.length > 0
+  );
+}
+
+function isScriptWidgetPerformanceCountersMessage(value: unknown): value is {
+  kk: true;
+  type: "getPerformanceCounters";
+  requestId: string;
+} {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { kk?: unknown; type?: unknown; requestId?: unknown };
+  return (
+    candidate.kk === true &&
+    candidate.type === "getPerformanceCounters" &&
+    typeof candidate.requestId === "string"
   );
 }
 

@@ -1010,6 +1010,13 @@ fn get_host_usage_snapshot(
 }
 
 #[tauri::command]
+fn get_system_performance_counters(
+    performance: tauri::State<'_, performance::PerformanceMonitor>,
+) -> performance::SystemPerformanceCountersSnapshot {
+    performance.system_performance_counters_snapshot()
+}
+
+#[tauri::command]
 fn create_diagnostics_bundle(
     app: tauri::AppHandle,
     performance: tauri::State<'_, performance::PerformanceMonitor>,
@@ -2287,6 +2294,7 @@ pub fn run() {
             keychain_status,
             get_performance_snapshot,
             get_host_usage_snapshot,
+            get_system_performance_counters,
             create_diagnostics_bundle,
             get_dont_sleep_enabled,
             set_dont_sleep_enabled,

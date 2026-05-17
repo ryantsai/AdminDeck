@@ -24,6 +24,7 @@ export const DEFAULT_AI_ASSISTANT_TOOLS: AiAssistantToolSettings = {
   appDataFileSearch: false,
   appDataFileRead: false,
   currentTime: false,
+  performanceCounters: false,
   dashboard: false,
   connections: true,
   sessions: true,

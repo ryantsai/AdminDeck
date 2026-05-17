@@ -103,6 +103,7 @@ export const defaultAiAssistantToolSettings = {
   appDataFileSearch: false,
   appDataFileRead: false,
   currentTime: false,
+  performanceCounters: false,
   dashboard: false,
   connections: true,
   sessions: true,
