@@ -225,6 +225,8 @@ The bridge exposes `KK.openExternal(url)`, `KK.getSettings()`, `KK.setSetting(ke
 
 Curated local libraries are registered in `src/dashboard/script/widgetLibraries.ts` and requested by AI-authored scripts through `body.libraries`. The script host loads every requested library before running widget source, so generated code must declare libraries it uses instead of assuming globals already exist.
 
+Matter.js is the default 2D physics building block for script widgets. It is registered under the `matter` library key, exposes the `Matter` global, and should be used for widget-sized games, physics toys, collision, gravity, rigid bodies, and constraints instead of custom per-widget physics loops. Matter.js widgets should size their canvas from `KK.getViewport()`, update renderer bounds and static wall/floor bodies on `KK.onViewportResize`, keep all bodies bounded to the widget arena, and stop runners or animation loops when gameplay is paused, finished, or otherwise inactive.
+
 When adding or renaming a script-widget library:
 
 - Add the npm package dependency if the library is not already present.

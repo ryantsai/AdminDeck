@@ -206,6 +206,12 @@ the prompt missed.
   `src-tauri/src/dashboard_validation.rs` alongside
   `src/dashboard/script/widgetLibraries.ts`. Without the Rust-side entry the
   unused-library check is silently skipped for that key.
+- Matter.js is the blessed bundled 2D physics library for script widgets.
+  Its catalog key is `matter`, its global is `Matter`, and the AI contract
+  requires generated physics widgets to declare `body.libraries: ["matter"]`
+  instead of hand-rolling collision, gravity, or rigid-body integration.
+  The same unused-library validation still applies: declaring `matter`
+  without referencing `Matter` is rejected before persistence.
 - Tightening the validator: add cases to the `validate_script_source_inner`
   / `strip_strings_and_comments` test groups in `dashboard_validation.rs`.
   Each new rejection rule must come with both a positive and a negative test.

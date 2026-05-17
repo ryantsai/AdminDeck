@@ -1521,6 +1521,12 @@ mod tests {
     }
 
     #[test]
+    fn unused_library_accepts_matter_called() {
+        let json = r#"{"source":"const engine = Matter.Engine.create(); Matter.Runner.run(engine);","libraries":["matter"],"permissions":{"network":false}}"#;
+        assert!(validate_script_body_json(json).is_ok());
+    }
+
+    #[test]
     fn unused_library_accepts_mermaid_called() {
         let json = r#"{"source":"mermaid.initialize({startOnLoad:true}); mermaid.run();","libraries":["mermaid"],"permissions":{"network":false}}"#;
         assert!(validate_script_body_json(json).is_ok());

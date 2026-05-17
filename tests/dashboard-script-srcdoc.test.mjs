@@ -186,3 +186,14 @@ test("script widget library catalog documents qrcode canvas target contract", as
   assert.match(catalog, /qrcode \(global: QRCode\)/);
   assert.match(catalog, /QRCode\.toCanvas, pass a real <canvas> element, not a wrapper div/);
 });
+
+test("script widget library catalog documents Matter.js physics contract", async () => {
+  const { libraryCatalogForAi } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/widgetLibraries.ts", import.meta.url),
+  );
+
+  const catalog = libraryCatalogForAi();
+  assert.match(catalog, /matter \(global: Matter\)/);
+  assert.match(catalog, /2D physics engine/);
+  assert.match(catalog, /explicit wall\/floor bodies sized from KK\.getViewport\(\)/);
+});
