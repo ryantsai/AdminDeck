@@ -43,6 +43,7 @@ export const defaultDashboardSettings: DashboardSettings = {
   confirmRemove: true,
   defaultLandingView: "lastActive",
   maxActiveScriptWidgets: MAX_ACTIVE_SCRIPT_WIDGETS_DEFAULT,
+  allowWidgetNetworkTools: true,
 };
 
 export const defaultTerminalSettings: TerminalSettings = {
@@ -106,6 +107,7 @@ export const defaultAiAssistantToolSettings = {
   dashboard: false,
   connections: true,
   sessions: true,
+  network: false,
 };
 
 export const defaultAiProviderSettings: AiProviderSettings = {
