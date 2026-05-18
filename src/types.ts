@@ -185,6 +185,7 @@ export interface GeneralSettings {
 }
 
 export type AppLauncherLaunchMode = "normal" | "admin" | "differentUser";
+export type AppLauncherViewMode = "icons" | "list" | "details";
 
 export interface AppLauncherEntry {
   id: string;
@@ -200,6 +201,7 @@ export interface AppLauncherEntry {
 
 export interface AppLauncherSettings {
   entries: AppLauncherEntry[];
+  viewMode: AppLauncherViewMode;
 }
 
 export interface DashboardSettings {

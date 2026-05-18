@@ -3,6 +3,7 @@ import type {
   AppLauncherEntry,
   AppLauncherLaunchMode,
   AppLauncherSettings,
+  AppLauncherViewMode,
   PreparedAppLauncherEntry,
 } from "../types";
 
@@ -36,7 +37,7 @@ export function parseAppLauncherSettingsJson(settingsValuesJson: string): AppLau
     const parsed = JSON.parse(settingsValuesJson) as Partial<AppLauncherSettings>;
     return normalizeAppLauncherSettings(parsed);
   } catch {
-    return { entries: [] };
+    return { entries: [], viewMode: "icons" };
   }
 }
 
@@ -110,7 +111,7 @@ export function reorderAppLauncherEntries(
 
 function readPreviewSettings(): AppLauncherSettings {
   if (typeof window === "undefined") {
-    return { entries: [] };
+    return { entries: [], viewMode: "icons" };
   }
   try {
     const parsed = JSON.parse(
@@ -118,7 +119,7 @@ function readPreviewSettings(): AppLauncherSettings {
     ) as Partial<AppLauncherSettings>;
     return normalizeAppLauncherSettings(parsed);
   } catch {
-    return { entries: [] };
+    return { entries: [], viewMode: "icons" };
   }
 }
 
@@ -127,6 +128,7 @@ function normalizeAppLauncherSettings(settings: Partial<AppLauncherSettings>): A
     entries: Array.isArray(settings.entries)
       ? settings.entries.filter(isStoredEntry)
       : [],
+    viewMode: isAppLauncherViewMode(settings.viewMode) ? settings.viewMode : "icons",
   };
 }
 
@@ -146,6 +148,10 @@ function isStoredEntry(value: unknown): value is AppLauncherEntry {
     typeof entry.createdAt === "string" &&
     typeof entry.updatedAt === "string"
   );
+}
+
+function isAppLauncherViewMode(value: unknown): value is AppLauncherViewMode {
+  return value === "icons" || value === "list" || value === "details";
 }
 
 function launcherNameFromPath(path: string) {

@@ -2,10 +2,13 @@ import {
   AppWindow,
   FilePlus,
   FolderPlus,
+  LayoutGrid,
+  LayoutList,
   Pencil,
   Play,
   Plus,
   Shield,
+  TableProperties,
   Trash2,
   UserRound,
   X,
@@ -30,6 +33,7 @@ import type {
   AppLauncherEntry,
   AppLauncherLaunchMode,
   AppLauncherSettings,
+  AppLauncherViewMode,
   PreparedAppLauncherEntry,
 } from "../types";
 import {
@@ -78,6 +82,8 @@ type PointerReorderState = {
   startY: number;
   active: boolean;
 };
+
+const APP_LAUNCHER_VIEW_MODES: AppLauncherViewMode[] = ["icons", "list", "details"];
 
 export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInstance }) {
   const { t } = useTranslation();
@@ -402,6 +408,7 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
     };
     const exists = settings.entries.some((entry) => entry.id === draft.id);
     const nextSettings = {
+      ...settings,
       entries: exists
         ? settings.entries.map((entry) => (entry.id === draft.id ? nextEntry : entry))
         : [...settings.entries, nextEntry],
@@ -423,6 +430,7 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
   async function removeEntry(entry: AppLauncherEntry) {
     try {
       await saveSettings({
+        ...settings,
         entries: settings.entries.filter((candidate) => candidate.id !== entry.id),
       });
       showStatusBarNotice(t("appLauncher.removedStatus", { name: entry.name }), {
@@ -467,7 +475,7 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
           } satisfies AppLauncherEntry;
         }),
       );
-      await saveSettings({ entries: [...settings.entries, ...droppedEntries] });
+      await saveSettings({ ...settings, entries: [...settings.entries, ...droppedEntries] });
       const lastEntry = droppedEntries[droppedEntries.length - 1];
       if (lastEntry) {
         showStatusBarNotice(t("appLauncher.savedStatus", { name: lastEntry.name }), {
@@ -492,7 +500,7 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
       return;
     }
     try {
-      await saveSettings({ entries: nextEntries });
+      await saveSettings({ ...settings, entries: nextEntries });
     } catch (error) {
       showStatusBarNotice(
         t("appLauncher.saveError", { message: errorMessage(error) }),
@@ -540,7 +548,10 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
       setReorderTarget(null);
       return;
     }
-    setReorderTarget({ id: targetId, placement: reorderPlacementFromPoint(event.clientX, targetTile) });
+    setReorderTarget({
+      id: targetId,
+      placement: reorderPlacementFromPoint(event.clientX, event.clientY, targetTile, settings.viewMode),
+    });
   }
 
   function finishPointerReorder(event: ReactPointerEvent<HTMLDivElement>) {
@@ -593,6 +604,20 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
     });
   }
 
+  async function saveViewMode(viewMode: AppLauncherViewMode) {
+    if (viewMode === settings.viewMode) {
+      return;
+    }
+    try {
+      await saveSettings({ ...settings, viewMode });
+    } catch (error) {
+      showStatusBarNotice(
+        t("appLauncher.saveError", { message: errorMessage(error) }),
+        { tone: "error" },
+      );
+    }
+  }
+
   async function launch(entry: AppLauncherEntry, mode: AppLauncherLaunchMode) {
     if (editMode || suppressNextLaunchRef.current) {
       return;
@@ -612,13 +637,17 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
 
   return (
     <div
-      className={`dashboard-widget-body app-launcher-widget${isDropTarget ? " is-drop-target" : ""}${editMode ? " is-managing" : ""}${addMenuState ? " is-adding" : ""}`}
+      className={`dashboard-widget-body app-launcher-widget app-launcher-widget-${settings.viewMode}${isDropTarget ? " is-drop-target" : ""}${editMode ? " is-managing" : ""}${addMenuState ? " is-adding" : ""}`}
       onDragLeave={() => setIsDropTarget(false)}
       onDragOver={handleBrowserDragOver}
       onDrop={handleBrowserDrop}
       ref={rootRef}
     >
       <div className="app-launcher-widget-toolbar">
+        <AppLauncherViewModeControl
+          onChange={(viewMode) => void saveViewMode(viewMode)}
+          value={settings.viewMode}
+        />
         <button
           className="secondary-button app-launcher-add"
           aria-label={t("common.add")}
@@ -629,7 +658,17 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
         </button>
       </div>
       {settings.entries.length > 0 ? (
-        <div className="app-launcher-tile-grid" aria-label={t("appLauncher.entriesLabel")}>
+        <div
+          className="app-launcher-tile-grid"
+          aria-label={t("appLauncher.entriesLabel")}
+          data-view-mode={settings.viewMode}
+        >
+          {settings.viewMode === "details" ? (
+            <div className="app-launcher-details-header" aria-hidden="true">
+              <span>{t("appLauncher.detailsNameColumn")}</span>
+              <span>{t("appLauncher.detailsPathColumn")}</span>
+            </div>
+          ) : null}
           {settings.entries.map((entry) => (
             <AppLauncherTile
               entry={entry}
@@ -649,6 +688,7 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
               onPointerUpEntry={finishPointerReorder}
               onRemove={removeEntry}
               prepared={preparedById[entry.id]}
+              viewMode={settings.viewMode}
             />
           ))}
         </div>
@@ -696,13 +736,62 @@ export function AppLauncherWidget({ instance }: { instance: DashboardWidgetInsta
   );
 }
 
-function reorderPlacementFromPoint(clientX: number, target: HTMLElement): ReorderPlacement {
+function reorderPlacementFromPoint(
+  clientX: number,
+  clientY: number,
+  target: HTMLElement,
+  viewMode: AppLauncherViewMode,
+): ReorderPlacement {
   const bounds = target.getBoundingClientRect();
+  if (viewMode !== "icons") {
+    return clientY >= bounds.top + bounds.height / 2 ? "after" : "before";
+  }
   return clientX >= bounds.left + bounds.width / 2 ? "after" : "before";
 }
 
 function isPointInsideBounds(x: number, y: number, bounds: DOMRect) {
   return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+}
+
+function AppLauncherViewModeControl({
+  onChange,
+  value,
+}: {
+  onChange: (viewMode: AppLauncherViewMode) => void;
+  value: AppLauncherViewMode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="app-launcher-view-mode" aria-label={t("appLauncher.viewModeLabel")} role="group">
+      {APP_LAUNCHER_VIEW_MODES.map((viewMode) => (
+        <button
+          aria-label={viewModeLabel(t, viewMode)}
+          aria-pressed={value === viewMode}
+          className={value === viewMode ? "active" : ""}
+          key={viewMode}
+          onClick={() => onChange(viewMode)}
+          type="button"
+        >
+          {viewMode === "icons" ? <LayoutGrid size={14} /> : null}
+          {viewMode === "list" ? <LayoutList size={14} /> : null}
+          {viewMode === "details" ? <TableProperties size={14} /> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function viewModeLabel(
+  t: ReturnType<typeof useTranslation>["t"],
+  viewMode: AppLauncherViewMode,
+) {
+  if (viewMode === "list") {
+    return t("appLauncher.listView");
+  }
+  if (viewMode === "details") {
+    return t("appLauncher.detailsView");
+  }
+  return t("appLauncher.iconView");
 }
 
 function AppLauncherTile({
@@ -718,12 +807,14 @@ function AppLauncherTile({
   onPointerUpEntry,
   onRemove,
   prepared,
+  viewMode,
 }: {
   entry: AppLauncherEntry;
   editMode: boolean;
   isDragging: boolean;
   reorderPlacement: ReorderPlacement | null;
   prepared?: PreparedAppLauncherEntry;
+  viewMode: AppLauncherViewMode;
   onLaunch: (entry: AppLauncherEntry, mode: AppLauncherLaunchMode) => Promise<void>;
   onMenu: (state: MenuState) => void;
   onPointerCancelEntry: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -785,7 +876,12 @@ function AppLauncherTile({
       ) : null}
       {editMode ? (
         <div className="app-launcher-tile-launch" aria-hidden="true">
-          <AppLauncherTileContent entryName={entry.name} iconDataUrl={iconDataUrl} />
+          <AppLauncherTileContent
+            entryName={entry.name}
+            iconDataUrl={iconDataUrl}
+            path={entry.path}
+            viewMode={viewMode}
+          />
         </div>
       ) : (
         <button
@@ -795,7 +891,12 @@ function AppLauncherTile({
           onKeyDown={handleKeyDown}
           type="button"
         >
-          <AppLauncherTileContent entryName={entry.name} iconDataUrl={iconDataUrl} />
+          <AppLauncherTileContent
+            entryName={entry.name}
+            iconDataUrl={iconDataUrl}
+            path={entry.path}
+            viewMode={viewMode}
+          />
         </button>
       )}
     </div>
@@ -805,9 +906,13 @@ function AppLauncherTile({
 function AppLauncherTileContent({
   entryName,
   iconDataUrl,
+  path,
+  viewMode,
 }: {
   entryName: string;
   iconDataUrl: string | null | undefined;
+  path: string;
+  viewMode: AppLauncherViewMode;
 }) {
   return (
     <>
@@ -819,6 +924,7 @@ function AppLauncherTileContent({
         )}
       </span>
       <span className="app-launcher-tile-label">{entryName}</span>
+      {viewMode === "details" ? <span className="app-launcher-tile-path">{path}</span> : null}
     </>
   );
 }

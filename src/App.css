@@ -1053,8 +1053,44 @@ button {
   display: flex;
   gap: 10px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   min-width: 0;
+}
+
+.app-launcher-view-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.app-launcher-view-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.app-launcher-view-mode button:hover,
+.app-launcher-view-mode button:focus-visible {
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+}
+
+.app-launcher-view-mode button.active {
+  color: var(--w-accent, var(--accent));
+  background: var(--surface);
 }
 
 .app-launcher-add {
@@ -1075,18 +1111,67 @@ button {
   gap: 8px;
 }
 
-.app-launcher-tile {
+.app-launcher-tile-grid[data-view-mode="list"],
+.app-launcher-tile-grid[data-view-mode="details"] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+}
+
+.app-launcher-details-header {
   display: grid;
-  justify-items: center;
+  grid-template-columns: minmax(160px, 0.9fr) minmax(0, 1.2fr);
+  gap: 10px;
+  padding: 0 10px 2px 46px;
+  color: var(--text-faint);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.app-launcher-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
   min-width: 0;
-  min-height: 76px;
-  padding: 9px 7px;
+  padding: 0;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 7px;
   cursor: pointer;
+}
+
+.app-launcher-tile-launch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 6px;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.app-launcher-widget-list .app-launcher-tile-launch,
+.app-launcher-widget-details .app-launcher-tile-launch {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.app-launcher-widget-details .app-launcher-tile-launch {
+  grid-template-columns: 30px minmax(160px, 0.9fr) minmax(0, 1.2fr);
+  gap: 10px;
 }
 
 .app-launcher-tile:hover,
@@ -1101,31 +1186,62 @@ button {
 }
 
 .app-launcher-tile-icon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  color: var(--accent);
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  color: var(--w-accent, var(--accent));
+  background: var(--w-accent-soft, var(--surface-muted));
   border-radius: 8px;
 }
 
-.app-launcher-tile-icon img {
-  width: 26px;
-  height: 26px;
+.app-launcher-widget-list .app-launcher-tile-icon,
+.app-launcher-widget-details .app-launcher-tile-icon {
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
-  object-fit: cover;
+}
+
+.app-launcher-tile-icon img {
+  max-width: 30px;
+  max-height: 30px;
+}
+
+.app-launcher-widget-list .app-launcher-tile-icon img,
+.app-launcher-widget-details .app-launcher-tile-icon img {
+  max-width: 22px;
+  max-height: 22px;
 }
 
 .app-launcher-tile-label {
   max-width: 100%;
+  display: -webkit-box;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  color: var(--text);
   text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.app-launcher-widget-list .app-launcher-tile-label,
+.app-launcher-widget-details .app-launcher-tile-label {
+  justify-self: start;
+  text-align: left;
+}
+
+.app-launcher-tile-path {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 10.5px;
+  line-height: 1.2;
 }
 
 .app-launcher-widget-empty {

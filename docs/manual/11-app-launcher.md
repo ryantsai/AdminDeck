@@ -3,8 +3,8 @@
 ## AI grep hints
 
 - Keys: `appLauncher.*` (full namespace)
-- Topics: launch local apps from Dashboard, run as admin, run as user, pinned apps, rail shortcuts, add/edit/remove entry
-- Synonyms: "shortcuts", "dock", "quick launch", "run as administrator", "launch program"
+- Topics: launch local apps from Dashboard, run as admin, run as user, pinned apps, rail shortcuts, add/edit/remove entry, icon/list/details view mode
+- Synonyms: "shortcuts", "dock", "quick launch", "run as administrator", "launch program", "Explorer view", "details view", "list view"
 
 > **Term:** the App Launcher is a Dashboard widget, **not** an Activity Rail module. The label that appears on its widget surface is `appLauncher.title` (module-style label `appLauncher.moduleLabel`, summary `appLauncher.subtitle`, status `appLauncher.statusReady`).
 
@@ -31,9 +31,19 @@ The dialog itself is accessible-labelled `appLauncher.dialogLabel`. Summary line
 
 Loading state during picker: `appLauncher.loading`. Empty state: `appLauncher.emptyTitle`, `appLauncher.emptyHint`. Selection failure: `appLauncher.selectError`. Save failure: `appLauncher.saveError`. Save status: `appLauncher.savedStatus`.
 
+## View modes
+
+The widget surface supports Explorer-style view modes. The view-mode control is labelled `appLauncher.viewModeLabel` and offers:
+
+- `appLauncher.iconView` — icon grid, the default for existing widgets.
+- `appLauncher.listView` — compact row list.
+- `appLauncher.detailsView` — row list with `appLauncher.detailsNameColumn` and `appLauncher.detailsPathColumn` headers.
+
+File-name labels may wrap to two lines in the launcher surface so longer local app or document names remain readable.
+
 ## Right-click context menu on an entry
 
-App Launcher actions live in the right-click menu, not the default surface. The default surface shows only the icon and label.
+App Launcher actions live in the right-click menu, not the default surface. Icon and list views show the icon and label; details view also shows the stored local path for comparison.
 
 - Launch: `appLauncher.launchApp`. Variants: `appLauncher.runNormal`, `appLauncher.runAdmin` (UAC elevation), `appLauncher.runAsUser` (run as a different user).
 - `appLauncher.editApp` / `appLauncher.edit` — open the edit dialog.
