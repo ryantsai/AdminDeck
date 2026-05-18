@@ -171,6 +171,7 @@ pub enum ValidationError {
     InvalidBackground,
     InvalidScriptSource,
     UnusedLibrary,
+    InvalidBodyOpacity,
 }
 
 pub fn validate_preset(value: &str) -> Result<(), ValidationError> {

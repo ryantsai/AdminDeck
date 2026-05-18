@@ -96,6 +96,7 @@ pub struct DashboardWidgetInstance {
     pub hide_title: bool,
     pub action_direction: Option<String>,
     pub settings_values_json: String,
+    pub body_opacity: Option<i64>,
     pub grid_x: i64,
     pub grid_y: i64,
     pub grid_w: i64,
@@ -144,6 +145,8 @@ pub struct InstancePatch {
     pub action_direction: Option<Option<String>>,
     #[serde(default)]
     pub settings_values_json: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nullable_patch")]
+    pub body_opacity: Option<Option<i64>>,
     #[serde(default)]
     pub grid_x: Option<i64>,
     #[serde(default)]
@@ -284,7 +287,8 @@ pub fn load_state(conn: &SqliteConnection) -> Result<DashboardLoadState, Dashboa
 
     let mut inst_stmt = conn.prepare(
         "SELECT id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-                glass, hide_title, action_direction, settings_values_json, grid_x, grid_y, grid_w, grid_h, sort_order
+                glass, hide_title, action_direction, settings_values_json, body_opacity,
+                grid_x, grid_y, grid_w, grid_h, sort_order
          FROM dashboard_widget_instances
          ORDER BY view_id, sort_order"
     )?;
@@ -303,11 +307,12 @@ pub fn load_state(conn: &SqliteConnection) -> Result<DashboardLoadState, Dashboa
                 hide_title: row.get::<_, i64>(9)? != 0,
                 action_direction: row.get(10)?,
                 settings_values_json: row.get(11)?,
-                grid_x: row.get(12)?,
-                grid_y: row.get(13)?,
-                grid_w: row.get(14)?,
-                grid_h: row.get(15)?,
-                sort_order: row.get(16)?,
+                body_opacity: row.get(12)?,
+                grid_x: row.get(13)?,
+                grid_y: row.get(14)?,
+                grid_w: row.get(15)?,
+                grid_h: row.get(16)?,
+                sort_order: row.get(17)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -491,8 +496,9 @@ pub fn add_instance(
     conn.execute(
         "INSERT INTO dashboard_widget_instances
             (id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-             glass, hide_title, action_direction, settings_values_json, grid_x, grid_y, grid_w, grid_h, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, NULL, '{}', ?, ?, ?, ?, ?)",
+             glass, hide_title, action_direction, settings_values_json, body_opacity,
+             grid_x, grid_y, grid_w, grid_h, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, NULL, '{}', NULL, ?, ?, ?, ?, ?)",
         params![id, view_id, kind, source_id, preset, accent_name, icon_name, hide_title as i64, x, y, w, h, next_sort],
     )?;
     Ok(DashboardWidgetInstance {
@@ -508,6 +514,7 @@ pub fn add_instance(
         hide_title,
         action_direction: None,
         settings_values_json: "{}".to_string(),
+        body_opacity: None,
         grid_x: x,
         grid_y: y,
         grid_w: w,
@@ -532,7 +539,8 @@ pub fn update_instance(
     }
     let mut current: DashboardWidgetInstance = conn.query_row(
         "SELECT id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-                glass, hide_title, action_direction, settings_values_json, grid_x, grid_y, grid_w, grid_h, sort_order
+                glass, hide_title, action_direction, settings_values_json, body_opacity,
+                grid_x, grid_y, grid_w, grid_h, sort_order
          FROM dashboard_widget_instances WHERE id = ?",
         params![id],
         |row| Ok(DashboardWidgetInstance {
@@ -548,11 +556,12 @@ pub fn update_instance(
             hide_title: row.get::<_, i64>(9)? != 0,
             action_direction: row.get(10)?,
             settings_values_json: row.get(11)?,
-            grid_x: row.get(12)?,
-            grid_y: row.get(13)?,
-            grid_w: row.get(14)?,
-            grid_h: row.get(15)?,
-            sort_order: row.get(16)?,
+            body_opacity: row.get(12)?,
+            grid_x: row.get(13)?,
+            grid_y: row.get(14)?,
+            grid_w: row.get(15)?,
+            grid_h: row.get(16)?,
+            sort_order: row.get(17)?,
         }),
     ).map_err(|e| match e {
         rusqlite::Error::QueryReturnedNoRows => DashboardStorageError::NotFound,
@@ -586,6 +595,17 @@ pub fn update_instance(
     if let Some(values) = patch.settings_values_json.clone() {
         current.settings_values_json = values;
     }
+    if let Some(opacity) = patch.body_opacity {
+        if let Some(value) = opacity {
+            if !(0..=100).contains(&value) {
+                return Err(DashboardStorageError::validation_with_detail(
+                    ValidationError::InvalidBodyOpacity,
+                    Some(format!("body_opacity must be between 0 and 100; got {value}")),
+                ));
+            }
+        }
+        current.body_opacity = opacity;
+    }
     if let Some(x) = patch.grid_x {
         current.grid_x = x;
     }
@@ -611,7 +631,7 @@ pub fn update_instance(
         "UPDATE dashboard_widget_instances
             SET preset = ?, accent_name = ?, icon_name = ?, custom_title = ?,
                 glass = ?, hide_title = ?, action_direction = ?, settings_values_json = ?,
-                grid_x = ?, grid_y = ?, grid_w = ?, grid_h = ?
+                body_opacity = ?, grid_x = ?, grid_y = ?, grid_w = ?, grid_h = ?
             WHERE id = ?",
         params![
             current.preset,
@@ -622,6 +642,7 @@ pub fn update_instance(
             current.hide_title as i64,
             current.action_direction,
             current.settings_values_json,
+            current.body_opacity,
             current.grid_x,
             current.grid_y,
             current.grid_w,
@@ -860,7 +881,8 @@ pub fn widget_secret_owner_id_for_instance(
 ) -> Result<Option<String>, DashboardStorageError> {
     let instance: DashboardWidgetInstance = conn.query_row(
         "SELECT id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-                glass, hide_title, action_direction, settings_values_json, grid_x, grid_y, grid_w, grid_h, sort_order
+                glass, hide_title, action_direction, settings_values_json, body_opacity,
+                grid_x, grid_y, grid_w, grid_h, sort_order
          FROM dashboard_widget_instances WHERE id = ?",
         params![instance_id],
         |row| Ok(DashboardWidgetInstance {
@@ -876,11 +898,12 @@ pub fn widget_secret_owner_id_for_instance(
             hide_title: row.get::<_, i64>(9)? != 0,
             action_direction: row.get(10)?,
             settings_values_json: row.get(11)?,
-            grid_x: row.get(12)?,
-            grid_y: row.get(13)?,
-            grid_w: row.get(14)?,
-            grid_h: row.get(15)?,
-            sort_order: row.get(16)?,
+            body_opacity: row.get(12)?,
+            grid_x: row.get(13)?,
+            grid_y: row.get(14)?,
+            grid_w: row.get(15)?,
+            grid_h: row.get(16)?,
+            sort_order: row.get(17)?,
         }),
     ).map_err(|e| match e {
         rusqlite::Error::QueryReturnedNoRows => DashboardStorageError::NotFound,
@@ -995,6 +1018,7 @@ mod tests {
                 hide_title INTEGER NOT NULL DEFAULT 0,
                 action_direction TEXT,
                 settings_values_json TEXT NOT NULL DEFAULT '{}',
+                body_opacity INTEGER,
                 grid_x INTEGER NOT NULL, grid_y INTEGER NOT NULL,
                 grid_w INTEGER NOT NULL, grid_h INTEGER NOT NULL,
                 sort_order INTEGER NOT NULL
@@ -1058,6 +1082,7 @@ mod tests {
                 hide_title: None,
                 action_direction: None,
                 settings_values_json: None,
+                body_opacity: None,
                 grid_x: None,
                 grid_y: None,
                 grid_w: None,
@@ -1099,6 +1124,7 @@ mod tests {
                 action_direction: None,
                 hide_title: Some(true),
                 settings_values_json: None,
+                body_opacity: None,
                 grid_x: None,
                 grid_y: None,
                 grid_w: None,
@@ -1168,6 +1194,7 @@ mod tests {
                 action_direction: None,
                 hide_title: None,
                 settings_values_json: None,
+                body_opacity: None,
                 grid_x: None,
                 grid_y: None,
                 grid_w: None,
@@ -1270,6 +1297,7 @@ mod tests {
                 hide_title: None,
                 action_direction: None,
                 settings_values_json: Some(r#"{"apiKey":"plain-text"}"#.into()),
+                body_opacity: None,
                 grid_x: None,
                 grid_y: None,
                 grid_w: None,
@@ -1288,6 +1316,7 @@ mod tests {
             preset: None, accent_name: None, icon_name: None, custom_title: None,
             glass: None, hide_title: None, action_direction: None,
             settings_values_json: Some(r#"{"apiKey":{"type":"secretRef","ownerId":"dashboard-widget-secret:inst:apiKey","hasSecret":true}}"#.into()),
+            body_opacity: None,
             grid_x: None, grid_y: None, grid_w: None, grid_h: None,
         }).unwrap();
         assert!(updated.settings_values_json.contains("secretRef"));

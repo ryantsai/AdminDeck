@@ -955,6 +955,28 @@ button.dashboard-pill-dot:focus-visible {
   line-height: 1.55;
 }
 
+/* Panel preset: the body owns its own surface so --w-body-opacity can fade
+   only the canvas, leaving the accent-colored head fully opaque. */
+.dw-preset-panel {
+  background: transparent;
+}
+
+.dw-preset-panel .dw-body {
+  position: relative;
+  z-index: 0;
+  background: transparent;
+}
+
+.dw-preset-panel .dw-body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--surface);
+  opacity: calc(var(--w-body-opacity, 100) / 100);
+}
+
 .dw-custom-widget .dw-head {
   min-height: 38px;
   padding: 5px 6px;

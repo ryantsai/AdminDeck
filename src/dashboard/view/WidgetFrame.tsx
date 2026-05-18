@@ -10,6 +10,7 @@ import { useDashboardStore } from "../state/dashboardStore";
 import { getBuiltInWidget } from "../registry/builtInRegistry";
 import { PRESET_RENDERERS } from "../registry/presetRegistry";
 import { resolveAccent } from "../registry/palette";
+import { effectiveBodyOpacity } from "../types";
 import type { DashboardWidgetInstance } from "../types";
 import { WidgetBody } from "./WidgetBody";
 
@@ -112,6 +113,7 @@ export function WidgetFrame({ instance, onCustomize }: WidgetFrameProps) {
     ["--w-accent" as unknown as string]: accent.color,
     ["--w-accent-soft" as unknown as string]: accent.soft,
     ["--w-title-text" as unknown as string]: accent.titleText,
+    ["--w-body-opacity" as unknown as string]: effectiveBodyOpacity(instance),
   } as CSSProperties;
 
   const className = [

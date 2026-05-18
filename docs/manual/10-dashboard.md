@@ -4,7 +4,7 @@
 
 - Keys: `dashboard.*` (full namespace)
 - Topics: Dashboard Views, Widget Instances, presets (panel / ambient / tile / hero / action), accents, icons, backgrounds, density, edit layout, catalog, custom widgets (content + script), AI-authored widgets, agent widget JSON
-- Synonyms: "homepage", "tiles", "cards", "widgets", "report", "background image", "wallpaper"
+- Synonyms: "homepage", "tiles", "cards", "widgets", "report", "background image", "wallpaper", "translucent widget", "see-through widget", "canvas opacity"
 
 > **Terms:** see `CONTEXT.md`. **Dashboard View** is a durable SQLite-backed tab; **Widget Instance** is a placed widget on a View with its own preset/accent/title/layout. **Dashboard Custom Widget** is an AI-authored widget definition (kinds `content` or `script`). Architecture details live in `docs/DASHBOARD.md`.
 
@@ -58,6 +58,7 @@ Fields:
 
 - **Preset**: `dashboard.presetLabel`. Options: `dashboard.preset.panel`, `dashboard.preset.ambient`, `dashboard.preset.tile`, `dashboard.preset.hero`, `dashboard.preset.action`. Ambient hides the title bar by default; `dashboard.hideTitle` is also offered for other presets. Action preset adds an `dashboard.actionDirection` axis with `dashboard.actionDirectionOptions.vertical` / `dashboard.actionDirectionOptions.horizontal`.
 - **Glass background**: `dashboard.glassBackground`.
+- **Canvas opacity**: `dashboard.canvasOpacity` — slider (0-100) that fades the Widget Instance body area only, leaving the title bar fully opaque. Default 70% for the built-in App Launcher and Connection widgets, 100% otherwise; visual effect is applied on the panel preset's `.dw-body`.
 - **Accent**: `dashboard.accent`, default `dashboard.accentDefault`.
 - **Icon**: `dashboard.icon`.
 - **Title**: `dashboard.titleLabel`, placeholder `dashboard.titlePlaceholder`. Untitled widgets show `dashboard.untitledWidget`.

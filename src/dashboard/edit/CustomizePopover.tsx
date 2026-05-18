@@ -17,7 +17,13 @@ import type {
   AccentName, DashboardWidgetInstance, IconName,
   WidgetSettingsField, WidgetSettingsSchema,
 } from "../types";
-import { defaultWidgetPresentationForPreset, ICON_NAMES, WIDGET_PRESETS } from "../types";
+import {
+  defaultBodyOpacityForInstance,
+  defaultWidgetPresentationForPreset,
+  effectiveBodyOpacity,
+  ICON_NAMES,
+  WIDGET_PRESETS,
+} from "../types";
 
 export interface CustomizePopoverProps {
   instance: DashboardWidgetInstance;
@@ -193,6 +199,9 @@ function CommonSection({ instance }: { instance: DashboardWidgetInstance }) {
         </section>
       ) : null}
 
+      <CanvasOpacityField instance={instance} />
+
+
       <section>
         <h4>{t("dashboard.accent")}</h4>
         <div className="dw-accent-picker">
@@ -233,6 +242,36 @@ function CommonSection({ instance }: { instance: DashboardWidgetInstance }) {
         </div>
       </section>
     </>
+  );
+}
+
+function CanvasOpacityField({ instance }: { instance: DashboardWidgetInstance }) {
+  const { t } = useTranslation();
+  const updateInstance = useDashboardStore((s) => s.updateInstance);
+  const value = effectiveBodyOpacity(instance);
+  const fallback = defaultBodyOpacityForInstance(instance);
+
+  return (
+    <section>
+      <label className="dw-field">
+        <span>
+          {t("dashboard.canvasOpacity")} <span className="dw-muted">({value}%)</span>
+        </span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={value}
+          onChange={(e) => {
+            const next = Number(e.currentTarget.value);
+            void updateInstance(instance.id, {
+              bodyOpacity: next === fallback ? null : next,
+            });
+          }}
+        />
+      </label>
+    </section>
   );
 }
 

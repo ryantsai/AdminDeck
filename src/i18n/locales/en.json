@@ -59,6 +59,7 @@
     },
     "glassBackground": "Frosted glass background",
     "hideTitle": "Hide title bar",
+    "canvasOpacity": "Canvas opacity",
     "actionDirection": "Layout direction",
     "actionDirectionOptions": {
       "vertical": "Vertical",

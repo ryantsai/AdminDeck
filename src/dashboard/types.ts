@@ -16,6 +16,26 @@ export function defaultWidgetPresentationForPreset<T extends WidgetPreset>(prese
   return DEFAULT_WIDGET_PRESENTATION_BY_PRESET[preset];
 }
 
+const TRANSLUCENT_BUILT_IN_WIDGET_IDS = new Set(["appLauncher", "connectionPane"]);
+
+export function defaultBodyOpacityForInstance(instance: {
+  kind: WidgetKind;
+  sourceId: string;
+}): number {
+  if (instance.kind === "builtIn" && TRANSLUCENT_BUILT_IN_WIDGET_IDS.has(instance.sourceId)) {
+    return 70;
+  }
+  return 100;
+}
+
+export function effectiveBodyOpacity(instance: {
+  kind: WidgetKind;
+  sourceId: string;
+  bodyOpacity?: number | null;
+}): number {
+  return instance.bodyOpacity ?? defaultBodyOpacityForInstance(instance);
+}
+
 export const ACCENT_NAMES = [
   "default", "blue", "indigo", "teal", "green", "amber", "red", "purple", "pink",
   "slate", "cyan", "orange", "rose", "emerald", "sky",
@@ -65,6 +85,7 @@ export interface DashboardWidgetInstance {
   customTitle: string | null;
   glass?: boolean;
   hideTitle?: boolean;
+  bodyOpacity?: number | null;
   settingsValuesJson: string;
   gridX: number;
   gridY: number;
@@ -98,6 +119,7 @@ export interface InstancePatch {
   customTitle?: string | null;
   glass?: boolean;
   hideTitle?: boolean;
+  bodyOpacity?: number | null;
   settingsValuesJson?: string;
   gridX?: number;
   gridY?: number;

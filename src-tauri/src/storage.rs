@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS dashboard_widget_instances (
     hide_title INTEGER NOT NULL DEFAULT 0,
     action_direction TEXT,
     settings_values_json TEXT NOT NULL DEFAULT '{}',
+    body_opacity INTEGER,
     grid_x INTEGER NOT NULL,
     grid_y INTEGER NOT NULL,
     grid_w INTEGER NOT NULL,
@@ -1721,6 +1722,12 @@ impl Storage {
             "dashboard_widget_instances",
             "hide_title",
             "INTEGER NOT NULL DEFAULT 0",
+        )?;
+        ensure_column(
+            &connection,
+            "dashboard_widget_instances",
+            "body_opacity",
+            "INTEGER",
         )?;
         ensure_column(&connection, "dashboard_views", "background_json", "TEXT")?;
         ensure_column(&connection, "dashboard_views", "tab_color", "TEXT")?;
@@ -5160,12 +5167,13 @@ mod tests {
             connection.execute(
                 "INSERT INTO dashboard_widget_instances
                     (id, view_id, kind, source_id, preset, accent_name, icon_name, custom_title,
-                     glass, action_direction, settings_values_json, grid_x, grid_y, grid_w, grid_h, sort_order)
+                     glass, action_direction, settings_values_json, body_opacity,
+                     grid_x, grid_y, grid_w, grid_h, sort_order)
                  VALUES
                     ('inst-1', 'view-1', 'script', 'cw-1', 'panel', 'blue', 'Key', NULL,
                      0, NULL,
                      '{\"apiKey\":{\"type\":\"secretRef\",\"ownerId\":\"dashboard-widget-secret:inst-1:apiKey\",\"hasSecret\":true}}',
-                     0, 0, 4, 3, 0)",
+                     NULL, 0, 0, 4, 3, 0)",
                 [],
             ).map_err(to_storage_error)?;
             Ok(())
