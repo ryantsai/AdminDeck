@@ -11,6 +11,7 @@
     "package:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-installer.ps1",
     "release:github": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-github.ps1",
     "smoke:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installer.ps1",
+    "i18n:check": "node scripts/check-locale-keys.mjs",
     "measure:ssh-readiness": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure-ssh-readiness.ps1",
     "preview": "vite preview",
     "tauri": "tauri"

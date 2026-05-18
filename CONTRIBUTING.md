@@ -221,6 +221,8 @@ This is the area where new contributors most commonly slip. Three rules and you'
 
 When you actually translate the key into another locale, delete the matching `localization_todo` file. If you rename or remove a key, rename or remove the todo file too.
 
+Always run `npm run i18n:check` during translation runs. It compares `src/i18n/locales/en.json` to every other locale file and reports missing or redundant keys before review.
+
 Technical terms (SSH, SFTP, RDP, VNC, tmux, ProxyJump, PowerShell, WSL, API, URL) typically stay English across all locales.
 
 ---

@@ -40,7 +40,7 @@ Detailed rules are in `AGENTS.md` §Internationalization. Summary:
 1. Every user-visible string must go through `t()` / `useTranslation()`. Bare English in JSX is a bug.
 2. English changes happen in `src/i18n/locales/en.json` first.
 3. Pending translations are tracked one-key-per-file under `docs/localization_todo/` (copy `_TEMPLATE.md`). Delete the corresponding file when a translation lands.
-4. Only update non-English locale files when intentionally translating; keep all 13 locale JSON files structurally aligned.
+4. Only update non-English locale files when intentionally translating; keep all 13 locale JSON files structurally aligned. Always run `npm run i18n:check` during translation runs to compare every locale against `en.json` for missing and redundant keys.
 5. Renames must update every locale file plus the matching `docs/localization_todo/` filename.
 
 Technical terms (SSH, SFTP, RDP, VNC, tmux, ProxyJump, PowerShell, WSL, API, URL) typically stay English across languages.
