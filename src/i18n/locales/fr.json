@@ -457,7 +457,7 @@
   },
   "appLauncher": {
     "addApp": "Ajouter une application",
-    "addFolder": "Add Folder",
+    "addFolder": "Ajouter un dossier",
     "addMenuApp": "Application",
     "addMenuFile": "Document",
     "addMenuFolder": "Dossier",
@@ -1056,7 +1056,8 @@
       "mono": "Mono"
     },
     "deleteViewBody": "Supprimer « {{name}} » et tous les widgets de cette vue du tableau de bord ? Cette action est irréversible.",
-    "deleteWidgetBody": "Supprimer « {{name}} » de cette vue du tableau de bord ? Cette action est irréversible."
+    "deleteWidgetBody": "Supprimer « {{name}} » de cette vue du tableau de bord ? Cette action est irréversible.",
+    "canvasOpacity": "Opacité du canevas"
   },
   "languages": {
     "de": "Deutsch",

@@ -457,7 +457,7 @@
   },
   "appLauncher": {
     "addApp": "Aggiungi app",
-    "addFolder": "Add Folder",
+    "addFolder": "Aggiungi cartella",
     "addMenuApp": "App",
     "addMenuFile": "Documento",
     "addMenuFolder": "Cartella",
@@ -1056,7 +1056,8 @@
       "mono": "Mono"
     },
     "deleteViewBody": "Eliminare \"{{name}}\" e tutti i widget in questa vista Dashboard? Non può essere annullato.",
-    "deleteWidgetBody": "Rimuovere \"{{name}}\" da questa vista Dashboard? Non può essere annullato."
+    "deleteWidgetBody": "Rimuovere \"{{name}}\" da questa vista Dashboard? Non può essere annullato.",
+    "canvasOpacity": "Opacità canvas"
   },
   "languages": {
     "de": "Deutsch",

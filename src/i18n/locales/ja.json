@@ -457,7 +457,7 @@
   },
   "appLauncher": {
     "addApp": "アプリを追加",
-    "addFolder": "フォルダを追加",
+    "addFolder": "フォルダーを追加",
     "addMenuApp": "アプリ",
     "addMenuFile": "ドキュメント",
     "addMenuFolder": "フォルダ",
@@ -1056,7 +1056,8 @@
       "mono": "等幅"
     },
     "deleteViewBody": "「{{name}}」とこのダッシュボードビューのすべてのウィジェットを削除しますか？この操作は元に戻せません。",
-    "deleteWidgetBody": "「{{name}}」をこのダッシュボードビューから削除しますか？この操作は元に戻せません。"
+    "deleteWidgetBody": "「{{name}}」をこのダッシュボードビューから削除しますか？この操作は元に戻せません。",
+    "canvasOpacity": "キャンバスの不透明度"
   },
   "languages": {
     "de": "Deutsch",

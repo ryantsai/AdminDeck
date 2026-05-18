@@ -1056,7 +1056,8 @@
       "mono": "等寬"
     },
     "deleteViewBody": "刪除「{{name}}」和此儀表板檢視中的所有小工具？此操作無法復原。",
-    "deleteWidgetBody": "從此儀表板檢視中移除「{{name}}」？此操作無法復原。"
+    "deleteWidgetBody": "從此儀表板檢視中移除「{{name}}」？此操作無法復原。",
+    "canvasOpacity": "畫布不透明度"
   },
   "languages": {
     "de": "Deutsch",

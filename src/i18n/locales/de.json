@@ -457,7 +457,7 @@
   },
   "appLauncher": {
     "addApp": "App hinzufügen",
-    "addFolder": "Add Folder",
+    "addFolder": "Ordner hinzufügen",
     "addMenuApp": "App",
     "addMenuFile": "Dokument",
     "addMenuFolder": "Ordner",
@@ -1056,7 +1056,8 @@
       "mono": "Mono"
     },
     "deleteViewBody": "„{{name}}“ und alle Widgets in dieser Dashboard-Ansicht löschen? Dies kann nicht rückgängig gemacht werden.",
-    "deleteWidgetBody": "„{{name}}“ aus dieser Dashboard-Ansicht entfernen? Dies kann nicht rückgängig gemacht werden."
+    "deleteWidgetBody": "„{{name}}“ aus dieser Dashboard-Ansicht entfernen? Dies kann nicht rückgängig gemacht werden.",
+    "canvasOpacity": "Canvas-Deckkraft"
   },
   "languages": {
     "de": "Deutsch",

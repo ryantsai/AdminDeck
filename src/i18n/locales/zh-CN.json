@@ -1056,7 +1056,8 @@
       "mono": "等宽"
     },
     "deleteViewBody": "删除「{{name}}」和此仪表板视图中的所有小部件？此操作无法撤销。",
-    "deleteWidgetBody": "从此仪表板视图中移除「{{name}}」？此操作无法撤销。"
+    "deleteWidgetBody": "从此仪表板视图中移除「{{name}}」？此操作无法撤销。",
+    "canvasOpacity": "画布不透明度"
   },
   "languages": {
     "de": "Deutsch",

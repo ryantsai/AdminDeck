@@ -518,7 +518,8 @@
     "unknownFileType": "알 수 없음",
     "viewModeLabel": "앱 런처 보기 모드",
     "workingDirectory": "작업 디렉터리",
-    "workingDirectoryPlaceholder": "선택적 폴더 경로"
+    "workingDirectoryPlaceholder": "선택적 폴더 경로",
+    "addFolder": "폴더 추가"
   },
   "common": {
     "about": "정보",
@@ -1055,7 +1056,8 @@
       "mono": "고정폭"
     },
     "deleteViewBody": "이 대시보드 보기에서 \"{{name}}\" 및 모든 위젯을 삭제하시겠습니까? 되돌릴 수 없습니다.",
-    "deleteWidgetBody": "이 대시보드 보기에서 \"{{name}}\"을(를) 제거하시겠습니까? 되돌릴 수 없습니다."
+    "deleteWidgetBody": "이 대시보드 보기에서 \"{{name}}\"을(를) 제거하시겠습니까? 되돌릴 수 없습니다.",
+    "canvasOpacity": "캔버스 불투명도"
   },
   "languages": {
     "de": "Deutsch",

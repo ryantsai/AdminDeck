@@ -518,7 +518,8 @@
     "unknownFileType": "Tidak diketahui",
     "viewModeLabel": "Mode tampilan peluncur aplikasi",
     "workingDirectory": "Direktori kerja",
-    "workingDirectoryPlaceholder": "Path folder opsional"
+    "workingDirectoryPlaceholder": "Path folder opsional",
+    "addFolder": "Tambah Folder"
   },
   "common": {
     "about": "Tentang",
@@ -1055,7 +1056,8 @@
       "mono": "Mono"
     },
     "deleteViewBody": "Hapus \"{{name}}\" dan semua widget di tampilan Dasbor ini? Ini tidak dapat dibatalkan.",
-    "deleteWidgetBody": "Hapus \"{{name}}\" dari tampilan Dasbor ini? Ini tidak dapat dibatalkan."
+    "deleteWidgetBody": "Hapus \"{{name}}\" dari tampilan Dasbor ini? Ini tidak dapat dibatalkan.",
+    "canvasOpacity": "Opasitas kanvas"
   },
   "languages": {
     "de": "Deutsch",

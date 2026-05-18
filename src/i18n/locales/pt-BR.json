@@ -518,7 +518,8 @@
     "unknownFileType": "Desconhecido",
     "viewModeLabel": "Modo de exibição do lançador",
     "workingDirectory": "Diretório de trabalho",
-    "workingDirectoryPlaceholder": "Caminho da pasta opcional"
+    "workingDirectoryPlaceholder": "Caminho da pasta opcional",
+    "addFolder": "Adicionar pasta"
   },
   "common": {
     "about": "Sobre",
@@ -1055,7 +1056,8 @@
       "mono": "Mono"
     },
     "deleteViewBody": "Excluir \"{{name}}\" e todos os widgets desta visualização do Dashboard? Isso não pode ser desfeito.",
-    "deleteWidgetBody": "Remover \"{{name}}\" desta visualização do Dashboard? Isso não pode ser desfeito."
+    "deleteWidgetBody": "Remover \"{{name}}\" desta visualização do Dashboard? Isso não pode ser desfeito.",
+    "canvasOpacity": "Opacidade da tela"
   },
   "languages": {
     "de": "Deutsch",

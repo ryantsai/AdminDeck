@@ -25,6 +25,8 @@
 | `id.json` | Indonesian |
 | `vi.json` | Vietnamese |
 
+> **`vi.json` frequently falls behind.** Vietnamese was added later than the other locales and has a pattern of accumulating missing keys after feature releases. When running a localization pass, always verify `vi.json` coverage first even if the other 12 locales are complete.
+
 Native language names come from the `languages` namespace in each locale file. English is bundled with the app; everything else loads on demand via dynamic `import()`. The active locale is persisted in `localStorage` under `kkterm.language` and survives restarts.
 
 ## Switching language

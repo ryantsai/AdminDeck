@@ -518,7 +518,8 @@
     "unknownFileType": "Desconocido",
     "viewModeLabel": "Modo de vista del lanzador",
     "workingDirectory": "Directorio de trabajo",
-    "workingDirectoryPlaceholder": "Ruta de carpeta opcional"
+    "workingDirectoryPlaceholder": "Ruta de carpeta opcional",
+    "addFolder": "Añadir carpeta"
   },
   "common": {
     "about": "Acerca de",
@@ -1055,7 +1056,8 @@
       "mono": "Mono"
     },
     "deleteViewBody": "¿Eliminar \"{{name}}\" y todos los widgets de esta vista del Dashboard? No se puede deshacer.",
-    "deleteWidgetBody": "¿Quitar \"{{name}}\" de esta vista del Dashboard? No se puede deshacer."
+    "deleteWidgetBody": "¿Quitar \"{{name}}\" de esta vista del Dashboard? No se puede deshacer.",
+    "canvasOpacity": "Opacidad del lienzo"
   },
   "languages": {
     "de": "Deutsch",

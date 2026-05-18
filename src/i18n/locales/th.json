@@ -518,7 +518,8 @@
     "unknownFileType": "ไม่ทราบ",
     "viewModeLabel": "โหมดมุมมองตัวเปิดแอป",
     "workingDirectory": "ไดเรกทอรีทำงาน",
-    "workingDirectoryPlaceholder": "พาธโฟลเดอร์ (ไม่บังคับ)"
+    "workingDirectoryPlaceholder": "พาธโฟลเดอร์ (ไม่บังคับ)",
+    "addFolder": "เพิ่มโฟลเดอร์"
   },
   "common": {
     "about": "เกี่ยวกับ",
@@ -1055,7 +1056,8 @@
       "mono": "ความกว้างเท่า"
     },
     "deleteViewBody": "ลบ \"{{name}}\" และวิดเจ็ตทั้งหมดในมุมมองแดชบอร์ดนี้หรือไม่ ไม่สามารถเรียกคืนได้",
-    "deleteWidgetBody": "ลบ \"{{name}}\" ออกจากมุมมองแดชบอร์ดนี้หรือไม่ ไม่สามารถเรียกคืนได้"
+    "deleteWidgetBody": "ลบ \"{{name}}\" ออกจากมุมมองแดชบอร์ดนี้หรือไม่ ไม่สามารถเรียกคืนได้",
+    "canvasOpacity": "ความทึบของผ้าใบ"
   },
   "languages": {
     "de": "Deutsch",
