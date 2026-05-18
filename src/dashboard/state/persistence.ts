@@ -215,9 +215,10 @@ export async function createCustomWidget(input: {
     }
     const state = browserPreviewState();
     const widget = { id: createPreviewId("cw"), ...input };
-    const widgetWithSettings = {
+    const widgetWithSettings: DashboardCustomWidget = {
       ...widget,
       settingsSchemaJson: input.settingsSchemaJson ?? "{\"fields\":[]}",
+      createdAt: new Date().toISOString(),
     };
     state.customWidgets.push(widgetWithSettings);
     return { ...widgetWithSettings };

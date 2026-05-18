@@ -49,19 +49,21 @@ export function CatalogOverlay({ viewId, onClose }: CatalogOverlayProps) {
       defaultSize: w.defaultSize,
       isCustom: false,
     }));
-    const customs: CatalogEntry[] = customWidgets.map((c) => ({
-      id: c.id,
-      kind: c.kind as WidgetKind,
-      title: c.title,
-      summary: c.summary,
-      category: c.category,
-      defaultPreset: "panel" as WidgetPreset,
-      defaultAccent: "blue" as AccentName,
-      defaultIcon: "Bot" as IconName,
-      defaultSize: { w: 3, h: 3 },
-      isCustom: true,
-      createdBy: c.createdBy,
-    }));
+    const customs: CatalogEntry[] = [...customWidgets]
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+      .map((c) => ({
+        id: c.id,
+        kind: c.kind as WidgetKind,
+        title: c.title,
+        summary: c.summary,
+        category: c.category,
+        defaultPreset: "ambient" as WidgetPreset,
+        defaultAccent: "blue" as AccentName,
+        defaultIcon: "Bot" as IconName,
+        defaultSize: { w: 3, h: 3 },
+        isCustom: true,
+        createdBy: c.createdBy,
+      }));
     return [...builtIns, ...customs];
   }, [customWidgets, t]);
 

@@ -114,6 +114,7 @@ pub struct DashboardCustomWidget {
     pub body_json: String,
     pub settings_schema_json: String,
     pub created_by: String,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -312,7 +313,7 @@ pub fn load_state(conn: &SqliteConnection) -> Result<DashboardLoadState, Dashboa
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut custom_stmt = conn.prepare(
-        "SELECT id, kind, title, summary, category, body_json, settings_schema_json, created_by FROM dashboard_custom_widgets"
+        "SELECT id, kind, title, summary, category, body_json, settings_schema_json, created_by, created_at FROM dashboard_custom_widgets"
     )?;
     let custom_widgets = custom_stmt
         .query_map([], |row| {
@@ -325,6 +326,7 @@ pub fn load_state(conn: &SqliteConnection) -> Result<DashboardLoadState, Dashboa
                 body_json: row.get(5)?,
                 settings_schema_json: row.get(6)?,
                 created_by: row.get(7)?,
+                created_at: row.get(8)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -733,6 +735,11 @@ pub fn create_custom_widget(
             created_by
         ],
     )?;
+    let created_at: String = conn.query_row(
+        "SELECT created_at FROM dashboard_custom_widgets WHERE id = ?",
+        params![id],
+        |row| row.get(0),
+    )?;
     Ok(DashboardCustomWidget {
         id: id.to_string(),
         kind: kind.to_string(),
@@ -742,6 +749,7 @@ pub fn create_custom_widget(
         body_json: body_json.to_string(),
         settings_schema_json: settings_schema_json.to_string(),
         created_by: created_by.to_string(),
+        created_at,
     })
 }
 
@@ -752,7 +760,7 @@ pub fn update_custom_widget(
 ) -> Result<DashboardCustomWidget, DashboardStorageError> {
     let mut current: DashboardCustomWidget = conn
         .query_row(
-            "SELECT id, kind, title, summary, category, body_json, settings_schema_json, created_by
+            "SELECT id, kind, title, summary, category, body_json, settings_schema_json, created_by, created_at
          FROM dashboard_custom_widgets WHERE id = ?",
             params![id],
             |row| {
@@ -765,6 +773,7 @@ pub fn update_custom_widget(
                     body_json: row.get(5)?,
                     settings_schema_json: row.get(6)?,
                     created_by: row.get(7)?,
+                    created_at: row.get(8)?,
                 })
             },
         )

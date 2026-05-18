@@ -82,6 +82,7 @@ export interface DashboardCustomWidget {
   bodyJson: string;
   settingsSchemaJson: string;
   createdBy: "user" | "agent";
+  createdAt: string;
 }
 
 export interface DashboardLoadState {
