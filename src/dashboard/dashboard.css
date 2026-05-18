@@ -1796,9 +1796,15 @@ button.dashboard-pill-dot:focus-visible {
   align-items: center;
   gap: 2px;
   padding: 2px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-2px);
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: 7px;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
 
 .app-launcher-view-mode button {
@@ -1826,6 +1832,15 @@ button.dashboard-pill-dot:focus-visible {
   color: var(--w-accent);
   background: var(--surface);
   box-shadow: var(--dashboard-shadow-card);
+}
+
+.app-launcher-widget:hover .app-launcher-view-mode,
+.app-launcher-widget:focus-within .app-launcher-view-mode,
+.app-launcher-widget.is-adding .app-launcher-view-mode,
+.app-launcher-widget.is-drop-target .app-launcher-view-mode {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .app-launcher-widget .app-launcher-add {

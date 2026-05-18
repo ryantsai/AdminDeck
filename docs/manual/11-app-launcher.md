@@ -33,7 +33,7 @@ Loading state during picker: `appLauncher.loading`. Empty state: `appLauncher.em
 
 ## View modes
 
-The widget surface supports Explorer-style view modes. The view-mode control is labelled `appLauncher.viewModeLabel` and offers:
+The widget surface supports Explorer-style view modes. The view-mode control is labelled `appLauncher.viewModeLabel` and appears when the pointer or keyboard focus enters the widget. It offers:
 
 - `appLauncher.iconView` — icon grid, the default for existing widgets.
 - `appLauncher.listView` — compact row list.
