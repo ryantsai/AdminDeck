@@ -57,6 +57,32 @@ Oh, and there's an AI assistant. But it has to ask permission before it does any
 
 ---
 
+## See It Move
+
+<!--
+  TODO: Replace this placeholder with a real demo GIF.
+  Recommended:
+    - 5-10 seconds, looped
+    - Show: open a Connection -> split a pane -> SFTP upload -> AI proposes a command
+    - Target ~5 MB so GitHub renders it inline without lazy-loading
+  Suggested path: docs/assets/demo.gif
+  Then change the <img src=...> below to: src="docs/assets/demo.gif"
+-->
+
+<p align="center">
+  <a href="https://github.com/ryantsai/KKTerm">
+    <img
+      src="https://placehold.co/1280x720/0d1117/8b949e?text=Drop+demo.gif+here%0A%E2%86%92+docs%2Fassets%2Fdemo.gif&font=source-code-pro"
+      alt="KKTerm demo placeholder — replace with docs/assets/demo.gif"
+      width="720"
+    />
+  </a>
+</p>
+
+<p align="center"><sub><em>(Demo GIF goes here. A picture is worth a thousand bullet points, and we ran out of bullet points.)</em></sub></p>
+
+---
+
 ## Why People Keep It Open All Day
 
 ### Local-first means actually local
@@ -262,7 +288,7 @@ We would love a hand. Genuinely. Even small things matter:
 - **Tighten the AI tool surface.** Provider adapters live in [`src-tauri/src/ai/providers/`](src-tauri/src/ai/providers/); the frontend registry is in [`src/ai/providerRegistry/`](src/ai/providerRegistry/).
 - **Improve the manual.** End-user docs live in [`docs/manual/`](docs/manual/). One chapter per UI module. If you used a feature and the docs didn't help, a PR fixing that is gold.
 
-A few ground rules — they're in [`AGENTS.md`](AGENTS.md), but the highlights:
+Full setup, project layout, PR checklist, and the list of "please do not break these" rules live in [`CONTRIBUTING.md`](CONTRIBUTING.md). The 30-second highlights:
 
 - **Read [`CONTEXT.md`](CONTEXT.md) before renaming user-facing terms.** **Connection**, **Session**, **Tab**, and **Quick Connect** mean specific things; please don't drift.
 - **Every user-visible string goes through `t()`.** No bare English text in JSX.
