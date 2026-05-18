@@ -65,12 +65,27 @@ test("assistant renders in-chat tool approval controls", async () => {
   assert.match(
     assistantSource,
     /toolApprovalCancelled/,
-    "AssistantPanel should show a cancelled state when the user bails out.",
+    "AssistantPanel should show a skipped state when the user cancels the tool call.",
   );
   assert.match(
     assistantSource,
-    /completeAssistantToolApproval\(request\.requestId,\s*false,\s*\{\s*cancelPrompt:\s*true\s*\}/,
-    "AssistantPanel should let Cancel reject the pending approval and stop the active response.",
+    /toolApprovalAllowSession/,
+    "AssistantPanel should offer an Allow in this session action.",
+  );
+  assert.match(
+    assistantSource,
+    /allowToolApprovalsForCurrentResponseRef\.current\s*=\s*true/,
+    "Allow in this session should remember approval for the active assistant response.",
+  );
+  assert.match(
+    assistantSource,
+    /completeAssistantToolApproval\(request\.requestId,\s*false\)/,
+    "Cancel should reject the pending tool call without stopping the active response.",
+  );
+  assert.doesNotMatch(
+    assistantSource,
+    /common\.yes|common\.no|cancelPrompt/,
+    "The approval card should use Allow, Allow in this session, and Cancel only.",
   );
   assert.match(
     tauriSource,

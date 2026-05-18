@@ -5561,6 +5561,27 @@ progress {
   align-items: center;
 }
 
+.assistant-tool-approval-summary {
+  align-items: center;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  padding: 8px 10px;
+}
+
+.assistant-tool-approval-summary > span {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.assistant-tool-approval-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-chat-timeline-item {
+  display: contents;
+}
+
 .proposal-context-details {
   display: grid;
   gap: 8px;
