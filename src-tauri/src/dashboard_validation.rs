@@ -471,6 +471,41 @@ pub fn validate_script_body_json(json: &str) -> Result<ScriptBody, ValidationErr
     validate_script_body_json_detailed(json).map_err(|(kind, _)| kind)
 }
 
+pub fn drop_unused_script_libraries(body: &mut Value) -> Vec<String> {
+    let Some(source) = body
+        .get("source")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+    else {
+        return Vec::new();
+    };
+    let Ok(code_only) = validate_script_source_inner(&source) else {
+        return Vec::new();
+    };
+    let Some(libraries) = body.get_mut("libraries").and_then(Value::as_array_mut) else {
+        return Vec::new();
+    };
+
+    let mut removed = Vec::new();
+    libraries.retain(|entry| {
+        let Some(key) = entry.as_str() else {
+            return true;
+        };
+        let Some(&(_, global)) = KNOWN_LIBRARY_GLOBALS
+            .iter()
+            .find(|&&(known_key, _)| known_key == key)
+        else {
+            return true;
+        };
+        if source_references_identifier(&code_only, global) {
+            return true;
+        }
+        removed.push(key.to_string());
+        false
+    });
+    removed
+}
+
 /// Same as `validate_script_body_json`, but also surfaces a human-readable
 /// detail string explaining which check failed. The detail is passed back to
 /// agents/clients so they can correct widget source without re-guessing.
@@ -1538,6 +1573,23 @@ mod tests {
             validate_script_body_json(json),
             Err(ValidationError::UnusedLibrary),
         );
+    }
+
+    #[test]
+    fn unused_libraries_can_be_dropped_before_ai_tool_validation() {
+        let mut body = serde_json::json!({
+            "source": "const root = document.getElementById('root'); root.textContent = new Date().toLocaleTimeString();",
+            "libraries": ["dayjs", "matter"],
+            "permissions": {"network": false, "pollSeconds": null},
+            "htmlShim": null
+        });
+
+        assert_eq!(
+            drop_unused_script_libraries(&mut body),
+            vec!["dayjs".to_string(), "matter".to_string()]
+        );
+        assert_eq!(body["libraries"], serde_json::json!([]));
+        assert!(validate_script_body_json(&body.to_string()).is_ok());
     }
 
     #[test]

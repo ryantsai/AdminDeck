@@ -3070,10 +3070,14 @@ async function waitForScreenshotSurface() {
 }
 
 function toolCallLabel(
-  toolName: string,
+  toolName: string | undefined,
   status: AssistantToolCallStatus["status"],
   t: ReturnType<typeof useTranslation>["t"],
 ): string {
+  const normalizedToolName = normalizeAssistantToolName(toolName);
+  if (!normalizedToolName) {
+    return status === "running" ? t("ai.toolCallRunning") : t("ai.toolCallComplete");
+  }
   const runningLabels: Record<string, string> = {
     web_search: t("ai.toolWebSearch"),
     web_fetch: t("ai.toolWebFetch"),
@@ -3159,11 +3163,15 @@ function toolCallLabel(
     session_file_browser_delete: t("ai.toolSessionsDone"),
   };
   const labels = status === "running" ? runningLabels : completedLabels;
-  return labels[toolName] ?? toolName;
+  return labels[normalizedToolName] ?? normalizedToolName;
 }
 
-function isDashboardMutatingTool(toolName: string) {
-  return toolName.startsWith("dashboard_") && toolName !== "dashboard_load_state";
+function isDashboardMutatingTool(toolName: unknown) {
+  const normalizedToolName = normalizeAssistantToolName(toolName);
+  if (!normalizedToolName) {
+    return false;
+  }
+  return normalizedToolName.startsWith("dashboard_") && normalizedToolName !== "dashboard_load_state";
 }
 
 function AssistantWorkPanel({ message }: { message: AssistantChatMessage }) {
@@ -3302,8 +3310,12 @@ function AssistantWorkPanel({ message }: { message: AssistantChatMessage }) {
   );
 }
 
-function humanizeAssistantToolName(toolName: string) {
-  return toolName.trim().replace(/[_-]+/g, " ");
+function humanizeAssistantToolName(toolName: string | undefined) {
+  return normalizeAssistantToolName(toolName)?.replace(/[_-]+/g, " ") ?? "";
+}
+
+function normalizeAssistantToolName(toolName: unknown) {
+  return typeof toolName === "string" && toolName.trim() ? toolName.trim() : undefined;
 }
 
 function formatAssistantWorkDuration(

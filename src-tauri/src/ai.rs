@@ -29,6 +29,7 @@ use tauri::{Emitter, Manager};
 
 use crate::dashboard_ids::new_dashboard_id;
 use crate::dashboard_storage as ds;
+use crate::dashboard_validation::drop_unused_script_libraries;
 use crate::storage::{
     AiAssistantToolSettings, AiProviderSettings, Storage, ai_provider_secret_owner_id,
 };
@@ -458,7 +459,7 @@ pub struct AgentRunResponse {
 }
 
 #[derive(Clone, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 enum AiStreamEvent {
     ReasoningDelta {
         delta: String,
@@ -3921,10 +3922,11 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
             let title = arg_string(&args, "title");
             let summary = arg_string(&args, "summary");
             let category = arg_string(&args, "category");
-            let body = args.get("body").cloned().unwrap_or(Value::Null);
+            let mut body = args.get("body").cloned().unwrap_or(Value::Null);
             if body.is_null() {
                 return Err("dashboard_create_widget requires body".to_string());
             }
+            let dropped_libraries = drop_unused_script_libraries(&mut body);
             let body_json =
                 serde_json::to_string(&body).map_err(|e| format!("invalid body: {e}"))?;
             let settings_schema_json = args
@@ -3967,6 +3969,7 @@ fn dashboard_tool(app: &tauri::AppHandle, name: &str, args: Value) -> String {
                     "summary": &summary,
                     "category": &category,
                     "bodyJson": &body_json,
+                    "droppedUnusedLibraries": &dropped_libraries,
                     "settingsSchemaJson": &settings_schema_json,
                     "requestedGrid": {
                         "w": requested_grid_w,
@@ -4117,7 +4120,8 @@ fn normalize_dashboard_custom_widget_patch(mut patch: Value) -> Result<Value, St
     let Some(object) = patch.as_object_mut() else {
         return Ok(patch);
     };
-    if let Some(body) = object.remove("body") {
+    if let Some(mut body) = object.remove("body") {
+        drop_unused_script_libraries(&mut body);
         let body_json =
             serde_json::to_string(&body).map_err(|error| format!("invalid patch.body: {error}"))?;
         object.insert("bodyJson".to_string(), Value::String(body_json));
@@ -5825,6 +5829,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ai_stream_tool_events_use_frontend_field_names() {
+        let event = serde_json::to_value(AiStreamEvent::ToolCallStart {
+            tool_id: "call_123".to_string(),
+            tool_name: "dashboard_create_widget".to_string(),
+        })
+        .expect("stream event serializes");
+
+        assert_eq!(
+            event.get("toolId").and_then(Value::as_str),
+            Some("call_123")
+        );
+        assert_eq!(
+            event.get("toolName").and_then(Value::as_str),
+            Some("dashboard_create_widget")
+        );
+        assert!(event.get("tool_id").is_none());
+        assert!(event.get("tool_name").is_none());
+    }
+
+    #[test]
     fn command_proposal_requires_non_empty_command() {
         let error = plan_command_proposal(CommandProposalRequest {
             prompt: "Check logs".to_string(),
@@ -6728,6 +6752,34 @@ mod tests {
             serde_json::from_str::<Value>(body_json).expect("bodyJson parses"),
             json!({
                 "source": "document.getElementById('root').textContent = 'ok';",
+                "permissions": {"network": false, "pollSeconds": null},
+                "htmlShim": null,
+                "libraries": []
+            })
+        );
+    }
+
+    #[test]
+    fn dashboard_update_patch_drops_unused_script_libraries() {
+        let patch = json!({
+            "body": {
+                "source": "document.getElementById('root').textContent = new Date().toLocaleTimeString();",
+                "permissions": {"network": false, "pollSeconds": null},
+                "htmlShim": null,
+                "libraries": ["dayjs"]
+            }
+        });
+
+        let normalized = normalize_dashboard_custom_widget_patch(patch).expect("patch normalizes");
+        let body_json = normalized
+            .get("bodyJson")
+            .and_then(Value::as_str)
+            .expect("structured body is serialized into bodyJson");
+
+        assert_eq!(
+            serde_json::from_str::<Value>(body_json).expect("bodyJson parses"),
+            json!({
+                "source": "document.getElementById('root').textContent = new Date().toLocaleTimeString();",
                 "permissions": {"network": false, "pollSeconds": null},
                 "htmlShim": null,
                 "libraries": []

@@ -37,23 +37,33 @@ export function applyAssistantStreamEventToMessage(
       msg.content += event.delta;
       break;
     case "toolCallStart":
+      const startedToolId = streamEventString(event, "toolId", "tool_id");
+      const startedToolName = streamEventString(event, "toolName", "tool_name");
       msg.workStartedAt = msg.workStartedAt ?? options.workStartedAt;
+      if (!startedToolId || !startedToolName) {
+        break;
+      }
       msg.toolCalls = [
-        ...(msg.toolCalls ?? []).filter((tc) => tc.toolId !== event.toolId),
+        ...(msg.toolCalls ?? []).filter((tc) => tc.toolId !== startedToolId),
         {
-          toolId: event.toolId,
-          toolName: event.toolName,
+          toolId: startedToolId,
+          toolName: startedToolName,
           status: "running",
           startedAt: options.now(),
         },
       ];
       break;
     case "toolCallEnd":
+      const endedToolId = streamEventString(event, "toolId", "tool_id");
+      const endedToolName = streamEventString(event, "toolName", "tool_name");
+      if (!endedToolId) {
+        break;
+      }
       msg.toolCalls = (msg.toolCalls ?? []).map((tc) =>
-        tc.toolId === event.toolId
+        tc.toolId === endedToolId
           ? {
               ...tc,
-              toolName: event.toolName,
+              toolName: endedToolName ?? tc.toolName,
               status: "completed",
               ...(event.error ? { error: event.error } : {}),
               endedAt: options.now(),
@@ -97,8 +107,13 @@ export function completeAssistantStreamMessageFromResponse<T extends AssistantSt
 export function latestRunningAssistantToolCall(message: AssistantStreamMessage) {
   const toolCalls = message.toolCalls ?? [];
   for (let index = toolCalls.length - 1; index >= 0; index -= 1) {
-    if (toolCalls[index].status === "running") {
-      return toolCalls[index];
+    const toolCall = toolCalls[index];
+    if (
+      toolCall.status === "running" &&
+      typeof toolCall.toolName === "string" &&
+      toolCall.toolName.trim()
+    ) {
+      return toolCall;
     }
   }
   return undefined;
@@ -117,4 +132,10 @@ function preserveSecretRequestDirectives(streamedContent: string, finalContent: 
     return finalContent;
   }
   return [finalContent.trimEnd(), ...missingDirectives].filter(Boolean).join("\n\n");
+}
+
+function streamEventString(event: AiStreamEvent, camelKey: string, snakeKey: string) {
+  const record = event as unknown as Record<string, unknown>;
+  const value = record[camelKey] ?? record[snakeKey];
+  return typeof value === "string" && value.trim() ? value : undefined;
 }

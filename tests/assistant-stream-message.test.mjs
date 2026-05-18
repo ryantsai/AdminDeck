@@ -89,3 +89,70 @@ test("assistant stream events preserve tool status and final content synchronous
   assert.equal(recovered.content, "It is 11:00 PM.");
   assert.equal(recovered.reasoningContent, "I checked the time.");
 });
+
+test("assistant stream events accept legacy snake_case tool fields", async () => {
+  const {
+    applyAssistantStreamEventToMessage,
+    latestRunningAssistantToolCall,
+  } = await importTypeScriptModule(
+    new URL("../src/ai/streamMessage.ts", import.meta.url),
+  );
+  const times = [
+    "2026-05-12T15:00:00.000Z",
+    "2026-05-12T15:00:01.000Z",
+  ];
+  const options = {
+    errorPrefix: "Error",
+    now: () => times.shift() ?? "2026-05-12T15:00:01.000Z",
+    workStartedAt: "2026-05-12T14:59:59.000Z",
+  };
+  let message = { content: "", isStreaming: true, workStartedAt: options.workStartedAt };
+
+  message = applyAssistantStreamEventToMessage(
+    message,
+    { type: "toolCallStart", tool_id: "call_legacy", tool_name: "dashboard_create_widget" },
+    options,
+  );
+
+  assert.equal(latestRunningAssistantToolCall(message).toolName, "dashboard_create_widget");
+
+  message = applyAssistantStreamEventToMessage(
+    message,
+    { type: "toolCallEnd", tool_id: "call_legacy", tool_name: "dashboard_create_widget" },
+    options,
+  );
+
+  assert.deepEqual(message.toolCalls, [
+    {
+      toolId: "call_legacy",
+      toolName: "dashboard_create_widget",
+      status: "completed",
+      startedAt: "2026-05-12T15:00:00.000Z",
+      endedAt: "2026-05-12T15:00:01.000Z",
+    },
+  ]);
+});
+
+test("assistant stream ignores malformed tool events instead of recording undefined names", async () => {
+  const {
+    applyAssistantStreamEventToMessage,
+    latestRunningAssistantToolCall,
+  } = await importTypeScriptModule(
+    new URL("../src/ai/streamMessage.ts", import.meta.url),
+  );
+  const options = {
+    errorPrefix: "Error",
+    now: () => "2026-05-12T15:00:00.000Z",
+    workStartedAt: "2026-05-12T14:59:59.000Z",
+  };
+
+  const message = applyAssistantStreamEventToMessage(
+    { content: "", isStreaming: true },
+    { type: "toolCallStart", toolId: "call_bad" },
+    options,
+  );
+
+  assert.equal(message.workStartedAt, options.workStartedAt);
+  assert.equal(message.toolCalls, undefined);
+  assert.equal(latestRunningAssistantToolCall(message), undefined);
+});
