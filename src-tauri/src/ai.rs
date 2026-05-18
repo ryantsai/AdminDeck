@@ -38,7 +38,7 @@ static LIVE_TOOL_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 const COPILOT_SDK_RESPONSE_TIMEOUT: Duration = Duration::from_secs(300);
 const DASHBOARD_WIDGET_COMPLETION_CONTRACT: &str = "Dashboard widget completion contract: complete the first created widget to the user's requested outcome before giving the final answer. If the request implies live/realtime data, MCP-backed data, web-fetched data, local file/session data, or any other changing external input, do not create a text-only placeholder or scaffold. In the same assistant turn, use multiple tool-call rounds as needed to discover schemas, read or fetch sample data, inspect real responses, self-correct validation errors, and then create a script widget wired to the actual data source with loading, error, empty, and refresh states. Use polling or event refresh when freshness matters. Create a static content widget only when the user explicitly asks for static text or when live data is impossible in the available permissions. If missing credentials or API access blocks live data, create settingsSchema secret/config fields and request the secret after creation, or ask one narrow blocking question instead of shipping a fake widget.";
 const DASHBOARD_WIDGET_SURFACE_CONTRACT: &str = "Dashboard widget surface contract: treat the widget root as the full allocated surface. Script widgets should make their outermost wrapper fill 100% width and height, usually with kk-shell, kk-stage, kk-panel, or kk-fill, and use KK.getViewport() plus KK.onViewportResize for canvases and visual libraries. Do not create a smaller centered app card, duplicate the host widget frame, or leave accidental blank space around the main content. If the useful object is naturally smaller, still use a full-size wrapper to align, center, or scale it intentionally. Script widgets should avoid max-width, fixed-height, or shrink-to-content outer wrappers unless the user explicitly asks for an inset miniature object.";
-const DASHBOARD_WIDGET_ANIMATION_CONTRACT: &str = "Dashboard widget animation contract: if the requested widget is meant to keep moving, such as a spinner, clock, orbit, meter, loader, or ambient 3D object, the animation must have a durable base motion that does not decay to a static frame. Drag/flick velocity may decay, but auto-spin or live animation needs an idle speed, fresh time-based angle, or restart path so it is still visibly moving after minutes of inactivity. If a requestAnimationFrame loop pauses while KK.isVisible() is false, restart that loop when visibility returns instead of leaving the widget frozen.";
+const DASHBOARD_WIDGET_ANIMATION_CONTRACT: &str = "Dashboard widget animation contract: declare body.lifecycle.kind explicitly. Use 'animation' for widgets that should always be visibly moving (spinners, clocks, orbits, meters, ambient 3D); the host runs a stall watchdog and reports the widget as 'stalled' to the assistant if no rAF callbacks fire for 8 seconds while the widget is visible. Use 'periodic' for widgets that refresh on an interval (counters, polled data). Use 'realtime' for widgets driven by external events (websockets, MCP streams). Use 'static' (the default when lifecycle is null) for non-moving content. For 'animation' widgets, design a durable base motion that does not decay to a static frame: drag/flick velocity may decay, but auto-spin or live animation needs an idle speed, fresh time-based angle, or restart path. If a requestAnimationFrame loop pauses while KK.isVisible() is false, restart that loop when visibility returns instead of leaving the widget frozen.";
 const DASHBOARD_WIDGET_PHYSICS_CONTRACT: &str = "Dashboard widget physics contract: for 2D physics, prefer the bundled Matter.js library instead of hand-rolling collision, gravity, constraints, or rigid-body integration. List body.libraries [\"matter\"] and call the Matter global from source. Size the Matter renderer/canvas from KK.getViewport(), rebuild or reposition static wall/floor bodies on KK.onViewportResize, keep the simulation bounded to the widget arena, and stop Runner or requestAnimationFrame work when the widget is paused, game-over, capped, or no longer needs animation.";
 const DASHBOARD_WIDGET_PERFORMANCE_COUNTER_CONTRACT: &str = "Dashboard performance counter contract: for local performance widgets, use a script widget that calls await KK.getPerformanceCounters(). It returns a low-overhead local snapshot with CPU, RAM, commit, process/thread/handle counts, aggregate network rates, KKTerm process memory/I/O rates, uptime, and system-drive free space. Poll at a modest interval such as 2-5 seconds; do not use requestAnimationFrame for counters.";
 const DASHBOARD_WIDGET_DOM_CONTRACT: &str = "Dashboard widget DOM contract: the generated source is smoke-checked before it is saved. Build the UI from the provided #root element with document.createElement and root.replaceChildren, or provide htmlShim for every extra element id you query. Do not call document.getElementById('some-id').innerHTML/textContent/appendChild unless that id is root, appears in htmlShim, or is created in source before use. After a dashboard_create_widget or dashboard_update_custom_widget call, inspect the tool result; if validation reports a DOM mount, JSON, library, or script-source error, fix the widget and retry before yielding to the user.";
@@ -3477,6 +3477,90 @@ fn dashboard_update_custom_widget_schema() -> Value {
     })
 }
 
+fn dashboard_content_table_schema() -> Value {
+    json!({
+        "type":"object",
+        "properties":{
+            "columns":{"type":"array","minItems":1,"maxItems":12,"items":{"type":"object","properties":{"key":{"type":"string","minLength":1},"label":{"type":"string","minLength":1},"align":{"type":["string","null"],"enum":["start","center","end",null]}},"required":["key","label","align"],"additionalProperties":false}},
+            "rows":{"type":"array","maxItems":200,"items":{"type":"object","additionalProperties":{"type":"string"}}}
+        },
+        "required":["columns","rows"],
+        "additionalProperties":false
+    })
+}
+
+fn dashboard_content_chart_schema() -> Value {
+    json!({
+        "anyOf":[
+            {"type":"object","properties":{"kind":{"type":"string","enum":["sparkline"]},"points":{"type":"array","minItems":1,"maxItems":200,"items":{"type":"number"}},"caption":{"type":["string","null"]}},"required":["kind","points","caption"],"additionalProperties":false},
+            {"type":"object","properties":{"kind":{"type":"string","enum":["bar"]},"series":{"type":"array","minItems":1,"maxItems":200,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"number"}},"required":["label","value"],"additionalProperties":false}},"caption":{"type":["string","null"]}},"required":["kind","series","caption"],"additionalProperties":false},
+            {"type":"object","properties":{"kind":{"type":"string","enum":["donut"]},"series":{"type":"array","minItems":1,"maxItems":200,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"number","minimum":0}},"required":["label","value"],"additionalProperties":false}},"caption":{"type":["string","null"]}},"required":["kind","series","caption"],"additionalProperties":false}
+        ]
+    })
+}
+
+fn dashboard_content_live_schema() -> Value {
+    // The render body is `dashboard_content_leaf_schema()` but we permit
+    // empty / partial data when bindings will fill it at runtime. We
+    // intentionally do NOT enforce minItems on the render's inner arrays
+    // here because bindings substitute those fields after fetch.
+    // Storage-side Rust validation only checks that render.shape is in the
+    // allowed set; the render's data is opaque JSON.
+    json!({
+        "type":"object",
+        "properties":{
+            "fetch":{
+                "type":"object",
+                "properties":{
+                    "url":{"type":"string","pattern":"^https://"},
+                    "refreshSec":{"type":["integer","null"],"minimum":5,"maximum":86400}
+                },
+                "required":["url","refreshSec"],
+                "additionalProperties":false
+            },
+            "render":{
+                "type":"object",
+                "properties":{
+                    "shape":{"type":"string","enum":["markdown","kvList","checklist","stat","table","chart"]},
+                    "data":{"type":"object"}
+                },
+                "required":["shape","data"],
+                "additionalProperties":false
+            },
+            "bindings":{
+                "type":"array",
+                "maxItems":12,
+                "items":{
+                    "type":"object",
+                    "properties":{
+                        "target":{"type":"string","pattern":"^[a-zA-Z][a-zA-Z0-9_]*$"},
+                        "source":{"type":"string","minLength":1,"maxLength":256}
+                    },
+                    "required":["target","source"],
+                    "additionalProperties":false
+                }
+            }
+        },
+        "required":["fetch","render","bindings"],
+        "additionalProperties":false
+    })
+}
+
+fn dashboard_content_leaf_schema() -> Value {
+    // Same as dashboard_widget_body_schema branches but WITHOUT layout — layout
+    // children are leaves only. Nested layouts are out of scope for v1.
+    json!({
+        "anyOf":[
+            {"type":"object","properties":{"shape":{"type":"string","enum":["markdown"]},"data":{"type":"object","properties":{"source":{"type":"string","minLength":1},"mode":{"type":"string","enum":["markdown","html"]}},"required":["source","mode"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["kvList"]},"data":{"type":"object","properties":{"rows":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"string"}},"required":["label","value"],"additionalProperties":false}}},"required":["rows"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["checklist"]},"data":{"type":"object","properties":{"items":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"done":{"type":"boolean"}},"required":["label","done"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["stat"]},"data":{"type":"object","properties":{"value":{"type":"string","minLength":1},"unit":{"type":["string","null"]},"delta":{"type":["string","null"]},"caption":{"type":["string","null"]}},"required":["value","unit","delta","caption"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["table"]},"data":dashboard_content_table_schema()},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["chart"]},"data":dashboard_content_chart_schema()},"required":["shape","data"],"additionalProperties":false}
+        ]
+    })
+}
+
 fn dashboard_widget_body_schema() -> Value {
     json!({
         "anyOf":[
@@ -3484,7 +3568,11 @@ fn dashboard_widget_body_schema() -> Value {
             {"type":"object","properties":{"shape":{"type":"string","enum":["kvList"]},"data":{"type":"object","properties":{"rows":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"value":{"type":"string"}},"required":["label","value"],"additionalProperties":false}}},"required":["rows"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
             {"type":"object","properties":{"shape":{"type":"string","enum":["checklist"]},"data":{"type":"object","properties":{"items":{"type":"array","minItems":1,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1},"done":{"type":"boolean"}},"required":["label","done"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
             {"type":"object","properties":{"shape":{"type":"string","enum":["stat"]},"data":{"type":"object","properties":{"value":{"type":"string","minLength":1},"unit":{"type":["string","null"]},"delta":{"type":["string","null"]},"caption":{"type":["string","null"]}},"required":["value","unit","delta","caption"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
-            {"type":"object","properties":{"source":{"type":"string","minLength":1},"permissions":{"type":"object","properties":{"network":{"type":"boolean"},"pollSeconds":{"type":["integer","null"],"minimum":1}},"required":["network","pollSeconds"],"additionalProperties":false},"htmlShim":{"type":["string","null"]},"libraries":{"type":"array","maxItems":8,"items":{"type":"string","enum":dashboard_widget_library_keys()}}},"required":["source","permissions","htmlShim","libraries"],"additionalProperties":false}
+            {"type":"object","properties":{"shape":{"type":"string","enum":["table"]},"data":dashboard_content_table_schema()},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["chart"]},"data":dashboard_content_chart_schema()},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["layout"]},"data":{"type":"object","properties":{"direction":{"type":"string","enum":["row","col","grid"]},"children":{"type":"array","minItems":1,"maxItems":12,"items":dashboard_content_leaf_schema()}},"required":["direction","children"],"additionalProperties":false}},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"shape":{"type":"string","enum":["live"]},"data":dashboard_content_live_schema()},"required":["shape","data"],"additionalProperties":false},
+            {"type":"object","properties":{"source":{"type":"string","minLength":1},"permissions":{"type":"object","properties":{"network":{"type":"boolean"},"pollSeconds":{"type":["integer","null"],"minimum":1}},"required":["network","pollSeconds"],"additionalProperties":false},"htmlShim":{"type":["string","null"]},"libraries":{"type":"array","maxItems":8,"items":{"type":"string","enum":dashboard_widget_library_keys()}},"lifecycle":{"type":["object","null"],"properties":{"kind":{"type":"string","enum":["static","periodic","animation","realtime"]},"minTickMs":{"type":["integer","null"],"minimum":16,"maximum":60000}},"required":["kind","minTickMs"],"additionalProperties":false}},"required":["source","permissions","htmlShim","libraries","lifecycle"],"additionalProperties":false}
         ]
     })
 }
@@ -6811,25 +6899,33 @@ mod tests {
             .find(|tool| tool.function.name == "dashboard_update_custom_widget")
             .expect("dashboard update custom widget tool exists");
 
+        // Locate the script-body branch in the anyOf list by looking for the
+        // unique `source` property (content shapes use `shape` + `data`).
+        // Using a search instead of a hardcoded index keeps this test stable
+        // as new content shapes are added in front of the script branch.
+        let script_branch = create_tool
+            .function
+            .parameters
+            .pointer("/properties/body/anyOf")
+            .and_then(Value::as_array)
+            .expect("create tool body schema is an anyOf union")
+            .iter()
+            .find(|b| b.pointer("/properties/source").is_some())
+            .expect("script-body branch present in create tool");
+        assert!(script_branch.pointer("/properties/libraries").is_some());
+        let update_script_branch = update_tool
+            .function
+            .parameters
+            .pointer("/properties/patch/properties/body/anyOf")
+            .and_then(Value::as_array)
+            .expect("update tool body schema is an anyOf union")
+            .iter()
+            .find(|b| b.pointer("/properties/source").is_some())
+            .expect("script-body branch present in update tool");
+        assert!(update_script_branch.pointer("/properties/libraries").is_some());
         assert!(
-            create_tool
-                .function
-                .parameters
-                .pointer("/properties/body/anyOf/4/properties/libraries")
-                .is_some()
-        );
-        assert!(
-            update_tool
-                .function
-                .parameters
-                .pointer("/properties/patch/properties/body/anyOf/4/properties/libraries")
-                .is_some()
-        );
-        assert!(
-            create_tool
-                .function
-                .parameters
-                .pointer("/properties/body/anyOf/4/required")
+            script_branch
+                .pointer("/required")
                 .and_then(Value::as_array)
                 .is_some_and(|required| required.contains(&json!("libraries")))
         );
@@ -6864,18 +6960,14 @@ mod tests {
                 .contains("Creative Commons images from credible sources")
         );
         assert!(
-            update_tool
-                .function
-                .parameters
-                .pointer("/properties/patch/properties/body/anyOf/4/required")
+            update_script_branch
+                .pointer("/required")
                 .and_then(Value::as_array)
                 .is_some_and(|required| required.contains(&json!("libraries")))
         );
 
-        let enum_values = create_tool
-            .function
-            .parameters
-            .pointer("/properties/body/anyOf/4/properties/libraries/items/enum")
+        let enum_values = script_branch
+            .pointer("/properties/libraries/items/enum")
             .and_then(Value::as_array)
             .expect("script libraries are enumerated");
         for library in [

@@ -38,6 +38,23 @@ import type { NativeContextMenuPosition } from "../../lib/nativeContextMenu";
 type SetCapped = (capped: boolean) => void;
 const activeScriptWidgets = new Map<string, SetCapped>();
 
+// How long to wait for the iframe's `kk.ready` signal before marking the
+// widget's health as `timeout`. Long enough to ride out library injection
+// + first paint on a slow WebView2 host, short enough that the assistant
+// learns about silent failures inside one user turn.
+const SCRIPT_WIDGET_SMOKE_TEST_MS = 2000;
+
+// Animation-lifecycle stall watchdog: if no `kk.motionTick` arrives for this
+// long while the widget is visible, flip the widget's health to `stalled`.
+// Threshold is intentionally generous so a temporarily slow frame loop (gc,
+// big sync work) does not false-positive; the real signal is "rAF stopped
+// firing entirely" which produces an infinite gap, not a 5–6 second one.
+const SCRIPT_WIDGET_MOTION_STALL_MS = 8000;
+// Polling interval for the watchdog. Higher than 1 s to avoid waking React
+// frequently; lower than the stall threshold so we always notice within ~3 s
+// of the boundary.
+const SCRIPT_WIDGET_MOTION_POLL_MS = 3000;
+
 const BRIDGE_RATE_LIMITS_MS = {
   setSettings: 500,
   getSecret: 500,
@@ -125,7 +142,15 @@ export function ScriptWidgetHost({
   const { t } = useTranslation();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bridgeLastAcceptedRef = useRef(new Map<RateLimitedBridgeMessage, number>());
+  // Last `kk.motionTick` timestamp from the iframe rAF wrapper. Reset to
+  // Date.now() on iframe mount so a slow first paint doesn't immediately
+  // trip the stall watchdog.
+  const motionTickRef = useRef<number>(0);
+  // Visibility, tracked in a ref so the stall watchdog can short-circuit
+  // when the widget is off-screen without re-running its setInterval.
+  const visibleRef = useRef<boolean>(true);
   const updateInstance = useDashboardStore((s) => s.updateInstance);
+  const setWidgetHealth = useDashboardStore((s) => s.setWidgetHealth);
   const maxActiveScriptWidgets = useWorkspaceStore(
     (s) => s.dashboardSettings.maxActiveScriptWidgets,
   );
@@ -209,6 +234,53 @@ export function ScriptWidgetHost({
     [parsed, settingsValuesJson, libraries],
   );
 
+  // Harden 5 (smoke test + health bubbling): when the iframe is about to
+  // mount, register the widget as `pending` and arm a 2s watchdog. The
+  // message listener below transitions to `ready` or `error` on iframe
+  // signals; if neither arrives within the window, the watchdog flips the
+  // state to `timeout` so a silently-broken widget shows up in the AI
+  // context payload as unhealthy. Cleared on unmount or reload.
+  useEffect(() => {
+    if (capped || !libraries) return;
+    motionTickRef.current = Date.now();
+    setWidgetHealth(instance.id, { state: "pending", since: Date.now() });
+    const timer = window.setTimeout(() => {
+      // Only escalate to timeout if the state is still pending; ready/error
+      // signals already moved us out of the smoke-test window.
+      const current = useDashboardStore.getState().widgetHealth[instance.id];
+      if (current?.state === "pending") {
+        setWidgetHealth(instance.id, { state: "timeout", since: Date.now() });
+      }
+    }, SCRIPT_WIDGET_SMOKE_TEST_MS);
+    return () => {
+      window.clearTimeout(timer);
+      setWidgetHealth(instance.id, null);
+    };
+  }, [instance.id, capped, libraries, reloadKey, setWidgetHealth]);
+
+  // Harden 6 (B1: motion watchdog): only enabled for widgets that declared
+  // `lifecycle.kind: "animation"`. Polls the last-motion-tick ref; if the
+  // tick is older than SCRIPT_WIDGET_MOTION_STALL_MS and the widget is
+  // visible, flip to `stalled`. The ready→stalled→ready transition is
+  // observable, so the AI sees the regression in the next context payload
+  // and can offer to fix it.
+  useEffect(() => {
+    if (capped || !libraries || parsed?.lifecycle?.kind !== "animation") return;
+    const interval = window.setInterval(() => {
+      if (!visibleRef.current) return;
+      const lastTick = motionTickRef.current;
+      if (lastTick === 0) return;
+      if (Date.now() - lastTick < SCRIPT_WIDGET_MOTION_STALL_MS) return;
+      const current = useDashboardStore.getState().widgetHealth[instance.id];
+      // Only escalate from ready / stalled. While pending, the smoke test
+      // owns the state; while error, the error message is more useful.
+      if (current?.state === "ready" || current?.state === "stalled") {
+        setWidgetHealth(instance.id, { state: "stalled", since: Date.now() });
+      }
+    }, SCRIPT_WIDGET_MOTION_POLL_MS);
+    return () => window.clearInterval(interval);
+  }, [instance.id, capped, libraries, parsed, reloadKey, setWidgetHealth]);
+
   // Harden 2: post visibility messages to the sandbox when the iframe
   // scrolls off-screen or is occluded. Widgets can check KK.isVisible()
   // to pause expensive rAF/animation loops.
@@ -219,6 +291,7 @@ export function ScriptWidgetHost({
       (entries) => {
         for (const entry of entries) {
           const visible = entry.isIntersecting && entry.intersectionRatio > 0.1;
+          visibleRef.current = visible;
           el.contentWindow?.postMessage(
             { kk: true, type: "setVisible", visible },
             "*",
@@ -252,6 +325,34 @@ export function ScriptWidgetHost({
     function onMessage(event: MessageEvent) {
       if (event.source !== iframeRef.current?.contentWindow) return;
       const data = event.data;
+      // Health signals — handled before bridge dispatch so that a widget
+      // whose runtime error fires inside a rate-limited bridge call still
+      // surfaces. `ready` is idempotent; subsequent `runtimeError` events
+      // after a `ready` are accepted so post-mount regressions are caught.
+      if (isScriptWidgetReadyMessage(data)) {
+        setWidgetHealth(instance.id, { state: "ready", since: Date.now() });
+        return;
+      }
+      if (isScriptWidgetRuntimeErrorMessage(data)) {
+        setWidgetHealth(instance.id, {
+          state: "error",
+          error: data.error,
+          since: Date.now(),
+        });
+        return;
+      }
+      if (isScriptWidgetMotionTickMessage(data)) {
+        // Just record the last-tick timestamp; the stall watchdog effect
+        // polls this ref. If the widget was previously marked `stalled`
+        // and the loop resumed (e.g. resize re-armed the rAF), flip back
+        // to `ready` so the AI context payload reflects current truth.
+        motionTickRef.current = Date.now();
+        const current = useDashboardStore.getState().widgetHealth[instance.id];
+        if (current?.state === "stalled") {
+          setWidgetHealth(instance.id, { state: "ready", since: Date.now() });
+        }
+        return;
+      }
       if (isScriptWidgetOpenExternalMessage(data)) {
         void openExternalUrl(data.url);
         return;
@@ -470,7 +571,7 @@ export function ScriptWidgetHost({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [instance.id, onWidgetContextMenu, updateInstance]);
+  }, [instance.id, onWidgetContextMenu, updateInstance, setWidgetHealth]);
 
   if (!parsed) {
     return <div className="dw-script-error">{t("dashboard.invalidScriptWidgetBody")}</div>;
@@ -520,6 +621,41 @@ function resolveSettingsValuesJson(settingsSchemaJson: string, settingsValuesJso
   const values = parseWidgetSettingsValuesJson(settingsValuesJson);
   if (!schema.ok) return values.ok ? JSON.stringify(values.value) : "{}";
   return JSON.stringify(settingsValuesWithDefaults(schema.value, values.ok ? values.value : {}));
+}
+
+function isScriptWidgetReadyMessage(value: unknown): value is { kk: true; type: "ready" } {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { kk?: unknown; type?: unknown };
+  return candidate.kk === true && candidate.type === "ready";
+}
+
+function isScriptWidgetRuntimeErrorMessage(value: unknown): value is {
+  kk: true;
+  type: "runtimeError";
+  error: string;
+} {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { kk?: unknown; type?: unknown; error?: unknown };
+  return (
+    candidate.kk === true &&
+    candidate.type === "runtimeError" &&
+    typeof candidate.error === "string"
+  );
+}
+
+function isScriptWidgetMotionTickMessage(value: unknown): value is {
+  kk: true;
+  type: "motionTick";
+  ticks: number;
+} {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { kk?: unknown; type?: unknown; ticks?: unknown };
+  return (
+    candidate.kk === true &&
+    candidate.type === "motionTick" &&
+    typeof candidate.ticks === "number" &&
+    Number.isFinite(candidate.ticks)
+  );
 }
 
 function isScriptWidgetOpenExternalMessage(value: unknown): value is { kk: true; type: "openExternalUrl"; url: string } {

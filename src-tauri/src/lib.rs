@@ -2440,6 +2440,7 @@ pub fn run() {
             dashboard_commands::dashboard_update_custom_widget,
             dashboard_commands::dashboard_remove_custom_widget,
             dashboard_commands::dashboard_reset,
+            dashboard_commands::dashboard_widget_fetch,
             dashboard_import_background_image,
             dashboard_load_background_image,
             mcp::mcp_list_servers,

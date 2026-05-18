@@ -1633,6 +1633,10 @@ type CommandMap = {
     args: undefined;
     result: null;
   };
+  dashboard_widget_fetch: {
+    args: { instanceId: string; url: string };
+    result: { status: number; body: unknown };
+  };
   dashboard_import_background_image: {
     args: { sourcePath: string };
     result: string;

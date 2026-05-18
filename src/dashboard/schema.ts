@@ -1,9 +1,14 @@
 import type {
-  ContentBody, ScriptBody, WidgetCustomKind,
+  ContentBody, ContentChart, ContentLeafBody, ContentLive, ContentTable,
+  ScriptBody, WidgetCustomKind,
   WidgetSecretRef, WidgetSettingsField, WidgetSettingsSchema,
 } from "./types";
 
 const MAX_CONTENT_BODY_BYTES = 32 * 1024;
+const MAX_TABLE_COLUMNS = 12;
+const MAX_TABLE_ROWS = 200;
+const MAX_CHART_POINTS = 200;
+const MAX_LAYOUT_CHILDREN = 12;
 const MAX_SCRIPT_SOURCE_BYTES = 64 * 1024;
 const MAX_SETTINGS_SCHEMA_BYTES = 16 * 1024;
 const MAX_SETTINGS_VALUES_BYTES = 32 * 1024;
@@ -110,9 +115,251 @@ export function validateContentWidgetBody(value: unknown): ValidationResult<Cont
         },
       };
     }
+    case "table": {
+      const table = parseContentTable(value.data);
+      if (!table) return { ok: false, reason: "invalidContentData" };
+      return { ok: true, value: { shape: "table", data: table } };
+    }
+    case "chart": {
+      const chart = parseContentChart(value.data);
+      if (!chart) return { ok: false, reason: "invalidContentData" };
+      return { ok: true, value: { shape: "chart", data: chart } };
+    }
+    case "live": {
+      const live = parseContentLive(value.data);
+      if (!live) return { ok: false, reason: "invalidContentData" };
+      return { ok: true, value: { shape: "live", data: live } };
+    }
+    case "layout": {
+      const direction = value.data.direction;
+      if (direction !== "row" && direction !== "col" && direction !== "grid") {
+        return { ok: false, reason: "invalidContentData" };
+      }
+      if (!Array.isArray(value.data.children) || value.data.children.length === 0) {
+        return { ok: false, reason: "invalidContentData" };
+      }
+      if (value.data.children.length > MAX_LAYOUT_CHILDREN) {
+        return { ok: false, reason: "invalidContentData" };
+      }
+      const children: ContentLeafBody[] = [];
+      for (const raw of value.data.children) {
+        const leaf = validateContentLeafBody(raw);
+        if (!leaf.ok) return leaf;
+        children.push(leaf.value);
+      }
+      return { ok: true, value: { shape: "layout", data: { direction, children } } };
+    }
     default:
       return { ok: false, reason: "invalidContentShape" };
   }
+}
+
+/// Same dispatcher as `validateContentWidgetBody` but excludes the `layout`
+/// shape. Mirrors the Rust `ContentLeafBody` enum.
+function validateContentLeafBody(value: unknown): ValidationResult<ContentLeafBody> {
+  if (!isRecord(value) || typeof value.shape !== "string" || !isRecord(value.data)) {
+    return { ok: false, reason: "invalidContentShape" };
+  }
+  if (value.shape === "layout" || value.shape === "live") {
+    // Nested layouts and live-inside-layout are out of scope for v1.
+    return { ok: false, reason: "invalidContentShape" };
+  }
+  // Delegate to the top-level dispatcher, then re-narrow to leaf — the
+  // dispatcher returns ContentBody, but our shape guard above rules out the
+  // layout and live variants.
+  const dispatched = validateContentWidgetBody(value);
+  if (!dispatched.ok) return dispatched;
+  if (dispatched.value.shape === "layout" || dispatched.value.shape === "live") {
+    return { ok: false, reason: "invalidContentShape" };
+  }
+  return { ok: true, value: dispatched.value };
+}
+
+const LIVE_BINDING_TARGET_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+const LIVE_RENDER_SHAPES = new Set(["markdown", "kvList", "checklist", "stat", "table", "chart"]);
+const MIN_LIVE_REFRESH_SEC = 5;
+const MAX_LIVE_REFRESH_SEC = 60 * 60 * 24;
+const MAX_LIVE_PATH_EXPRESSION_LEN = 256;
+
+function parseContentLive(data: Record<string, unknown>): ContentLive | null {
+  const fetchRaw = data.fetch;
+  if (!isRecord(fetchRaw) || typeof fetchRaw.url !== "string") return null;
+  if (!fetchRaw.url.startsWith("https://")) return null;
+  let refreshSec: number | undefined;
+  if (fetchRaw.refreshSec !== undefined && fetchRaw.refreshSec !== null) {
+    if (typeof fetchRaw.refreshSec !== "number" || !Number.isInteger(fetchRaw.refreshSec)) return null;
+    if (fetchRaw.refreshSec < MIN_LIVE_REFRESH_SEC || fetchRaw.refreshSec > MAX_LIVE_REFRESH_SEC) return null;
+    refreshSec = fetchRaw.refreshSec;
+  }
+  const renderRaw = data.render;
+  if (!isRecord(renderRaw) || typeof renderRaw.shape !== "string" || !LIVE_RENDER_SHAPES.has(renderRaw.shape)) {
+    return null;
+  }
+  if (!isRecord(renderRaw.data)) return null;
+  const bindingsRaw = data.bindings;
+  if (!Array.isArray(bindingsRaw)) return null;
+  const bindings: ContentLive["bindings"] = [];
+  for (const b of bindingsRaw) {
+    if (!isRecord(b)) return null;
+    if (typeof b.target !== "string" || !LIVE_BINDING_TARGET_PATTERN.test(b.target)) return null;
+    if (typeof b.source !== "string" || b.source.length === 0 || b.source.length > MAX_LIVE_PATH_EXPRESSION_LEN) {
+      return null;
+    }
+    if (!isValidLivePathExpression(b.source)) return null;
+    bindings.push({ target: b.target, source: b.source });
+  }
+  return {
+    fetch: { url: fetchRaw.url, refreshSec },
+    render: { shape: renderRaw.shape as ContentLeafBody["shape"], data: renderRaw.data },
+    bindings,
+  };
+}
+
+/// Tiny JSON-path subset, mirrors `validate_live_path_expression` in Rust:
+///   identifier (.identifier | [N] | [*])*
+export function isValidLivePathExpression(path: string): boolean {
+  if (path.length === 0) return false;
+  let i = 0;
+  const bytes = path;
+  while (i < bytes.length) {
+    // Identifier segment: first byte alpha, then alpha/digit/_.
+    if (!/[a-zA-Z]/.test(bytes[i]!)) return false;
+    i++;
+    while (i < bytes.length && /[a-zA-Z0-9_]/.test(bytes[i]!)) i++;
+    while (i < bytes.length && bytes[i] === "[") {
+      i++;
+      if (i < bytes.length && bytes[i] === "*") {
+        i++;
+      } else {
+        const digitStart = i;
+        while (i < bytes.length && /[0-9]/.test(bytes[i]!)) i++;
+        if (i === digitStart) return false;
+      }
+      if (i >= bytes.length || bytes[i] !== "]") return false;
+      i++;
+    }
+    if (i === bytes.length) break;
+    if (bytes[i] !== ".") return false;
+    i++;
+    if (i === bytes.length) return false;
+  }
+  return true;
+}
+
+/// Resolve a path expression against a fetched JSON value. Returns
+/// `undefined` if any segment misses; `[*]` produces an array via
+/// fan-out over remaining path.
+export function resolveLivePath(value: unknown, path: string): unknown {
+  return walkPath(value, path, 0);
+}
+
+function walkPath(value: unknown, path: string, cursor: number): unknown {
+  if (cursor >= path.length) return value;
+  // Identifier segment
+  let i = cursor;
+  while (i < path.length && /[a-zA-Z0-9_]/.test(path[i]!)) i++;
+  const key = path.slice(cursor, i);
+  if (key.length === 0) return undefined;
+  if (!isRecord(value)) return undefined;
+  let cur: unknown = (value as Record<string, unknown>)[key];
+  // Indexer chain
+  while (i < path.length && path[i] === "[") {
+    i++;
+    if (path[i] === "*") {
+      i++;
+      if (path[i] !== "]") return undefined;
+      i++;
+      if (!Array.isArray(cur)) return undefined;
+      // Fan-out remaining path across each element. If we're at end of
+      // path, return the array as-is; otherwise expect a `.subkey` next.
+      if (i >= path.length) return cur;
+      if (path[i] === ".") {
+        const restStart = i + 1;
+        return cur.map((el) => walkPath(el, path, restStart));
+      }
+      return undefined;
+    }
+    // Numeric index
+    const dStart = i;
+    while (i < path.length && /[0-9]/.test(path[i]!)) i++;
+    if (i === dStart) return undefined;
+    const idx = Number.parseInt(path.slice(dStart, i), 10);
+    if (path[i] !== "]") return undefined;
+    i++;
+    if (!Array.isArray(cur)) return undefined;
+    cur = (cur as unknown[])[idx];
+  }
+  if (i >= path.length) return cur;
+  if (path[i] !== ".") return undefined;
+  return walkPath(cur, path, i + 1);
+}
+
+function parseContentTable(data: Record<string, unknown>): ContentTable | null {
+  if (!Array.isArray(data.columns) || data.columns.length === 0 || data.columns.length > MAX_TABLE_COLUMNS) {
+    return null;
+  }
+  if (!Array.isArray(data.rows) || data.rows.length > MAX_TABLE_ROWS) {
+    return null;
+  }
+  const seenKeys = new Set<string>();
+  const columns: ContentTable["columns"] = [];
+  for (const raw of data.columns) {
+    if (!isRecord(raw) || !isNonEmptyString(raw.key) || !isNonEmptyString(raw.label)) return null;
+    if (raw.align !== undefined && raw.align !== null && raw.align !== "start" && raw.align !== "center" && raw.align !== "end") {
+      return null;
+    }
+    if (seenKeys.has(raw.key)) return null;
+    seenKeys.add(raw.key);
+    columns.push({
+      key: raw.key,
+      label: raw.label,
+      align: raw.align === "start" || raw.align === "center" || raw.align === "end" ? raw.align : undefined,
+    });
+  }
+  const rows: ContentTable["rows"] = [];
+  for (const raw of data.rows) {
+    if (!isRecord(raw)) return null;
+    const row: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (typeof v !== "string") return null;
+      row[k] = v;
+    }
+    rows.push(row);
+  }
+  return { columns, rows };
+}
+
+function parseContentChart(data: Record<string, unknown>): ContentChart | null {
+  const kind = data.kind;
+  if (kind === "sparkline") {
+    if (!Array.isArray(data.points) || data.points.length === 0 || data.points.length > MAX_CHART_POINTS) return null;
+    const points: number[] = [];
+    for (const p of data.points) {
+      if (typeof p !== "number" || !Number.isFinite(p)) return null;
+      points.push(p);
+    }
+    return {
+      kind: "sparkline",
+      points,
+      caption: typeof data.caption === "string" ? data.caption : undefined,
+    };
+  }
+  if (kind === "bar" || kind === "donut") {
+    if (!Array.isArray(data.series) || data.series.length === 0 || data.series.length > MAX_CHART_POINTS) return null;
+    const series: { label: string; value: number }[] = [];
+    for (const entry of data.series) {
+      if (!isRecord(entry) || !isNonEmptyString(entry.label)) return null;
+      if (typeof entry.value !== "number" || !Number.isFinite(entry.value)) return null;
+      if (kind === "donut" && entry.value < 0) return null;
+      series.push({ label: entry.label, value: entry.value });
+    }
+    return {
+      kind,
+      series,
+      caption: typeof data.caption === "string" ? data.caption : undefined,
+    };
+  }
+  return null;
 }
 
 export function validateScriptWidgetBody(value: unknown): ValidationResult<ScriptBody> {
@@ -157,6 +404,30 @@ export function validateScriptWidgetBody(value: unknown): ValidationResult<Scrip
     }
     libraries = list.length > 0 ? list : undefined;
   }
+  let lifecycle: ScriptBody["lifecycle"];
+  if (value.lifecycle !== undefined && value.lifecycle !== null) {
+    if (!isRecord(value.lifecycle)) {
+      return { ok: false, reason: "invalidScriptBody" };
+    }
+    const kind = value.lifecycle.kind;
+    if (kind !== "static" && kind !== "periodic" && kind !== "animation" && kind !== "realtime") {
+      return { ok: false, reason: "invalidScriptBody" };
+    }
+    const rawMinTick = value.lifecycle.minTickMs;
+    let minTickMs: number | undefined;
+    if (rawMinTick !== undefined && rawMinTick !== null) {
+      if (
+        typeof rawMinTick !== "number" ||
+        !Number.isInteger(rawMinTick) ||
+        rawMinTick < 16 ||
+        rawMinTick > 60_000
+      ) {
+        return { ok: false, reason: "invalidScriptBody" };
+      }
+      minTickMs = rawMinTick;
+    }
+    lifecycle = { kind, minTickMs };
+  }
   return {
     ok: true,
     value: {
@@ -167,6 +438,7 @@ export function validateScriptWidgetBody(value: unknown): ValidationResult<Scrip
       },
       htmlShim: typeof value.htmlShim === "string" ? value.htmlShim : undefined,
       libraries,
+      lifecycle,
     },
   };
 }

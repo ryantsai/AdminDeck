@@ -37,7 +37,7 @@ export function WidgetBody({
     );
   }
 
-  if (cw.kind === "content") return <ContentWidgetRenderer bodyJson={cw.bodyJson} />;
+  if (cw.kind === "content") return <ContentWidgetRenderer bodyJson={cw.bodyJson} instance={instance} />;
   if (cw.kind === "script") {
     return (
       <ScriptWidgetHost

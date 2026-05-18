@@ -317,3 +317,138 @@ pub fn dashboard_reset(app: AppHandle) -> Result<(), DashboardCommandError> {
     crate::prune_unreferenced_backgrounds(&app);
     Ok(())
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardWidgetFetchResult {
+    /// HTTP status code from the upstream response.
+    pub status: u16,
+    /// Parsed JSON body. Always populated on success even when the upstream
+    /// returns non-2xx — the renderer surfaces the status to the user.
+    pub body: Value,
+}
+
+/// HTTP fetch for `live` content widgets. The renderer calls this once on
+/// mount and again on each refresh interval; reqwest runs in the Rust main
+/// process so app-level WebView2 cookies / credentials are never carried
+/// into AI-authored URLs.
+///
+/// Security model:
+///   * `instance_id` must resolve to a content widget whose stored body
+///     declares `shape: "live"` and whose `fetch.url` exactly matches the
+///     requested `url`. A renderer with a tampered URL cannot fetch
+///     anything not authored into the persisted widget.
+///   * `url` must start with `https://`. Plaintext `http://` is rejected
+///     here AND at storage-validation time.
+///   * 10-second wall clock cap.
+///   * Response body capped at `MAX_LIVE_RESPONSE_BYTES`. Larger responses
+///     return a structured `bodyTooLarge` validation error.
+///   * Response must be parseable as JSON. Non-JSON responses return a
+///     `notJson` validation error. v1 does not support text-mode bodies;
+///     that's a future addition alongside `parse: "text" | "json"`.
+#[tauri::command]
+pub async fn dashboard_widget_fetch(
+    app: AppHandle,
+    instance_id: String,
+    url: String,
+) -> Result<DashboardWidgetFetchResult, DashboardCommandError> {
+    use crate::dashboard_validation::MAX_LIVE_RESPONSE_BYTES;
+
+    // Look up the stored widget body so we can verify the requested URL
+    // matches what was authored. Done synchronously off the async runtime.
+    let body_json = {
+        let app = app.clone();
+        let instance_id = instance_id.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            storage(&app).with_connection_infallible(
+                |conn| -> Result<String, DashboardCommandError> {
+                    ds::content_widget_body_json_for_instance(conn, &instance_id)
+                        .map_err(Into::into)
+                },
+            )
+        })
+        .await
+        .map_err(|error| DashboardCommandError::Internal {
+            message: format!("widget body lookup join failed: {error}"),
+        })??
+    };
+
+    let parsed_body: Value =
+        serde_json::from_str(&body_json).map_err(|error| DashboardCommandError::Internal {
+            message: format!("stored widget body did not parse as JSON: {error}"),
+        })?;
+    let stored_url = parsed_body
+        .get("data")
+        .and_then(|d| d.get("fetch"))
+        .and_then(|f| f.get("url"))
+        .and_then(Value::as_str);
+    if parsed_body.get("shape").and_then(Value::as_str) != Some("live") {
+        return Err(DashboardCommandError::Validation {
+            reason: "notLiveWidget".to_string(),
+            detail: Some("widget instance does not declare shape: live".to_string()),
+        });
+    }
+    if stored_url != Some(url.as_str()) {
+        return Err(DashboardCommandError::Validation {
+            reason: "urlMismatch".to_string(),
+            detail: Some(
+                "requested url does not match the widget's stored fetch.url".to_string(),
+            ),
+        });
+    }
+    if !url.starts_with("https://") {
+        return Err(DashboardCommandError::Validation {
+            reason: "insecureScheme".to_string(),
+            detail: Some("only https:// is allowed".to_string()),
+        });
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|error| DashboardCommandError::Internal {
+            message: format!("failed to build HTTP client: {error}"),
+        })?;
+    let response = client
+        .get(&url)
+        .header(reqwest::header::ACCEPT, "application/json")
+        .send()
+        .await
+        .map_err(|error| DashboardCommandError::Validation {
+            reason: "networkError".to_string(),
+            detail: Some(error.to_string()),
+        })?;
+    let status = response.status().as_u16();
+    // Stream the body with a hard cap so a multi-GB response cannot exhaust
+    // memory. `bytes()` would buffer the entire body; we instead iterate.
+    let bytes = {
+        use futures::StreamExt;
+        let mut acc: Vec<u8> = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|error| DashboardCommandError::Validation {
+                reason: "networkError".to_string(),
+                detail: Some(error.to_string()),
+            })?;
+            if acc.len() + chunk.len() > MAX_LIVE_RESPONSE_BYTES {
+                return Err(DashboardCommandError::Validation {
+                    reason: "bodyTooLarge".to_string(),
+                    detail: Some(format!(
+                        "response exceeded {MAX_LIVE_RESPONSE_BYTES} bytes"
+                    )),
+                });
+            }
+            acc.extend_from_slice(&chunk);
+        }
+        acc
+    };
+    let body: Value = serde_json::from_slice(&bytes).map_err(|error| {
+        DashboardCommandError::Validation {
+            reason: "notJson".to_string(),
+            detail: Some(format!(
+                "response did not parse as JSON: {error}; v1 supports JSON only"
+            )),
+        }
+    })?;
+    Ok(DashboardWidgetFetchResult { status, body })
+}

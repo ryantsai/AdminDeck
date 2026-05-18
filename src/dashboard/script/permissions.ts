@@ -240,6 +240,13 @@ export function buildSrcdoc(
       var _kkLastRafTimestamp = 0;
       var _kkRafTimer = 0;
       var _kkRafHandle = 0;
+      // Motion watchdog: emit a kk.motionTick every N rAF callbacks so the
+      // parent can detect when an 'animation' lifecycle widget's frame loop
+      // has stopped firing. Throttled to one message every ~500 ms regardless
+      // of frame rate so we never spam the bridge.
+      var _kkMotionTickCounter = 0;
+      var _kkLastMotionTickPostAt = 0;
+      var KK_MOTION_TICK_MIN_MS = 500;
       var KK_RAF_MIN_INTERVAL_MS = 33;
       var KK_SET_TIMEOUT_MIN_MS = 16;
       var KK_SET_INTERVAL_MIN_MS = 100;
@@ -270,6 +277,18 @@ export function buildSrcdoc(
             _nativeSetTimeout(function () { throw error; }, 0);
           }
         });
+        _kkMotionTickCounter++;
+        // Heartbeat for animation-lifecycle stall detection. Throttled to one
+        // post per KK_MOTION_TICK_MIN_MS so a 60 fps widget produces ~2
+        // messages/s, not 60. The parent's stall watchdog flips an
+        // animation-lifecycle widget's health to 'stalled' when no tick
+        // arrives for 8 s while the widget is visible.
+        if (timestamp - _kkLastMotionTickPostAt >= KK_MOTION_TICK_MIN_MS) {
+          _kkLastMotionTickPostAt = timestamp;
+          try {
+            window.parent.postMessage({ kk: true, type: 'motionTick', ticks: _kkMotionTickCounter }, '*');
+          } catch (_postErr) { /* parent gone; ignore */ }
+        }
         scheduleKkRafPump(KK_RAF_MIN_INTERVAL_MS);
       }
       window.requestAnimationFrame = function (callback) {
@@ -650,9 +669,18 @@ export function buildSrcdoc(
         }, "*");
       }, true);
       function showError(err) {
+        var serialized = String(err && (err.stack || err.message) || err);
+        // Bubble the runtime error to the parent so ScriptWidgetHost can
+        // flag this widget unhealthy. Without this, errors stayed inside
+        // the iframe in a <pre>, invisible to both the user (until they
+        // scrolled to this widget) and the AI assistant (which never
+        // learned its widget had broken).
+        try {
+          window.parent.postMessage({ kk: true, type: 'runtimeError', error: serialized }, '*');
+        } catch (_postErr) { /* parent gone; nothing to do */ }
         const pre = document.createElement('pre');
         pre.className = 'kk-widget-error';
-        pre.textContent = String(err && (err.stack || err.message) || err);
+        pre.textContent = serialized;
         document.body.replaceChildren(pre);
       }
       window.addEventListener('error', function (event) {
@@ -686,6 +714,14 @@ export function buildSrcdoc(
         // (matches the effect-style "return cleanup" idiom AI generators emit).
         // No leading newline: keeps user line N at blob line N for stack traces.
         return injectScript('(function(){' + ${source} + '\\n})();', 'kkterm-dashboard-widget.js');
+      }).then(function () {
+        // Smoke-test signal: the widget source loaded without a synchronous
+        // throw at top level. The parent's 2s watchdog uses this to
+        // distinguish "took a moment but mounted fine" from "silently
+        // failed to ever render".
+        try {
+          window.parent.postMessage({ kk: true, type: 'ready' }, '*');
+        } catch (_postErr) { /* parent gone; nothing to do */ }
       }).catch(showError);
     })();
   </script>

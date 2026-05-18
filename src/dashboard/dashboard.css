@@ -1291,6 +1291,182 @@ button.dashboard-pill-dot:focus-visible {
   line-height: 1.65;
 }
 
+/* --- Table content shape ------------------------------------------------- */
+
+.dw-table-wrap {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.dw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.dw-table th,
+.dw-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-faint, rgba(0, 0, 0, 0.08));
+  text-align: left;
+}
+
+.dw-table th {
+  color: var(--text-faint);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  background: var(--surface, transparent);
+}
+
+.dw-table tbody tr:hover {
+  background: var(--w-accent-soft, rgba(0, 0, 0, 0.04));
+}
+
+/* --- Chart content shape ------------------------------------------------- */
+
+.dw-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.dw-chart-caption {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.dw-sparkline {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dw-bar-chart {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.dw-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.4fr) minmax(0, 1fr) minmax(0, max-content);
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.dw-bar-label {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dw-bar-track {
+  height: 8px;
+  background: var(--w-accent-soft, rgba(0, 0, 0, 0.06));
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dw-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--w-accent, currentColor);
+  border-radius: 4px;
+}
+
+.dw-bar-fill.dw-bar-neg {
+  background: var(--w-accent, currentColor);
+  opacity: 0.55;
+}
+
+.dw-bar-value {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+}
+
+.dw-donut {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* --- Live (fetch+compute) widget states ---------------------------------- */
+
+.dw-live-loading,
+.dw-live-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 40px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+}
+
+.dw-live-error {
+  color: var(--w-accent, currentColor);
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Layout container ---------------------------------------------------- */
+
+.dw-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+  min-height: 0;
+}
+
+.dw-layout-row {
+  flex-direction: row;
+}
+
+.dw-layout-col {
+  flex-direction: column;
+}
+
+.dw-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  align-content: start;
+}
+
+.dw-layout-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .dw-content-rich {
   min-width: 0;
   color: var(--text-muted);

@@ -185,6 +185,96 @@ test("script widget wraps user source in IIFE so top-level return is legal", asy
   assert.throws(() => new vm.Script(source), /Illegal return/);
 });
 
+test("script widget signals smoke-test ready and bubbles runtime errors to parent", async () => {
+  const { buildSrcdoc } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/permissions.ts", import.meta.url),
+  );
+  const srcdoc = buildSrcdoc({
+    source: "document.getElementById('root').textContent = 'ok';",
+    permissions: { network: false },
+  });
+
+  // After the user source loads, the host posts a kk.ready signal so
+  // ScriptWidgetHost can clear its 2s smoke-test watchdog. Without this
+  // signal, every widget would appear unhealthy on first mount.
+  assert.match(
+    srcdoc,
+    /window\.parent\.postMessage\(\{\s*kk:\s*true,\s*type:\s*'ready'\s*\},\s*'\*'\)/,
+  );
+
+  // The iframe's showError handler posts kk.runtimeError to the parent so
+  // a thrown widget surfaces in the dashboard health state and the
+  // assistant context payload, not only in an in-iframe <pre>.
+  assert.match(
+    srcdoc,
+    /window\.parent\.postMessage\(\{\s*kk:\s*true,\s*type:\s*'runtimeError',\s*error:\s*serialized\s*\},\s*'\*'\)/,
+  );
+});
+
+test("live widget path expression resolves dotted, indexed, and fan-out paths", async () => {
+  const { resolveLivePath, isValidLivePathExpression } = await importTypeScriptModule(
+    new URL("../src/dashboard/schema.ts", import.meta.url),
+  );
+
+  const data = {
+    quote: { price: 42.5, ts: 1700000000 },
+    quotes: [
+      { close: 100, vol: 1000 },
+      { close: 102, vol: 900 },
+      { close: 99,  vol: 1100 },
+    ],
+    nested: { a: { b: [{ c: "deep" }] } },
+  };
+
+  // Syntactic validator must accept the canonical forms.
+  for (const p of ["quote.price", "quotes[0].close", "quotes[*].close", "nested.a.b[0].c"]) {
+    assert.equal(isValidLivePathExpression(p), true, p);
+  }
+
+  // Resolver behavior — primitive at the end.
+  assert.equal(resolveLivePath(data, "quote.price"), 42.5);
+  assert.equal(resolveLivePath(data, "quotes[1].close"), 102);
+  assert.equal(resolveLivePath(data, "nested.a.b[0].c"), "deep");
+
+  // Resolver behavior — array fan-out.
+  assert.deepEqual(resolveLivePath(data, "quotes[*].close"), [100, 102, 99]);
+  assert.deepEqual(resolveLivePath(data, "quotes[*].vol"), [1000, 900, 1100]);
+
+  // Missing path → undefined, not throw.
+  assert.equal(resolveLivePath(data, "quote.missing"), undefined);
+  assert.equal(resolveLivePath(data, "missing[0]"), undefined);
+  // Index past end → undefined.
+  assert.equal(resolveLivePath(data, "quotes[99]"), undefined);
+
+  // Malformed paths must be rejected at validation time so the renderer
+  // never asks the resolver to walk garbage.
+  for (const bad of ["", ".key", "key.", "key[", "key[]", "key.123", "key/value"]) {
+    assert.equal(isValidLivePathExpression(bad), false, `${bad} should be invalid`);
+  }
+});
+
+test("script widget rAF wrapper emits throttled motionTick heartbeat for stall watchdog", async () => {
+  const { buildSrcdoc } = await importTypeScriptModule(
+    new URL("../src/dashboard/script/permissions.ts", import.meta.url),
+  );
+  const srcdoc = buildSrcdoc({
+    source: "function frame(){ requestAnimationFrame(frame); } requestAnimationFrame(frame);",
+    permissions: { network: false },
+  });
+
+  // The wrapper centralises rAF dispatch in runKkRafPump; the heartbeat
+  // post must live inside that function so every iframe gets a stall
+  // signal whether or not the user source calls rAF.
+  assert.match(srcdoc, /KK_MOTION_TICK_MIN_MS\s*=\s*500/);
+  assert.match(
+    srcdoc,
+    /window\.parent\.postMessage\(\{\s*kk:\s*true,\s*type:\s*'motionTick',\s*ticks:\s*_kkMotionTickCounter\s*\},\s*'\*'\)/,
+  );
+  // Throttle gate: the post must be guarded by a timestamp comparison so
+  // a 60 fps widget produces ~2 messages/s, not 60.
+  assert.match(srcdoc, /if\s*\(\s*timestamp\s*-\s*_kkLastMotionTickPostAt\s*>=\s*KK_MOTION_TICK_MIN_MS\s*\)/);
+});
+
 test("script widget infers common local libraries from legacy generated source", async () => {
   const { resolveWidgetLibraryKeys } = await importTypeScriptModule(
     new URL("../src/dashboard/script/widgetLibraries.ts", import.meta.url),

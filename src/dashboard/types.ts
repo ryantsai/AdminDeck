@@ -153,17 +153,69 @@ export interface LayoutEntry {
 
 export type ContentShape = "markdown" | "kvList" | "checklist" | "stat";
 
-export type ContentBody =
+export type ContentTableAlign = "start" | "center" | "end";
+
+export interface ContentTableColumn {
+  key: string;
+  label: string;
+  align?: ContentTableAlign;
+}
+
+export interface ContentTable {
+  columns: ContentTableColumn[];
+  rows: Record<string, string>[];
+}
+
+export type ContentChart =
+  | { kind: "sparkline"; points: number[]; caption?: string }
+  | { kind: "bar"; series: { label: string; value: number }[]; caption?: string }
+  | { kind: "donut"; series: { label: string; value: number }[]; caption?: string };
+
+export type ContentLayoutDirection = "row" | "col" | "grid";
+
+/// Leaf body = a content shape that is NOT itself a layout. Mirrors the
+/// Rust `ContentLeafBody` to keep nested layouts excluded at the type level.
+export type ContentLeafBody =
   | { shape: "markdown"; data: { source: string; mode?: "markdown" | "html" } }
   | { shape: "kvList"; data: { rows: { label: string; value: string }[] } }
   | { shape: "checklist"; data: { items: { label: string; done?: boolean }[] } }
-  | { shape: "stat"; data: { value: string; unit?: string; delta?: string; caption?: string } };
+  | { shape: "stat"; data: { value: string; unit?: string; delta?: string; caption?: string } }
+  | { shape: "table"; data: ContentTable }
+  | { shape: "chart"; data: ContentChart };
+
+export interface ContentLiveBinding {
+  target: string;
+  source: string;
+}
+
+export interface ContentLive {
+  fetch: { url: string; refreshSec?: number };
+  /// Opaque render body — `shape` and `data` are validated, but `data`'s
+  /// inner fields may be incomplete since bindings fill them at runtime.
+  render: { shape: ContentLeafBody["shape"]; data: Record<string, unknown> };
+  bindings: ContentLiveBinding[];
+}
+
+export type ContentBody =
+  | ContentLeafBody
+  | { shape: "layout"; data: { direction: ContentLayoutDirection; children: ContentLeafBody[] } }
+  | { shape: "live"; data: ContentLive };
+
+export type ScriptLifecycleKind = "static" | "periodic" | "animation" | "realtime";
+
+export interface ScriptLifecycle {
+  kind: ScriptLifecycleKind;
+  minTickMs?: number;
+}
 
 export interface ScriptBody {
   source: string;
   permissions: { network: boolean; pollSeconds?: number };
   htmlShim?: string;
   libraries?: string[];
+  /// Declared runtime lifecycle. `animation` arms a stall watchdog in the
+  /// host; other kinds are reserved for future invariants. Absent ⇒ static.
+  lifecycle?: ScriptLifecycle;
 }
 
 export type WidgetSettingsField =

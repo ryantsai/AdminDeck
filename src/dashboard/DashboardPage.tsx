@@ -42,6 +42,7 @@ export function DashboardPage({
   const renameView = useDashboardStore((s) => s.renameView);
   const removeView = useDashboardStore((s) => s.removeView);
   const setViewTabColor = useDashboardStore((s) => s.setViewTabColor);
+  const widgetHealth = useDashboardStore((s) => s.widgetHealth);
   const defaultLandingView = useWorkspaceStore((s) => s.dashboardSettings.defaultLandingView);
 
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -138,6 +139,24 @@ export function DashboardPage({
         summary: widget.summary,
         activeOnView: activeCustomSourceIds.has(widget.id),
       })),
+      // Smoke-test + runtime errors bubbled up from ScriptWidgetHost. The
+      // assistant uses this to notice and offer to fix widgets it has
+      // recently authored that silently failed to mount or threw at runtime,
+      // rather than waiting for the user to scroll over and report the
+      // empty/blank widget.
+      unhealthyInstances: viewInstances
+        .map((instance) => {
+          const health = widgetHealth[instance.id];
+          if (!health || health.state === "pending" || health.state === "ready") return null;
+          return {
+            id: instance.id,
+            kind: instance.kind,
+            sourceId: instance.sourceId,
+            state: health.state,
+            ...(health.state === "error" ? { error: health.error } : {}),
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
       mcpServers: mcpServers.map((server) => ({
         id: server.id,
         name: server.name,
@@ -155,7 +174,7 @@ export function DashboardPage({
         t("dashboard.assistantContextIntro"),
         "For a user request to create a visible Dashboard widget, use dashboard_create_widget with activeView.id so the widget is validated and placed on the selected view in one step.",
         "For a user request to fix or edit an existing AI-authored widget, use dashboard_load_state to read the current customWidgets[].bodyJson and instances[].sourceId, then call dashboard_update_custom_widget. Prefer patch.body over patch.bodyJson so you can submit structured content/script bodies without manual JSON escaping.",
-        "Prefer content widgets for static notes, sanitized HTML fragments, checklists, stats, and key/value summaries. For markdown-shaped content widgets, set data.mode to markdown when data.source is Markdown text and html when data.source is an HTML fragment. Use script widgets only when live JavaScript behavior is required.",
+        "Prefer content widgets whenever possible. Available content shapes: markdown (text or sanitized HTML fragment via data.mode), kvList (label/value rows), checklist, stat, table (declarative columns + rows), chart (kind: sparkline | bar | donut), layout (row/col/grid containers wrapping the other shapes), and live (declarative HTTP fetch + JSON-path bindings into a render leaf). For tables, provide columns:[{key,label,align?}] and rows:[{<column.key>: <string>}]. For charts: sparkline takes a points:number[] array, bar/donut take series:[{label, value}]. For live widgets, set data.fetch.url (must be https://), optional data.fetch.refreshSec (5..86400), data.render to a leaf shape (stat/chart/table/etc), and data.bindings to a list of { target, source } mapping render-body fields to JSON-path expressions (subset: identifier.identifier, [N], [*]) over the fetched JSON. Use a layout container to compose multiple non-script shapes (e.g. a stat next to a sparkline) inside one widget. Use script widgets ONLY when interactive JavaScript, animations, or behaviors not expressible as fetch+bindings are required; static data summaries, tables, small charts, and JSON-API displays should be content widgets.",
         "When using a script widget, provide JavaScript source only. Do not generate a full HTML document or include <script> tags; create DOM nodes inside #root instead.",
         "Your script runs inside a synchronous function wrapper, so top-level `return` is allowed for early exit but any returned cleanup function is ignored. The iframe is destroyed on unmount, so cleanup is usually unnecessary; if you need to react to visibility changes use KK.isVisible(). Top-level `await` is not available; wrap async work in an `async` IIFE.",
         "Choose preset, accentName, iconName, and grid size intentionally from the widget purpose. Default to panel for ordinary tools, use ambient for lightweight notes or subtle widgets, and reserve hero for rare high-priority summaries. Choose an accent color that fits the widget theme; if no accent is clearly preferable, choose a random non-default accent.",
@@ -179,7 +198,7 @@ export function DashboardPage({
         JSON.stringify(dashboardSnapshot, null, 2),
       ].join("\n"),
     });
-  }, [activeView, viewInstances, activeCustomSourceIds, customWidgets, mcpServers, onAssistantContextChange, t]);
+  }, [activeView, viewInstances, activeCustomSourceIds, customWidgets, mcpServers, widgetHealth, onAssistantContextChange, t]);
 
   if (!ready || !activeView) {
     return (

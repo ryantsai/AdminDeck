@@ -7,6 +7,30 @@ import type {
   WidgetKind, WidgetPreset, AccentName, IconName, CustomWidgetPatch, DashboardBackground,
 } from "../types";
 
+/// Per-instance script widget runtime health, kept in-memory only.
+///
+/// `pending` is the initial state when a script widget mounts; the parent
+/// arms a 2s watchdog and waits for one of:
+///   - `kk.ready` from the iframe after the source injects without a
+///     synchronous throw → `ready`.
+///   - `kk.runtimeError` from the iframe's error handler → `error` carrying
+///     the serialized error message.
+///   - watchdog elapses with no signal → `timeout`.
+/// After `ready`, a later `kk.runtimeError` transitions back to `error` so
+/// regressions after first paint are still observable.
+/// `stalled` is exclusive to widgets that declared `lifecycle.kind:
+/// "animation"`; it fires when the iframe's rAF heartbeat (kk.motionTick)
+/// has not arrived for ~8 s while the widget is visible — indicating the
+/// frame loop stopped firing entirely. Catches "exception in update
+/// callback that got swallowed"; does NOT catch "rAF still running, scene
+/// visually frozen" — that needs a pixel-hash watchdog (future work).
+export type WidgetHealth =
+  | { state: "pending"; since: number }
+  | { state: "ready"; since: number }
+  | { state: "error"; error: string; since: number }
+  | { state: "timeout"; since: number }
+  | { state: "stalled"; since: number };
+
 interface DashboardStoreState {
   ready: boolean;
   loading: boolean;
@@ -14,6 +38,8 @@ interface DashboardStoreState {
   instances: DashboardWidgetInstance[];
   customWidgets: DashboardCustomWidget[];
   agentCreatedRevealInstanceIds: string[];
+  widgetHealth: Record<string, WidgetHealth>;
+  setWidgetHealth: (instanceId: string, health: WidgetHealth | null) => void;
   activeViewId: string | null;
   editMode: boolean;
   lastError: string | null;
@@ -70,10 +96,22 @@ export const useDashboardStore = create<DashboardStoreState>((set, get) => ({
   instances: [],
   customWidgets: [],
   agentCreatedRevealInstanceIds: [],
+  widgetHealth: {},
   activeViewId: null,
   editMode: false,
   lastError: null,
   backgroundImages: {},
+
+  setWidgetHealth: (instanceId, health) =>
+    set((s) => {
+      const next = { ...s.widgetHealth };
+      if (health === null) {
+        delete next[instanceId];
+      } else {
+        next[instanceId] = health;
+      }
+      return { ...s, widgetHealth: next };
+    }),
 
   load: async () => {
     set({ loading: true });

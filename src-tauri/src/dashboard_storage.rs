@@ -957,6 +957,30 @@ pub fn widget_secret_owner_id_for_instance(
     Ok(has_ref.then_some(expected_owner_id))
 }
 
+/// Resolve a content widget instance to its custom widget body JSON.
+/// Returns `NotFound` if the instance does not exist, is not a content
+/// widget, or its source custom widget has been removed. Used by the
+/// `dashboard_widget_fetch` command to verify that the requested URL was
+/// authored into the stored widget body before issuing an HTTP request.
+pub fn content_widget_body_json_for_instance(
+    conn: &SqliteConnection,
+    instance_id: &str,
+) -> Result<String, DashboardStorageError> {
+    let row = conn.query_row(
+        "SELECT cw.body_json
+         FROM dashboard_widget_instances inst
+         JOIN dashboard_custom_widgets cw ON cw.id = inst.source_id
+         WHERE inst.id = ? AND inst.kind = 'content'",
+        params![instance_id],
+        |row| row.get::<_, String>(0),
+    );
+    match row {
+        Ok(body) => Ok(body),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Err(DashboardStorageError::NotFound),
+        Err(other) => Err(DashboardStorageError::Sqlite(other)),
+    }
+}
+
 pub fn seed_default(conn: &SqliteConnection) -> Result<(), DashboardStorageError> {
     let view_exists: i64 =
         conn.query_row("SELECT COUNT(*) FROM dashboard_views", [], |row| row.get(0))?;

@@ -52,6 +52,11 @@ lazy_static = "1.5.0"
 shared_library = "0.1.9"
 winapi = "0.3.9"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "rustls-tls"] }
+oxc_allocator = "0.132"
+oxc_parser = "0.132"
+oxc_span = "0.132"
+oxc_ast = "0.132"
+oxc_ast_visit = "0.132"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics", "Win32_Graphics_Gdi", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Ole", "Win32_System_Variant", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
