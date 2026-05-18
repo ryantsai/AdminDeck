@@ -1483,6 +1483,19 @@ button {
   cursor: col-resize;
 }
 
+.panel-resize-handle::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: 3px;
+  background: #2f80ff;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 120ms ease 500ms;
+}
+
 .panel-resize-handle-left,
 .connection-collapsed-separator {
   grid-column: 3;
@@ -1500,15 +1513,24 @@ button {
 }
 
 .panel-resize-handle:hover,
-.panel-resize-handle:focus-visible,
-.panel-resize-handle-collapsed {
+.panel-resize-handle:focus-visible {
   color: var(--text);
-  background: #bfd0ea;
   outline: 0;
 }
 
+.panel-resize-handle:not(.panel-resize-handle-collapsed):hover::after,
+.panel-resize-handle:not(.panel-resize-handle-collapsed):focus-visible::after {
+  opacity: 1;
+}
+
 .panel-resize-handle-collapsed {
+  color: var(--text);
+  background: #bfd0ea;
   cursor: pointer;
+}
+
+.panel-resize-handle-collapsed::after {
+  content: none;
 }
 
 .panel-collapsed-tab {
