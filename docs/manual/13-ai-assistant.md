@@ -52,6 +52,8 @@ Assistant tool calls run under one of two modes (selector label `ai.toolPermissi
 - **Prompt** (`ai.toolPermissionPrompt`) — each tool call requires explicit approval.
 - **Allow all** (`ai.toolPermissionAllowAll`) — tool calls run without prompting. Use deliberately.
 
+In Prompt / Default permissions mode, mutating tool calls pause the current assistant response and show an in-chat approval card: `ai.toolApprovalTitle`, `ai.toolApprovalTool`, `ai.toolApprovalBody`, `ai.toolApprovalDetails`, `ai.toolApprovalWaiting`, `ai.toolApprovalApproved`, `ai.toolApprovalRejected`, `ai.toolApprovalCancelled`, with action buttons `common.yes`, `common.no`, and `common.cancel`. Choosing Yes or No resumes the same assistant response; Cancel bails out of the current response. This does not require changing the global permission selector to `ai.toolPermissionAllowAll`.
+
 ### Built-in tools
 
 Built-in AI tools default on except `settings.aiTools.email.label`. The email tool stays off until enabled in Settings because it requires delivery configuration and an email secret.

@@ -955,6 +955,14 @@ fn complete_assistant_live_tool_request(
 }
 
 #[tauri::command]
+fn complete_assistant_tool_approval_request(
+    bridge: tauri::State<'_, ai::AssistantToolApprovalBridge>,
+    completion: ai::AssistantToolApprovalCompletion,
+) -> Result<(), String> {
+    ai::complete_tool_approval_request(&bridge, completion)
+}
+
+#[tauri::command]
 async fn run_ai_agent(
     app: tauri::AppHandle,
     storage: tauri::State<'_, storage::Storage>,
@@ -2238,6 +2246,7 @@ pub fn run() {
             app.manage(power_manager);
             app.manage(secrets::Secrets::new());
             app.manage(ai::AssistantLiveToolBridge::new());
+            app.manage(ai::AssistantToolApprovalBridge::new());
             app.manage(sessions::SessionManager::new());
             app.manage(sftp::SftpSessionManager::new());
             app.manage(ftp::FtpSessionManager::new());
@@ -2343,6 +2352,7 @@ pub fn run() {
             list_ai_provider_models,
             plan_command_proposal,
             complete_assistant_live_tool_request,
+            complete_assistant_tool_approval_request,
             run_ai_agent,
             run_ai_agent_streaming,
             keychain_status,

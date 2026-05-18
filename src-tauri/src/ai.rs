@@ -56,6 +56,10 @@ pub struct AssistantLiveToolBridge {
     pending: Mutex<HashMap<String, oneshot::Sender<String>>>,
 }
 
+pub struct AssistantToolApprovalBridge {
+    pending: Mutex<HashMap<String, oneshot::Sender<bool>>>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CopilotModelOption {
@@ -190,11 +194,109 @@ impl AssistantLiveToolBridge {
     }
 }
 
+impl AssistantToolApprovalBridge {
+    pub fn new() -> Self {
+        Self {
+            pending: Mutex::new(HashMap::new()),
+        }
+    }
+
+    async fn request(&self, app: &tauri::AppHandle, tool_name: &str, args: &Value) -> bool {
+        let request_id = new_tool_approval_request_id();
+        let (tx, rx) = oneshot::channel();
+        match self.pending.lock() {
+            Ok(mut pending) => {
+                pending.insert(request_id.clone(), tx);
+            }
+            Err(_) => {
+                return false;
+            }
+        }
+
+        let payload = json!({
+            "requestId": request_id,
+            "toolName": tool_name,
+            "args": args,
+        });
+        ai_interaction_debug!("tool.approval_request", payload.clone());
+        if let Err(error) = app.emit("assistant-tool-approval-request", payload) {
+            let _ = self.take_pending(&request_id);
+            ai_interaction_debug!(
+                "tool.approval_dispatch_error",
+                json!({
+                    "requestId": request_id,
+                    "toolName": tool_name,
+                    "error": error.to_string(),
+                })
+            );
+            return false;
+        }
+
+        match timeout(Duration::from_secs(300), rx).await {
+            Ok(Ok(approved)) => {
+                ai_interaction_debug!(
+                    "tool.approval_result",
+                    json!({
+                        "requestId": request_id,
+                        "toolName": tool_name,
+                        "approved": approved,
+                    })
+                );
+                approved
+            }
+            Ok(Err(_)) => {
+                ai_interaction_debug!(
+                    "tool.approval_channel_closed",
+                    json!({
+                        "requestId": request_id,
+                        "toolName": tool_name,
+                    })
+                );
+                false
+            }
+            Err(_) => {
+                let _ = self.take_pending(&request_id);
+                ai_interaction_debug!(
+                    "tool.approval_timeout",
+                    json!({
+                        "requestId": request_id,
+                        "toolName": tool_name,
+                    })
+                );
+                false
+            }
+        }
+    }
+
+    fn complete(&self, request_id: &str, approved: bool) -> Result<(), String> {
+        let sender = self
+            .take_pending(request_id)
+            .ok_or_else(|| "tool approval request is no longer pending".to_string())?;
+        sender
+            .send(approved)
+            .map_err(|_| "tool approval receiver is no longer available".to_string())
+    }
+
+    fn take_pending(&self, request_id: &str) -> Option<oneshot::Sender<bool>> {
+        self.pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| pending.remove(request_id))
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssistantLiveToolCompletion {
     request_id: String,
     result: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssistantToolApprovalCompletion {
+    request_id: String,
+    approved: bool,
 }
 
 pub fn complete_live_tool_request(
@@ -211,6 +313,20 @@ pub fn complete_live_tool_request(
     bridge.complete(&completion.request_id, completion.result)
 }
 
+pub fn complete_tool_approval_request(
+    bridge: &AssistantToolApprovalBridge,
+    completion: AssistantToolApprovalCompletion,
+) -> Result<(), String> {
+    ai_interaction_debug!(
+        "tool.approval_frontend_completion",
+        json!({
+            "requestId": completion.request_id,
+            "approved": completion.approved,
+        })
+    );
+    bridge.complete(&completion.request_id, completion.approved)
+}
+
 fn new_live_tool_request_id() -> String {
     let seq = LIVE_TOOL_REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
     let millis = SystemTime::now()
@@ -218,6 +334,15 @@ fn new_live_tool_request_id() -> String {
         .map(|duration| duration.as_millis())
         .unwrap_or(0);
     format!("live-tool-{millis}-{seq}")
+}
+
+fn new_tool_approval_request_id() -> String {
+    let seq = LIVE_TOOL_REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    format!("tool-approval-{millis}-{seq}")
 }
 
 #[derive(Deserialize)]
@@ -3629,17 +3754,23 @@ async fn run_ai_tool(
     );
     if tool_requires_allow_all(&call.function.name) && settings.tool_permission_mode() != "allowAll"
     {
-        let result = tool_permission_required_result(&call.function.name);
-        ai_interaction_debug!(
-            "tool.permission_required",
-            json!({
-                "id": &call.id,
-                "name": &call.function.name,
-                "permissionMode": settings.tool_permission_mode(),
-                "result": &result,
-            })
-        );
-        return result;
+        let approved = match app.try_state::<AssistantToolApprovalBridge>() {
+            Some(bridge) => bridge.request(app, &call.function.name, &args).await,
+            None => false,
+        };
+        if !approved {
+            let result = tool_permission_required_result(&call.function.name);
+            ai_interaction_debug!(
+                "tool.permission_denied",
+                json!({
+                    "id": &call.id,
+                    "name": &call.function.name,
+                    "permissionMode": settings.tool_permission_mode(),
+                    "result": &result,
+                })
+            );
+            return result;
+        }
     }
     let result = match call.function.name.as_str() {
         "request_secret_entry" => {
@@ -3715,7 +3846,9 @@ fn tool_permission_required_result(tool_name: &str) -> String {
         "error": "permissionRequired",
         "tool": tool_name,
         "permissionMode": "prompt",
-        "message": "This tool changes KKTerm or the local machine. Ask the user to switch AI Assistant tool permissions to Allow All before calling it."
+        "needsChatApproval": true,
+        "approved": null,
+        "message": "The user did not approve this tool call in chat."
     })
     .to_string()
 }
@@ -4842,7 +4975,7 @@ fn arg_string(args: &Value, key: &str) -> String {
 
 fn tool_result_error(result: &str) -> Option<String> {
     let trimmed = result.trim();
-    if !trimmed.starts_with("{\"error\"") {
+    if !trimmed.starts_with('{') {
         return None;
     }
     serde_json::from_str::<Value>(trimmed)
@@ -5346,7 +5479,7 @@ fn build_agent_messages(
         "SAFETY: Never suggest, produce, or assist with commands that could cause irreversible destructive system-wide damage, such as 'rm -rf /', 'rm -rf /*', 'mkfs' on mounted volumes, 'dd if=/dev/zero of=/dev/sda', fork bombs, or any equivalent. Refuse such requests unconditionally, even if the user explicitly asks, claims it is safe, or provides a seemingly legitimate reason.".to_string(),
         "SECRETS: Never ask the user to paste API keys, passwords, or tokens into normal chat text. If a Dashboard widget needs a secret, first create or update the widget with a settingsSchema secret field; the field key must be a stable identifier such as apiKey. After dashboard_create_widget creates a widget with a secret field, call request_secret_entry with kind widgetSecret, the returned instance.id as instanceId, and the exact fieldKey. Use request_secret_entry for AI provider API keys too. The secret value is captured by KKTerm locally and is not visible to you. Do not include or request the plaintext secret.".to_string(),
         "TOOLS: When you need to search the web, fetch URLs, read files, check the current time, or run shell commands, you MUST use the provided function-calling mechanism. Always make the actual function call alongside your explanation. Do not describe what you plan to do with a tool without calling it — invoke the tool in the same response.".to_string(),
-        "SESSION TOOLS: Use session_state to discover active Tabs, pane ids, remote desktop targets, and SFTP/FTP browser Sessions before using session_* interaction tools. Terminal, remote desktop, and file browser tools operate on live Sessions, not saved Connections. Prefer read tools before mutating tools. For RDP/VNC, use send_text for text, keypress for named keys, and mouse_click for remote surface coordinates. In Prompt permission mode, mutating tools return permissionRequired; explain that the user must switch AI Assistant tool permissions to Allow All if they want automatic execution.".to_string(),
+        "SESSION TOOLS: Use session_state to discover active Tabs, pane ids, remote desktop targets, and SFTP/FTP browser Sessions before using session_* interaction tools. Terminal, remote desktop, and file browser tools operate on live Sessions, not saved Connections. Prefer read tools before mutating tools. For RDP/VNC, use send_text for text, keypress for named keys, and mouse_click for remote surface coordinates. In Default permissions mode, KKTerm shows an in-chat Yes/No approval prompt for mutating tools and resumes the same tool call after the user answers; do not ask the user to change the global permission mode.".to_string(),
         "DASHBOARD TOOLS: When the active page context is Dashboard and the user asks to create, customize, arrange, repair, or remove Dashboard widgets or views, use the dashboard_* tools. To create a new user-requested widget on the active view, use dashboard_create_widget so the widget is validated and placed on the selected view in one step. Do not use the separate two-step dashboard_create_custom_widget + dashboard_add_instance for user-visible widget creation. When the user reports an error in an existing AI Created Widget, use dashboard_load_state to read the current Dashboard AI Created Widget source, then call dashboard_update_custom_widget with the matching AI Created Widget id. Prefer patch.body for widget source edits; patch.body is structured JSON and avoids escaping mistakes. Do not ask the user to paste widget source that KKTerm can read through dashboard_load_state. All AI Created Widgets are script widgets. For static requests, create a small script widget that renders concise DOM inside #root using KKTerm's built-in classes. Design AI Created Widgets as polished, self-contained Mac OS X Dashboard-style widgets: a single-purpose singleton object with a focused visual state, minimal explanatory text, and only the controls needed for the task. Make widgets as graphical as possible by default, using charts, meters, maps, timelines, canvases, imagery, icons, and spatial layout instead of prose-first blocks; avoid text-only widgets unless the user explicitly asks for text-only output. When an illustrative or photographic asset would improve the widget, search for and use or download Creative Commons images from credible sources, prefer stable source URLs, avoid arbitrary copyrighted/hotlinked images, and preserve attribution/licensing context in source comments or nearby metadata when practical. Avoid generic form-like layouts unless the user explicitly asks for a data-entry form; prefer compact meters, clocks, gauges, search boxes, calculators, monitors, launchers, canvases, and other object-like surfaces. Choose the preset, accent, icon, and grid size to fit the widget's job and KKTerm's quiet desktop style. Choose an accent color that fits the widget theme; if no accent is clearly preferable, choose a random non-default accent. Be boundary-aware: size simple timers/counters at least 4x3, forms or images need 5x4 or larger, and list widgets tall enough for their expected rows so the initial widget does not show inner scrollbars. Games, canvas demos, and single-purpose interactive tools should start compact, normally 4-6 columns wide and 4-7 rows tall; do not make them full-width unless the user asks for a wide layout. For Three.js widgets, list body.libraries [\"three\"], size the renderer from KK.getViewport(), update renderer/camera on KK.onViewportResize, center the scene at world origin, and fit the camera to a Box3/Sphere around the complete object with about 15-25% margin so it remains centered and fully visible instead of oversized or clipped. For QR code widgets, list body.libraries [\"qrcode\"] and pass a real canvas element to QRCode.toCanvas; create a wrapping div only for padding/background, then append the canvas inside it. For chartjs, echarts, leaflet, konva, pixijs, matter, mermaid, qrcode, jsbarcode, and gridjs widgets, mount the visual area inside kk-stage or kk-panel and size it from KK.getViewport() or the containing element; on KK.onViewportResize call the library's resize/update method so it stays centered and proportionate. Script widgets can create file and folder drop zones with KK.onFileDrop(elementOrSelector, callback, options); the callback receives dropped file and directory entries, and file entries include bytes as Uint8Array. Keep generated script widget UI compact, app-like, readable, high-contrast, and free of full HTML documents or script tags. Use KKTerm's built-in script UI classes before writing custom CSS: kk-shell, kk-toolbar, kk-cluster, kk-title, kk-subtitle, kk-muted, kk-panel, kk-card, kk-grid, kk-stat, kk-stat-value, kk-stat-label, kk-pill, kk-badge, kk-stage, and kk-fill. Avoid default unstyled browser controls and oversized explanatory text. Use body.libraries for curated local script libraries such as mermaid, Matter.js, and animejs; runtime CDN scripts are blocked by CSP. Use permissions.network=true only for remote network access or remote images. Use settingsSchema.fields for persistent per-instance custom options; KKTerm renders those settings and scripts can read non-secret values with KK.getSettings() and save via KK.setSetting(key, value). KK.getSettings() is synchronous; do not await it. Passwords, API keys, tokens, and similar sensitive values must use settingsSchema field type secret with no defaultValue; SQLite stores only a secretRef, the value lives in OS keychain as widgetSecret. Top-level await is not available because script widgets run inside a synchronous function wrapper; wrap async bridge calls such as KK.getSecret('fieldKey') in an async IIFE. After creating a widget with a secret field, call request_secret_entry using the returned widget instance id and the exact secret field key instead of asking the user to paste the secret in chat. When a widget embeds remote images or fetches remote data, set script permissions.network=true. External website links should be http/https anchors or KK.openExternal(url); they open in the external browser, not inside the widget iframe.".to_string(),
         DASHBOARD_WIDGET_COMPLETION_CONTRACT.to_string(),
         DASHBOARD_WIDGET_SURFACE_CONTRACT.to_string(),
@@ -7437,6 +7570,38 @@ mod tests {
         assert_eq!(value["ok"], false);
         assert_eq!(value["error"], "permissionRequired");
         assert_eq!(value["permissionMode"], "prompt");
+    }
+
+    #[test]
+    fn prompt_permission_mode_requests_inline_chat_approval() {
+        let result = tool_permission_required_result("dashboard_reset");
+        let value: Value = serde_json::from_str(&result).expect("permission result is JSON");
+
+        assert_eq!(value["needsChatApproval"], true);
+        assert_eq!(value["approved"], Value::Null);
+        assert!(!value["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Allow All"));
+
+        let messages = build_agent_messages(
+            "Create a widget".to_string(),
+            "Dashboard".to_string(),
+            Some("chat".to_string()),
+            "medium".to_string(),
+            None,
+            None,
+            None,
+            false,
+            None,
+            vec![],
+            vec![],
+            None,
+            None,
+        );
+        let system_content = text_content(&messages[0]);
+        assert!(system_content.contains("KKTerm shows an in-chat Yes/No approval prompt"));
+        assert!(!system_content.contains("switch AI Assistant tool permissions to Allow All"));
     }
 
     #[test]

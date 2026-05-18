@@ -39,3 +39,42 @@ test("status bar exposes a clickable AI working indicator", async () => {
     "AssistantPanel should publish in-flight work to shared state.",
   );
 });
+
+test("assistant renders in-chat tool approval controls", async () => {
+  const assistantSource = await readFile(
+    new URL("../src/ai/AssistantPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  const tauriSource = await readFile(new URL("../src/lib/tauri.ts", import.meta.url), "utf8");
+
+  assert.match(
+    assistantSource,
+    /assistant-tool-approval-request/,
+    "AssistantPanel should listen for backend tool approval requests.",
+  );
+  assert.match(
+    assistantSource,
+    /complete_assistant_tool_approval_request/,
+    "AssistantPanel should complete the approval request instead of changing global settings.",
+  );
+  assert.match(
+    assistantSource,
+    /assistant-tool-approval-card/,
+    "AssistantPanel should render an in-chat approval card.",
+  );
+  assert.match(
+    assistantSource,
+    /toolApprovalCancelled/,
+    "AssistantPanel should show a cancelled state when the user bails out.",
+  );
+  assert.match(
+    assistantSource,
+    /completeAssistantToolApproval\(request\.requestId,\s*false,\s*\{\s*cancelPrompt:\s*true\s*\}/,
+    "AssistantPanel should let Cancel reject the pending approval and stop the active response.",
+  );
+  assert.match(
+    tauriSource,
+    /complete_assistant_tool_approval_request/,
+    "typed Tauri wrappers should include the approval completion command.",
+  );
+});

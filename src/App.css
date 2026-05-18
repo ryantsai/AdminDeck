@@ -5482,6 +5482,85 @@ progress {
   line-height: 1.45;
 }
 
+.assistant-tool-approval-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.assistant-tool-approval-card header,
+.assistant-tool-approval-card footer {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.assistant-tool-approval-card header {
+  justify-content: flex-start;
+}
+
+.assistant-tool-approval-card header svg {
+  color: var(--amber);
+  flex: 0 0 auto;
+}
+
+.assistant-tool-approval-card header div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.assistant-tool-approval-card strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.assistant-tool-approval-card small,
+.assistant-tool-approval-card footer span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.assistant-tool-approval-card p {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.assistant-tool-approval-card details {
+  display: grid;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.assistant-tool-approval-card summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.assistant-tool-approval-card pre {
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  padding: 9px;
+  color: #dce7f5;
+  background: var(--terminal);
+  border-radius: 6px;
+}
+
+.assistant-tool-approval-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .proposal-context-details {
   display: grid;
   gap: 8px;

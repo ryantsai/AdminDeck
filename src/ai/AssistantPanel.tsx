@@ -158,6 +158,16 @@ type AssistantLiveToolRequest = {
   args?: Record<string, unknown>;
 };
 
+type AssistantToolApprovalRequest = {
+  requestId: string;
+  toolName: string;
+  args?: Record<string, unknown>;
+};
+
+type PendingToolApproval = AssistantToolApprovalRequest & {
+  status: "pending" | "approved" | "rejected" | "cancelled";
+};
+
 export interface AssistantPageContext {
   contextKind?: "dashboard";
   contextLabel: string;
@@ -798,6 +808,7 @@ export function AssistantPanel({
   const [showAllChats, setShowAllChats] = useState(false);
   const [chatError, setChatError] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
+  const [pendingToolApprovals, setPendingToolApprovals] = useState<PendingToolApproval[]>([]);
   const [assistantIntent, setAssistantIntent] = useState<AssistantPromptIntent>("chat");
   const [addContextMenuOpen, setAddContextMenuOpen] = useState(false);
   const [permissionMenuOpen, setPermissionMenuOpen] = useState(false);
@@ -1029,7 +1040,7 @@ export function AssistantPanel({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [isSendingPrompt, messages, shouldShowPreStreamWaiting]);
+  }, [isSendingPrompt, messages, pendingToolApprovals, shouldShowPreStreamWaiting]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -1054,6 +1065,35 @@ export function AssistantPanel({
       unlisten?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<AssistantToolApprovalRequest>("assistant-tool-approval-request", (event) => {
+      if (disposed) {
+        return;
+      }
+      const request = event.payload;
+      setPendingToolApprovals((current) => [
+        ...current.filter((item) => item.requestId !== request.requestId),
+        { ...request, status: "pending" },
+      ]);
+      forceChatScrollToBottomRef.current = true;
+    }).then((dispose) => {
+      if (disposed) {
+        dispose();
+        return;
+      }
+      unlisten = dispose;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -1139,6 +1179,11 @@ export function AssistantPanel({
     activeAssistantRequestIdRef.current += 1;
     setIsSendingPrompt(false);
     setChatError("");
+    pendingToolApprovals
+      .filter((request) => request.status === "pending")
+      .forEach((request) => {
+        void completeAssistantToolApproval(request.requestId, false);
+      });
     window.requestAnimationFrame(() => {
       composerTextareaRef.current?.focus();
     });
@@ -1158,6 +1203,7 @@ export function AssistantPanel({
     setFileContexts([]);
     setImagePasteRejected(false);
     setAssistantIntent("chat");
+    setPendingToolApprovals([]);
     setShowAllChats(false);
   }
 
@@ -1214,6 +1260,7 @@ export function AssistantPanel({
     setFileContexts([]);
     setImagePasteRejected(false);
     setAssistantIntent("chat");
+    setPendingToolApprovals([]);
     setShowAllChats(false);
   }
 
@@ -1234,6 +1281,7 @@ export function AssistantPanel({
       setFileContexts([]);
       setImagePasteRejected(false);
       setAssistantIntent("chat");
+      setPendingToolApprovals([]);
     }
   }
 
@@ -1289,6 +1337,39 @@ export function AssistantPanel({
           requestId: request.requestId,
           result: JSON.stringify(result),
         },
+      });
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function completeAssistantToolApproval(
+    requestId: string,
+    approved: boolean,
+    options?: { cancelPrompt?: boolean },
+  ) {
+    setPendingToolApprovals((current) =>
+      current.map((item) =>
+        item.requestId === requestId
+          ? {
+              ...item,
+              status: options?.cancelPrompt
+                ? "cancelled"
+                : approved
+                  ? "approved"
+                  : "rejected",
+            }
+          : item,
+      ),
+    );
+    if (options?.cancelPrompt) {
+      activeAssistantRequestIdRef.current += 1;
+      setIsSendingPrompt(false);
+      setChatError("");
+    }
+    try {
+      await invokeCommand("complete_assistant_tool_approval_request", {
+        completion: { requestId, approved },
       });
     } catch (error) {
       setChatError(error instanceof Error ? error.message : String(error));
@@ -1792,6 +1873,7 @@ export function AssistantPanel({
       clearAssistantContextSnippet();
     }
     setChatError("");
+    setPendingToolApprovals([]);
     setIsSendingPrompt(true);
     const requestId = activeAssistantRequestIdRef.current + 1;
     activeAssistantRequestIdRef.current = requestId;
@@ -2395,6 +2477,18 @@ export function AssistantPanel({
             }
           />
         ))}
+        {pendingToolApprovals.map((request) => (
+          <AssistantToolApprovalCard
+            key={request.requestId}
+            request={request}
+            onAnswer={(approved) =>
+              void completeAssistantToolApproval(request.requestId, approved)
+            }
+            onCancel={() =>
+              void completeAssistantToolApproval(request.requestId, false, { cancelPrompt: true })
+            }
+          />
+        ))}
         {shouldShowPreStreamWaiting ? (
           <article className="assistant-message assistant-waiting" aria-live="polite">
             <span className="assistant-spinner" aria-hidden="true" />
@@ -2768,6 +2862,100 @@ export function AssistantPanel({
       ) : null}
     </aside>
   );
+}
+
+function AssistantToolApprovalCard({
+  onAnswer,
+  onCancel,
+  request,
+}: {
+  onAnswer: (approved: boolean) => void;
+  onCancel: () => void;
+  request: PendingToolApproval;
+}) {
+  const { t } = useTranslation();
+  const isPending = request.status === "pending";
+  const argsPreview = formatToolApprovalArgs(request.args);
+
+  return (
+    <article className="assistant-message assistant">
+      <div className="assistant-message-content">
+        <section className="assistant-tool-approval-card" aria-live="polite">
+          <header>
+            <ShieldAlert size={15} />
+            <div>
+              <strong>{t("ai.toolApprovalTitle")}</strong>
+              <small>
+                {t("ai.toolApprovalTool", {
+                  tool: humanizeAssistantToolName(request.toolName),
+                })}
+              </small>
+            </div>
+          </header>
+          <p>{t("ai.toolApprovalBody")}</p>
+          {argsPreview ? (
+            <details>
+              <summary>{t("ai.toolApprovalDetails")}</summary>
+              <pre>
+                <code>{argsPreview}</code>
+              </pre>
+            </details>
+          ) : null}
+          <footer>
+            <span>
+              {request.status === "approved"
+                ? t("ai.toolApprovalApproved")
+                : request.status === "rejected"
+                  ? t("ai.toolApprovalRejected")
+                  : request.status === "cancelled"
+                    ? t("ai.toolApprovalCancelled")
+                    : t("ai.toolApprovalWaiting")}
+            </span>
+            <div className="assistant-tool-approval-actions">
+              <button
+                className="toolbar-button"
+                disabled={!isPending}
+                onClick={onCancel}
+                type="button"
+              >
+                <Square size={14} />
+                {t("common.cancel")}
+              </button>
+              <button
+                className="toolbar-button"
+                disabled={!isPending}
+                onClick={() => onAnswer(false)}
+                type="button"
+              >
+                <X size={14} />
+                {t("common.no")}
+              </button>
+              <button
+                className="toolbar-button primary"
+                disabled={!isPending}
+                onClick={() => onAnswer(true)}
+                type="button"
+              >
+                <Check size={14} />
+                {t("common.yes")}
+              </button>
+            </div>
+          </footer>
+        </section>
+      </div>
+    </article>
+  );
+}
+
+function formatToolApprovalArgs(args: Record<string, unknown> | undefined) {
+  if (!args || Object.keys(args).length === 0) {
+    return "";
+  }
+  try {
+    return JSON.stringify(args, null, 2);
+  } catch {
+    return "";
+  }
 }
 
 function AssistantMessageView({

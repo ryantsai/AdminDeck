@@ -999,6 +999,10 @@ type CommandMap = {
     args: { completion: { requestId: string; result: string } };
     result: null;
   };
+  complete_assistant_tool_approval_request: {
+    args: { completion: { requestId: string; approved: boolean } };
+    result: null;
+  };
   run_ai_agent: {
     args: { request: AgentRunRequest };
     result: AgentRunResponse;
