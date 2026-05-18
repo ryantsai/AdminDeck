@@ -8,6 +8,7 @@ import { resolveBackgroundPreset } from "../registry/backgroundPresets";
 import { DashboardDynamicBackground } from "../registry/dynamicBackgrounds";
 import { useDashboardStore } from "../state/dashboardStore";
 import type { BackgroundFit, DashboardView, DashboardWidgetInstance, GridDensity } from "../types";
+import { DashboardWidgetErrorBoundary } from "./DashboardWidgetErrorBoundary";
 import { WidgetFrame } from "./WidgetFrame";
 
 const ResponsiveGrid = WidthProvider(GridLayout);
@@ -132,7 +133,12 @@ export function DashboardCanvas({
       >
         {instances.map((i) => (
           <div key={i.id}>
-            <WidgetFrame instance={i} onCustomize={onCustomize} />
+            <DashboardWidgetErrorBoundary
+              resetKey={`${i.id}:${i.sourceId}:${i.kind}`}
+              fallback={<div className="dashboard-widget-error">{t("common.error")}</div>}
+            >
+              <WidgetFrame instance={i} onCustomize={onCustomize} />
+            </DashboardWidgetErrorBoundary>
           </div>
         ))}
       </ResponsiveGrid>

@@ -23,3 +23,18 @@ test("Dashboard widget deletion uses the shared delete confirmation dialog", asy
   assert.doesNotMatch(frame, /removeConfirmHint/);
   assert.doesNotMatch(frame, /confirmTimerRef/);
 });
+
+test("Dashboard widgets are isolated by an error boundary", async () => {
+  const canvas = await readFile(new URL("../src/dashboard/view/DashboardCanvas.tsx", import.meta.url), "utf8");
+  const boundary = await readFile(
+    new URL("../src/dashboard/view/DashboardWidgetErrorBoundary.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(canvas, /import \{ DashboardWidgetErrorBoundary \} from "\.\/DashboardWidgetErrorBoundary";/);
+  assert.match(canvas, /<DashboardWidgetErrorBoundary[\s\S]*<WidgetFrame instance=\{i\}/);
+  assert.match(canvas, /fallback=\{<div className="dashboard-widget-error">\{t\("common\.error"\)\}<\/div>\}/);
+  assert.match(boundary, /static getDerivedStateFromError/);
+  assert.match(boundary, /componentDidCatch/);
+  assert.match(boundary, /previousProps\.resetKey !== this\.props\.resetKey/);
+});
