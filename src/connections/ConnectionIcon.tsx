@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { ConnectionType } from "../types";
 import ftpIcon from "../assets/connection-icons/ftp.png";
 import rdpIcon from "../assets/connection-icons/rdp.png";
@@ -49,27 +50,43 @@ export function connectionIconSrcForConnection({
 
 export function ConnectionIcon({
   className,
+  iconBackgroundColor,
   iconDataUrl,
   localShell,
   size = 16,
   type,
 }: {
   className?: string;
+  iconBackgroundColor?: string | null;
   iconDataUrl?: string | null;
   localShell?: string;
   size?: number;
   type: ConnectionType;
 }) {
   const src = connectionIconSrcForConnection({ iconDataUrl, localShell, type });
+  const hasBackground = Boolean(iconBackgroundColor);
+  const shellSize = hasBackground ? size + 6 : size;
+  const style = {
+    "--connection-icon-bg": iconBackgroundColor ?? "transparent",
+    "--connection-icon-size": `${size}px`,
+    "--connection-icon-shell-size": `${shellSize}px`,
+  } as CSSProperties;
   return (
-    <img
-      alt=""
+    <span
       aria-hidden="true"
-      className={["connection-icon-image", className].filter(Boolean).join(" ")}
-      draggable={false}
-      height={size}
-      src={src}
-      width={size}
-    />
+      className={["connection-icon-shell", hasBackground ? "has-background" : "", className]
+        .filter(Boolean)
+        .join(" ")}
+      style={style}
+    >
+      <img
+        alt=""
+        className="connection-icon-image"
+        draggable={false}
+        height={size}
+        src={src}
+        width={size}
+      />
+    </span>
   );
 }

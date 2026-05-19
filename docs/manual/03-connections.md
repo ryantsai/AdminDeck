@@ -3,8 +3,8 @@
 ## AI grep hints
 
 - Keys: `connections.*` (full namespace), `app.connectionRail`
-- Topics: Connection Tree, folders, search, Quick Connect, Add Connection, rename, delete, duplicate, pin to rail, drag/drop, properties dialog
-- Synonyms: "saved host", "profile", "ssh entry", "create folder", "favourites"
+- Topics: Connection Tree, folders, search, Quick Connect, Add Connection, rename, delete, duplicate, pin to rail, drag/drop, properties dialog, icon image, icon background
+- Synonyms: "saved host", "profile", "ssh entry", "create folder", "favourites", "icon color", "connection color"
 
 > **Term:** "Connection" is the canonical name for a durable openable resource. Do not use "profile", "host entry", or "saved session". A Connection only becomes a live **Session** when opened; switching Tabs does not end the Session.
 
@@ -64,6 +64,8 @@ Both are app-owned DOM dialogs (not browser-native `prompt`).
 - Recently used Connections list, empty state `connections.noRecent`
 
 **Add Connection** uses the same form shape but persists to SQLite. The Type selector label is `connections.type`.
+
+For saved Connections, the properties/Add Connection header includes Connection icon presentation controls. `connections.editIcon` changes the icon image. `connections.editIconBackground` opens the circular icon background picker; `connections.iconBackground` labels the picker, `connections.transparentIconBackground` clears the color back to the default transparent state, and `connections.selectIconBackground` applies a palette color. The chosen background is shown behind Connection icons in the Connection Tree and on pinned/connected Activity Rail Connection shortcuts.
 
 ## Drag and drop
 

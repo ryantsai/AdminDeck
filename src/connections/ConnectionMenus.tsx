@@ -131,7 +131,13 @@ export function QuickConnectMenu({
             onClick={() => onOpenConnection(connection)}
             type="button"
           >
-            <ConnectionGlyph iconDataUrl={connection.iconDataUrl} localShell={connection.localShell} size={15} type={connection.type} />
+            <ConnectionGlyph
+              iconBackgroundColor={connection.iconBackgroundColor}
+              iconDataUrl={connection.iconDataUrl}
+              localShell={connection.localShell}
+              size={15}
+              type={connection.type}
+            />
             <span className="connection-main">
               <strong>{connection.name}</strong>
               <small>{connectionSubtitle(connection)}</small>

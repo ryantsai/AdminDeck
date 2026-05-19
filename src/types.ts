@@ -32,6 +32,7 @@ export interface Connection {
   urlCredentialUsername?: string;
   hasUrlCredential?: boolean;
   iconDataUrl?: string | null;
+  iconBackgroundColor?: string | null;
   rdpOptions?: RdpConnectionOptions;
   vncOptions?: VncConnectionOptions;
   ftpOptions?: FtpConnectionOptions;

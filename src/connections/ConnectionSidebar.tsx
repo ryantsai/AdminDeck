@@ -1,4 +1,5 @@
 import { ConnectionGlyph, connectionSubtitle, connectionTypeSubtitle } from "./ConnectionGlyph";
+import { ConnectionIconBackgroundPicker } from "./ConnectionIconBackgroundPicker";
 import { ConnectionIconPicker } from "./ConnectionIconPicker";
 import { connectionIconSrcForConnection } from "./ConnectionIcon";
 import { AddConnectionMenu, QuickConnectMenu } from "./ConnectionMenus";
@@ -100,6 +101,7 @@ type TransferSshPublicKeyDialogState = {
 
 type ConnectionDialogRequest = CreateConnectionRequest & {
   iconDataUrl?: string | null;
+  iconBackgroundColor?: string | null;
   password?: string;
   urlCredentialUsername?: string;
   urlPassword?: string;
@@ -478,13 +480,13 @@ export function ConnectionSidebar({
 
   async function handleConnectionSubmit(request: ConnectionDialogRequest) {
     setFormError("");
-    const { iconDataUrl, password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
+    const { iconDataUrl, iconBackgroundColor, password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
     if (formMode === "save") {
       try {
         let connection = await invokeCommand("create_connection", {
           request: connectionRequest,
         });
-        connection = await saveConnectionIconDataUrl(connection, iconDataUrl);
+        connection = await saveConnectionIconPresentation(connection, iconDataUrl, iconBackgroundColor);
         if (password) {
           await storeConnectionPassword(connection.id, password);
         }
@@ -527,6 +529,7 @@ export function ConnectionSidebar({
         connectionRequest.type === "url" && urlCredentialUsername ? urlCredentialUsername : undefined,
       hasUrlCredential: connectionRequest.type === "url" && Boolean(urlCredentialUsername && urlPassword),
       iconDataUrl,
+      iconBackgroundColor,
       status: "idle",
     };
 
@@ -549,7 +552,7 @@ export function ConnectionSidebar({
     }
 
     setFormError("");
-    const { iconDataUrl, password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
+    const { iconDataUrl, iconBackgroundColor, password, urlCredentialUsername, urlPassword, ...connectionRequest } = request;
     const updateRequest: UpdateConnectionRequest = {
       ...connectionRequest,
       id: editConnection.connection.id,
@@ -560,7 +563,7 @@ export function ConnectionSidebar({
       let connection = await invokeCommand("update_connection", {
         request: updateRequest,
       });
-      connection = await saveConnectionIconDataUrl(connection, iconDataUrl);
+      connection = await saveConnectionIconPresentation(connection, iconDataUrl, iconBackgroundColor);
       if (password) {
         await storeConnectionPassword(connection.id, password);
       }
@@ -668,6 +671,23 @@ export function ConnectionSidebar({
       iconDataUrl: normalizedIconDataUrl,
     });
     return updated ?? { ...connection, iconDataUrl: normalizedIconDataUrl };
+  }
+
+  async function saveConnectionIconPresentation(
+    connection: Connection,
+    iconDataUrl: string | null | undefined,
+    iconBackgroundColor: string | null | undefined,
+  ) {
+    let updatedConnection = await saveConnectionIconDataUrl(connection, iconDataUrl);
+    const normalizedIconBackgroundColor = iconBackgroundColor ?? null;
+    if ((updatedConnection.iconBackgroundColor ?? null) === normalizedIconBackgroundColor) {
+      return updatedConnection;
+    }
+    const updated = await invokeCommand("update_connection_icon_background_color", {
+      connectionId: updatedConnection.id,
+      iconBackgroundColor: normalizedIconBackgroundColor,
+    });
+    return updated ?? { ...updatedConnection, iconBackgroundColor: normalizedIconBackgroundColor };
   }
 
   async function handleDeleteFolder(folder: ConnectionFolder) {
@@ -2356,6 +2376,9 @@ function ConnectionDialog({
     String(initialConnection?.port ?? (connectionType ? defaultPortForConnectionType(connectionType, sshSettings) : "")),
   );
   const [iconDataUrl, setIconDataUrl] = useState<string | null>(initialConnection?.iconDataUrl ?? null);
+  const [iconBackgroundColor, setIconBackgroundColor] = useState<string | null>(
+    initialConnection?.iconBackgroundColor ?? null,
+  );
   const [rdpInheritsSettingsDefaults, setRdpInheritsSettingsDefaults] = useState(
     initialConnection?.rdpOptions?.inheritDefaults ?? true,
   );
@@ -2578,6 +2601,7 @@ function ConnectionDialog({
           : undefined,
       urlPassword: connectionType === "url" ? String(form.get("urlPassword") ?? "") || undefined : undefined,
       iconDataUrl: mode === "quick" ? undefined : iconDataUrl,
+      iconBackgroundColor: mode === "quick" ? undefined : iconBackgroundColor,
     });
   }
 
@@ -2661,19 +2685,27 @@ function ConnectionDialog({
           <div className="connection-type-summary">
             {mode === "quick" ? (
               <ConnectionGlyph
+                iconBackgroundColor={initialConnection?.iconBackgroundColor}
                 iconDataUrl={initialConnection?.iconDataUrl}
                 localShell={initialConnection?.localShell}
                 size={20}
                 type={connectionType}
               />
             ) : (
-              <ConnectionIconPicker
-                customIconDataUrls={reusableIconDataUrls}
-                iconDataUrl={iconDataUrl}
-                localShell={initialConnection?.localShell}
-                onChange={setIconDataUrl}
-                type={connectionType}
-              />
+              <div className="connection-appearance-controls">
+                <ConnectionIconPicker
+                  customIconDataUrls={reusableIconDataUrls}
+                  iconBackgroundColor={iconBackgroundColor}
+                  iconDataUrl={iconDataUrl}
+                  localShell={initialConnection?.localShell}
+                  onChange={setIconDataUrl}
+                  type={connectionType}
+                />
+                <ConnectionIconBackgroundPicker
+                  color={iconBackgroundColor}
+                  onChange={setIconBackgroundColor}
+                />
+              </div>
             )}
             <span>
               <strong>{connectionTypeLabel(connectionType)}</strong>
@@ -3525,7 +3557,13 @@ function ConnectionRow({
     >
       {isRenaming ? (
         <div className="connection-open connection-open-editing">
-          <ConnectionGlyph iconDataUrl={connection.iconDataUrl} localShell={connection.localShell} size={18} type={connection.type} />
+          <ConnectionGlyph
+            iconBackgroundColor={connection.iconBackgroundColor}
+            iconDataUrl={connection.iconDataUrl}
+            localShell={connection.localShell}
+            size={18}
+            type={connection.type}
+          />
           <span className="connection-main">
             <InlineTreeRenameInput
               ariaLabel={i18next.t("connections.renameConnection")}
@@ -3537,7 +3575,13 @@ function ConnectionRow({
         </div>
       ) : (
         <button className="connection-open" onClick={onOpen}>
-          <ConnectionGlyph iconDataUrl={connection.iconDataUrl} localShell={connection.localShell} size={18} type={connection.type} />
+          <ConnectionGlyph
+            iconBackgroundColor={connection.iconBackgroundColor}
+            iconDataUrl={connection.iconDataUrl}
+            localShell={connection.localShell}
+            size={18}
+            type={connection.type}
+          />
           <span className="connection-main">
             <strong>{connection.name}</strong>
           </span>

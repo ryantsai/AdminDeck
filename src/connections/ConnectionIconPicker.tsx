@@ -16,12 +16,14 @@ const MAX_SOURCE_ICON_FILE_BYTES = 20 * 1024 * 1024;
 
 export function ConnectionIconPicker({
   customIconDataUrls,
+  iconBackgroundColor,
   iconDataUrl,
   localShell,
   onChange,
   type,
 }: {
   customIconDataUrls: string[];
+  iconBackgroundColor?: string | null;
   iconDataUrl?: string | null;
   localShell?: string;
   onChange: (iconDataUrl: string | null) => void;
@@ -112,7 +114,13 @@ export function ConnectionIconPicker({
         type="button"
         {...dialogButtonAria(open)}
       >
-        <ConnectionIcon iconDataUrl={currentIconDataUrl} localShell={localShell} size={38} type={type} />
+        <ConnectionIcon
+          iconBackgroundColor={iconBackgroundColor}
+          iconDataUrl={currentIconDataUrl}
+          localShell={localShell}
+          size={32}
+          type={type}
+        />
         <span className="connection-icon-edit-glyph" aria-hidden="true">
           <Pencil size={12} />
         </span>

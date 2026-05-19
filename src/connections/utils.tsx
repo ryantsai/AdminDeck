@@ -179,12 +179,14 @@ export function connectionIconForType(type: ConnectionType) {
 export function connectionTypeForTab(tab: WorkspaceTab): {
   type: ConnectionType;
   iconDataUrl?: string | null;
+  iconBackgroundColor?: string | null;
   localShell?: string;
 } {
   if (tab.connection) {
     return {
       type: tab.connection.type,
       iconDataUrl: tab.connection.iconDataUrl,
+      iconBackgroundColor: tab.connection.iconBackgroundColor,
       localShell: tab.connection.localShell,
     };
   }

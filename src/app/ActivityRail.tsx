@@ -549,6 +549,7 @@ export function ActivityRail({
               onPointerUp={item.pinned ? undefined : handleConnectedRailPointerEnd}
             >
               <ConnectionIcon
+                iconBackgroundColor={item.connection.iconBackgroundColor}
                 iconDataUrl={item.connection.iconDataUrl}
                 localShell={item.connection.localShell}
                 size={18}

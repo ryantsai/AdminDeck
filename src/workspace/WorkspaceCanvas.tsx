@@ -105,6 +105,7 @@ export function TabStrip() {
           >
             <button className="tab-button" onClick={() => activateTab(tab.id)} type="button">
               <ConnectionIcon
+                iconBackgroundColor={connectionTypeForTab(tab).iconBackgroundColor}
                 iconDataUrl={connectionTypeForTab(tab).iconDataUrl}
                 localShell={connectionTypeForTab(tab).localShell}
                 size={14}

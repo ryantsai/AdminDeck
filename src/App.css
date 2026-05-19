@@ -466,6 +466,10 @@ button {
   border-radius: 4px;
 }
 
+.rail-button-connection .connection-icon-shell.has-background {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+}
+
 .rail-button-connection.dragging {
   opacity: 0.48;
 }
@@ -2142,10 +2146,10 @@ h2 {
 }
 
 .connection-open > .i-icon,
-.connection-open > .connection-icon-image,
+.connection-open > .connection-icon-shell,
 .quick-connect-menu .i-icon,
-.quick-connect-menu .connection-icon-image,
-.tree-drag-preview .connection-icon-image,
+.quick-connect-menu .connection-icon-shell,
+.tree-drag-preview .connection-icon-shell,
 .tree-drag-preview .i-icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -2153,8 +2157,25 @@ h2 {
   justify-content: center;
 }
 
+.connection-icon-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--connection-icon-shell-size);
+  height: var(--connection-icon-shell-size);
+  background: var(--connection-icon-bg);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.connection-icon-shell.has-background {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.38), 0 1px 2px rgb(15 23 42 / 0.16);
+}
+
 .connection-icon-image {
   display: inline-block;
+  width: var(--connection-icon-size);
+  height: var(--connection-icon-size);
   object-fit: contain;
   vertical-align: middle;
 }
@@ -3926,7 +3947,7 @@ progress {
   box-shadow: var(--shadow);
 }
 
-.active-session-hint > .connection-icon-image {
+.active-session-hint > .connection-icon-shell {
   flex: 0 0 auto;
 }
 
@@ -6263,6 +6284,7 @@ progress {
 }
 
 .settings-section-icon svg,
+.settings-section-icon .connection-icon-shell,
 .settings-section-icon .connection-icon-image {
   width: 20px;
   height: 20px;
@@ -6481,7 +6503,7 @@ progress {
 
 .connection-type-summary {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -6515,6 +6537,12 @@ progress {
   font-weight: 700;
 }
 
+.connection-appearance-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .connection-icon-editor {
   position: relative;
   display: inline-flex;
@@ -6542,9 +6570,12 @@ progress {
   border-color: var(--border-strong);
 }
 
+.connection-icon-edit-button .connection-icon-shell {
+  max-width: 38px;
+  max-height: 38px;
+}
+
 .connection-icon-edit-button .connection-icon-image {
-  max-width: 30px;
-  max-height: 30px;
   border-radius: 5px;
 }
 
@@ -6577,6 +6608,98 @@ progress {
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.connection-icon-bg-editor {
+  position: relative;
+  display: inline-flex;
+}
+
+.connection-icon-bg-edit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.connection-icon-bg-edit-button:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.connection-icon-bg-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--connection-icon-bg-preview);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+}
+
+.connection-icon-bg-preview.active {
+  color: #ffffff;
+  border-style: solid;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.38);
+}
+
+.connection-icon-bg-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 3;
+  display: grid;
+  width: 154px;
+  gap: 9px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.connection-icon-bg-popover p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.connection-icon-bg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 26px);
+  gap: 6px;
+}
+
+.connection-icon-bg-choice {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  cursor: pointer;
+  background: var(--connection-icon-bg-choice);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.connection-icon-bg-choice.transparent {
+  background:
+    linear-gradient(45deg, transparent 46%, var(--red) 47%, var(--red) 53%, transparent 54%),
+    var(--surface-muted);
+  border-style: dashed;
+}
+
+.connection-icon-bg-choice:hover,
+.connection-icon-bg-choice[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .connection-icon-picker-section {
@@ -6646,6 +6769,7 @@ progress {
 }
 
 .connection-icon-choice img,
+.connection-icon-choice .connection-icon-shell,
 .connection-icon-choice .connection-icon-image {
   max-width: 22px;
   max-height: 22px;

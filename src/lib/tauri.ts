@@ -752,6 +752,10 @@ type CommandMap = {
     args: { connectionId: string; iconDataUrl?: string | null };
     result: Connection | null;
   };
+  update_connection_icon_background_color: {
+    args: { connectionId: string; iconBackgroundColor?: string | null };
+    result: Connection | null;
+  };
   delete_connection: {
     args: { connectionId: string };
     result: null;

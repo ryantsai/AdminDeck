@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS connections (
     vnc_options TEXT,
     ftp_options TEXT,
     icon_data_url TEXT,
+    icon_background_color TEXT,
     connection_type TEXT NOT NULL CHECK (connection_type IN ('local', 'ssh', 'telnet', 'serial', 'url', 'rdp', 'vnc', 'ftp')),
     status TEXT NOT NULL CHECK (status IN ('connected', 'idle', 'offline')),
     sort_order INTEGER NOT NULL
@@ -711,6 +712,7 @@ pub struct SavedConnection {
     #[serde(default)]
     ftp_options: Option<crate::ftp::FtpOptions>,
     icon_data_url: Option<String>,
+    icon_background_color: Option<String>,
     #[serde(rename = "type")]
     connection_type: String,
     tags: Vec<String>,
@@ -1722,6 +1724,7 @@ impl Storage {
         ensure_column(&connection, "connections", "vnc_options", "TEXT")?;
         ensure_column(&connection, "connections", "ftp_options", "TEXT")?;
         ensure_column(&connection, "connections", "icon_data_url", "TEXT")?;
+        ensure_column(&connection, "connections", "icon_background_color", "TEXT")?;
         ensure_column(
             &connection,
             "connections",
@@ -1909,6 +1912,7 @@ impl Storage {
             vnc_options,
             ftp_options,
             icon_data_url: None,
+            icon_background_color: None,
             connection_type,
             tags,
             status: "idle".to_string(),
@@ -2116,6 +2120,36 @@ impl Storage {
             .execute(
                 "UPDATE connections SET icon_data_url = ?1 WHERE id = ?2",
                 params![icon_data_url, &connection_id],
+            )
+            .map_err(to_storage_error)?;
+        get_connection_by_id(&connection, &connection_id).map(Some)
+    }
+
+    pub fn update_connection_icon_background_color(
+        &self,
+        connection_id: String,
+        icon_background_color: Option<String>,
+    ) -> Result<Option<SavedConnection>, String> {
+        let connection_id = required_field("connection id", connection_id)?;
+        let icon_background_color =
+            normalize_connection_icon_background_color(icon_background_color)?;
+        let connection = self.lock()?;
+        let current_icon_background_color = connection
+            .query_row(
+                "SELECT icon_background_color FROM connections WHERE id = ?1",
+                params![&connection_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()
+            .map_err(to_storage_error)?
+            .ok_or_else(|| "connection was not found".to_string())?;
+        if current_icon_background_color == icon_background_color {
+            return Ok(None);
+        }
+        connection
+            .execute(
+                "UPDATE connections SET icon_background_color = ?1 WHERE id = ?2",
+                params![icon_background_color, &connection_id],
             )
             .map_err(to_storage_error)?;
         get_connection_by_id(&connection, &connection_id).map(Some)
@@ -2478,7 +2512,7 @@ impl Storage {
 
         let source = transaction
             .query_row(
-                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, serial_line, serial_speed, connection_type, icon_data_url
+                "SELECT folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, serial_line, serial_speed, connection_type, icon_data_url, icon_background_color
                  FROM connections
                  WHERE id = ?1",
                 params![source_id],
@@ -2502,6 +2536,7 @@ impl Storage {
                         optional_serial_speed(row.get::<_, Option<i64>>(15)?)?,
                         row.get::<_, String>(16)?,
                         row.get::<_, Option<String>>(17)?,
+                        row.get::<_, Option<String>>(18)?,
                     ))
                 },
             )
@@ -2527,6 +2562,7 @@ impl Storage {
             serial_speed,
             connection_type,
             icon_data_url,
+            icon_background_color,
         ) = source;
         let duplicate_name = request
             .name
@@ -2544,8 +2580,8 @@ impl Storage {
         transaction
             .execute(
                 "INSERT INTO connections (
-                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, tmux_connection_id, serial_line, serial_speed, connection_type, icon_data_url, status, sort_order
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, 'idle', ?21)",
+                    id, folder_id, name, host, username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, tmux_connection_id, serial_line, serial_speed, connection_type, icon_data_url, icon_background_color, status, sort_order
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, 'idle', ?22)",
                 params![
                     duplicate_id,
                     folder_id,
@@ -2567,6 +2603,7 @@ impl Storage {
                     serial_speed,
                     connection_type,
                     icon_data_url,
+                    icon_background_color,
                     next_sort_order
                 ],
             )
@@ -3135,7 +3172,7 @@ fn list_connections_for_folder(
     };
     let mut statement = connection
         .prepare(&format!(
-            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, serial_line, serial_speed, rdp_options, vnc_options, ftp_options, icon_data_url,
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, serial_line, serial_speed, rdp_options, vnc_options, ftp_options, icon_data_url, icon_background_color,
                     url_credentials.username
              FROM connections
              LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
@@ -3397,14 +3434,14 @@ fn get_connection_by_id(
 ) -> Result<SavedConnection, String> {
     let saved_connection = connection
         .query_row(
-            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, serial_line, serial_speed, rdp_options, vnc_options, ftp_options, icon_data_url,
+            "SELECT connections.id, name, host, connections.username, port, key_path, proxy_jump, auth_method, local_shell, local_startup_directory, local_startup_script, url, data_partition, use_tmux_sessions, tmux_connection_id, connection_type, serial_line, serial_speed, rdp_options, vnc_options, ftp_options, icon_data_url, icon_background_color,
                     url_credentials.username
              FROM connections
              LEFT JOIN url_credentials ON url_credentials.connection_id = connections.id
              WHERE connections.id = ?1",
             params![connection_id],
             |row| {
-                let url_credential_username: Option<String> = row.get(22)?;
+                let url_credential_username: Option<String> = row.get(23)?;
                 Ok(SavedConnection {
                     id: row.get(0)?,
                     name: row.get(1)?,
@@ -3428,6 +3465,7 @@ fn get_connection_by_id(
                     vnc_options: parse_vnc_connection_options(row.get(19)?)?,
                     ftp_options: parse_ftp_connection_options(row.get(20)?)?,
                     icon_data_url: row.get(21)?,
+                    icon_background_color: row.get(22)?,
                     url_credential_username: url_credential_username.clone(),
                     has_url_credential: url_credential_username.is_some(),
                     status: "idle".to_string(),
@@ -3446,7 +3484,7 @@ fn get_connection_by_id(
 }
 
 fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedConnection> {
-    let url_credential_username: Option<String> = row.get(22)?;
+    let url_credential_username: Option<String> = row.get(23)?;
     Ok(SavedConnection {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -3470,6 +3508,7 @@ fn saved_connection_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedC
         vnc_options: parse_vnc_connection_options(row.get(19)?)?,
         ftp_options: parse_ftp_connection_options(row.get(20)?)?,
         icon_data_url: row.get(21)?,
+        icon_background_color: row.get(22)?,
         url_credential_username: url_credential_username.clone(),
         has_url_credential: url_credential_username.is_some(),
         status: "idle".to_string(),
@@ -3897,6 +3936,21 @@ fn normalize_connection_icon_data_url(value: Option<String>) -> Result<Option<St
         }
     }
     Ok(value)
+}
+
+fn normalize_connection_icon_background_color(
+    value: Option<String>,
+) -> Result<Option<String>, String> {
+    let value = trim_optional(value);
+    if let Some(value) = value.as_deref() {
+        let color = value.strip_prefix('#').unwrap_or(value);
+        let valid_length = color.len() == 3 || color.len() == 6;
+        if !valid_length || !color.chars().all(|character| character.is_ascii_hexdigit()) {
+            return Err("connection icon background color must be a hex color".to_string());
+        }
+        return Ok(Some(format!("#{color}").to_lowercase()));
+    }
+    Ok(None)
 }
 
 fn required_field(field: &str, value: String) -> Result<String, String> {
@@ -5232,6 +5286,36 @@ mod tests {
             .expect("connection icon is cleared")
             .expect("cleared icon returns the updated connection");
         assert!(cleared.icon_data_url.is_none());
+    }
+
+    #[test]
+    fn connection_icon_background_color_updates_for_any_connection_type() {
+        let storage =
+            Storage::open(temp_db_path("connection-icon-background")).expect("storage opens");
+        let created = create_test_ssh_connection(&storage, "Bastion", "bastion.internal", None);
+
+        let updated = storage
+            .update_connection_icon_background_color(created.id.clone(), Some(" #2563eb ".to_string()))
+            .expect("connection icon background is updated")
+            .expect("changed background returns the updated connection");
+
+        assert_eq!(updated.icon_background_color.as_deref(), Some("#2563eb"));
+
+        let tree = storage
+            .list_connection_tree()
+            .expect("connection tree loads");
+        let reloaded = tree
+            .connections
+            .iter()
+            .find(|connection| connection.id == created.id)
+            .expect("connection exists");
+        assert_eq!(reloaded.icon_background_color.as_deref(), Some("#2563eb"));
+
+        let cleared = storage
+            .update_connection_icon_background_color(created.id.clone(), None)
+            .expect("connection icon background is cleared")
+            .expect("cleared background returns the updated connection");
+        assert!(cleared.icon_background_color.is_none());
     }
 
     #[test]
