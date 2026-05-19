@@ -270,6 +270,15 @@ function assistantIntentLabel(
   return t("ai.title");
 }
 
+function sampleRandom<T>(arr: T[], n: number): T[] {
+  const copy = arr.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
+
 function assistantIntentExamples(
   intent: AssistantPromptIntent,
   t: ReturnType<typeof useTranslation>["t"],
@@ -810,6 +819,7 @@ export function AssistantPanel({
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
   const [pendingToolApprovals, setPendingToolApprovals] = useState<PendingToolApproval[]>([]);
   const [assistantIntent, setAssistantIntent] = useState<AssistantPromptIntent>("chat");
+  const [displayedIntentExamples, setDisplayedIntentExamples] = useState<string[]>([]);
   const [addContextMenuOpen, setAddContextMenuOpen] = useState(false);
   const [permissionMenuOpen, setPermissionMenuOpen] = useState(false);
   const [pastedImageContexts, setPastedImageContexts] = useState<AssistantImageAttachment[]>([]);
@@ -821,9 +831,6 @@ export function AssistantPanel({
   const activeComposerIntentLabel = activeComposerIntent
     ? assistantIntentLabel(activeComposerIntent, t)
     : "";
-  const activeComposerIntentExamples = activeComposerIntent
-    ? assistantIntentExamples(activeComposerIntent, t)
-    : [];
   const [refreshedModelOptions, setRefreshedModelOptions] = useState<AiProviderModelOption[]>([]);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
@@ -1216,6 +1223,7 @@ export function AssistantPanel({
     setAssistantIntent("chat");
     setPendingToolApprovals([]);
     allowToolApprovalsForCurrentResponseRef.current = false;
+    setDisplayedIntentExamples([]);
     setShowAllChats(false);
   }
 
@@ -1274,6 +1282,7 @@ export function AssistantPanel({
     setAssistantIntent("chat");
     setPendingToolApprovals([]);
     allowToolApprovalsForCurrentResponseRef.current = false;
+    setDisplayedIntentExamples([]);
     setShowAllChats(false);
   }
 
@@ -1296,6 +1305,7 @@ export function AssistantPanel({
       setAssistantIntent("chat");
       setPendingToolApprovals([]);
       allowToolApprovalsForCurrentResponseRef.current = false;
+      setDisplayedIntentExamples([]);
     }
   }
 
@@ -1697,6 +1707,8 @@ export function AssistantPanel({
   function handleSelectAssistantIntent(intent: AssistantPromptIntent) {
     setAssistantIntent(intent);
     setAddContextMenuOpen(false);
+    const all = assistantIntentExamples(intent, t);
+    setDisplayedIntentExamples(sampleRandom(all, 3));
     window.requestAnimationFrame(() => {
       composerTextareaRef.current?.focus();
     });
@@ -1704,6 +1716,7 @@ export function AssistantPanel({
 
   function handleClearAssistantIntent() {
     setAssistantIntent("chat");
+    setDisplayedIntentExamples([]);
     window.requestAnimationFrame(() => {
       composerTextareaRef.current?.focus();
     });
@@ -2660,12 +2673,12 @@ export function AssistantPanel({
                 <X size={12} />
               </button>
             </div>
-            {activeComposerIntentExamples.length > 0 ? (
+            {displayedIntentExamples.length > 0 ? (
               <div className="assistant-intent-examples">
-                {activeComposerIntentExamples.map((example) => (
+                {displayedIntentExamples.map((example, i) => (
                   <button
                     className="assistant-intent-example-bubble"
-                    key={example}
+                    key={i}
                     onClick={() => handleUseIntentExample(example)}
                     type="button"
                   >
