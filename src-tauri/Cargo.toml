@@ -1,6 +1,6 @@
 [package]
 name = "kkterm"
-version = "0.1.17"
+version = "0.1.18"
 description = "Fast local-first administration workspace for terminals, SSH, SFTP, and approval-based command assistance."
 authors = ["Ryan Tsai"]
 license = "MIT"
@@ -70,6 +70,7 @@ opt-level = "s"
 
 [profile.dev]
 opt-level = 1
+
 
 
 
